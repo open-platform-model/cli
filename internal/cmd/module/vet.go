@@ -31,34 +31,34 @@ func NewModuleVetCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Short: "Validate module without generating manifests",
 		Long: `Validate an OPM module without generating manifests.
 
-	This command first verifies the module's identity and coordinates — the
-	identity package conforms to core's #IdentityPackage, metadata derives from
-	it, and cue.mod agrees with the declared module path — then validates the
-	module's #config contract using either the module's debugValues (default) or
-	explicit values files passed with -f/--values.
+This command first verifies the module's identity and coordinates — the
+identity package conforms to core's #IdentityPackage, metadata derives from
+it, and cue.mod agrees with the declared module path — then validates the
+module's #config contract using either the module's debugValues (default) or
+explicit values files passed with -f/--values.
 
-	It then renders the module exactly as 'opm module build' does and reports
-	each rendered object without printing it, so vet and build reach the same
-	verdict. By default the render runs against a platform generated from the
-	module's own cue.mod/module.cue, one registry entry per catalog the module
-	pins, at the pinned version; the cluster is not read. Pass --platform <dir>
-	to render against a platform module instead.
+It then renders the module exactly as 'opm module build' does and reports
+each rendered object without printing it, so vet and build reach the same
+verdict. By default the render runs against a platform generated from the
+module's own cue.mod/module.cue, one registry entry per catalog the module
+pins, at the pinned version; the cluster is not read. Pass --platform <dir>
+to render against a platform module instead.
 
-	Arguments:
-	  path    Path to module directory (default: current directory)
+Arguments:
+  path    Path to module directory (default: current directory)
 
-	Examples:
-	  # Validate debugValues in current directory against the module's deps
-	  opm module vet
+Examples:
+  # Validate debugValues in current directory against the module's deps
+  opm module vet
 
-	  # Validate module against explicit values
-	  opm module vet ./my-module -f prod-values.cue
+  # Validate module against explicit values
+  opm module vet ./my-module -f prod-values.cue
 
-	  # Validate by merging multiple values files
-	  opm module vet ./my-module -f base.cue -f prod.cue
+  # Validate by merging multiple values files
+  opm module vet ./my-module -f base.cue -f prod.cue
 
-	  # Validate against a platform module instead of the module's deps
-	  opm module vet ./my-module --platform ./pulled-platform`,
+  # Validate against a platform module instead of the module's deps
+  opm module vet ./my-module --platform ./pulled-platform`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			return runVet(c.Context(), cfg, args, &rf)

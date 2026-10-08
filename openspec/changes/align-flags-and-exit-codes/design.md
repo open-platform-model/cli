@@ -73,11 +73,12 @@ both already dependencies. The error text follows the existing commands:
 `invalid output format "<v>" (valid: ...)`, exit 1 (`ExitGeneralError`), as
 `cmd-structure` and `status-exit-codes` specify for the same mistake.
 
-### The entry point returns its exit code
+### The exit code mapping moves into `internal/cmd`
 
-`main` becomes `os.Exit(run(os.Args[1:], os.Stderr))`. `run` builds the root command,
-executes it and maps the error exactly as today. A test in `cmd/opm` calls `run` and
-asserts the code, which is the only place the code of a non-`ExitError` is decided.
+`main` becomes `os.Exit(cmd.Run(os.Args[1:], os.Stderr))`. `cmd.Run` builds the root
+command, executes it and maps the error exactly as `main` did. The tests sit beside it in
+`internal/cmd`, because CI and `task test:unit` run `./internal/...` and never `./cmd/...`:
+a test in `cmd/opm` would pin nothing.
 
 ### Help layout is tested over the whole tree
 

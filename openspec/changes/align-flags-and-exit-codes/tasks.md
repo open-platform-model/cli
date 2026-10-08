@@ -7,10 +7,10 @@
 
 ## 2. Exit code of a usage error and help layout
 
-- [ ] 2.1 `cmd/opm/main.go`: move the body of `main` into `run(args, stderr) int` with unchanged mapping; `cmd/opm/main_test.go` asserts exit 1 for an unknown command, an unknown flag and a missing argument, and that the error is on standard error
-- [ ] 2.2 `internal/cmd/root.go`: add the `Exit codes` table to the root long description; a test in `root_test.go` fails before and passes after
-- [ ] 2.3 Add a test in `internal/cmd` that walks the command tree and fails on a long description line that begins with a tab; fix every hit (the `catalog` and `registry` groups at least) with whitespace-only edits
-- [ ] 2.4 `task fmt`, `task vet`, `task lint` and `task test:unit` green, then commit `fix(cmd): document the exit codes in the root help and remove tab indentation from help text`
+- [x] 2.1 Move the body of `main` into `cmd.Run(args, stderr) int` in `internal/cmd/run.go` with unchanged mapping, so the tests run in CI (`./internal/...`); `internal/cmd/run_test.go` asserts exit 1 for an unknown command, an unknown flag, a missing argument, a bad flag value and excluding flags, and that the error is on standard error
+- [x] 2.2 `internal/cmd/root.go`: add the `Exit codes` table to the root long description; a test in `root_test.go` fails before and passes after
+- [x] 2.3 Add a test in `internal/cmd` that walks the command tree and fails on a long description line that begins with a tab; fix every hit (the `catalog` and `registry` groups at least) with whitespace-only edits
+- [x] 2.4 `task fmt`, `task vet`, `task lint` and `task test:unit` green, then commit `fix(cmd): document the exit codes in the root help and remove tab indentation from help text`
 
 ## 3. Output formats on version and template list
 

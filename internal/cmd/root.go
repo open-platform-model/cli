@@ -31,9 +31,21 @@ func NewRootCmd() *cobra.Command {
 	)
 
 	rootCmd := &cobra.Command{
-		Use:           "opm",
-		Short:         "Open Platform Model CLI",
-		Long:          `OPM CLI manages module lifecycle and configuration for the Open Platform Model.`,
+		Use:   "opm",
+		Short: "Open Platform Model CLI",
+		Long: `OPM CLI manages module lifecycle and configuration for the Open Platform Model.
+
+Exit codes:
+  0  success
+  1  general error, usage errors included (unknown command or flag,
+     wrong number of arguments)
+  2  validation error or refusal
+  3  connectivity error (cluster or registry unreachable)
+  4  permission denied
+  5  not found
+
+The help of a command states where it differs, for example
+'opm instance status', which exits 2 when a resource is not ready.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {

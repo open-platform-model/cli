@@ -22,27 +22,27 @@ func NewCatalogPublishCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Long: `Publish an OPM catalog to its registry, at the coordinates the catalog itself
 declares.
 
-	The pipeline reads identity/identity.cue, validates it against core's
-	#IdentityPackage, derives repository/major/tag from the declared module path,
-	runs the publish gates, prints the resolved plan, and pushes. What is
-	published is the catalog directory as it is on disk, zipped by CUE's module
-	machinery: no copied build directory, no generated version override, and no
-	git state is checked, so commit first.
+The pipeline reads identity/identity.cue, validates it against core's
+#IdentityPackage, derives repository/major/tag from the declared module path,
+runs the publish gates, prints the resolved plan, and pushes. What is
+published is the catalog directory as it is on disk, zipped by CUE's module
+machinery: no copied build directory, no generated version override, and no
+git state is checked, so commit first.
 
-	Exit codes: 0 published (or dry-run GO), 2 refused, 3 registry unreachable.
+Exit codes: 0 published (or dry-run GO), 2 refused, 3 registry unreachable.
 
-	Arguments:
-	  path    Path to the catalog directory (default: current directory)
+Arguments:
+  path    Path to the catalog directory (default: current directory)
 
-	Examples:
-	  # See the plan and every gate verdict without pushing
-	  opm catalog publish ./src --dry-run
+Examples:
+  # See the plan and every gate verdict without pushing
+  opm catalog publish ./src --dry-run
 
-	  # Publish at the committed (release-owned) version
-	  opm catalog publish ./src
+  # Publish at the committed (release-owned) version
+  opm catalog publish ./src
 
-	  # Assert the version being released
-	  opm catalog publish ./src --version 1.3.0`,
+  # Assert the version being released
+  opm catalog publish ./src --version 1.3.0`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			return cmdutil.RunPublish(c, cfg, publish.KindCatalog, args, &flags)
