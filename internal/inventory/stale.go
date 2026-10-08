@@ -24,8 +24,11 @@ import (
 //   - If the resource exists without OPM managed-by label → error (untracked),
 //     unless admit holds it
 //   - If the resource does not exist → OK
+//   - If the read fails with anything but NotFound → error (unreadable), with
+//     the read error in the chain
 //
-// admit passes the untracked test only, never the terminating one. Only
+// admit passes the untracked test only, never the terminating one and never
+// the unreadable one. Only
 // `opm operator install` passes a non-empty set: the objects it proved came
 // from an earlier operator release manifest, or that carry the operator
 // instance's identity (0012:D8:R6). Every other caller passes nil.
@@ -45,10 +48,11 @@ func PreApplyExistenceCheck(ctx context.Context, client *kubernetes.Client, entr
 			if apierrors.IsNotFound(err) {
 				continue // Resource doesn't exist — OK for first install
 			}
-			// Other errors (RBAC, etc.) — warn but don't fail
-			output.Debug("could not check resource existence (skipping)",
-				"kind", entry.Kind, "name", entry.Name, "err", err)
-			continue
+			// Any other answer leaves the question open, and the forced apply
+			// that follows would take over whatever holds the name.
+			return fmt.Errorf("cannot check whether %s/%s in namespace %q already exists: %w\n"+
+				"apply stopped before any change. Check that you can read that resource, then run the command again",
+				entry.Kind, entry.Name, entry.Namespace, err)
 		}
 
 		obj = unstrObj

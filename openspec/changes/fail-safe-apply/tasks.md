@@ -6,9 +6,9 @@
 
 ## 2. First-install existence check refuses an unreadable object
 
-- [ ] 2.1 Add a test in `internal/inventory` for `PreApplyExistenceCheck` with a read failing with Forbidden (error returned, names the resource, still Forbidden through unwrapping) and with NotFound (passes), and a test in `internal/workflow/apply` that `Execute` exits 4 and applies nothing; see them fail on the current code
-- [ ] 2.2 Return the read error from `PreApplyExistenceCheck` and map it to an exit code in `RunPreApplyExistenceCheck`; verify the 2.1 tests and the `internal/operator` tests pass
-- [ ] 2.3 `task lint` and `task test:unit` green, then commit `fix(apply): refuse a first install when an object cannot be read`
+- [x] 2.1 Add a test in `internal/inventory` for `PreApplyExistenceCheck` with a read failing with Forbidden (error returned, names the resource, still Forbidden through unwrapping) and with NotFound (passes), and a test in `internal/workflow/apply` that `Execute` exits 4 and applies nothing; see them fail on the current code
+- [x] 2.2 Return the read error from `PreApplyExistenceCheck` and map it to an exit code in `RunPreApplyExistenceCheck`; verify the 2.1 tests and the `internal/operator` tests pass
+- [x] 2.3 `task lint` and `task test:unit` green, then commit `fix(apply): refuse a first install when an object cannot be read`
 
 ## 3. Failed prune keeps the entry and fails the command
 

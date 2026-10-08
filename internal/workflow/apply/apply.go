@@ -510,7 +510,13 @@ func RunPreApplyExistenceCheck(ctx context.Context, k8sClient *kubernetes.Client
 		return nil
 	}
 	if err := inventory.PreApplyExistenceCheck(ctx, k8sClient, currentEntries, admit); err != nil {
-		return fmt.Errorf("pre-apply existence check failed: %w", err)
+		// An object the check could not read carries the API error, so the
+		// exit code follows it; an untracked or terminating object maps to
+		// the general code.
+		return &opmexit.ExitError{
+			Code: exitCodeFromK8sError(err),
+			Err:  fmt.Errorf("pre-apply existence check failed: %w", err),
+		}
 	}
 	return nil
 }
