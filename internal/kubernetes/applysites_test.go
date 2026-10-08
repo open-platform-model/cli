@@ -41,14 +41,17 @@ var allowedApplySites = []string{
 	"internal/workflow/apply/apply.go:Execute",
 }
 
-// TestApplyCallSites fails when a PATCH is sent, or this package's Apply or
-// ApplyOne is called, from a function outside the allowed list, so a new
-// apply cannot bypass the ownership guard unseen. It reads the non-test Go
-// files under internal/, cmd/ and pkg/ and reports every call of a method
-// named Patch with four or more arguments, the shape of the dynamic and typed
-// client calls, every call of a function or method named ApplyOne or
-// applyOne, and every call of Apply on this package under any import name,
-// wherever the call stands.
+// TestApplyCallSites fails when a PATCH, an apply or an update is sent, or
+// this package's Apply or ApplyOne is called, from a function outside the
+// allowed list, so a new write of an object cannot bypass the ownership guard
+// unseen. It reads the non-test Go files under internal/, cmd/ and pkg/ and
+// reports, wherever the call stands: every call of a method named Patch,
+// Apply or ApplyStatus with four or more arguments, or Update or UpdateStatus
+// with three or more, the shapes of the dynamic and typed client calls; every
+// call of a function or method named ApplyOne or applyOne; and every call of
+// Apply on this package under any import name. It matches by name and
+// argument count, not by type, so a write through a wrapper of another name
+// is not seen.
 func TestApplyCallSites(t *testing.T) {
 	root := filepath.Join("..", "..")
 	var got []string
@@ -107,16 +110,24 @@ func allRenamed(ctx context.Context) { _, _ = k8s.Apply(ctx, c, objs, "name", op
 
 func otherApply(ctx context.Context) { _ = cfg.Apply(ctx); _, _ = inventory.Apply(ctx, c) }
 
+func dynamicApply(ctx context.Context) { _, _ = c.ResourceClient(gvr, ns).Apply(ctx, "a", obj, o) }
+
+func dynamicApplyStatus(ctx context.Context) { _, _ = r.ApplyStatus(ctx, "a", obj, o) }
+
+func update(ctx context.Context) { _, _ = r.Update(ctx, obj, o) }
+
+func updateStatus(ctx context.Context) { _, _ = r.UpdateStatus(ctx, obj, o) }
+
 func inLiteral() { f := func() { _, _ = r.Patch(context.TODO(), "a", pt, data, o) }; f() }
 
 var packageLevel = func() error { _, err := r.Patch(context.Background(), "a", pt, data, o); return err }
 
-func notASend() { p.Patch("key"); _ = jsonpatch.Patch(a, b) }
+func notASend() { p.Patch("key"); _ = jsonpatch.Patch(a, b); m.Update(k, v); h.Update(b) }
 `
 	file, err := parser.ParseFile(token.NewFileSet(), "x.go", src, parser.SkipObjectResolution)
 	require.NoError(t, err)
 	assert.Equal(t,
-		[]string{"patch", "patchSubresource", "one", "oneLocal", "oneUnexported", "all", "allRenamed", "inLiteral", "package-level declaration"},
+		[]string{"patch", "patchSubresource", "one", "oneLocal", "oneUnexported", "all", "allRenamed", "dynamicApply", "dynamicApplyStatus", "update", "updateStatus", "inLiteral", "package-level declaration"},
 		applySites(file))
 }
 
@@ -150,9 +161,10 @@ func applySites(file *ast.File) []string {
 	return sites
 }
 
-// sendsApply reports whether node holds a call of a method named Patch with
-// four or more arguments, a call of ApplyOne or applyOne, or a call of the
-// CLI's own kubernetes.Apply.
+// sendsApply reports whether node holds a call of a method named Patch,
+// Apply or ApplyStatus with four or more arguments, of Update or UpdateStatus
+// with three or more, a call of ApplyOne or applyOne, or a call of the CLI's
+// own kubernetes.Apply.
 func sendsApply(node ast.Node, ownPackage map[string]bool) bool {
 	found := false
 	ast.Inspect(node, func(n ast.Node) bool {
@@ -167,16 +179,28 @@ func sendsApply(node ast.Node, ownPackage map[string]bool) bool {
 			}
 		case *ast.SelectorExpr:
 			pkg, isIdent := fun.X.(*ast.Ident)
-			switch {
-			case fun.Sel.Name == "ApplyOne":
-				found = true
-			case fun.Sel.Name == "Patch" && len(call.Args) >= 4:
-				found = true
-			case fun.Sel.Name == "Apply" && isIdent && ownPackage[pkg.Name]:
+			if isWriteMethod(fun.Sel.Name, len(call.Args)) || (fun.Sel.Name == "Apply" && isIdent && ownPackage[pkg.Name]) {
 				found = true
 			}
 		}
 		return true
 	})
 	return found
+}
+
+// isWriteMethod reports whether a method call of this name and argument
+// count has the shape of a client write: ApplyOne with any arguments; Patch,
+// Apply or ApplyStatus with four or more; Update or UpdateStatus with three
+// or more.
+func isWriteMethod(name string, args int) bool {
+	switch name {
+	case "ApplyOne":
+		return true
+	case "Patch", "Apply", "ApplyStatus":
+		return args >= 4
+	case "Update", "UpdateStatus":
+		return args >= 3
+	default:
+		return false
+	}
 }

@@ -40,7 +40,14 @@ WARN ConfigMap/default/settings was adopted by module instance 9a40c1de-52f0-5b0
 
 An object that the inventory of the instance already lists is always applied, also when its labels name another instance. Only a deletion timestamp or an `opmodel.dev/adopt` annotation for another instance stops it.
 
-`opm operator install` runs the same check on every install and exits 2 for each row above. It also refuses, with exit 2, an object that another instance adopted: the operator needs every object that its module renders.
+`opm operator install` runs the same check on every install, before it changes anything. It differs from the table in four points:
+
+- An object that OPM does not manage, or that belongs to another instance, exits 2.
+- An object that another instance adopted is a refusal too, with exit 2: the operator needs every object that its module renders.
+- An object that is being deleted is not refused at once. Install waits for it to go, up to `--timeout`, and fails when it is still there.
+- An object that install cannot read exits by the read error, as in the table: 4, 3 or 1.
+
+For a CustomResourceDefinition, the Namespace or another object that an earlier operator release manifest installed, install prints `operator migration refused` and `carries the identity of instance <name>` in place of `belongs to module instance`. The exit code is 2.
 
 ## Causes and fixes
 

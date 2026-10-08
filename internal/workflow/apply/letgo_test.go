@@ -81,3 +81,25 @@ func TestExecute_HandOverStaysUntilTheAnnotationNamesThisInstance(t *testing.T) 
 	entries, _ = cluster.writtenInventory(t)
 	assert.ElementsMatch(t, []string{"app", "settings"}, entryNames(entries), "and recorded again")
 }
+
+// When the only rendered object is adopted by another instance, nothing is
+// applied and nothing is deleted; the apply still succeeds and writes the
+// record, now with an empty inventory.
+func TestExecute_LetsGoOfItsOnlyObject(t *testing.T) {
+	withReleasedCLIVersion(t)
+	logBuf := captureLog(t)
+	cluster := newApplyCluster(
+		recordWithIdentity(renderIdentity, "settings"),
+		liveConfigMap("settings", opmlabels.ManagedByCLI, renderIdentity, otherIdentity),
+	)
+
+	require.NoError(t, Execute(context.Background(), cluster.request(Options{}, "settings")))
+
+	for _, w := range cluster.writes() {
+		assert.NotContains(t, w, "configmaps", "the adopted object is neither applied nor deleted")
+	}
+	entries, written := cluster.writtenInventory(t)
+	require.True(t, written, "the record is written")
+	assert.Empty(t, entries)
+	assert.Contains(t, logBuf.String(), "was adopted by module instance "+otherIdentity)
+}
