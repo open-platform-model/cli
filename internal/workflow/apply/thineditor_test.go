@@ -142,3 +142,11 @@ func TestThinEditor_DeleteDataWarnsOnOperatorManaged(t *testing.T) {
 		}
 	}
 }
+
+// The note must name the setting the operator obeys. "has no effect" alone
+// sent the user nowhere.
+func TestDeleteDataOperatorManagedNote_NamesTheDataPolicy(t *testing.T) {
+	assert.Contains(t, DeleteDataOperatorManagedNote, "--delete-data does not change what the operator does")
+	assert.Contains(t, DeleteDataOperatorManagedNote, "spec.dataPolicy")
+	assert.Contains(t, DeleteDataOperatorManagedNote, "PersistentVolumeClaims")
+}

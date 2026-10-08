@@ -64,6 +64,33 @@ func TestRecordFromUnstructured_FullMapping(t *testing.T) {
 	assert.Equal(t, "web", rec.Inventory.Entries[0].Component)
 }
 
+// spec.dataPolicy is the operator's field. The record carries it as written,
+// so the command that reports it can show an unknown value as it is; an absent
+// or wrong-typed value reads as empty.
+func TestRecordFromUnstructured_DataPolicyIsReadAsWritten(t *testing.T) {
+	tests := []struct {
+		name  string
+		value any
+		set   bool
+		want  string
+	}{
+		{"absent", nil, false, ""},
+		{"Keep", "Keep", true, "Keep"},
+		{"Delete", "Delete", true, "Delete"},
+		{"unknown value", "Retain", true, "Retain"},
+		{"wrong type", true, true, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			obj := moduleInstanceObj("podinfo", "uuid-1")
+			if tt.set {
+				require.NoError(t, unstructured.SetNestedField(obj.Object, tt.value, "spec", "dataPolicy"))
+			}
+			assert.Equal(t, tt.want, recordFromUnstructured(obj).DataPolicy)
+		})
+	}
+}
+
 func TestRecordFromUnstructured_EmptyStatusYieldsEmptyInventory(t *testing.T) {
 	obj := moduleInstanceObj("podinfo", "uuid-1")
 	rec := recordFromUnstructured(obj)

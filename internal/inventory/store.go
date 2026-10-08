@@ -291,6 +291,11 @@ func recordFromUnstructured(obj *unstructured.Unstructured) *Record {
 		rec.Prune = prune
 	}
 
+	//nolint:errcheck // best-effort read; absent or wrong-typed spec.dataPolicy reads as empty, which the operator treats as Keep
+	if dataPolicy, ok, _ := unstructured.NestedString(obj.Object, "spec", "dataPolicy"); ok {
+		rec.DataPolicy = dataPolicy
+	}
+
 	//nolint:errcheck // best-effort read; a wrong-typed status.inventory yields empty inventory
 	if invMap, ok, _ := unstructured.NestedMap(obj.Object, "status", "inventory"); ok {
 		rec.Inventory = inventoryFromWire(invMap)

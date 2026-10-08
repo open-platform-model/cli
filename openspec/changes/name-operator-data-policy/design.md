@@ -88,7 +88,7 @@ WARN --delete-data does not change what the operator does with an operator-manag
 Closing output of a completed delete, `spec.prune` set, the policy keeps, the inventory tracked the claim `apps/data`:
 
 ```text
-Instance deleted - the operator pruned its tracked resources and keeps PersistentVolumeClaims
+Instance deleted: the operator pruned its tracked resources and keeps PersistentVolumeClaims
 
 The instance tracked 1 PersistentVolumeClaim(s). The operator keeps them and the data on them
 (spec.dataPolicy is not set), and OPM no longer tracks them.
@@ -96,9 +96,19 @@ An operator released before spec.dataPolicy deleted them. To see what is left:
   kubectl get pvc -n apps
 To delete a claim and its data:
   kubectl delete pvc data -n apps
+To have the operator delete claims with an instance, set spec.dataPolicy to Delete before deleting it.
 ```
 
-The closing output claims nothing the CLI did not establish: the disappearance of the `ModuleInstance` proves that the finalizer completed, not which claims are left. When the inventory tracked no claim, or the policy is `Delete`, the closing line stays "Instance deleted - operator pruned N resources". The tracked claims are counted from the inventory entries of the record with `kubernetes.IsDataClaim`, which the CLI-owned branch already uses.
+Progress line of the run, and the dry-run line, `spec.prune` set (the first exists today; both gain the part after the comma):
+
+```text
+INFO deleting the ModuleInstance [...] the operator prunes its resources, PersistentVolumeClaims and the data on them kept (spec.dataPolicy is not set)
+INFO dry run complete: ModuleInstance "demo" would be deleted and the operator would prune its 2 tracked resource(s), PersistentVolumeClaims and the data on them included (spec.dataPolicy is Delete)
+```
+
+The dry run adds the sentence on older operators as its own line when the inventory tracks a claim that the policy keeps.
+
+The closing output claims nothing the CLI did not establish: the disappearance of the `ModuleInstance` proves that the finalizer completed, not which claims are left. When the inventory tracked no claim, or the policy is `Delete`, the closing line stays as it is today ("Instance deleted", then "operator pruned N resources"). The tracked claims are counted from the inventory entries of the record with `kubernetes.IsDataClaim`, which the CLI-owned branch already uses.
 
 Syntax, flags and exit codes: `opm instance delete <file|name|uuid> [flags]` is unchanged. No flag is added or changed. Exit codes are unchanged: 0 on success and on a declined prompt, 2 when the operator is not ready, 5 for a missing instance. No new error is introduced.
 

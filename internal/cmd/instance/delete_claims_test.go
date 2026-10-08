@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
@@ -258,39 +260,74 @@ func TestInstanceDeleteCmd_DeleteDataFlag(t *testing.T) {
 }
 
 // operatorManaged turns the scenario's instance into an operator-managed one
-// with the given spec.prune.
-func (s *claimScenario) operatorManaged(t *testing.T, prune bool) {
+// with the given spec.prune and spec.dataPolicy ("" leaves the field absent).
+func (s *claimScenario) operatorManaged(t *testing.T, prune bool, dataPolicy string) {
 	t.Helper()
 	mi, err := s.fake.Tracker().Get(inventory.ModuleInstanceGVR, "apps", "demo")
 	require.NoError(t, err)
 	obj := mi.(*unstructured.Unstructured)
 	require.NoError(t, unstructured.SetNestedField(obj.Object, inventory.OwnerOperator, "spec", "owner"))
 	require.NoError(t, unstructured.SetNestedField(obj.Object, prune, "spec", "prune"))
+	if dataPolicy != "" {
+		require.NoError(t, unstructured.SetNestedField(obj.Object, dataPolicy, "spec", "dataPolicy"))
+	}
 	require.NoError(t, s.fake.Tracker().Update(inventory.ModuleInstanceGVR, obj, "apps"))
 }
 
-// On an operator-managed instance opm keeps no claim: the operator removes
-// what the instance tracks when spec.prune is set. The prompt must say that
-// and must never say that claims are kept, with or without --delete-data,
-// and the note that --delete-data has no effect comes before the question.
-func TestConfirmAndDelete_OperatorManagedPromptDoesNotPromiseKeptClaims(t *testing.T) {
-	for _, prune := range []bool{true, false} {
+const (
+	promptOperatorDeletesClaims = "so the operator deletes its tracked resources, PersistentVolumeClaims and the data on them included."
+	promptOperatorKeepsClaims   = "so the operator deletes its tracked resources and keeps PersistentVolumeClaims and the data on them."
+	promptOperatorOrphans       = "spec.prune is not set, so the operator leaves its tracked resources running."
+)
+
+// On an operator-managed instance the operator deletes, not opm, so the prompt
+// says what the instance's spec.prune and spec.dataPolicy make the operator
+// do, read from the cluster: claims go only under spec.prune with the policy
+// Delete. The prompt is the same with and without --delete-data, never lists
+// claims as the CLI-owned prompt does, and the note about --delete-data comes
+// before the question.
+func TestConfirmAndDelete_OperatorManagedPromptSaysWhatTheOperatorDoes(t *testing.T) {
+	tests := []struct {
+		name       string
+		prune      bool
+		dataPolicy string
+		want       []string
+		older      bool
+	}{
+		{"no prune", false, "", []string{promptOperatorOrphans}, false},
+		{"no prune, Delete", false, "Delete", []string{promptOperatorOrphans}, false},
+		{"prune, Delete", true, "Delete", []string{"spec.prune is set and spec.dataPolicy is Delete, " + promptOperatorDeletesClaims}, false},
+		{"prune, Keep", true, "Keep", []string{"spec.prune is set and spec.dataPolicy is Keep, " + promptOperatorKeepsClaims}, true},
+		{"prune, absent", true, "", []string{"spec.prune is set and spec.dataPolicy is not set, " + promptOperatorKeepsClaims}, true},
+		{"prune, unknown value", true, "Retain", []string{
+			`spec.prune is set and spec.dataPolicy is "Retain", not a value opm knows, read as Keep, ` + promptOperatorKeepsClaims,
+		}, true},
+		{"prune, lower-case delete is not Delete", true, "delete", []string{`spec.dataPolicy is "delete"`, promptOperatorKeepsClaims}, true},
+	}
+	for _, tt := range tests {
 		for _, deleteData := range []bool{true, false} {
-			t.Run(fmt.Sprintf("prune=%v/deleteData=%v", prune, deleteData), func(t *testing.T) {
+			t.Run(fmt.Sprintf("%s/deleteData=%v", tt.name, deleteData), func(t *testing.T) {
 				s := newClaimScenario()
-				s.operatorManaged(t, prune)
+				s.operatorManaged(t, tt.prune, tt.dataPolicy)
 				out, err := s.confirm(t, "demo", deleteFlags{DeleteData: deleteData}, "n\n")
 				require.NoError(t, err, out)
 
 				question := strings.Index(out, "[y/N]")
 				require.GreaterOrEqual(t, question, 0, out)
-				assert.NotContains(t, out, "are kept", "no promise that claims are kept")
-				assert.NotContains(t, out, "will be deleted:", "the claim list is for CLI-owned instances")
 				assert.Contains(t, out, "This instance is operator-managed")
-				if prune {
-					assert.Contains(t, out, "spec.prune is set, so the operator deletes its tracked resources, PersistentVolumeClaims and the data on them included")
+				for _, w := range tt.want {
+					assert.Contains(t, out, w)
+				}
+				assert.NotContains(t, out, "will be deleted:", "the claim list is for CLI-owned instances")
+				assert.NotContains(t, out, "PersistentVolumeClaims are kept)", "the CLI-owned prompt is not used")
+				if !tt.prune || tt.dataPolicy != "Delete" {
+					assert.NotContains(t, out, promptOperatorDeletesClaims)
+				}
+				if tt.older {
+					assert.Contains(t, out, olderOperatorNote)
+					assert.Less(t, strings.Index(out, olderOperatorNote), question, "said before the question")
 				} else {
-					assert.Contains(t, out, "spec.prune is not set, so the operator leaves its tracked resources running")
+					assert.NotContains(t, out, olderOperatorNote)
 				}
 
 				note := strings.Index(out, workflowapply.DeleteDataOperatorManagedNote)
@@ -313,7 +350,7 @@ func TestConfirmAndDelete_OperatorManagedPromptDoesNotPromiseKeptClaims(t *testi
 // With --yes there is no prompt; the note about --delete-data still prints.
 func TestConfirmAndDelete_OperatorManagedDeleteDataWarnsWithYes(t *testing.T) {
 	s := newClaimScenario()
-	s.operatorManaged(t, true)
+	s.operatorManaged(t, true, "")
 	// The delete then stops at the operator-readiness guard of this cluster.
 	out, err := s.confirm(t, "demo", deleteFlags{DeleteData: true, SkipConfirm: true}, "")
 	require.Error(t, err)
@@ -323,10 +360,119 @@ func TestConfirmAndDelete_OperatorManagedDeleteDataWarnsWithYes(t *testing.T) {
 }
 
 func TestOperatorManagedDeletePrompt(t *testing.T) {
-	p := operatorManagedDeletePrompt("", "abc-123", "media", true)
+	p := operatorManagedDeletePrompt("", "abc-123", "media", true, "Delete")
 	assert.Contains(t, p, `instance-id "abc-123" in namespace "media"`)
 	assert.True(t, strings.HasSuffix(p, "[y/N]: "))
-	assert.NotContains(t, p, "are kept")
+	assert.NotContains(t, p, "keeps PersistentVolumeClaims")
+}
+
+// The value comes from the cluster. One opm does not know is shown quoted, so
+// a control character in it cannot rewrite the terminal line of the prompt.
+func TestOperatorManagedDeletePrompt_UnknownPolicyIsQuoted(t *testing.T) {
+	p := operatorManagedDeletePrompt("demo", "", "apps", true, "Delete\x1b[2K\rKeep")
+	assert.NotContains(t, p, "\x1b")
+	assert.NotContains(t, p, "\r")
+	assert.Contains(t, p, `"Delete\x1b[2K\rKeep"`)
+	assert.Contains(t, p, promptOperatorKeepsClaims)
+}
+
+// operatorClaimRecord is an operator-owned record with spec.prune set that
+// tracks a Deployment and the claim apps/data.
+func operatorClaimRecord(dataPolicy string) *inventory.Record {
+	return &inventory.Record{
+		Name: "demo", Namespace: "apps", Owner: inventory.OwnerOperator, Prune: true, DataPolicy: dataPolicy,
+		Inventory: inventory.Inventory{Entries: []k8sinventory.Entry{
+			{Group: "apps", Kind: "Deployment", Namespace: "apps", Name: "web"},
+			{Kind: "PersistentVolumeClaim", Namespace: "apps", Name: "data"},
+		}},
+	}
+}
+
+func runOperatorOwnedDelete(t *testing.T, rec *inventory.Record, dryRun bool) string {
+	t.Helper()
+	client, _ := fakeClusterClient(append(runningOperatorObjects(), moduleInstanceObj(rec.Namespace, rec.Name))...)
+	var runErr error
+	out := captureOutput(t, func() {
+		runErr = deleteOperatorOwned(context.Background(), client, rec, 5*time.Second, dryRun, output.InstanceLogger(rec.Name))
+	})
+	require.NoError(t, runErr, out)
+	return out
+}
+
+// The ModuleInstance being gone does not prove that claims are gone or left.
+// When the instance tracked a claim the data policy keeps, the closing output
+// does not say that everything was pruned: it names the claim, the policy and
+// what an older operator did, and prints the command that deletes the claim.
+func TestDeleteOperatorOwned_KeptClaimsAreNamedAtTheEnd(t *testing.T) {
+	for _, dataPolicy := range []string{"", "Keep", "Retain"} {
+		t.Run("dataPolicy="+dataPolicy, func(t *testing.T) {
+			out := runOperatorOwnedDelete(t, operatorClaimRecord(dataPolicy), false)
+
+			assert.Contains(t, out, "PersistentVolumeClaims and the data on them kept ("+describeDataPolicy(dataPolicy)+")")
+			assert.Contains(t, out, "Instance deleted: the operator pruned its tracked resources and keeps PersistentVolumeClaims")
+			assert.NotContains(t, out, "operator pruned 2 resources")
+			assert.NotContains(t, out, "all resources have been deleted")
+			assert.Contains(t, out, "The instance tracked 1 PersistentVolumeClaim(s)")
+			assert.Contains(t, out, describeDataPolicy(dataPolicy))
+			assert.Contains(t, out, "An operator released before spec.dataPolicy deleted them")
+			assert.Contains(t, out, "kubectl get pvc -n apps")
+			assert.Contains(t, out, "kubectl delete pvc data -n apps")
+			assert.NotContains(t, out, "kubectl delete pvc web")
+		})
+	}
+}
+
+// With the policy Delete, or with no claim in the inventory, the operator
+// prunes everything the instance tracks and the closing line says so.
+func TestDeleteOperatorOwned_FullPruneIsReportedAsBefore(t *testing.T) {
+	noClaim := operatorClaimRecord("")
+	noClaim.Inventory.Entries = noClaim.Inventory.Entries[:1]
+	tests := []struct {
+		name string
+		rec  *inventory.Record
+		want string
+	}{
+		{"Delete", operatorClaimRecord("Delete"), "operator pruned 2 resources"},
+		{"no claim tracked", noClaim, "operator pruned 1 resources"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := runOperatorOwnedDelete(t, tt.rec, false)
+			assert.Contains(t, out, tt.want)
+			assert.NotContains(t, out, "kubectl delete pvc")
+			assert.NotContains(t, out, "An operator released before")
+		})
+	}
+	out := runOperatorOwnedDelete(t, operatorClaimRecord("Delete"), false)
+	assert.Contains(t, out, "PersistentVolumeClaims and the data on them included (spec.dataPolicy is Delete)")
+}
+
+// The dry run states the same outcome for claims as the prompt does.
+func TestDeleteOperatorOwned_DryRunStatesTheClaimOutcome(t *testing.T) {
+	kept := runOperatorOwnedDelete(t, operatorClaimRecord(""), true)
+	assert.Contains(t, kept, "would prune its 2 tracked resource(s), PersistentVolumeClaims and the data on them kept (spec.dataPolicy is not set)")
+	assert.Contains(t, kept, olderOperatorNote)
+
+	deleted := runOperatorOwnedDelete(t, operatorClaimRecord("Delete"), true)
+	assert.Contains(t, deleted, "would prune its 2 tracked resource(s), PersistentVolumeClaims and the data on them included (spec.dataPolicy is Delete)")
+	assert.NotContains(t, deleted, olderOperatorNote)
+
+	orphaned := operatorClaimRecord("Delete")
+	orphaned.Prune = false
+	out := runOperatorOwnedDelete(t, orphaned, true)
+	assert.Contains(t, out, "would be left running (spec.prune is not set)")
+	assert.NotContains(t, out, "PersistentVolumeClaims")
+}
+
+// A core-group claim only: a kind of the same name in another API group is
+// not data the operator's policy covers.
+func TestTrackedClaims_CoreGroupOnly(t *testing.T) {
+	rec := operatorClaimRecord("")
+	rec.Inventory.Entries = append(rec.Inventory.Entries,
+		k8sinventory.Entry{Group: "example.com", Kind: "PersistentVolumeClaim", Namespace: "apps", Name: "other"})
+	claims := trackedClaims(rec)
+	require.Len(t, claims, 1)
+	assert.Equal(t, "data", claims[0].Name)
 }
 
 // confirm runs the whole read, prompt and delete step against the scenario's

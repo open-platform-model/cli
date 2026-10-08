@@ -113,6 +113,10 @@ func TestDeleteDataFlagOnDeleteAndBothApplies(t *testing.T) {
 		assert.Contains(t, f.Usage, "kept by default", path)
 		assert.Contains(t, c.Long, "PersistentVolumeClaims", "%s: the help says claims are kept", path)
 		assert.Contains(t, c.Long, "--delete-data", path)
+		// On an operator-managed instance the flag does not steer the
+		// operator; the help names the field that does.
+		assert.Contains(t, c.Long, "spec.dataPolicy", "%s: the help names the operator's setting", path)
+		assert.NotContains(t, c.Long, "--delete-data has no effect", path)
 	}
 }
 

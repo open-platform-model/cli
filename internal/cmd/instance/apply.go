@@ -47,8 +47,9 @@ Pruning keeps PersistentVolumeClaims: a claim the module no longer renders
 stays in the cluster and in the inventory, is listed with the status "kept",
 and does not fail the apply. Pass --delete-data to prune such claims and the
 data on them; a claim kept by an earlier apply is pruned then too. On an
-operator-managed instance the operator decides what is pruned, and
---delete-data has no effect.
+operator-managed instance the operator decides what is pruned: it keeps
+PersistentVolumeClaims unless the instance's spec.dataPolicy is Delete, and
+--delete-data does not change that.
 
 Arguments:
   instance.cue    Path to the instance .cue file (required)
