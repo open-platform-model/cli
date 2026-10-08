@@ -23,6 +23,17 @@ import (
 	"github.com/open-platform-model/library/opm/k8s/ownership"
 )
 
+// deleteActions returns the delete calls the fake dynamic client received.
+func deleteActions(dyn *dynamicfake.FakeDynamicClient) []k8stesting.DeleteAction {
+	var out []k8stesting.DeleteAction
+	for _, a := range dyn.Actions() {
+		if d, ok := a.(k8stesting.DeleteAction); ok {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
 // planFor is the deletion plan of a user's explicit delete of entries, judged
 // with the test instance's identity.
 func planFor(entries ...k8sinventory.Entry) lifecycle.DeletionPlan {
@@ -336,4 +347,19 @@ func TestRunDeletion_OrderIsTheDescendingSort(t *testing.T) {
 		got = append(got, d.GetResource().Resource+"/"+d.GetName())
 	}
 	assert.Equal(t, want, got)
+}
+
+// TestIsProtectedKind_IsTheLibraryRule: the CLI's protected-kind test and the
+// library's safety exclusion are one rule.
+func TestIsProtectedKind_IsTheLibraryRule(t *testing.T) {
+	for _, tc := range []struct{ group, kind string }{
+		{"", "Namespace"},
+		{"apiextensions.k8s.io", "CustomResourceDefinition"},
+		{"example.io", "Namespace"},
+		{"", "CustomResourceDefinition"},
+		{"apps", "Deployment"},
+		{"", "PersistentVolumeClaim"},
+	} {
+		assert.Equal(t, ownership.SafetyExcluded(tc.group, tc.kind), IsProtectedKind(tc.group, tc.kind), "%s/%s", tc.group, tc.kind)
+	}
 }

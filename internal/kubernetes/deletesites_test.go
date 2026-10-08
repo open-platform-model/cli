@@ -16,20 +16,21 @@ import (
 
 // allowedDeleteSites are the only functions of the CLI that may send a
 // DELETE to the cluster, as "<file relative to the repo root>:<function>".
-// Every object of an instance is deleted through JudgedDelete, which asks the
-// library's delete verdict first. The two others are named exceptions: the
-// operator install's migration deletes run under a verdict taken when the
-// plan was made, and the ModuleInstance record is the CLI's own.
+// Every object of an instance is deleted by RunDeletion, through its
+// sendDelete: only when the library's deletion plan names the delete, after
+// the delete verdict. The two others are named exceptions: the operator
+// install's migration deletes run under a verdict taken when the plan was
+// made (the one exception 0012:D4:R1 allows), and the ModuleInstance record
+// is the CLI's own.
 var allowedDeleteSites = []string{
 	"internal/inventory/store.go:DeleteCR",
-	"internal/kubernetes/delete.go:JudgedDelete",
 	"internal/kubernetes/deletion.go:sendDelete",
 	"internal/operator/migration_execute.go:deleteProven",
 }
 
 // cliKubernetesPackage is this package's import path. Its own
-// Delete(ctx, client, opts) is the instance delete loop, which sends its
-// deletes through JudgedDelete, so a call of it is not a send.
+// Delete(ctx, client, opts) is the instance delete, which sends its deletes
+// through RunDeletion, so a call of it is not a send.
 const cliKubernetesPackage = "github.com/open-platform-model/cli/internal/kubernetes"
 
 // TestDeleteCallSites fails when a DELETE or a DELETE of a collection is
@@ -69,7 +70,7 @@ func TestDeleteCallSites(t *testing.T) {
 	}
 	sort.Strings(got)
 	assert.Equal(t, allowedDeleteSites, got,
-		"a delete of an instance's object goes through JudgedDelete; a new exception needs a reason in allowedDeleteSites")
+		"a delete of an instance's object goes through RunDeletion; a new exception needs a reason in allowedDeleteSites")
 }
 
 // TestDeleteSites_Matcher pins what the call-site matcher sees, so the guard

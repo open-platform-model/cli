@@ -98,6 +98,13 @@ func DeleteSuperseded(ctx context.Context, client *kubernetes.Client, plan *Migr
 // deleteProven deletes one object the plan's delete verdict allowed, with
 // that verdict's UID precondition. An object the plan holds no proceed
 // verdict for is not deleted: the migration stops.
+//
+// These deletes stay outside the library's deletion plan
+// (kubernetes.RunDeletion), as the one exception 0012:D4:R1 names: the
+// objects are proven earlier-manifest objects and no inventory entries of an
+// instance, their verdict is asked with Admit, which a deletion plan does not
+// carry, and it is taken in the check phase, before the install's first
+// write, so that a refusal changes nothing.
 func deleteProven(ctx context.Context, client *kubernetes.Client, plan *MigrationPlan, obj *unstructured.Unstructured) error {
 	step := "deleting " + objPath(obj.GetKind(), obj.GetNamespace(), obj.GetName())
 	verdict, judged := plan.deleteVerdicts[keyOf(obj)]

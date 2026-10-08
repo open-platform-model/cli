@@ -10,11 +10,7 @@ import (
 	"github.com/open-platform-model/library/opm/k8s/lifecycle"
 	"github.com/open-platform-model/library/opm/k8s/object"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/library/opm/k8s/ownership"
@@ -299,86 +295,3 @@ func recordUnreadable(result *DeleteResult, unreadable []UnreadableResource, del
 // holds its name. It is never reported as deleted; the next run reads the
 // new object and judges it.
 var ErrReplaced = errors.New("the object was replaced after it was read, so it was not deleted")
-
-// liveReadError marks an error of JudgedDelete as a failure of the live
-// read, kind resolution included, as opposed to a failure of the DELETE. It
-// adds no text of its own.
-type liveReadError struct{ err error }
-
-func (e *liveReadError) Error() string { return e.err.Error() }
-func (e *liveReadError) Unwrap() error { return e.err }
-
-// IsLiveReadFailure reports whether an error of JudgedDelete came from
-// reading the live object, so that no DELETE was sent.
-func IsLiveReadFailure(err error) bool {
-	var readErr *liveReadError
-	return errors.As(err, &readErr)
-}
-
-// DeleteOutcome is what JudgedDelete did with one object.
-type DeleteOutcome struct {
-	// Deleted reports that the API server accepted the DELETE.
-	Deleted bool
-	// Skip is why the object was left in place; empty when the delete
-	// verdict allowed the delete. An object that is already gone, at the
-	// read or at the DELETE, is ownership.SkipAlreadyAbsent.
-	Skip ownership.SkipReason
-	// Message is the library's wording of the skip, for the user.
-	Message string
-}
-
-// JudgedDelete is the one way the CLI deletes an object of an instance. It
-// reads the live object under the resource the cluster serves its kind as,
-// asks the library's delete verdict with instanceUUID, the identity that
-// applied the object, and only on a proceed verdict sends the DELETE, with
-// foreground propagation and a precondition on the UID of the object it
-// read. A dry run stops after the verdict.
-//
-// A kind OPM never deletes is skipped without a read. A read that fails with
-// anything but NotFound, a kind that cannot be resolved included, is returned
-// as the error (IsLiveReadFailure): the object may still exist. A DELETE
-// refused on the UID precondition is ErrReplaced.
-func JudgedDelete(ctx context.Context, client *Client, obj ownership.Object, version, instanceUUID string, dryRun bool) (DeleteOutcome, error) {
-	if ownership.SafetyExcluded(obj.Group, obj.Kind) {
-		return outcomeOf(ownership.CanDelete(ownership.DeleteInput{Object: obj, InstanceUUID: instanceUUID})), nil
-	}
-
-	gvk := schema.GroupVersionKind{Group: obj.Group, Version: version, Kind: obj.Kind}
-	resource, err := client.ResourceClientFor(ctx, gvk, obj.Namespace)
-	if err != nil {
-		return DeleteOutcome{}, &liveReadError{err: err}
-	}
-	live, err := resource.Get(ctx, obj.Name, metav1.GetOptions{})
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return DeleteOutcome{}, &liveReadError{err: err}
-		}
-		live = nil
-	}
-
-	verdict := ownership.CanDelete(ownership.DeleteInput{Object: obj, Live: live, InstanceUUID: instanceUUID})
-	if !verdict.Proceed() || dryRun {
-		return outcomeOf(verdict), nil
-	}
-
-	propagation := metav1.DeletePropagationForeground
-	err = resource.Delete(ctx, obj.Name, metav1.DeleteOptions{
-		PropagationPolicy: &propagation,
-		Preconditions:     verdict.Preconditions(),
-	})
-	switch {
-	case err == nil:
-		return DeleteOutcome{Deleted: true}, nil
-	case apierrors.IsNotFound(err):
-		// Gone between the read and the delete: already done.
-		return DeleteOutcome{Skip: ownership.SkipAlreadyAbsent, Message: obj.String() + " no longer exists"}, nil
-	case apierrors.IsConflict(err) && verdict.Preconditions() != nil:
-		return DeleteOutcome{}, fmt.Errorf("%w: %w", ErrReplaced, err)
-	default:
-		return DeleteOutcome{}, err
-	}
-}
-
-func outcomeOf(v ownership.DeleteVerdict) DeleteOutcome {
-	return DeleteOutcome{Skip: v.Skip, Message: v.Message}
-}
