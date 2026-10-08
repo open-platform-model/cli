@@ -64,3 +64,39 @@ func TestPruneStale_ExitCode(t *testing.T) {
 		})
 	}
 }
+
+// The prune preview of a dry run exits with the same codes: a stale object
+// it could not read is a prune the real apply fails on.
+func TestPreviewPrune_ExitCode(t *testing.T) {
+	cmGVK := schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}
+	stale := []k8sinventory.Entry{{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "stale"}}
+	denied := apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, "stale", errors.New("denied"))
+	discovery := func(cause error) error {
+		return &kubernetes.DiscoveryError{GroupVersion: cmGVK.GroupVersion(), Err: cause}
+	}
+
+	tests := map[string]struct {
+		resolve error
+		want    int
+	}{
+		"discovery denied":      {resolve: discovery(denied), want: opmexit.ExitPermissionDenied},
+		"discovery unavailable": {resolve: discovery(apierrors.NewServiceUnavailable("down")), want: opmexit.ExitConnectivityError},
+		"kind not served":       {resolve: &kubernetes.KindNotServedError{GVK: cmGVK}, want: opmexit.ExitGeneralError},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			logBuf := captureLog(t)
+			dyn := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), renderedConfigMap(stale[0].Name))
+			resources := kubetest.Resources()
+			resources.Set(cmGVK, kubetest.Outcome{Err: tt.resolve})
+			client := &kubernetes.Client{Dynamic: dyn, Resources: resources}
+
+			err := previewPrune(context.Background(), client, stale, nil, "", output.InstanceLogger("demo"))
+
+			requireExitCode(t, err, tt.want)
+			assert.NotEmpty(t, logLine(logBuf.String(), "ConfigMap/default/stale", "cannot check"), logBuf.String())
+			assert.NotContains(t, logBuf.String(), "would prune")
+			assert.Empty(t, dyn.Actions(), "nothing is sent")
+		})
+	}
+}
