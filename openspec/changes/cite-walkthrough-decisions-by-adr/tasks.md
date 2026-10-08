@@ -11,9 +11,9 @@ git grep -nE "\b([Dd]ecisions?|[Tt]asks?|[Ii]tems?) [a-j][1-5]\b" -- . ':!opensp
 
 ## 1. Cite library ADR-013 in the Dependabot configuration
 
-- [ ] 1.1 `.github/dependabot.yml`, the comment above the `cuelang.org/go` ignore entry: "(owner decision j4, 2026-10-03; workspace RELEASING.md, section "Pin classes")" becomes "(library ADR-013, decision j4; workspace RELEASING.md, section "Pin classes")", rewrapped. Verify: `git diff -U0 origin/main -- .github/dependabot.yml` shows comment lines only.
-- [ ] 1.2 Verify the claim against the record: the `j4` row of library ADR-013 says "`cuelang.org/go` moves only through a library release", which is what the comment and the requirement cite it for.
-- [ ] 1.3 `task fmt`, `task vet`, `task lint`, `task openspec:check`, `task docs:bundle:check` and `task test:unit` green, then commit `docs: cite library ADR-013 for walkthrough decision j4`.
+- [x] 1.1 `.github/dependabot.yml`, the comment above the `cuelang.org/go` ignore entry: "(owner decision j4, 2026-10-03; workspace RELEASING.md, section "Pin classes")" becomes "(library ADR-013, decision j4; workspace RELEASING.md, section "Pin classes")", rewrapped. Verify: `git diff -U0 origin/main -- .github/dependabot.yml` shows comment lines only.
+- [x] 1.2 Verify the claim against the record: the `j4` row of library ADR-013 says "`cuelang.org/go` moves only through a library release", which is what the comment and the requirement cite it for.
+- [x] 1.3 `task fmt`, `task vet`, `task lint`, `task openspec:check`, `task docs:bundle:check` and `task test:unit` green, then commit `docs: cite library ADR-013 for walkthrough decision j4`.
 
 ## 2. Verify and archive
 
