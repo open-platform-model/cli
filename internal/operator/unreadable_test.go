@@ -71,7 +71,6 @@ func TestPlanInstall_UnreadableObjectRefuses(t *testing.T) {
 			check: func(t *testing.T, err error) {
 				var ge *GuardError
 				require.ErrorAs(t, err, &ge)
-				assert.Contains(t, err.Error(), "apply stopped before any change")
 			},
 		},
 	}
@@ -90,4 +89,29 @@ func TestPlanInstall_UnreadableObjectRefuses(t *testing.T) {
 			assert.Empty(t, fc.Writes(), "a refused install writes nothing")
 		})
 	}
+}
+
+// A read that fails inside the instance apply, after install applied the
+// CRDs, is refused without the claim that nothing was changed: the CRDs are
+// in the cluster by then.
+func TestInstall_RefusalAfterTheCRDsClaimsNothing(t *testing.T) {
+	fc := newFakeCluster(t)
+	fc.fake.PrependReactor("get", "moduleinstances", func(k8stesting.Action) (bool, runtime.Object, error) {
+		if len(fc.Writes()) == 0 {
+			return false, nil, nil
+		}
+		return true, nil, apierrors.NewForbidden(
+			schema.GroupResource{Group: "opmodel.dev", Resource: "moduleinstances"}, OperatorInstanceName, errors.New("no get"))
+	})
+	r := &fakeRender{objs: moduleObjects(renderOpts{})}
+	env := newEnv(fc, r)
+
+	plan, err := PlanInstall(context.Background(), env, testResolution("v0.1.0"), defaultTarget, PlanOptions{Timeout: time.Second})
+	require.NoError(t, err)
+	_, err = Install(context.Background(), env, plan)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot read the ModuleInstance record")
+	assert.NotContains(t, err.Error(), "before any change")
+	assert.NotEmpty(t, fc.Writes(), "the CRDs were applied before the refusal")
 }

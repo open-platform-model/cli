@@ -15,10 +15,12 @@ existence check, and no test at the install level shows it.
 - With `--create-namespace`, the apply reads first whether the namespace exists, runs every
   check that can refuse, and creates the missing namespace only after the last check passed,
   directly before the first write. A refused apply has created nothing.
-- A check that reads inside the namespace that is still missing treats it as holding nothing:
-  no record and no resource. This needs no new code path, because the API answers NotFound.
-- The two refusal texts say again that the apply stopped before any change: the unreadable
-  object of the existence check, and the unreadable `ModuleInstance` record.
+- While the namespace is missing the apply treats it as holding nothing and sends no read into
+  it: no record read, and the existence check skips the objects in it. A namespace that
+  somebody else creates in the meantime stops the apply, because nothing in it was checked.
+- The refusals of `opm instance apply` and `opm module apply` say again that the apply stopped
+  before any change: the existence check, and the unreadable `ModuleInstance` record.
+  `opm operator install`, which writes before its instance apply, does not get that sentence.
 - The success path keeps its result: the namespace is created and every resource is applied.
   Only the position of the line `namespace "<ns>" created` in the log moves, to after the
   checks. A dry run prints what it printed before, in the same order.
@@ -49,8 +51,10 @@ None.
 
 - `internal/workflow/apply/apply.go`: the order inside `Execute`; `EnsureNamespaceIfRequested`
   is split into a read and a create.
-- `internal/inventory/stale.go`: one sentence of the unreadable-object refusal.
+- `internal/inventory/stale.go`: one sentence of the unreadable-object refusal moves to the
+  workflow.
 - `internal/operator/plan_install.go`: the comment on `GuardError`.
+  `internal/operator/install.go`: sets the new `Options.AfterCallerWrites`.
 - Tests: `internal/workflow/apply/`, `internal/operator/`, and one mapping row in
   `internal/cmd/operator/operator_test.go` (the exit code is assigned there).
 - No dependency, no API, no docs page: no user page states the order.

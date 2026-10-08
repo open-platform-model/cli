@@ -2,12 +2,16 @@
 
 ### Requirement: Create-namespace creates the namespace only after every check passed
 
-With `--create-namespace`, `opm instance apply` and `opm module apply` SHALL read first whether the instance namespace exists, and SHALL create a missing namespace only after every check of the apply that can refuse has passed: the cluster gates, the read of the `ModuleInstance` record, the ownership decision, the status-permission check, the empty-render guard and the first-install existence check. The namespace SHALL be created before the first rendered resource is applied. An apply that one of these checks refuses SHALL NOT create the namespace and SHALL leave the cluster unchanged. A check that reads inside the namespace while it is still missing SHALL treat the namespace as holding nothing: no `ModuleInstance` record, so the apply is a first install, and no resource, so the existence check passes for every object in it. A failure of the first read (whether the namespace exists) SHALL stop the apply with the exit code of its cause, before any other step. A successful apply SHALL end with the same cluster state as before this requirement: the namespace exists and every rendered resource is applied; an apply that renders nothing and has no record SHALL still create the namespace. A dry run SHALL create nothing and SHALL report first that the namespace would be created.
+With `--create-namespace`, `opm instance apply` and `opm module apply` SHALL read first whether the instance namespace exists, and SHALL create a missing namespace only after every check of the apply that can refuse has passed: the cluster gates, the status-permission check, the empty-render guard and the first-install existence check. The namespace SHALL be created before the first rendered resource is applied. An apply that one of these checks refuses SHALL NOT create the namespace and SHALL leave the cluster unchanged.
+
+While the namespace is missing, the apply SHALL treat it as holding nothing and SHALL NOT send a read into it: it SHALL NOT read the `ModuleInstance` record, so the apply is a first install, and the existence check SHALL skip every rendered object in that namespace. Rendered cluster-scoped objects and objects in other namespaces SHALL be checked as usual. The status-permission check SHALL run unchanged; it asks about the namespace by name and does not need it to exist.
+
+A failure of the first read (whether the namespace exists) SHALL stop the apply with the exit code of its cause, before any other step. A failure of the create SHALL stop the apply with the exit code of its cause, before any rendered resource is applied. When the namespace turns out to exist at the create although the first read found it missing, the apply SHALL stop with exit code 1 before any change and SHALL tell the user to run the command again, because nothing inside that namespace was checked. A dry run SHALL create nothing and SHALL report first that the namespace would be created.
 
 #### Scenario: A refused first install creates no namespace
 
 - **WHEN** `opm instance apply --create-namespace` runs for an instance whose namespace does not exist
-- **AND** the read of a rendered resource fails with Forbidden
+- **AND** the read of a rendered cluster-scoped resource fails with Forbidden
 - **THEN** the command SHALL exit 4
 - **AND** the namespace SHALL NOT exist afterwards
 - **AND** no rendered resource SHALL be applied and no `ModuleInstance` SHALL be written
@@ -31,19 +35,37 @@ With `--create-namespace`, `opm instance apply` and `opm module apply` SHALL rea
 - **THEN** the command SHALL exit 4
 - **AND** the namespace SHALL NOT exist afterwards
 
-#### Scenario: A missing namespace reads as a first install
+#### Scenario: A missing namespace is a first install and is not read
 
 - **WHEN** `opm instance apply --create-namespace` runs for an instance whose namespace does not exist and no check refuses
-- **THEN** the apply SHALL proceed as a first-time apply
+- **THEN** the command SHALL send no read of a `ModuleInstance` or of a rendered object into that namespace before it creates it
 - **AND** the namespace SHALL be created before the first rendered resource is applied
 - **AND** the `ModuleInstance` record SHALL be written at revision 1
+
+#### Scenario: A caller without cluster-wide read is not refused by the missing namespace
+
+- **WHEN** `opm instance apply --create-namespace` runs for an instance whose namespace does not exist
+- **AND** the API server would answer Forbidden to the caller's read of a `ModuleInstance` or of a ConfigMap in a namespace that does not exist
+- **THEN** the apply SHALL NOT fail on such a read
 
 #### Scenario: An existing namespace is left alone
 
 - **WHEN** `opm instance apply --create-namespace` runs for an instance whose namespace exists
 - **THEN** no namespace SHALL be created and the apply SHALL proceed as without the flag
 
-#### Scenario: Nothing to apply still creates the namespace
+#### Scenario: The namespace read fails
 
-- **WHEN** `opm instance apply --create-namespace` runs for an instance whose namespace does not exist, the render holds no resource and no record exists
-- **THEN** the command SHALL report that there is nothing to apply, create the namespace and exit 0
+- **WHEN** `opm instance apply --create-namespace` runs and the read of the namespace fails with Forbidden
+- **THEN** the command SHALL exit 4 before any other call to the cluster
+
+#### Scenario: The namespace create fails
+
+- **WHEN** `opm instance apply --create-namespace` runs, every check passes and the create of the namespace fails with Forbidden
+- **THEN** the command SHALL exit 4
+- **AND** no rendered resource SHALL be applied and no `ModuleInstance` SHALL be written
+
+#### Scenario: The namespace appears during the checks
+
+- **WHEN** `opm instance apply --create-namespace` found the namespace missing and another actor creates it before the apply does
+- **THEN** the command SHALL exit 1, say that the namespace was created by someone else, and tell the user to run the command again
+- **AND** no rendered resource SHALL be applied

@@ -55,12 +55,13 @@ New order on a real run:
 ```text
 1  namespaceToCreate              GET namespace                                (exit by cause)
 2  RunClusterGates
-3  LoadPreviousInventory          a missing namespace answers NotFound: no record
+3  LoadPreviousInventory          skipped when step 1 found the namespace missing
 4  ownership                      a record implies the namespace exists
 5  GateStatusRBAC
 6  GuardEmptyRender
-7  RunPreApplyExistenceCheck      a missing namespace answers NotFound: nothing there
+7  RunPreApplyExistenceCheck      objects in the missing namespace are skipped
 8  ensureNamespace                CREATE, only when step 1 found it missing    <- first write
+                                  (exit 1 when the namespace exists by now)
 9  kubernetes.Apply, prune, record write
 ```
 
@@ -71,8 +72,8 @@ the apply at the same place and with the same text as today. And a dry run print
 
 Both steps use the existing `kubernetes.Client.EnsureNamespace`: with `dryRun` true it is the
 read (it reports a missing namespace and creates nothing), with `dryRun` false it is the create.
-The create reads once more before it writes, which costs one GET and keeps its handling of a
-namespace somebody else created in between (AlreadyExists is not an error).
+The create reads once more before it writes, which costs one GET, and reports whether it
+created the namespace; "not created" is the refusal described below.
 
 **Alternatives considered**
 
@@ -85,26 +86,39 @@ namespace somebody else created in between (AlreadyExists is not an error).
 3. Add a `NamespaceExists` method to the client. Not needed: the dry-run form of
    `EnsureNamespace` is that read already.
 
-### A missing namespace reads as "nothing there"
+### A missing namespace holds nothing, so nothing in it is read
 
-Three checks name the instance namespace before it exists:
+When step 1 found the namespace missing, the apply sends no read into it:
 
-| Check | Call | Answer in a missing namespace | Effect |
-| --- | --- | --- | --- |
-| Record read | GET `moduleinstances/<name>` in the namespace | NotFound | no record: first install, which is correct, since a record cannot exist without its namespace |
-| Status permission | `SelfSubjectAccessReview` naming the namespace | allowed or denied from cluster-wide rules; no RoleBinding can exist in a missing namespace, and creating the namespace adds none | the same answer the check gives right after the create |
-| Existence check | GET each rendered object | NotFound for every object in the namespace | passes; objects in other namespaces and cluster-scoped objects are checked as usual |
+| Check | In a missing namespace | Effect |
+| --- | --- | --- |
+| Record read | skipped | no record: a first install, which is correct, since a record cannot exist without its namespace |
+| Existence check | rendered objects in that namespace are skipped | cluster-scoped objects and other namespaces are checked as usual |
+| Status permission | unchanged: a `SelfSubjectAccessReview` naming the namespace | allowed or denied from the rules that exist; see the limit below |
 
-No code treats the missing namespace specially: `inventory.GetRecord` and
-`inventory.FirstInstallCheck` already map NotFound to "absent". The API server answers a GET of
-a namespaced object in a missing namespace with 404, reason NotFound; `apierrors.IsNotFound`
-is true for it. This assumption is not checked against a live cluster in this change (the unit
-tests use fake clients, which answer NotFound as well); the existing integration program
-`tests/integration/module-apply` runs the path on a cluster.
+The first draft of this change sent the reads and relied on a NotFound answer. Review showed
+that this holds only for a caller with cluster-wide read: the API server authorizes a request
+before it looks the object up, so a caller whose rights come from a RoleBinding in the
+namespace gets Forbidden for a read in a namespace that does not exist yet. Skipping the reads
+does not depend on which of the two the server answers.
+
+Because nothing inside the namespace was checked, a namespace that exists at the create
+(somebody else made it in between, with or without a record in it) stops the apply with exit 1
+and "run the command again". The second run finds the namespace and reads it.
+
+Limit, not removed by this change: the status-permission check still runs before the create. A
+caller whose right to patch `moduleinstances/status` comes only from a RoleBinding that some
+automation adds after the namespace appears is refused (exit 4) and the namespace is never
+created by the apply. Before this change the first run created the namespace and was refused
+too, and a later run passed. Whether that check may move after the create is a question for the
+owner.
+
+A module that renders its own instance Namespace, applied with `--create-namespace` into a
+cluster without it, was refused before this change (the namespace the flag had just created was
+found as an untracked Namespace). It now passes: the check runs while the namespace is missing.
 
 The paths that need a record (the thin-editor path of an operator-owned instance and the
-empty-render guard) cannot meet a missing namespace: step 1 then finds the namespace present and
-there is nothing to create.
+empty-render guard) cannot meet a missing namespace.
 
 ### An apply with nothing to apply still creates the namespace
 
@@ -114,11 +128,16 @@ creates the namespace first. Nothing can refuse after that point.
 
 ### Refusal text
 
-Both refusals run before step 8 for every caller, so both can say it:
+Both refusals run before step 8. `opm instance apply` and `opm module apply` write nothing
+before `Execute`, so for them both texts say that the apply stopped before any change.
+`opm operator install` applies its CRDs and its migration before it calls `Execute`; it sets
+the new `Options.AfterCallerWrites`, and the sentence is left out. The sentence is added by
+the workflow, not by `internal/inventory`, and follows every refusal of the existence check.
 
 ```text
-cannot check whether ConfigMap/app in namespace "media" already exists: <read error>
-apply stopped before any change. Check that you can read that resource, then run the command again
+pre-apply existence check failed: cannot check whether ClusterRole/app in namespace "" already exists: <read error>
+Check that you can read that resource, then run the command again
+apply stopped before any change
 ```
 
 ```text
@@ -150,12 +169,14 @@ scope) and is raised as a question for the owner.
 
 ## Risks / Trade-offs
 
-- [A window between the read and the create grows by the duration of the checks] → the create
-  tolerates AlreadyExists; a namespace deleted in that window is created again.
+- [A window between the read and the create grows by the duration of the checks] → a namespace
+  that appears in it stops the apply (exit 1, run again). A namespace that was present at the
+  read and is deleted in the window is not created; the apply then fails at its first
+  namespaced object, as it would without the flag.
 - [A user who may create namespaces but may not read `moduleinstances` gets no namespace] → that
   is the intent: the apply could not have gone on.
-- [Fake clients stand in for the 404 of a missing namespace] → stated above as unverified
-  against a live cluster.
+- [No run against a live cluster in this change] → the apply no longer depends on the answer
+  to a read in a missing namespace; the access review for a missing namespace is not observed.
 
 ## Research & Decisions
 

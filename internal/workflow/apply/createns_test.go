@@ -3,6 +3,7 @@ package apply
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 
@@ -69,16 +70,7 @@ func TestExecute_RefusalCreatesNoNamespace(t *testing.T) {
 				})
 			},
 			code: opmexit.ExitValidationError,
-		},
-		{
-			name: "unreadable record",
-			setup: func(c *applyCluster) {
-				c.dyn.PrependReactor("get", "moduleinstances", func(k8stesting.Action) (bool, runtime.Object, error) {
-					return true, nil, forbidden("moduleinstances", "demo")
-				})
-			},
-			code: opmexit.ExitPermissionDenied,
-			want: "apply stopped before any change",
+			want: "ModuleInstance CRD not found",
 		},
 		{
 			name: "status permission denied",
@@ -93,12 +85,12 @@ func TestExecute_RefusalCreatesNoNamespace(t *testing.T) {
 		{
 			name: "existence check: unreadable object",
 			setup: func(c *applyCluster) {
-				c.dyn.PrependReactor("get", "configmaps", func(k8stesting.Action) (bool, runtime.Object, error) {
-					return true, nil, forbidden("configmaps", "app")
+				c.dyn.PrependReactor("get", "clusterroles", func(k8stesting.Action) (bool, runtime.Object, error) {
+					return true, nil, forbidden("clusterroles", "demo-role")
 				})
 			},
 			code: opmexit.ExitPermissionDenied,
-			want: "apply stopped before any change",
+			want: "cannot check whether ClusterRole/demo-role",
 		},
 		{
 			name:    "existence check: untracked cluster-scoped object",
@@ -128,6 +120,9 @@ func TestExecute_RefusalCreatesNoNamespace(t *testing.T) {
 
 			requireExitCode(t, err, c.code)
 			assert.Contains(t, err.Error(), c.want)
+			if strings.HasPrefix(c.name, "existence check") {
+				assert.Contains(t, err.Error(), "apply stopped before any change")
+			}
 			assert.NotContains(t, err.Error(), "rendered resource was applied", "the text carries no namespace caveat")
 			assert.Zero(t, namespaceCreates(cluster), "a refused apply creates no namespace")
 			assert.Empty(t, cluster.writes(), "nothing is applied and no record is written")
@@ -171,10 +166,13 @@ func TestExecute_CreateNamespaceComesBeforeTheFirstApply(t *testing.T) {
 	create := indexOf(calls, "create namespaces")
 	require.GreaterOrEqual(t, create, 0, "the namespace is created: %v", calls)
 	assert.Equal(t, "get namespaces", calls[0], "whether the namespace exists is read first")
-	for _, check := range []string{"get customresourcedefinitions", "get moduleinstances", "create selfsubjectaccessreviews", "get configmaps"} {
+	for _, check := range []string{"get customresourcedefinitions", "create selfsubjectaccessreviews"} {
 		at := indexOf(calls, check)
 		require.GreaterOrEqual(t, at, 0, "%s ran: %v", check, calls)
 		assert.Less(t, at, create, "%s runs before the namespace is created", check)
+	}
+	for _, read := range []string{"get moduleinstances", "get configmaps"} {
+		assert.NotContains(t, calls[:create], read, "no read is sent into the namespace while it is missing")
 	}
 	for i, call := range calls {
 		if call == "patch configmaps" || call == "patch moduleinstances" || call == "patch moduleinstances/status" {
@@ -216,6 +214,98 @@ func TestExecute_CreateNamespaceWithNothingToApply(t *testing.T) {
 	assert.Empty(t, cluster.writes())
 }
 
+// A caller whose rights in the instance namespace come from a RoleBinding
+// gets Forbidden, not NotFound, for a read in a namespace that does not exist
+// yet. The apply sends no such read: a missing namespace holds no record and
+// no resource, so the apply goes on as a first install.
+func TestExecute_MissingNamespaceIsNotRead(t *testing.T) {
+	withReleasedCLIVersion(t)
+	captureLog(t)
+	cluster := newApplyCluster()
+	created := false
+	cluster.client.Clientset.(*k8sfake.Clientset).PrependReactor("create", "namespaces", func(k8stesting.Action) (bool, runtime.Object, error) {
+		created = true
+		return false, nil, nil
+	})
+	denyUntilCreated := func(a k8stesting.Action) (bool, runtime.Object, error) {
+		if created {
+			return false, nil, nil
+		}
+		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: a.GetResource().Resource}, "", errors.New("no role binding yet"))
+	}
+	cluster.dyn.PrependReactor("get", "moduleinstances", denyUntilCreated)
+	cluster.dyn.PrependReactor("get", "configmaps", denyUntilCreated)
+
+	require.NoError(t, Execute(context.Background(), cluster.request(Options{CreateNS: true}, "app")))
+
+	assert.Equal(t, 1, namespaceCreates(cluster))
+	assert.Equal(t, 1, cluster.writtenRevision(t), "a first install")
+}
+
+// A failed read of the namespace stops the apply first, and a failed create
+// stops it before any resource is applied; both exit by the cause.
+func TestExecute_NamespaceReadOrCreateFails(t *testing.T) {
+	for _, verb := range []string{"get", "create"} {
+		t.Run(verb, func(t *testing.T) {
+			withReleasedCLIVersion(t)
+			captureLog(t)
+			cluster := newApplyCluster()
+			cluster.client.Clientset.(*k8sfake.Clientset).PrependReactor(verb, "namespaces", func(k8stesting.Action) (bool, runtime.Object, error) {
+				return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "namespaces"}, "default", errors.New("no access"))
+			})
+
+			err := Execute(context.Background(), cluster.request(Options{CreateNS: true}, "app"))
+
+			requireExitCode(t, err, opmexit.ExitPermissionDenied)
+			assert.Contains(t, err.Error(), `namespace "default"`)
+			assert.Empty(t, cluster.writes(), "nothing is applied and no record is written")
+			if verb == "get" {
+				assert.Empty(t, cluster.dyn.Actions(), "no other step ran")
+			}
+		})
+	}
+}
+
+// A namespace that somebody else created between the read and the create
+// stops the apply: the checks looked at nothing inside it.
+func TestExecute_NamespaceAppearedDuringTheChecks(t *testing.T) {
+	withReleasedCLIVersion(t)
+	captureLog(t)
+	cluster := newApplyCluster()
+	cluster.client.Clientset.(*k8sfake.Clientset).PrependReactor("create", "namespaces", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewAlreadyExists(schema.GroupResource{Resource: "namespaces"}, "default")
+	})
+
+	err := Execute(context.Background(), cluster.request(Options{CreateNS: true}, "app"))
+
+	requireExitCode(t, err, opmexit.ExitGeneralError)
+	assert.Contains(t, err.Error(), `namespace "default" was created by someone else`)
+	assert.Contains(t, err.Error(), "Run the command again")
+	assert.Empty(t, cluster.writes())
+}
+
+// A caller that wrote to the cluster before the apply (opm operator install)
+// gets the refusals without the claim that nothing was changed.
+func TestExecute_RefusalAfterCallerWritesClaimsNothing(t *testing.T) {
+	reads := map[string]string{"moduleinstances": "cannot read the ModuleInstance record", "configmaps": "cannot check whether ConfigMap/app"}
+	for resource, want := range reads {
+		t.Run(resource, func(t *testing.T) {
+			withReleasedCLIVersion(t)
+			captureLog(t)
+			cluster := newApplyCluster()
+			cluster.dyn.PrependReactor("get", resource, func(k8stesting.Action) (bool, runtime.Object, error) {
+				return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: resource}, "x", errors.New("no access"))
+			})
+
+			err := Execute(context.Background(), cluster.request(Options{AfterCallerWrites: true}, "app"))
+
+			requireExitCode(t, err, opmexit.ExitPermissionDenied)
+			assert.Contains(t, err.Error(), want)
+			assert.NotContains(t, err.Error(), "before any change")
+		})
+	}
+}
+
 func indexOf(calls []string, call string) int {
 	for i, c := range calls {
 		if c == call {
@@ -223,4 +313,27 @@ func indexOf(calls []string, call string) int {
 		}
 	}
 	return -1
+}
+
+// A module that renders its own instance Namespace, applied with
+// --create-namespace into a cluster without it: the existence check runs
+// while the namespace is missing, so it finds no untracked Namespace; the
+// namespace is then created and the rendered Namespace is applied over it.
+func TestExecute_CreateNamespaceWithARenderedInstanceNamespace(t *testing.T) {
+	withReleasedCLIVersion(t)
+	captureLog(t)
+	cluster := newApplyCluster()
+	rendered := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "v1", "kind": "Namespace", "metadata": map[string]any{"name": "default"},
+	}}
+	cluster.dyn.PrependReactor("patch", "namespaces", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, rendered, nil
+	})
+	req := cluster.request(Options{CreateNS: true}, "app")
+	req.Result.Resources = append(req.Result.Resources, rendered)
+
+	require.NoError(t, Execute(context.Background(), req))
+
+	assert.Equal(t, 1, namespaceCreates(cluster))
+	assert.Contains(t, cluster.writes(), "patch namespaces default")
 }
