@@ -7,9 +7,9 @@
 
 ## 2. The flag on instance delete
 
-- [ ] 2.1 Add tests in `internal/cmd/instance`: `--wait` is registered and reaches the delete; a timeout prints each terminating resource with its finalizers, prints no success line, keeps the `ModuleInstance` and exits 1; a wait that completes reports as without the flag; without `--wait` no resource is read after its delete and the output and exit code of a delete with a terminating resource are pinned
-- [ ] 2.2 Add `--wait` to `opm instance delete`, pass it with `--timeout` to the delete, print the timeout report, and update the help of the command and of `--timeout`
-- [ ] 2.3 `task fmt`, `task vet`, `task lint`, `task test:unit` and `task docs:bundle:check` green, then commit `feat(instance): add --wait to instance delete`
+- [x] 2.1 Add tests in `internal/cmd/instance`: `--wait` is registered and reaches the delete; a timeout prints each terminating resource with its finalizers, prints no success line, keeps the `ModuleInstance` and exits 1; a wait that completes reports as without the flag; without `--wait` no resource is read after its delete and the output and exit code of a delete with a terminating resource are pinned
+- [x] 2.2 Add `--wait` to `opm instance delete`, pass it with `--timeout` to the delete, print the timeout report, and update the help of the command and of `--timeout`
+- [x] 2.3 `task fmt`, `task vet`, `task lint`, `task test:unit` and `task docs:bundle:check` green, then commit `feat(instance): add --wait to instance delete`
 
 ## 3. Documentation
 

@@ -59,9 +59,12 @@ const (
 	StatusLeftBehind = "left behind"
 	// StatusKept marks a PersistentVolumeClaim prune or delete kept on
 	// purpose because --delete-data was not set.
-	StatusKept   = "kept"
-	StatusValid  = "valid"
-	statusFailed = "failed"
+	StatusKept = "kept"
+	// StatusTerminating marks a deleted object that still exists: its
+	// dependents or its finalizers hold it.
+	StatusTerminating = "terminating"
+	StatusValid       = "valid"
+	statusFailed      = "failed"
 )
 
 // StatusStyle returns the lipgloss style for a given resource status string.
@@ -78,7 +81,7 @@ func statusStyle(status string) lipgloss.Style {
 		return lipgloss.NewStyle().Faint(true)
 	case StatusDeleted:
 		return lipgloss.NewStyle().Foreground(colorRed)
-	case StatusLeftBehind:
+	case StatusLeftBehind, StatusTerminating:
 		return lipgloss.NewStyle().Foreground(ColorYellow)
 	case statusFailed:
 		return lipgloss.NewStyle().Bold(true).Foreground(colorBoldRed)
@@ -104,7 +107,7 @@ func statusIcon(status string) string {
 		return "="
 	case StatusDeleted:
 		return "-"
-	case StatusLeftBehind:
+	case StatusLeftBehind, StatusTerminating:
 		return "!"
 	case statusFailed:
 		return "!"

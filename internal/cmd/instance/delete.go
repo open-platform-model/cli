@@ -37,6 +37,7 @@ func NewInstanceDeleteCmd(cfg *config.GlobalConfig) *cobra.Command {
 		forceFlag   bool
 		dryRunFlag  bool
 		deleteData  bool
+		waitFlag    bool
 		timeoutFlag time.Duration
 	)
 
@@ -73,6 +74,21 @@ carries an opmodel.dev/adopt annotation naming another instance is left
 behind. Every resource left behind is listed with its reason; remove
 it with 'kubectl delete' once nothing else needs it.
 
+The command returns when the API server has accepted every delete. A deleted
+resource can still exist then, terminating, until its dependents and its
+finalizers are gone. Pass --wait to return only when every resource this run
+deleted is gone: its read returns NotFound, or a new object holds its name.
+--timeout (default 5m0s) bounds the wait and starts with it. Kept claims,
+resources left behind and resources that were already gone are not waited
+for. When the wait times out, the command lists each resource that is still
+terminating, with its finalizers, keeps the ModuleInstance and exits 1; run
+the same command again to wait again, or without --wait to delete the
+ModuleInstance and stop tracking those resources. --wait does nothing on
+--dry-run, and nothing when a resource failed to delete. For an
+operator-managed instance the command always waits, bounded by --timeout,
+until the ModuleInstance is gone, with or without --wait; it does not check
+the resources the operator prunes.
+
 Deleting an instance that deploys the operator (the instance opm-operator in
 opm-operator-system, any instance of the operator module, or one whose
 inventory holds the operator's CRDs) is refused in two cases, dry runs
@@ -107,13 +123,17 @@ Examples:
   opm instance delete jellyfin -n media --yes
 
   # Also delete the PersistentVolumeClaims and the data on them
-  opm instance delete jellyfin -n media --delete-data`,
+  opm instance delete jellyfin -n media --delete-data
+
+  # Return only when the deleted resources are gone, or after two minutes
+  opm instance delete jellyfin -n media --yes --wait --timeout 2m`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			return runDelete(c.Context(), args[0], cfg, &kf, namespace, deleteFlags{
 				SkipConfirm: yesFlag || forceFlag,
 				DryRun:      dryRunFlag,
 				DeleteData:  deleteData,
+				Wait:        waitFlag,
 				Timeout:     timeoutFlag,
 			})
 		},
@@ -128,8 +148,10 @@ Examples:
 	cmdutil.DeprecateFlag(c, "force", "yes")
 	c.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Preview without deleting")
 	c.Flags().BoolVar(&deleteData, "delete-data", false, deleteDataFlagHelp)
+	c.Flags().BoolVar(&waitFlag, "wait", false,
+		"Wait until every resource this run deleted is gone before returning (skipped on --dry-run; operator-managed instances always wait for the operator)")
 	c.Flags().DurationVar(&timeoutFlag, "timeout", inventory.DefaultReconcileTimeout,
-		"Bound on the operator-cleanup wait (operator-managed instances only)")
+		"Bound on the --wait wait, and on the operator-cleanup wait of an operator-managed instance")
 
 	return c
 }
@@ -148,7 +170,12 @@ type deleteFlags struct {
 	DryRun      bool
 	// DeleteData is --delete-data: delete tracked PersistentVolumeClaims too.
 	DeleteData bool
-	Timeout    time.Duration
+	// Wait is --wait: return only when the deleted resources are gone, or
+	// Timeout passed. An operator-managed delete waits without it.
+	Wait bool
+	// Timeout is --timeout: it bounds the wait of Wait, and the wait for
+	// the operator's cleanup of an operator-managed instance.
+	Timeout time.Duration
 }
 
 func runInstanceDelete(ctx context.Context, identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag string, flags deleteFlags) error {
@@ -208,7 +235,7 @@ func confirmAndDelete(ctx context.Context, k8sClient *kubernetes.Client, rsf *cm
 		return readConfirmation(in)
 	}
 
-	return deleteResolvedInstance(ctx, k8sClient, rsf, namespace, inv, liveResources, unreadable, confirm, flags.Timeout, flags.DryRun, flags.DeleteData, instanceLog)
+	return deleteResolvedInstance(ctx, k8sClient, rsf, namespace, inv, liveResources, unreadable, confirm, flags, instanceLog)
 }
 
 // confirmFunc asks whether the delete goes ahead. It is called once, after
@@ -250,20 +277,20 @@ func claimsToDelete(inv *inventory.Record, live []*unstructured.Unstructured, de
 // the ModuleInstance and the operator prunes with its own credentials.
 func deleteResolvedInstance(ctx context.Context, k8sClient *kubernetes.Client, rsf *cmdutil.InstanceSelectorFlags, namespace string,
 	inv *inventory.Record, liveResources []*unstructured.Unstructured, unreadable []inventory.UnreadableEntry, confirm confirmFunc,
-	timeout time.Duration, dryRun, deleteData bool, instanceLog *log.Logger) error {
+	flags deleteFlags, instanceLog *log.Logger) error {
 	if err := guardOperatorInstanceDelete(ctx, k8sClient, inv); err != nil {
 		return err
 	}
 
 	if inventory.ResolveOwnership(inv) == inventory.ModeOperatorOwned {
-		return deleteOperatorOwned(ctx, k8sClient, inv, confirm, timeout, dryRun, instanceLog)
+		return deleteOperatorOwned(ctx, k8sClient, inv, confirm, flags.Timeout, flags.DryRun, instanceLog)
 	}
 
 	if !confirm(operatorClaims{}) {
 		instanceLog.Info("deletion canceled")
 		return nil
 	}
-	return executeInstanceDelete(ctx, k8sClient, rsf, namespace, inv, liveResources, unreadable, dryRun, deleteData, instanceLog)
+	return executeInstanceDelete(ctx, k8sClient, rsf, namespace, inv, liveResources, unreadable, flags, instanceLog)
 }
 
 // guardOperatorInstanceDelete refuses to delete an instance that deploys the
@@ -404,8 +431,10 @@ func deleteOperatorOwned(ctx context.Context, k8sClient *kubernetes.Client, inv 
 // delete that fails after the workloads are gone fails the command with the
 // exit code of its cause. A PersistentVolumeClaim is kept unless deleteData;
 // a kept claim does not block the ModuleInstance delete, so it is left
-// untracked, where no later opm command can delete it.
-func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rsf *cmdutil.InstanceSelectorFlags, namespace string, inv *inventory.Record, liveResources []*unstructured.Unstructured, unreadable []inventory.UnreadableEntry, dryRun, deleteData bool, instanceLog *log.Logger) error {
+// untracked, where no later opm command can delete it. With flags.Wait the
+// ModuleInstance is deleted only when every deleted resource is gone; the
+// ones still terminating when flags.Timeout passed fail the command.
+func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rsf *cmdutil.InstanceSelectorFlags, namespace string, inv *inventory.Record, liveResources []*unstructured.Unstructured, unreadable []inventory.UnreadableEntry, flags deleteFlags, instanceLog *log.Logger) error {
 	deleteResult, err := workflowapply.DeleteRecorded(ctx, workflowapply.DeleteRequest{
 		Client:       k8sClient,
 		InstanceName: rsf.InstanceName,
@@ -414,8 +443,10 @@ func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rs
 		Record:       inv,
 		Live:         liveResources,
 		Unreadable:   inventory.UnreadableResources(unreadable),
-		DryRun:       dryRun,
-		DeleteData:   deleteData,
+		DryRun:       flags.DryRun,
+		DeleteData:   flags.DeleteData,
+		Wait:         flags.Wait,
+		Timeout:      flags.Timeout,
 		Log:          instanceLog,
 	})
 	if err != nil {
@@ -428,7 +459,7 @@ func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rs
 		}
 		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
 	}
-	return reportInstanceDelete(deleteResult, dryRun, instanceLog)
+	return reportInstanceDelete(deleteResult, flags.DryRun, instanceLog)
 }
 
 // reportInstanceDelete prints the closing summary of a CLI-owned delete and
@@ -448,6 +479,10 @@ func reportInstanceDelete(deleteResult *kubernetes.DeleteResult, dryRun bool, in
 		return &opmexit.ExitError{Code: deleteFailureExitCode(deleteResult), Err: fmt.Errorf(format, n), Printed: true}
 	}
 
+	if len(deleteResult.Terminating) > 0 {
+		return reportTerminating(deleteResult, instanceLog)
+	}
+
 	leftBehind := len(deleteResult.LeftBehind)
 	switch {
 	case dryRun && leftBehind > 0:
@@ -465,6 +500,33 @@ func reportInstanceDelete(deleteResult *kubernetes.DeleteResult, dryRun bool, in
 	}
 	reportKeptClaims(deleteResult.Kept, dryRun, instanceLog)
 	return nil
+}
+
+// reportTerminating closes a delete whose --wait ran out of time: one line
+// per deleted resource that still exists, with the finalizers that hold it or
+// the error of its last read, then what the user can do. It claims no
+// completion, since the ModuleInstance was kept, and exits 1: the cluster
+// answered every read, so this is not the connectivity class of exit 3.
+func reportTerminating(deleteResult *kubernetes.DeleteResult, instanceLog *log.Logger) error {
+	for i := range deleteResult.Terminating {
+		t := &deleteResult.Terminating[i]
+		line := output.FormatResourceLine(t.Entry.Kind, t.Entry.Namespace, t.Entry.Name, output.StatusTerminating)
+		switch {
+		case t.Err != nil:
+			instanceLog.Warn(line, "error", t.Err)
+		case len(t.Finalizers) > 0:
+			instanceLog.Warn(line, "finalizers", strings.Join(t.Finalizers, ","))
+		default:
+			instanceLog.Warn(line)
+		}
+	}
+	err := fmt.Errorf("timed out after %s: %d deleted resource(s) are still terminating", deleteResult.WaitElapsed, len(deleteResult.Terminating))
+	instanceLog.Error(err.Error())
+	output.Details("The ModuleInstance was kept, so it still tracks these resources.\n" +
+		"A resource stays until its dependents are gone and every finalizer on it is removed.\n" +
+		"Run the same command again to wait again; re-running is safe.\n" +
+		"Without --wait the command deletes the ModuleInstance and does not wait for them.")
+	return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err, Printed: true}
 }
 
 // reportKeptClaims closes a delete that kept PersistentVolumeClaims: how many,
