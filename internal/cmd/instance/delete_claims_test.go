@@ -17,6 +17,8 @@ import (
 
 	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 
+	opmexit "github.com/open-platform-model/cli/internal/exit"
+
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
 	"github.com/open-platform-model/cli/internal/inventory"
@@ -55,6 +57,11 @@ func newClaimScenario() *claimScenario {
 	mi := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": inventory.APIVersionModuleInstance, "kind": inventory.KindModuleInstance,
 		"metadata": map[string]any{"name": "demo", "namespace": "apps"},
+		"spec":     map[string]any{"owner": inventory.OwnerCLI},
+		"status": map[string]any{"instanceUUID": uuid, "inventory": map[string]any{"revision": int64(1), "entries": []any{
+			map[string]any{"group": "", "kind": "ConfigMap", "namespace": "apps", "name": "web", "v": "v1", "component": "app"},
+			map[string]any{"group": "", "kind": "PersistentVolumeClaim", "namespace": "apps", "name": "data", "v": "v1", "component": "app"},
+		}}},
 	}}
 	fake := fakedynamic.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(),
 		map[schema.GroupVersionResource]string{inventory.ModuleInstanceGVR: "ModuleInstanceList"},
@@ -264,4 +271,72 @@ func TestDeleteResolvedInstance_DeleteDataOnOperatorManagedWarns(t *testing.T) {
 	}
 	assert.Contains(t, run(true), workflowapply.DeleteDataOperatorManagedNote)
 	assert.NotContains(t, run(false), "--delete-data")
+}
+
+// confirm runs the whole read, prompt and delete step against the scenario's
+// cluster, with answer as standard input.
+func (s *claimScenario) confirm(t *testing.T, instance string, flags deleteFlags, answer string) (string, error) {
+	t.Helper()
+	var runErr error
+	out := captureOutput(t, func() {
+		runErr = confirmAndDelete(context.Background(), s.client, &cmdutil.InstanceSelectorFlags{InstanceName: instance}, "apps",
+			flags, strings.NewReader(answer), output.InstanceLogger(instance))
+	})
+	return out, runErr
+}
+
+// With --delete-data the prompt names the claims read from the instance's
+// record before anything is deleted, and a "no" deletes nothing.
+func TestConfirmAndDelete_PromptNamesTheClaimsDeleteDataDeletes(t *testing.T) {
+	s := newClaimScenario()
+	out, err := s.confirm(t, "demo", deleteFlags{DeleteData: true}, "n\n")
+	require.NoError(t, err, out)
+
+	assert.Contains(t, out, "these PersistentVolumeClaims and the data on them will be deleted")
+	assert.Contains(t, out, "  apps/data\n")
+	assert.Contains(t, out, "deletion canceled")
+	assert.True(t, s.exists(claimGVR, "data"), "a declined prompt deletes nothing")
+	assert.True(t, s.exists(configMapGVR, "web"), "a declined prompt deletes nothing")
+	assert.True(t, s.exists(inventory.ModuleInstanceGVR, "demo"))
+
+	out, err = s.confirm(t, "demo", deleteFlags{DeleteData: true}, "y\n")
+	require.NoError(t, err, out)
+	assert.False(t, s.exists(claimGVR, "data"), "a confirmed --delete-data deletes the claim")
+	assert.False(t, s.exists(inventory.ModuleInstanceGVR, "demo"))
+}
+
+// Without --delete-data the prompt says claims are kept, and a "yes" keeps
+// them. --yes skips the prompt and keeps them too.
+func TestConfirmAndDelete_WithoutDeleteDataKeepsClaims(t *testing.T) {
+	for name, tc := range map[string]struct {
+		flags      deleteFlags
+		wantPrompt bool
+	}{
+		"confirmed at the prompt": {deleteFlags{}, true},
+		"--yes":                   {deleteFlags{SkipConfirm: true}, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := newClaimScenario()
+			out, err := s.confirm(t, "demo", tc.flags, "y\n")
+			require.NoError(t, err, out)
+
+			assert.Equal(t, tc.wantPrompt, strings.Contains(out, "[y/N]"), out)
+			if tc.wantPrompt {
+				assert.Contains(t, out, "PersistentVolumeClaims are kept")
+			}
+			assert.NotContains(t, out, "will be deleted")
+			assert.True(t, s.exists(claimGVR, "data"), "the claim is kept")
+			assert.False(t, s.exists(configMapGVR, "web"))
+			assert.False(t, s.exists(inventory.ModuleInstanceGVR, "demo"))
+		})
+	}
+}
+
+// An instance with no record is reported as not found (exit 5) before any
+// prompt: the user is not asked to confirm a delete of nothing.
+func TestConfirmAndDelete_MissingInstanceIsReportedBeforeThePrompt(t *testing.T) {
+	s := newClaimScenario()
+	out, err := s.confirm(t, "nosuch", deleteFlags{}, "y\n")
+	requireExitCode(t, err, opmexit.ExitNotFound)
+	assert.NotContains(t, out, "[y/N]", "no prompt for an instance that does not exist")
 }

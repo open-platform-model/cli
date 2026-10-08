@@ -159,8 +159,14 @@ func runInstanceDelete(ctx context.Context, identifier string, cfg *config.Globa
 		return err
 	}
 
-	// The record is read before the prompt, so that the prompt can name the
-	// claims --delete-data deletes. The read changes nothing.
+	return confirmAndDelete(ctx, k8sClient, rsf, namespace, flags, os.Stdin, instanceLog)
+}
+
+// confirmAndDelete reads the instance record, asks for confirmation on in
+// unless the flags skip it, and deletes. The record is read before the
+// prompt, so that the prompt can name the claims --delete-data deletes and a
+// missing instance is reported without a question. The read changes nothing.
+func confirmAndDelete(ctx context.Context, k8sClient *kubernetes.Client, rsf *cmdutil.InstanceSelectorFlags, namespace string, flags deleteFlags, in io.Reader, instanceLog *log.Logger) error {
 	inv, liveResources, _, unreadable, err := query.ResolveInventory(ctx, k8sClient, rsf, namespace, instanceLog)
 	if err != nil {
 		return err
@@ -170,7 +176,7 @@ func runInstanceDelete(ctx context.Context, identifier string, cfg *config.Globa
 		instanceLog.Info("dry run - no changes will be made")
 	} else if !flags.SkipConfirm {
 		output.Prompt(deletePrompt(rsf.InstanceName, rsf.InstanceID, namespace, claimsToDelete(inv, liveResources, flags.DeleteData)))
-		if !readConfirmation(os.Stdin) {
+		if !readConfirmation(in) {
 			instanceLog.Info("deletion canceled")
 			return nil
 		}
