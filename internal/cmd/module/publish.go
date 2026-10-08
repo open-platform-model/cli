@@ -29,7 +29,8 @@ declares.
 	zip carries that written file. It asserts a declared Version and never
 	overwrites one.
 
-	Exit codes: 0 published (or dry-run GO), 2 refused, 3 registry unreachable.
+	Exit codes: 0 published (or dry-run GO), 2 refused, 3 registry operation
+	failed (unreachable, credentials refused, or another registry error).
 
 	Arguments:
 	  path    Path to the module directory (default: current directory)

@@ -39,7 +39,7 @@ func (f *PublishFlags) AddTo(cmd *cobra.Command) {
 // RunPublish is the shared body of both publish commands: resolve core's
 // #IdentityPackage from the kernel schema cache, compute the plan, print it,
 // print any refusals through the validation funnel, and push on GO outside
-// --dry-run. Exit codes: refusal 2, registry unreachable 3, unexpected 1.
+// --dry-run. Exit codes: refusal 2, failed registry operation 3, unexpected 1.
 func RunPublish(cmd *cobra.Command, cfg *config.GlobalConfig, kind publish.Kind, args []string, flags *PublishFlags) error {
 	dir := ResolveModulePath(args)
 
@@ -47,9 +47,9 @@ func RunPublish(cmd *cobra.Command, cfg *config.GlobalConfig, kind publish.Kind,
 	schemaVal, err := k.SchemaCache().Get()
 	if err != nil {
 		// The schema fetch is a registry round-trip like the lookup and the
-		// push: failing to reach it is a connectivity failure, not a verdict
-		// on the artifact.
-		return publishError(&publish.ConnectivityError{Op: "loading core schema", Err: err})
+		// push: its failure is a registry failure, not a verdict on the
+		// artifact.
+		return publishError(publish.RegistryFailure("loading core schema", err))
 	}
 	identitySchema := schemaVal.LookupPath(cue.MakePath(cue.Def("IdentityPackage")))
 	if !identitySchema.Exists() {
@@ -154,14 +154,27 @@ func PrintRefusals(refusals []publish.Refusal) {
 	}
 }
 
-// publishError maps pipeline errors to exit codes: registry unreachability
-// is a connectivity failure (3) — the artifact was never judged — and
-// anything else is unexpected (1).
+// registryLoginHint is the next step after a registry refused the caller.
+// Without a host argument the login command resolves the configured mapping
+// to its host, or lists the hosts when it names several.
+const registryLoginHint = "Log in to the registry, then retry:  opm registry login"
+
+// publishError maps pipeline errors to exit codes: a failed registry
+// operation is exit 3, whether the registry gave no response
+// (*publish.ConnectivityError) or answered with a failure
+// (*publish.RegistryError), because the artifact was never judged; anything
+// else is unexpected (1). A refused credential gains the login hint.
 func publishError(err error) error {
-	code := opmexit.ExitGeneralError
+	var regErr *publish.RegistryError
+	if errors.As(err, &regErr) {
+		if regErr.Unauthorized {
+			err = fmt.Errorf("%w\n  %s", err, registryLoginHint)
+		}
+		return &opmexit.ExitError{Code: opmexit.ExitConnectivityError, Err: err}
+	}
 	var connErr *publish.ConnectivityError
 	if errors.As(err, &connErr) {
-		code = opmexit.ExitConnectivityError
+		return &opmexit.ExitError{Code: opmexit.ExitConnectivityError, Err: err}
 	}
-	return &opmexit.ExitError{Code: code, Err: err}
+	return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err}
 }
