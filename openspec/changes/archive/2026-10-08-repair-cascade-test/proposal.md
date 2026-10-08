@@ -9,7 +9,7 @@ The setup technique is the defect. It lowers the pin under unchanged source, whi
 ## What Changes
 
 - `setup_older` lowers the library to a version the test makes from the tree's own library: the same source under a lower version name, served to `go get` from a file proxy in the test's temporary directory. The source always compiles, so the setup no longer depends on which library API the cli uses. The cascade run itself is untouched: it still gets the real library version through the normal Go proxy settings.
-- The `older` library row leaves `testdata/older.tsv`; the catalog, core and podinfo rows stay. This departs from section 8 of the shared cascade contract for the library key; design.md records it, and the contract itself is not changed here.
+- The `older` library row leaves `testdata/older.tsv`; the catalog, core and podinfo rows stay. This departs from section 8 of the shared cascade contract for the library key; the owner allowed it on 2026-10-09, design.md records it, and the contract itself is not changed here.
 - `setup_older` names the step that failed and shows the last lines of its output in the FAIL line, instead of "the setup did not apply" alone.
 - The `older.tsv` check moves to the pre-checks, so the offline set (the required `Lint` job) also runs it. It needs no network.
 - No scenario is removed, and no scenario assertion changes. `cascade.sh` does not change.

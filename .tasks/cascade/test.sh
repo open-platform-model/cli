@@ -146,8 +146,9 @@ why() { tail -n 3 "$RUN_OUT" | tr '\n' ' '; }
 # cli imports once the cli adopts new library API. lib_older_name names a
 # version below the tree's, which older_lib fills with the tree's own library.
 # This departs from contract §8, which asks for an older real published version
-# per pin key (openspec change repair-cascade-test, design.md, "Deviation from
-# the cascade contract").
+# per pin key. The owner allowed the departure on 2026-10-09, for the library
+# key only (openspec change repair-cascade-test, design.md, "Deviation from the
+# cascade contract").
 OLDER="$HERE/testdata/older.tsv"
 older() { awk -F'\t' -v r="$1" -v k="$2" '$1 == r && $2 == k { print $3; exit }' "$OLDER"; }
 # older_than A B: true when A ranks below B (the stub's semver-cmp).

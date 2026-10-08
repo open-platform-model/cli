@@ -57,7 +57,7 @@ The name MUST sort below the tree's version in SemVer, in the stub's `semver-cmp
 
 **Rationale**: section 8 assumes an older published version that the tree compiles against. For a Go library pin that holds only while the consumer uses no API newer than the row. Today no such library version exists, so S2, S4 and S9 cannot hold under the letter of section 8.
 
-**Open**: the contract text belongs to `.github` and this change does not touch it. Whether the contract gets a clarification, and whether sibling repos with a Go pin take the same setup, is the owner's decision. Until then `test.sh` names the deviation in a comment where it happens.
+**Owner's decision (2026-10-09)**: the owner allowed the departure, for the library key only: the cli's cascade test may make its older library from the tree's own library. The contract text belongs to `.github` and this change does not touch it; a clarification there, and the setup of sibling repos with a Go pin, are not decided here. `test.sh` names the departure in a comment where it happens.
 
 ### Failure text
 

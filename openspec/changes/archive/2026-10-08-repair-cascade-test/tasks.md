@@ -18,3 +18,8 @@ One PR, titled `test(cascade): build the older library from the tree's own`.
 - [x] 2.1 `lib_older_name`: a `v0.0.0-0.cascade.<tree version>` name, below pseudo-version pins too; the library gets its own FAIL text.
 - [x] 2.2 Record the deviation from contract section 8 in design.md and in `test.sh`; name the remaining catalog and core risk of S9; correct the spec sentence on the `oldest` rows and the import timeline.
 - [x] 2.3 Run the gates again; commit.
+
+## 3. Owner's decision and archive
+
+- [x] 3.1 Record the owner's decision of 2026-10-09 (the departure from contract section 8 is allowed for the library key) in design.md, proposal.md and the `test.sh` comment.
+- [x] 3.2 Sync the delta into `openspec/specs/deps-cascade/spec.md`, run the gates on the final tree, archive.
