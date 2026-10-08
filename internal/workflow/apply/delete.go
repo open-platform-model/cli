@@ -44,7 +44,7 @@ type RecordDeleteError struct {
 }
 
 func (e *RecordDeleteError) Error() string {
-	return fmt.Sprintf("deleting ModuleInstance %s/%s: its tracked resources were deleted, but the record remains: %v; fix the cause and re-run, re-running is safe",
+	return fmt.Sprintf("the tracked resources of ModuleInstance %s/%s were deleted, but the record remains: %v; fix the cause and re-run, re-running is safe",
 		e.Namespace, e.Name, e.Err)
 }
 

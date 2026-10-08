@@ -1,8 +1,8 @@
 ## ADDED Requirements
 
-### Requirement: Instance diff fails when an object could not be read
+### Requirement: Instance diff fails when a rendered resource could not be read
 
-`opm instance diff` SHALL treat each of the following as a failure: a rendered resource whose live read fails with an error other than NotFound, a rendered resource whose comparison with the live object fails, an instance record whose read fails with an error other than NotFound, and a tracked resource that orphan detection could not read. For each failure the command SHALL print an error that names the object and carries the cause; for a failed record read it SHALL say that orphan detection did not run. The command SHALL still compare the objects it can read and SHALL print the differences it found. When at least one failure exists, the command SHALL NOT print `No differences found` and SHALL exit non-zero: with the code of the failures when all of them have the same class (4 when the API server denied the read with Forbidden or Unauthorized, 3 on a server timeout or service unavailable, 1 for any other failure), and 1 when the classes differ. A NotFound answer for a rendered resource SHALL still mean a new resource. With no failure the command SHALL behave as before.
+`opm instance diff` SHALL treat a rendered resource whose live read fails with an error other than NotFound, and a rendered resource whose comparison with the live object fails, as a failure. For each failure the command SHALL print an error that names the resource and carries the cause. The command SHALL still compare the resources it can read and SHALL print the differences it found. When at least one failure exists, the command SHALL NOT print `No differences found` and SHALL exit non-zero: with the code of the failures when all of them have the same class (4 when the API server denied the read with Forbidden or Unauthorized, 3 on a server timeout or service unavailable, 1 for any other failure), and 1 when the classes differ. A NotFound answer for a rendered resource SHALL still mean a new resource. With no failure the command SHALL behave as before. A tracked resource that orphan detection could not read stays a warning that does not change the exit code.
 
 #### Scenario: Every rendered resource is unreadable
 
@@ -19,18 +19,17 @@
 - **AND** SHALL print an error naming the second resource
 - **AND** SHALL exit 1
 
-#### Scenario: Unreadable instance record
-
-- **WHEN** the read of the instance's `ModuleInstance` record fails with Forbidden
-- **AND** every rendered resource equals its live object
-- **THEN** the command SHALL print an error naming the record and saying that orphan detection did not run
-- **AND** SHALL NOT print `No differences found`
-- **AND** SHALL exit 4
-
 #### Scenario: Failures of two classes
 
 - **WHEN** one read fails with Forbidden and another with an internal server error
 - **THEN** the command SHALL exit 1
+
+#### Scenario: Unreadable tracked resource that is not rendered
+
+- **WHEN** every rendered resource is read
+- **AND** orphan detection cannot read a tracked resource that is not rendered
+- **THEN** the command SHALL warn that orphan detection could not check it
+- **AND** the exit code SHALL NOT change
 
 #### Scenario: Nothing failed and nothing differs
 

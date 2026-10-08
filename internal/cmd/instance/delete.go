@@ -292,7 +292,7 @@ func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rs
 	if err != nil {
 		var recordErr *workflowapply.RecordDeleteError
 		if errors.As(err, &recordErr) {
-			instanceLog.Error(fmt.Sprintf("deleting ModuleInstance %s/%s: its tracked resources were deleted, but the record remains",
+			instanceLog.Error(fmt.Sprintf("the tracked resources of ModuleInstance %s/%s were deleted, but the record remains",
 				recordErr.Namespace, recordErr.Name), "error", recordErr.Err)
 			output.Details("The ModuleInstance still lists resources that are gone.\n" +
 				"Fix the cause (for example missing RBAC) and re-run; re-running is safe.")

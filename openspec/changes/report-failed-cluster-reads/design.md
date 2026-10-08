@@ -19,6 +19,7 @@ See proposal.md for the defects. Observed at the base commit:
 
 - The apply path, the empty-render return of diff, the orphan wording.
 - A changed exit code for `tree` or `events`.
+- Orphan detection: an unreadable tracked resource stays a warning, and an unreadable instance record still skips it. See Open Questions.
 
 ## Research & Decisions
 
@@ -50,8 +51,8 @@ A re-run is safe: absent objects count as deleted, then the record delete is tri
 **Options considered**:
 1. Stop at the first failed read. Simple, but hides the differences already found and the other failures.
 2. Compare everything, print what was found, then fail.
-**Decision**: Option 2. `Diff` MUST return each failed read and each failed comparison in `DiffResult.Errors`; `Warnings` is removed. The command MUST add a failed record read and each unreadable tracked resource, print the differences found, and return an `*exit.ExitError`. It MUST NOT print `No differences found` when any failure exists.
-**Rationale**: One run shows every cause. A failed record read does not stop the comparison of the rendered resources; it only means orphan detection did not run, and the error says so.
+**Decision**: Option 2. `Diff` MUST return each failed read and each failed comparison in `DiffResult.Errors`; `Warnings` is removed. The command MUST print the differences found and return an `*exit.ExitError`. It MUST NOT print `No differences found` when any failure exists.
+**Rationale**: One run shows every cause.
 
 ```go
 type DiffError struct {
@@ -70,7 +71,7 @@ type DiffError struct {
 `opm instance delete <name> [flags]`, `opm operator uninstall [flags]`, `opm instance diff <instance.cue> [flags]`. No flag changes.
 
 ```text
-ERRO deleting ModuleInstance apps/demo: its tracked resources were deleted, but the record remains error=<cause>
+ERRO the tracked resources of ModuleInstance apps/demo were deleted, but the record remains error=<cause>
 
 The ModuleInstance still lists resources that are gone.
 Fix the cause (for example missing RBAC) and re-run; re-running is safe.
@@ -78,17 +79,16 @@ Fix the cause (for example missing RBAC) and re-run; re-running is safe.
 
 ```text
 ERRO could not diff resource kind=ConfigMap namespace=apps name=web error="reading the live object: <cause>"
-ERRO diff is incomplete: 1 object(s) could not be read or compared
+ERRO diff is incomplete: 1 resource(s) could not be read or compared
 
 Fix the cause (for example missing RBAC) and run the diff again.
 ```
 
 ## Risks / Trade-offs
 
-- [A user who can read workloads but not ModuleInstances now gets a non-zero diff] -> The error names the record; without it the diff cannot see orphans, and saying "No differences found" was the defect.
 - [A script that treats any non-zero diff exit as "differences exist"] -> Diff exits 0 when differences exist today, so no such contract exists.
-- [The spec sentence that kept diff at exit 0 for unreadable tracked resources is reversed] -> Recorded in the proposal; `tree` and `events` keep it.
+- [A diff whose orphan detection could not read a tracked resource, or the instance record, still exits 0 and can print "No differences found"] -> Accepted behaviour of the `resource-discovery` spec; changing it is an owner decision.
 
 ## Open Questions
 
-None.
+- Does `opm instance diff` also fail when orphan detection cannot read a tracked resource that is not rendered, or cannot read the instance record? The `resource-discovery` spec says a warning and exit 0 for the first; the second is a debug line today. Not changed here.
