@@ -224,7 +224,9 @@ The apply flow SHALL follow this sequence: (1) render resources, (2) compute man
 
 ### Requirement: Dry-run prune preview lists left-behind resources
 
-When `--dry-run` is set and pruning is enabled, the apply SHALL list the stale resources a real apply would prune, each with the status `would prune`, SHALL list separately each stale resource of a protected kind (core `Namespace`, `apiextensions.k8s.io` `CustomResourceDefinition`) with the status `left behind`, and SHALL list separately each stale core `PersistentVolumeClaim` that a real apply with the same flags would keep, with the status `kept`. The preview SHALL use the same protected-kind rule and the same `--delete-data` rule as the real prune, so the three lists together cover the whole stale set. With `--no-prune`, none of the lists SHALL be printed.
+When `--dry-run` is set and pruning is enabled, the apply SHALL read each stale resource a real apply would try to prune and SHALL ask the same delete verdict, with the same instance identity, as the real prune ("Prune asks the ownership verdict for each stale resource"). It SHALL list each stale resource the verdict allows a real apply to delete with the status `would prune`, SHALL list separately each stale resource of a protected kind (core `Namespace`, `apiextensions.k8s.io` `CustomResourceDefinition`) with the status `left behind`, and SHALL list separately each stale core `PersistentVolumeClaim` that a real apply with the same flags would keep, with the status `kept`. The preview SHALL use the same protected-kind rule and the same `--delete-data` rule as the real prune, so no stale resource is listed as `would prune` that a real apply with the same flags leaves in the cluster.
+
+A stale resource the verdict leaves in place SHALL NOT be listed as `would prune`. It SHALL be listed on its own line with the reason the verdict gives, which names the owner: with the status `would keep` when the live object is not managed by OPM or belongs to another instance, and with the status `would let go` when another instance is adopting it. Neither line SHALL change the exit code. A stale resource that is already gone SHALL be listed on no line. A stale resource whose live read fails with any error other than NotFound SHALL be listed with the status `cannot check` and the read error, and the dry run SHALL exit with the code the real apply exits with after such a failed prune: 1, or the code of a failed API discovery request (4 denied, 3 unavailable). The preview SHALL send no delete and no other write. With `--no-prune`, none of the lists SHALL be printed and no stale resource SHALL be read for a verdict.
 
 #### Scenario: Preview separates pruned and left-behind resources
 
@@ -248,11 +250,40 @@ When `--dry-run` is set and pruning is enabled, the apply SHALL list the stale r
 - **WHEN** `opm instance apply --dry-run --delete-data` runs with a stale set holding a PersistentVolumeClaim
 - **THEN** the output SHALL list the claim as `would prune`
 
-### Requirement: First install over resources OPM already manages warns
+#### Scenario: Preview keeps what the instance does not own
+
+- **WHEN** `opm instance apply --dry-run` runs with a stale ConfigMap whose live object carries no OPM managed-by label
+- **THEN** the output SHALL list the ConfigMap as `would keep` with the reason that it is not managed by OPM
+- **AND** the output SHALL NOT list it as `would prune`
+- **AND** the command SHALL exit 0 when nothing else fails
+
+#### Scenario: Preview names the owning instance
+
+- **WHEN** `opm instance apply --dry-run` runs with a stale ConfigMap whose live object carries another instance's UUID label
+- **THEN** the output SHALL list the ConfigMap as `would keep` with a reason that names that instance's UUID
+
+#### Scenario: Preview lets go of an adopted resource
+
+- **WHEN** `opm instance apply --dry-run` runs with a stale ConfigMap whose live `opmodel.dev/adopt` annotation names another instance
+- **THEN** the output SHALL list the ConfigMap as `would let go` with a reason that names that instance's UUID
+- **AND** no delete SHALL be sent
+
+#### Scenario: Preview leaves out a stale resource that is gone
+
+- **WHEN** `opm instance apply --dry-run` runs with a stale ConfigMap that no longer exists in the cluster
+- **THEN** the output SHALL list it on no `would prune` line
+
+#### Scenario: Preview cannot read a stale resource
+
+- **WHEN** `opm instance apply --dry-run` runs and the read of a stale ConfigMap fails with Forbidden
+- **THEN** the output SHALL list the ConfigMap as `cannot check` with the read error
+- **AND** the command SHALL exit 1
+
+### Requirement: First install over OPM-managed resources warns
 
 On a first-time apply (no `ModuleInstance` record), when one or more rendered resources already exist in the cluster with an OPM managed-by label, `opm instance apply` and `opm module apply` SHALL print one warning on the log stream before any rendered resource is applied. The warning SHALL give the number of such resources and the number of rendered resources, and SHALL say that the instance has no `ModuleInstance` record, that an apply updates those resources in place and records them, and that it prunes nothing. The warning SHALL NOT change the exit code and SHALL NOT stop the apply.
 
-A dry run SHALL print the warning too. It SHALL read the rendered resources for this purpose only and SHALL refuse nothing because of that read: a resource the real run would refuse SHALL end the look without a warning and without an error. The dry-run warning SHALL name the release to apply with first (`v1.0.0-beta.10`) when an older release recorded the instance in a Secret.
+A dry run SHALL print the warning too, when its ownership guard refuses nothing ("Ownership guard on every apply and dry run"): a dry run that previews a refusal stops there, as the real run does, and prints no such warning. The dry-run warning SHALL name the release to apply with first (`v1.0.0-beta.10`) when an older release recorded the instance in a Secret.
 
 The warning of a real run SHALL NOT send the user to that release, because the run writes the record and that release then deletes the Secret without reading it. It SHALL name the Secret (`opm.<name>.<id>`), SHALL say to keep it and not to apply with an older release, and SHALL name the docs page that describes the cleanup.
 
@@ -273,12 +304,6 @@ The apply SHALL print no such warning when no rendered resource exists yet, or w
 - **THEN** the command SHALL print one warning that names 2 of 3 resources and the release `v1.0.0-beta.10`
 - **AND** no record SHALL be written
 
-#### Scenario: Dry-run look refuses nothing
-
-- **WHEN** `opm instance apply --dry-run` runs for an instance with no `ModuleInstance` record
-- **AND** a rendered resource exists without OPM labels
-- **THEN** the dry run SHALL NOT fail because of that resource and SHALL print no such warning
-
 #### Scenario: Operator install prints no warning
 
 - **WHEN** `opm operator install` runs on a cluster with no operator
@@ -294,6 +319,12 @@ The apply SHALL print no such warning when no rendered resource exists yet, or w
 
 - **WHEN** `opm instance apply` runs for an instance that has a `ModuleInstance` record
 - **THEN** the command SHALL print no such warning
+
+#### Scenario: Dry run that previews a refusal prints no warning
+
+- **WHEN** `opm instance apply --dry-run` runs for an instance with no `ModuleInstance` record
+- **AND** a rendered resource exists without OPM labels
+- **THEN** the dry run SHALL print the `would refuse` line of that resource and SHALL print no such warning
 
 ### Requirement: Prune keeps stale PersistentVolumeClaims unless delete-data is set
 
@@ -358,7 +389,7 @@ Before the prune deletes a stale resource, it SHALL read the live object and SHA
 
 An instance's identity derives from its module's path without the major version, the instance name and the namespace. The record is found by name and namespace, so within one record the identity changes only when the module's path changes. On the first apply after such a change the prune SHALL still delete the stale resources the instance owned under the recorded identity, and the record SHALL take the rendered identity only in the write that follows the prune.
 
-Each delete SHALL carry a precondition on the UID of the object that was read, so that an object deleted and created again under the same name since the read is not deleted. A delete the API server refuses on that precondition, and a live read that fails with any error other than NotFound, SHALL each count as a failed delete of that resource ("Failed prune keeps the entry and fails the command"). A stale `PersistentVolumeClaim` that is kept SHALL NOT be judged; with `--delete-data` it SHALL be judged like any other stale resource. The dry-run prune preview SHALL stay as it is: it reads no stale resource for a verdict, so it MAY list as `would prune` a resource the real run leaves behind.
+Each delete SHALL carry a precondition on the UID of the object that was read, so that an object deleted and created again under the same name since the read is not deleted. A delete the API server refuses on that precondition, and a live read that fails with any error other than NotFound, SHALL each count as a failed delete of that resource ("Failed prune keeps the entry and fails the command"). A stale `PersistentVolumeClaim` that is kept SHALL NOT be judged; with `--delete-data` it SHALL be judged like any other stale resource. The dry-run prune preview SHALL ask the same verdict with the same identity and SHALL send no delete ("Dry-run prune preview lists left-behind resources").
 
 #### Scenario: Stale name taken by a user's object
 
@@ -416,7 +447,7 @@ Each delete SHALL carry a precondition on the UID of the object that was read, s
 - **WHEN** the stale set holds a PersistentVolumeClaim and `--delete-data` is not set
 - **THEN** the claim SHALL be listed as `kept` and SHALL stay in the written inventory
 
-### Requirement: Ownership guard on every apply
+### Requirement: Ownership guard on every apply and dry run
 
 On every apply in CLI-executor mode, the first as well as every later one, `opm instance apply` and `opm module apply` SHALL read each rendered resource from the cluster and SHALL take the decision to apply it from the ownership verdict the CLI shares with the operator, asked with the instance identity of the render. A resource that does not exist SHALL pass. An existing resource that the instance's `ModuleInstance` record does not list SHALL be refused when it carries no OPM managed-by label, or when its `module-instance.opmodel.dev/uuid` label names another instance. An existing resource with a `deletionTimestamp` SHALL be refused whether or not the record lists it. When any resource is refused, the apply SHALL fail before its first write, the namespace of `--create-namespace` included, SHALL report every refused resource by kind, namespace and name with the reason, SHALL say that the apply stopped before any change, and SHALL exit 1. Source: 0012:D4:R2, 0012:D8:R1, 0012:D8:R5.
 
@@ -426,7 +457,7 @@ The one override SHALL be the adopt annotation: an existing resource whose `opmo
 
 If a rendered resource cannot be read (the read fails with any error other than NotFound), the apply SHALL fail before its first write: the error SHALL name the resource and carry the read error, and the exit code SHALL be 4 when the API server denied the read (Forbidden or Unauthorized), 3 when it answered with a server timeout or service unavailable, and 1 for any other failure. A NotFound answer, or a kind the cluster does not serve yet, SHALL mean the resource does not exist. With `--create-namespace` and a missing namespace, the guard SHALL skip the rendered resources in that namespace.
 
-A dry run SHALL refuse nothing because of the guard: it SHALL NOT fail and SHALL NOT print a refusal for a resource the real run would refuse.
+A dry run SHALL run the same guard, with the same reads, the same verdict and the same admission set as the real run, and SHALL write nothing. For each resource the real run would refuse, the dry run SHALL print one line that names the resource by kind, namespace and name with the status `would refuse` and the reason of the verdict, which names the owning or adopting instance where there is one and the adopt annotation to set where one lifts the refusal. The dry run SHALL then stop where the real run stops: it SHALL send no rendered resource to the server, SHALL print no prune preview, and SHALL exit 1, the code of the real refusal, with an error that gives the number of refused resources, says that a real apply would be refused, and says that the dry run changed nothing. On a first apply it SHALL add the same earlier-identity line as the real refusal. When a rendered resource cannot be read, the dry run SHALL fail with the same error and the same exit code (4, 3 or 1) as the real run. A dry run of an operator-managed instance SHALL NOT run the guard: the operator applies that instance.
 
 A caller MAY pass an explicit admission set of resources; a resource in that set SHALL pass the refusal of a resource OPM does not manage when it carries no UUID label or this instance's, and SHALL still fail every other test. Only `opm operator install` SHALL pass a non-empty set, holding exactly the existing resources it proved came from an earlier opm-operator release manifest, or that already carry the operator instance's identity; every other caller SHALL pass none. No flag SHALL fill the set. When the guard refuses in the check phase of `opm operator install`, the exit code SHALL be that command's apply-guard code (capability `operator-lifecycle`). When it refuses inside that command's instance apply, after the install's writes, the refusal SHALL NOT say that nothing was changed. Source: 0012:D8:R6.
 
@@ -504,11 +535,6 @@ A caller MAY pass an explicit admission set of resources; a resource in that set
 - **WHEN** the read of a rendered resource answers NotFound
 - **THEN** the guard SHALL NOT refuse that resource
 
-#### Scenario: Dry run refuses nothing
-
-- **WHEN** `opm instance apply --dry-run` runs and a rendered resource exists without an OPM managed-by label
-- **THEN** the dry run SHALL NOT fail because of that resource
-
 #### Scenario: Admitted resource passes
 
 - **WHEN** `opm operator install` applies the operator instance
@@ -526,9 +552,41 @@ A caller MAY pass an explicit admission set of resources; a resource in that set
 - **AND** a rendered resource already exists on the cluster without OPM labels
 - **THEN** the command SHALL fail with an error naming the resource
 
+#### Scenario: Dry run previews a refusal and exits 1
+
+- **WHEN** `opm instance apply --dry-run` runs and a rendered resource exists without an OPM managed-by label
+- **THEN** the output SHALL list that resource as `would refuse` with the reason and the adopt annotation to set
+- **AND** the command SHALL exit 1
+- **AND** no rendered resource SHALL be sent to the server and no record SHALL be written
+
+#### Scenario: Dry run names the owner of a refused resource
+
+- **WHEN** `opm module apply --dry-run` runs and a rendered resource the record does not list carries another instance's UUID label
+- **THEN** the `would refuse` line SHALL name that instance's UUID
+- **AND** the command SHALL exit 1
+
+#### Scenario: Dry run lists every refused resource
+
+- **WHEN** `opm instance apply --dry-run` runs and two rendered resources exist without an OPM managed-by label
+- **THEN** the output SHALL hold one `would refuse` line for each
+
+#### Scenario: Dry run with an unreadable resource
+
+- **WHEN** `opm instance apply --dry-run` runs and the read of a rendered resource fails with Forbidden
+- **THEN** the command SHALL exit 4 with an error naming the resource and the read error
+
+#### Scenario: Dry run with nothing to refuse
+
+- **WHEN** `opm instance apply --dry-run` runs and every existing rendered resource is the instance's own
+- **THEN** the output SHALL hold no `would refuse` line and the command SHALL exit 0 when nothing else fails
+
 ### Requirement: Resource adopted by another instance is let go
 
-When the instance's UUID is known and the live `opmodel.dev/adopt` annotation of a rendered resource names another instance, the apply SHALL NOT apply that resource and SHALL NOT fail because of it. This SHALL hold for a resource the instance's record lists, and for an OPM-managed resource the record does not list that carries no UUID label, this instance's UUID or the UUID its annotation names. The apply SHALL print one warning that names the resource and the adopting instance and says how to take the resource back, SHALL apply the other rendered resources, and SHALL write the inventory without that resource. The apply SHALL NOT prune or otherwise delete it. `opm operator install` is the exception: it refuses on such a resource (capability `operator-lifecycle`). Source: 0012:D8:R8, 0012:D7:R1.
+When the instance's UUID is known and the live `opmodel.dev/adopt` annotation of a rendered resource names another instance, the apply SHALL NOT apply that resource and SHALL NOT fail because of it. This SHALL hold for a resource the instance's record lists, and for an OPM-managed resource the record does not list that carries no UUID label, this instance's UUID or the UUID its annotation names. The apply SHALL print one warning that names the resource and the adopting instance and says how to take the resource back, SHALL apply the other rendered resources, and SHALL write the inventory without that resource. The apply SHALL NOT prune or otherwise delete it. A dry run SHALL NOT send such a resource to the server either: in place of the warning it SHALL print one line that names the resource with the status `would skip` and the same text, and it SHALL NOT fail because of it.
+
+When every rendered resource is let go, so that the apply applies nothing, the real apply SHALL print, after the warnings and the inventory write, one closing line that says that nothing was applied because all rendered resources are adopted by another instance, with their number. It SHALL print no success line that says resources were applied or are up to date, and SHALL keep exit 0. A dry run in the same state SHALL print one closing line that says that nothing would be applied, for the same reason.
+
+`opm operator install` is the exception: it refuses on such a resource (capability `operator-lifecycle`). Source: 0012:D8:R8, 0012:D7:R1.
 
 #### Scenario: Recorded resource handed to another instance
 
@@ -550,6 +608,27 @@ When the instance's UUID is known and the live `opmodel.dev/adopt` annotation of
 - **WHEN** the adopt annotation of ConfigMap `settings` is set to the first instance's UUID
 - **AND** the first instance is applied
 - **THEN** the ConfigMap SHALL be applied and recorded in its inventory
+
+#### Scenario: Every rendered resource is adopted elsewhere
+
+- **WHEN** `opm instance apply` runs and the live adopt annotation of each rendered resource names another instance
+- **THEN** no rendered resource SHALL be applied or deleted
+- **AND** the output SHALL hold one line that says that nothing was applied because all rendered resources are adopted by another instance
+- **AND** the inventory SHALL be written without those resources
+- **AND** the command SHALL exit 0
+
+#### Scenario: Dry run skips an adopted resource
+
+- **WHEN** `opm instance apply --dry-run` runs and the live adopt annotation of rendered ConfigMap `settings` names another instance
+- **THEN** the output SHALL list the ConfigMap as `would skip` with a reason that names the adopting instance
+- **AND** the ConfigMap SHALL NOT be sent to the server
+- **AND** the command SHALL exit 0 when the other resources pass
+
+#### Scenario: Dry run where every rendered resource is adopted elsewhere
+
+- **WHEN** `opm instance apply --dry-run` runs and the live adopt annotation of each rendered resource names another instance
+- **THEN** the output SHALL hold one line that says that nothing would be applied
+- **AND** the command SHALL exit 0
 
 ### Requirement: Prune follows the shared deletion plan
 
