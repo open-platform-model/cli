@@ -157,8 +157,12 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 
 	// Gate 6: existence check, first-ever apply only (no previous inventory).
 	hasPrevInventory := prevRecord != nil || legacy != nil
-	if err := RunPreApplyExistenceCheck(ctx, req.K8sClient, hasPrevInventory, dryRun, currentEntries, req.Admit); err != nil {
+	alreadyManaged, err := RunPreApplyExistenceCheck(ctx, req.K8sClient, hasPrevInventory, dryRun, currentEntries, req.Admit)
+	if err != nil {
 		return err
+	}
+	if len(alreadyManaged) > 0 {
+		instanceLog.Warn(unrecordedResourcesWarning(len(alreadyManaged), len(currentEntries)))
 	}
 
 	if dryRun {
@@ -543,20 +547,40 @@ func GuardEmptyRender(resourceCount int, prevEntries []k8sinventory.Entry, force
 	return nil
 }
 
-func RunPreApplyExistenceCheck(ctx context.Context, k8sClient *kubernetes.Client, hasPrevInventory, dryRun bool, currentEntries []k8sinventory.Entry, admit inventory.AdmitSet) error {
+// RunPreApplyExistenceCheck runs the first-install existence check: never on
+// a dry run and never when a previous inventory exists. It returns the
+// rendered entries that already exist under OPM management
+// (inventory.FirstInstallCheck).
+func RunPreApplyExistenceCheck(ctx context.Context, k8sClient *kubernetes.Client, hasPrevInventory, dryRun bool, currentEntries []k8sinventory.Entry, admit inventory.AdmitSet) ([]k8sinventory.Entry, error) {
 	if hasPrevInventory || dryRun {
-		return nil
+		return nil, nil
 	}
-	if err := inventory.PreApplyExistenceCheck(ctx, k8sClient, currentEntries, admit); err != nil {
+	managed, err := inventory.FirstInstallCheck(ctx, k8sClient, currentEntries, admit)
+	if err != nil {
 		// An object the check could not read carries the API error, so the
 		// exit code follows it; an untracked or terminating object maps to
 		// the general code.
-		return &opmexit.ExitError{
+		return nil, &opmexit.ExitError{
 			Code: exitCodeFromK8sError(err),
 			Err:  fmt.Errorf("pre-apply existence check failed: %w", err),
 		}
 	}
-	return nil
+	return managed, nil
+}
+
+// lastMigratingRelease is the last opm release that moved an inventory kept
+// in a Secret into the ModuleInstance record.
+const lastMigratingRelease = "v1.0.0-beta.10"
+
+// unrecordedResourcesWarning is the warning of a first install that found
+// existing of its rendered resources already in the cluster under OPM
+// management. No record lists them, so the apply cannot know what else an
+// earlier apply created: it says what it does and what it leaves alone.
+func unrecordedResourcesWarning(existing, rendered int) string {
+	return fmt.Sprintf("%d of %d rendered resource(s) already exist and are managed by OPM, but the instance has no ModuleInstance record. "+
+		"Apply updates them in place and records them; it prunes nothing, so a resource an earlier apply created and this render no longer produces stays in the cluster untracked. "+
+		"If opm v1.0.0-alpha.1 or older last applied this instance, its inventory is in a Secret this release does not read: apply the instance once with opm %s first",
+		existing, rendered, lastMigratingRelease)
 }
 
 // FormatDryRunSummary is the closing line of a dry run: how many resources

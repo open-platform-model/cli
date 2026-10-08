@@ -35,6 +35,17 @@ import (
 //
 // This check should be skipped entirely when a previous inventory exists.
 func PreApplyExistenceCheck(ctx context.Context, client *kubernetes.Client, entries []k8sinventory.Entry, admit AdmitSet) error {
+	_, err := FirstInstallCheck(ctx, client, entries, admit)
+	return err
+}
+
+// FirstInstallCheck is PreApplyExistenceCheck that also reports what passed
+// while already in the cluster: managed holds, in entry order, the entries
+// whose object exists with an OPM managed-by label. Such an object was
+// applied by OPM before, yet the caller has no inventory that records it, so
+// a caller that goes on takes it into a new inventory. An admitted object is
+// not OPM-managed and is not reported.
+func FirstInstallCheck(ctx context.Context, client *kubernetes.Client, entries []k8sinventory.Entry, admit AdmitSet) (managed []k8sinventory.Entry, err error) {
 	for _, entry := range entries {
 		gvr := schema.GroupVersionResource{
 			Group:    entry.Group,
@@ -50,7 +61,7 @@ func PreApplyExistenceCheck(ctx context.Context, client *kubernetes.Client, entr
 			}
 			// Any other answer leaves the question open, and the forced apply
 			// that follows would take over whatever holds the name.
-			return fmt.Errorf("cannot check whether %s/%s in namespace %q already exists: %w\n"+
+			return nil, fmt.Errorf("cannot check whether %s/%s in namespace %q already exists: %w\n"+
 				"apply stopped before any rendered resource was applied. Check that you can read that resource, then run the command again",
 				entry.Kind, entry.Name, entry.Namespace, err)
 		}
@@ -59,7 +70,7 @@ func PreApplyExistenceCheck(ctx context.Context, client *kubernetes.Client, entr
 
 		// Check for terminating resources
 		if obj.GetDeletionTimestamp() != nil {
-			return fmt.Errorf("resource %s/%s in namespace %q is terminating (deletionTimestamp set) — wait for deletion to complete before applying",
+			return nil, fmt.Errorf("resource %s/%s in namespace %q is terminating (deletionTimestamp set) — wait for deletion to complete before applying",
 				entry.Kind, entry.Name, entry.Namespace)
 		}
 
@@ -67,12 +78,16 @@ func PreApplyExistenceCheck(ctx context.Context, client *kubernetes.Client, entr
 		// Accepts any known OPM actor value (opm-cli, opm-controller, or
 		// legacy open-platform-model) for backward compatibility.
 		labels := unstrObj.GetLabels()
-		if !opmlabels.IsOPMManagedBy(labels[opmlabels.ManagedBy]) && !admit.Has(entry) {
-			return fmt.Errorf("resource %s/%s in namespace %q already exists and is not managed by OPM — remove or rename it, or change the module to render a different name",
+		if opmlabels.IsOPMManagedBy(labels[opmlabels.ManagedBy]) {
+			managed = append(managed, entry)
+			continue
+		}
+		if !admit.Has(entry) {
+			return nil, fmt.Errorf("resource %s/%s in namespace %q already exists and is not managed by OPM — remove or rename it, or change the module to render a different name",
 				entry.Kind, entry.Name, entry.Namespace)
 		}
 	}
-	return nil
+	return managed, nil
 }
 
 // SplitProtected partitions a stale set into the entries prune may delete and

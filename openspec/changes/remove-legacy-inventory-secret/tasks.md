@@ -1,8 +1,8 @@
 ## 1. Warn on a first install over resources OPM already manages
 
-- [ ] 1.1 Add tests: `inventory.FirstInstallCheck` returns the entries that exist with an OPM managed-by label and leaves out absent and admitted ones; `Execute` on a first install prints one warning naming "2 of 3" when two rendered ConfigMaps exist with the label, applies all three and exits 0; no warning on a clean first install or with a record. See the `Execute` warning test fail on the current code
-- [ ] 1.2 Add `FirstInstallCheck` to `internal/inventory/stale.go` with `PreApplyExistenceCheck` as its wrapper; return the list from `RunPreApplyExistenceCheck`; print the warning in `Execute`
-- [ ] 1.3 `task lint` and `task test:unit` green, then commit `feat(apply): warn when a first install finds resources OPM already manages`
+- [x] 1.1 Add tests: `inventory.FirstInstallCheck` returns the entries that exist with an OPM managed-by label and leaves out absent and admitted ones; `Execute` on a first install prints one warning naming "2 of 3" when two rendered ConfigMaps exist with the label, applies all three and exits 0; no warning on a clean first install or with a record. See the `Execute` warning test fail on the current code
+- [x] 1.2 Add `FirstInstallCheck` to `internal/inventory/stale.go` with `PreApplyExistenceCheck` as its wrapper; return the list from `RunPreApplyExistenceCheck`; print the warning in `Execute`
+- [x] 1.3 `task lint` and `task test:unit` green, then commit `feat(apply): warn when a first install finds resources OPM already manages`
 
 ## 2. Remove the legacy inventory Secret path
 
