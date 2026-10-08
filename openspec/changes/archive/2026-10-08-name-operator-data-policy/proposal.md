@@ -8,7 +8,7 @@ cli#345 made the CLI keep PersistentVolumeClaims unless `--delete-data`, and tol
 - The dry run and the run with `--yes` state the same outcome, and the closing output of a delete after which the operator may have kept claims no longer says that the operator pruned every tracked resource: it names the claims and prints the `kubectl delete pvc` command for each.
 - The warning for `--delete-data` on an operator-managed instance (`opm instance delete`, `opm instance apply`, `opm module apply`) says that the flag does not change what the operator does, names `spec.dataPolicy` as the setting of an operator that has it, and says that an older operator deletes claims. It stays a warning; the command goes on.
 - The help of the three commands and the page `docs/site/diagnostics/kept-volume-claims.md` say the same, and the page names the exception the operator documents: a forced recreate under `spec.rollout.forceConflicts` deletes and recreates a claim whatever the data policy says.
-- The CLI reads `spec.dataPolicy` from the unstructured `ModuleInstance` it already reads, and does not import the operator's Go types. The CRD read is one more GET of an object the delete of an operator-managed instance reads already for its readiness gate.
+- The CLI reads `spec.dataPolicy` from the unstructured `ModuleInstance` it already reads, and does not import the operator's Go types. The CRD is the one the readiness gate of that delete reads; it is read once. The gate, and the guard for an instance that deploys the operator, now run before the question, so a refused delete asks nothing.
 
 What does not change: everything the CLI does for an instance it owns (cli#345), the flags, the exit codes, and what the operator does.
 
@@ -30,7 +30,7 @@ None.
 - `internal/cmd/instance/delete.go`: the prompt, the dry-run and progress lines and the closing output of the operator-owned branch; the help text.
 - `internal/cmd/instance/apply.go`, `internal/cmd/module/apply.go`: one help sentence each.
 - `internal/workflow/apply/delete.go`: the text of the constant `DeleteDataOperatorManagedNote`, nothing else in that package.
-- `internal/operator/crdfield.go` (new): `ModuleInstanceSpecField`, a read of the ModuleInstance CRD schema.
+- `internal/operator/crdfield.go` (new): `SpecFieldSupport`; `internal/operator/ready.go`: `ReadyModuleInstanceCRD`, the readiness gate that returns the CRD it read; `internal/inventory/gates.go`: `ModuleInstanceCRDHasField`, an exported wrapper of the existing schema walker.
 - `internal/inventory/record.go`, `internal/inventory/store.go`: one new field `Record.DataPolicy` and its read from `spec.dataPolicy`, beside `Record.Prune`. No logic there changes.
 - `docs/site/diagnostics/kept-volume-claims.md`.
 - Tests in `internal/cmd/instance`, `internal/inventory` and `internal/workflow/apply`.

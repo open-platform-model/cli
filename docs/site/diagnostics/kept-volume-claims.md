@@ -89,15 +89,13 @@ For an instance that the operator manages, `opm instance delete` deletes only th
 
 ### An operator without the field deletes claims
 
-`spec.dataPolicy` is new in the operator. An operator released before the field deletes PersistentVolumeClaims and the data on them whenever `spec.prune` is set. Nothing on the instance changes that: the API server of such a cluster drops `spec.dataPolicy` from a `ModuleInstance`.
+`spec.dataPolicy` is new in the operator. An operator released before the field deletes PersistentVolumeClaims and the data on them whenever `spec.prune` is set. Its `ModuleInstance` CRD has no `spec.dataPolicy` in its schema, and `opm` reads the field's absence there as "this operator deletes claims", whatever the instance carries.
 
-To see which operator API a cluster has, ask it for the field:
+To see the release of the operator that runs in a cluster, read the `Operator` column of the Platform:
 
 ```sh
-kubectl explain moduleinstance.spec.dataPolicy
+kubectl get platform cluster
 ```
-
-If the command fails, the installed CRDs have no such field, and the operator deletes claims.
 
 ### An operator with the field keeps claims
 
@@ -113,7 +111,7 @@ The same holds for the prune of the operator: a claim that a new render no longe
 
 Only `Delete` makes the operator delete claims. `opm` shows the value as it is written; a value other than `Keep` and `Delete` is shown in quotes and read as `Keep`, which is also how the operator reads it.
 
-To have such an operator delete the claims of an instance, set the field before you delete the instance. This works only where `kubectl explain` shows the field:
+To have such an operator delete the claims of an instance, set the field before you delete the instance. This needs an operator and CRDs that have the field:
 
 ```sh
 kubectl patch moduleinstance jellyfin -n media --type=merge -p '{"spec":{"dataPolicy":"Delete"}}'
@@ -121,14 +119,18 @@ kubectl patch moduleinstance jellyfin -n media --type=merge -p '{"spec":{"dataPo
 
 ### What the confirmation prompt says
 
-Before it asks, `opm instance delete` reads the `ModuleInstance`, with its `spec.prune`, its `spec.dataPolicy` and its inventory. When `spec.prune` is set and the inventory tracks a PersistentVolumeClaim, it also reads the `ModuleInstance` CRD, to see whether the operator has `spec.dataPolicy`. The prompt then says one of these:
+Before it asks, `opm instance delete` reads the `ModuleInstance`, with its `spec.prune`, its `spec.dataPolicy` and its inventory, and the resources that the inventory tracks. For an operator-managed instance it then checks that the operator is ready: it reads the four CRDs of the operator and the Deployment of its controller. An operator that is not ready, or that `opm` cannot read, ends the command with a refusal, before any question. From the `ModuleInstance` CRD that this check reads, `opm` also takes whether the operator has `spec.dataPolicy`.
+
+When `spec.prune` is set and the inventory tracks a PersistentVolumeClaim, the prompt says one of these:
 
 | The cluster | The prompt says |
 | --- | --- |
 | The CRD has no `spec.dataPolicy` | The operator has no `spec.dataPolicy` and deletes the claims and the data on them. |
 | `spec.dataPolicy` is `Delete` | The operator deletes the claims and the data on them. |
 | The CRD has the field, and the value is `Keep`, not set, or unknown | The operator keeps the claims. One more sentence says that an operator older than its CRDs deletes them. |
-| The CRD cannot be read | An operator with the field keeps the claims, an older one deletes them, and `opm` could not tell which runs. |
+| The CRD has no schema that `opm` can read | An operator with the field keeps the claims, an older one deletes them, and `opm` could not tell which runs. |
+
+An instance that tracks no PersistentVolumeClaim gets no sentence about claims.
 
 On an operator without the field:
 
@@ -145,7 +147,9 @@ The ModuleInstance CRD has spec.dataPolicy, but an operator older than its CRDs 
 Delete the ModuleInstance for instance "jellyfin" in namespace "media"? [y/N]:
 ```
 
-The second sentence is there because the CRDs can be newer than the operator that runs beside them: `opm operator install --crds-only` updates the CRDs alone. `opm` reads no object that names the release of the running operator. If you are not sure, compare the image of the operator Deployment with the release whose CRDs you installed before you answer.
+The second sentence is there because the CRDs can be newer than the operator that runs beside them: `opm operator install --crds-only` updates the CRDs alone. `opm instance delete` decides from the CRD only. It compares no operator release, because no release with the field existed to compare with when this was written. If you are not sure, read the running release with `kubectl get platform cluster` before you answer.
+
+The opposite state, an operator that is newer than its CRDs, is not supported. In that state the CRD has no `spec.dataPolicy`, so the prompt says that the operator deletes the claims, while an operator with the field keeps them.
 
 With `--yes` and with `--dry-run` there is no prompt; the same outcome is on the `INFO` line of the run. After a delete that may have kept claims, the closing output lists them with the `kubectl get pvc` and `kubectl delete pvc` commands. It does not say that the claims are still there: `opm` does not read them back.
 

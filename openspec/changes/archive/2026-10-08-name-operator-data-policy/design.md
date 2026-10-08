@@ -17,7 +17,7 @@ See `proposal.md` for the motivation. The facts the design rests on, each read f
 
 - No change to the CLI-owned delete and prune (cli#345).
 - No new flag, no refusal, and no read of an object the command does not read already.
-- No change to the logic of `internal/inventory`, `internal/kubernetes` or `internal/workflow/apply`. The change adds one read field to `inventory.Record`, rewords one constant in `internal/workflow/apply`, and adds one read-only function to `internal/operator`.
+- No change to the logic of `internal/inventory`, `internal/kubernetes` or `internal/workflow/apply`. The change adds one read field to `inventory.Record` and one exported wrapper of the existing CRD schema walker there, rewords one constant in `internal/workflow/apply`, and lets the readiness gate in `internal/operator` return the CRD it read.
 - The CLI does not set `spec.dataPolicy`.
 
 ## Decisions
@@ -34,35 +34,55 @@ Alternative: read the `ModuleInstance` a second time in the delete command. Reje
 
 ### The operator's CRD says whether the operator has the field
 
-An operator released before `spec.dataPolicy` does not know the field and deletes claims under `spec.prune`. When this change was written no released operator had the field (opm-operator#267 was open), and the operator this CLI pins and installs was one of them. A prompt that leads with "keeps PersistentVolumeClaims" is then false for every released operator. So the CLI must find out, and it can, from an object the delete of an operator-managed instance already reads: the readiness gate `operator.CheckReady` reads the `moduleinstances.opmodel.dev` CRD. The schema of that CRD says whether the API has `spec.dataPolicy`, with no version number to compare.
+An operator released before `spec.dataPolicy` does not know the field and deletes claims under `spec.prune`. When this change was written no released operator had the field (opm-operator#267 was open), and the operator this CLI pins and installs was one of them. A prompt that leads with "keeps PersistentVolumeClaims" is then false for every released operator. So the CLI must find out, and it can, from an object the delete of an operator-managed instance already reads: its readiness gate reads the `moduleinstances.opmodel.dev` CRD. The schema of that CRD says whether the API has `spec.dataPolicy`, with no version number to compare.
 
 ```go
 // internal/operator
 type FieldSupport int // FieldUnknown, FieldAbsent, FieldPresent
 
-// ModuleInstanceSpecField reads the ModuleInstance CRD and reports whether a
-// version it serves has spec.<field>. A failed read is FieldUnknown.
-func ModuleInstanceSpecField(ctx context.Context, client *kubernetes.Client, field string) FieldSupport
+// ReadyModuleInstanceCRD is CheckReady that also returns the live
+// ModuleInstance CRD the gate read. It refuses exactly when CheckReady does.
+func ReadyModuleInstanceCRD(ctx context.Context, client *kubernetes.Client) (*unstructured.Unstructured, error)
+
+// SpecFieldSupport reports whether that CRD has spec.<field>.
+func SpecFieldSupport(crd *unstructured.Unstructured, field string) FieldSupport
+
+// internal/inventory: the one reading of the CRD schema (storage version,
+// else the first served one), shared with the apply gate CheckCRDFieldFloor.
+func ModuleInstanceCRDHasField(crd *unstructured.Unstructured, parent, child string) (bool, error)
 ```
 
-The delete command reads it before the prompt, and only when the answer changes a message: the instance is operator-managed, `spec.prune` is set and the inventory tracks a PersistentVolumeClaim. The result has four cases:
+One read, one schema walker. The gate reads the CRD once and the field is taken from that object. `internal/inventory/gates.go` already walks the CRD schema for the apply gate; the new exported function wraps that walker, so the two callers cannot apply different version rules.
+
+The result has four cases, for an instance with `spec.prune` set that tracks a claim:
 
 | CRD | `spec.dataPolicy` | The CLI says |
 | --- | --- | --- |
 | no such field | any | the operator has no `spec.dataPolicy` and deletes the claims |
 | any | `Delete` | the operator deletes the claims |
 | has the field | `Keep`, absent, unknown | the operator keeps the claims; an operator older than its CRDs deletes them |
-| unreadable | not `Delete` | neither: an operator with the field keeps them, an older one deletes them, opm could not read the CRD |
+| no readable schema | not `Delete` | neither: an operator with the field keeps them, an older one deletes them, opm could not read the schema |
 
-A CRD without the field also means that the API server drops the field from every `ModuleInstance`, so the first row holds whatever a user tried to set.
+The third row keeps one sentence of doubt. `opm operator install --crds-only` and a failed controller rollout both leave CRDs that are newer than the controller. The delete decides from the CRD only and compares no operator release: no release with the field existed to compare with. The release of the running controller is readable (`Platform/cluster` `status.operatorVersion`, which the apply gate reads, and the image of the controller Deployment, which the readiness gate reads); a comparison is a follow-up for when the release number exists.
 
-The third row keeps one sentence of doubt. `opm operator install --crds-only` and a failed controller rollout both leave CRDs that are newer than the controller, and no object the command reads names the controller's release: `Platform/cluster` `status.operatorVersion` would be a read of another object that a namespace-scoped user is often denied, and no release number of the field exists to compare with.
+The fourth row is a CRD that the gate read and found Established, but whose version or schema cannot be read. A CRD that cannot be read at all never reaches the prompt: the gate refuses first.
 
-The fourth row is reached only when the CRD read fails. The readiness gate then refuses the delete after the prompt, so the row is a safe wording for a prompt that leads nowhere, not a path to a delete.
+The opposite skew, a controller newer than its CRDs, is not supported. The CRD then has no field, the CLI says that the operator deletes the claims, and an operator with the field keeps them. The docs page says so.
 
-Cost: one more GET of the CRD, of an object the command reads anyway, and none for an instance without `spec.prune` or without a tracked claim.
+### The question comes after every check that can refuse
 
-Alternative: make `CheckReady` return the objects it fetched and run it before the prompt. Rejected for this change: it moves the readiness refusal in front of the question for every operator-managed delete and changes a function three commands share. Alternative: leave the prompt as cli#345 wrote it until the CLI pins an operator with the field. Rejected: the text is then wrong on the day that operator is installed by any other means.
+The readiness gate refuses the delete of an operator-managed instance when the operator is not ready or cannot be read. It ran after the prompt, so a user answered a question about data loss and was then refused. The question now runs after the guard for an instance that deploys the operator and after the readiness gate, in one place:
+
+```go
+// confirmFunc asks whether the delete goes ahead, with what the operator does
+// with the instance's claims. A run that skips the question answers yes.
+type confirmFunc func(opClaims operatorClaims) bool
+
+func deleteResolvedInstance(..., confirm confirmFunc, ...) error // guard, then: operator-owned -> deleteOperatorOwned; else confirm, delete
+func deleteOperatorOwned(..., confirm confirmFunc, ...) error   // readiness gate, claims from its CRD, confirm, delete
+```
+
+The gate does not tell an RBAC denial from "operator not ready": both are the same refusal, as before this change. Whether a denied read should degrade is an owner decision and is not taken here.
 
 The tracked claims are counted from the inventory entries of the record with `kubernetes.IsDataClaim`, which the CLI-owned branch already uses.
 
@@ -88,11 +108,11 @@ This instance is operator-managed: spec.prune is set and spec.dataPolicy is not 
 The ModuleInstance CRD has spec.dataPolicy, but an operator older than its CRDs deletes the claims whatever the field says.
 ```
 
-Prompt, the CRD cannot be read:
+Prompt, the CRD has no readable schema:
 
 ```text
 This instance is operator-managed: spec.prune is set and spec.dataPolicy is not set, so the operator deletes its tracked resources.
-An operator that has spec.dataPolicy keeps PersistentVolumeClaims and the data on them, an older operator deletes them, and opm could not read the ModuleInstance CRD to tell which runs here.
+An operator that has spec.dataPolicy keeps PersistentVolumeClaims and the data on them, an older operator deletes them, and opm could not read the schema of the ModuleInstance CRD to tell which runs here.
 ```
 
 Prompt, `spec.prune` set, no claim tracked:
@@ -136,7 +156,7 @@ To have the operator delete claims with an instance, set spec.dataPolicy to Dele
 
 The closing output claims nothing the CLI did not establish: the disappearance of the `ModuleInstance` proves that the finalizer completed, not which claims are left. In every other case the closing line stays as it is today ("Instance deleted", then "operator pruned N resources").
 
-Syntax, flags and exit codes: `opm instance delete <file|name|uuid> [flags]` is unchanged. No flag is added or changed. Exit codes are unchanged: 0 on success and on a declined prompt, 2 when the operator is not ready, 5 for a missing instance. No new error is introduced: a failed CRD read changes the wording only.
+Syntax, flags and exit codes: `opm instance delete <file|name|uuid> [flags]` is unchanged. No flag is added or changed. Exit codes are unchanged: 0 on success and on a declined prompt, 2 when the operator is not ready, 5 for a missing instance. No new error is introduced. The operator-readiness refusal (exit 2) now comes before the question.
 
 ## Risks / Trade-offs
 

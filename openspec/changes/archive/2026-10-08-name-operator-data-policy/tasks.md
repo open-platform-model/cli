@@ -18,3 +18,10 @@
 - [x] 3.2 `internal/cmd/instance/delete.go`: read the CRD before the prompt, only for an operator-managed instance with `spec.prune` set that tracks a claim; the prompt, the dry-run line, the progress line and the closing output say that claims are deleted when the CRD has no `spec.dataPolicy`, say "kept" only when it has, and say nothing about claims when none is tracked; tests cover the three CRD cases and count the CRD reads
 - [x] 3.3 The `--delete-data` warning and the help of the three commands say what an older operator does; the docs page says what the command reads and what each case prints
 - [x] 3.4 `task fmt`, `task vet`, `task lint`, `task openspec:check`, `task docs:bundle:check`, `task test:unit` and `task cascade:wiring:check` green, then commit `fix(cmd): say that an operator without spec.dataPolicy deletes claims`
+
+## 4. Fix-check: the refusal comes before the question, one CRD read, one schema walker
+
+- [x] 4.1 `internal/operator`, `internal/inventory`: `ReadyModuleInstanceCRD` returns the CRD the readiness gate read; `SpecFieldSupport` asks `inventory.ModuleInstanceCRDHasField`, the walker of the apply gate; tests cover present, absent, no schema, no CRD and the gate's refusal
+- [x] 4.2 `internal/cmd/instance/delete.go`: the question is asked after the guard and the readiness gate; tests pin that a refused delete prints no question and that the ModuleInstance CRD is read once
+- [x] 4.3 The docs page says what the command reads, names `kubectl get platform cluster`, drops the claims nobody ran, and names the unsupported skew
+- [x] 4.4 `task fmt`, `task vet`, `task lint`, `task openspec:check`, `task docs:bundle:check`, `task test:unit` and `task cascade:wiring:check` green, then commit `fix(cmd): refuse an operator-managed delete before asking about it`

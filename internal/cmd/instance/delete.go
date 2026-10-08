@@ -175,6 +175,10 @@ func runInstanceDelete(ctx context.Context, identifier string, cfg *config.Globa
 // unless the flags skip it, and deletes. The record is read before the
 // prompt, so that the prompt can name the claims --delete-data deletes and a
 // missing instance is reported without a question. The read changes nothing.
+//
+// The question is asked by deleteResolvedInstance, after every check that can
+// refuse the delete: nobody is asked about their data for a delete that the
+// command then refuses.
 func confirmAndDelete(ctx context.Context, k8sClient *kubernetes.Client, rsf *cmdutil.InstanceSelectorFlags, namespace string, flags deleteFlags, in io.Reader, instanceLog *log.Logger) error {
 	inv, liveResources, _, unreadable, err := query.ResolveInventory(ctx, k8sClient, rsf, namespace, instanceLog)
 	if err != nil {
@@ -188,27 +192,30 @@ func confirmAndDelete(ctx context.Context, k8sClient *kubernetes.Client, rsf *cm
 	if operatorManaged && flags.DeleteData {
 		instanceLog.Warn(workflowapply.DeleteDataOperatorManagedNote)
 	}
-
-	// Read before the question too: what the operator does with the claims
-	// depends on whether its CRD has spec.dataPolicy at all.
-	opClaims := readOperatorClaims(ctx, k8sClient, inv)
-
 	if flags.DryRun {
 		instanceLog.Info("dry run - no changes will be made")
-	} else if !flags.SkipConfirm {
+	}
+
+	confirm := func(opClaims operatorClaims) bool {
+		if flags.DryRun || flags.SkipConfirm {
+			return true
+		}
 		prompt := deletePrompt(rsf.InstanceName, rsf.InstanceID, namespace, claimsToDelete(inv, liveResources, flags.DeleteData))
 		if operatorManaged {
 			prompt = operatorManagedDeletePrompt(rsf.InstanceName, rsf.InstanceID, namespace, inv.Prune, opClaims)
 		}
 		output.Prompt(prompt)
-		if !readConfirmation(in) {
-			instanceLog.Info("deletion canceled")
-			return nil
-		}
+		return readConfirmation(in)
 	}
 
-	return deleteResolvedInstance(ctx, k8sClient, rsf, namespace, inv, liveResources, unreadable, opClaims, flags.Timeout, flags.DryRun, flags.DeleteData, instanceLog)
+	return deleteResolvedInstance(ctx, k8sClient, rsf, namespace, inv, liveResources, unreadable, confirm, flags.Timeout, flags.DryRun, flags.DeleteData, instanceLog)
 }
+
+// confirmFunc asks whether the delete goes ahead. It is called once, after
+// the checks that can refuse the delete, with what the operator does with the
+// instance's PersistentVolumeClaims (the zero value for a CLI-owned instance).
+// A run that skips the question answers yes.
+type confirmFunc func(opClaims operatorClaims) bool
 
 // claimsToDelete lists, as "<namespace>/<name>", the PersistentVolumeClaims a
 // delete with these flags removes: the live tracked claims of a CLI-owned
@@ -233,21 +240,29 @@ func claimsToDelete(inv *inventory.Record, live []*unstructured.Unstructured, de
 // operator-owned instance is deleted by deleting its CR and letting the
 // operator's finalizer prune the workloads.
 //
+// confirm is asked after the guard and, for an operator-owned instance, after
+// the operator-readiness gate: both can refuse, and a refusal comes before the
+// question. A "no" deletes nothing and is not an error.
+//
 // unreadable lists the tracked resources discovery could not read. The
 // CLI-owned branch treats each as a per-resource failure and keeps the
 // ModuleInstance; the operator-owned branch ignores them, since it deletes only
 // the ModuleInstance and the operator prunes with its own credentials.
 func deleteResolvedInstance(ctx context.Context, k8sClient *kubernetes.Client, rsf *cmdutil.InstanceSelectorFlags, namespace string,
-	inv *inventory.Record, liveResources []*unstructured.Unstructured, unreadable []inventory.UnreadableEntry, opClaims operatorClaims,
+	inv *inventory.Record, liveResources []*unstructured.Unstructured, unreadable []inventory.UnreadableEntry, confirm confirmFunc,
 	timeout time.Duration, dryRun, deleteData bool, instanceLog *log.Logger) error {
 	if err := guardOperatorInstanceDelete(ctx, k8sClient, inv); err != nil {
 		return err
 	}
 
 	if inventory.ResolveOwnership(inv) == inventory.ModeOperatorOwned {
-		return deleteOperatorOwned(ctx, k8sClient, inv, opClaims, timeout, dryRun, instanceLog)
+		return deleteOperatorOwned(ctx, k8sClient, inv, confirm, timeout, dryRun, instanceLog)
 	}
 
+	if !confirm(operatorClaims{}) {
+		instanceLog.Info("deletion canceled")
+		return nil
+	}
 	return executeInstanceDelete(ctx, k8sClient, rsf, namespace, inv, liveResources, unreadable, dryRun, deleteData, instanceLog)
 }
 
@@ -303,8 +318,13 @@ func guardOperatorInstanceDelete(ctx context.Context, k8sClient *kubernetes.Clie
 // with its workloads orphaned and unreachable through the CLI. That is the same
 // footgun `opm operator uninstall` guards from the other side, and it has no
 // --force bypass here: forcing it produces the wedge, it does not avoid it.
-func deleteOperatorOwned(ctx context.Context, k8sClient *kubernetes.Client, inv *inventory.Record, claims operatorClaims, timeout time.Duration, dryRun bool, instanceLog *log.Logger) error {
-	if err := operator.CheckReady(ctx, k8sClient); err != nil {
+//
+// The guard runs before confirm is asked, so its refusal comes before the
+// question. The ModuleInstance CRD it reads also says whether the operator has
+// spec.dataPolicy, which the question needs; no second read is made for that.
+func deleteOperatorOwned(ctx context.Context, k8sClient *kubernetes.Client, inv *inventory.Record, confirm confirmFunc, timeout time.Duration, dryRun bool, instanceLog *log.Logger) error {
+	crd, err := operator.ReadyModuleInstanceCRD(ctx, k8sClient)
+	if err != nil {
 		var notReady *operator.NotReadyError
 		if errors.As(err, &notReady) {
 			notReady.Hint = fmt.Sprintf(
@@ -312,6 +332,12 @@ func deleteOperatorOwned(ctx context.Context, k8sClient *kubernetes.Client, inv 
 				inv.Name, inventory.CleanupFinalizer)
 		}
 		return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err}
+	}
+
+	claims := operatorClaimsOf(inv, crd)
+	if !confirm(claims) {
+		instanceLog.Info("deletion canceled")
+		return nil
 	}
 
 	// spec.prune decides whether removing the CR removes the workloads. It has
@@ -505,7 +531,12 @@ func reportOperatorPrune(inv *inventory.Record, claims operatorClaims, instanceL
 	var b strings.Builder
 	fmt.Fprintf(&b, "The instance tracked %d PersistentVolumeClaim(s). An operator that has spec.dataPolicy keeps them\n", len(claims.tracked))
 	fmt.Fprintf(&b, "and the data on them (%s), and OPM no longer tracks them.\n", describeDataPolicy(claims.dataPolicy))
-	b.WriteString("An operator older than its CRDs deleted them. To see what is left:\n")
+	if claims.fate() == claimsUndecided {
+		b.WriteString("An operator without spec.dataPolicy, or older than its CRDs, deleted them, and opm could not read\n")
+		b.WriteString("the schema of the ModuleInstance CRD to tell. To see what is left:\n")
+	} else {
+		b.WriteString("An operator older than its CRDs deleted them. To see what is left:\n")
+	}
 	fmt.Fprintf(&b, "  kubectl get pvc -n %s\n", inv.Namespace)
 	b.WriteString("To delete a claim and its data:\n")
 	for _, c := range claims.tracked {
@@ -530,10 +561,11 @@ const (
 // that the controller is as new as its CRDs.
 const keptClaimsHedge = "The ModuleInstance CRD has spec.dataPolicy, but an operator older than its CRDs deletes the claims whatever the field says."
 
-// undecidedClaimsNote stands in for a statement about claims when the CRD
-// could not be read.
+// undecidedClaimsNote stands in for a statement about claims when the schema
+// of the CRD could not be read. The readiness gate has read the CRD by then,
+// so this is a CRD without a readable version or schema, not a failed read.
 const undecidedClaimsNote = "An operator that has spec.dataPolicy keeps PersistentVolumeClaims and the data on them, an older operator deletes them, " +
-	"and opm could not read the ModuleInstance CRD to tell which runs here."
+	"and opm could not read the schema of the ModuleInstance CRD to tell which runs here."
 
 // claimFate is what the operator does with the PersistentVolumeClaims of an
 // instance with spec.prune set, as far as opm can read it.
@@ -547,7 +579,8 @@ const (
 	claimsDeleted
 	// claimsKept: the CRD has the field and its value is not Delete.
 	claimsKept
-	// claimsUndecided: the value is not Delete and the CRD could not be read.
+	// claimsUndecided: the value is not Delete and the CRD's schema could not
+	// be read.
 	claimsUndecided
 )
 
@@ -561,19 +594,19 @@ type operatorClaims struct {
 	field      operator.FieldSupport
 }
 
-// readOperatorClaims builds the operatorClaims of an operator-managed
-// instance. It reads the ModuleInstance CRD, which the readiness gate of the
-// delete reads too, only when the answer matters: spec.prune is set and the
-// inventory tracks a claim. Every other instance costs no read.
-func readOperatorClaims(ctx context.Context, k8sClient *kubernetes.Client, inv *inventory.Record) operatorClaims {
-	if inventory.ResolveOwnership(inv) != inventory.ModeOperatorOwned || !inv.Prune {
+// operatorClaimsOf builds the operatorClaims of an operator-managed instance
+// from its record and the live ModuleInstance CRD the readiness gate read.
+// Without spec.prune the operator leaves everything, so the zero value is
+// returned and no message speaks of claims.
+func operatorClaimsOf(inv *inventory.Record, crd *unstructured.Unstructured) operatorClaims {
+	if !inv.Prune {
 		return operatorClaims{}
 	}
-	claims := operatorClaims{tracked: trackedClaims(inv), dataPolicy: inv.DataPolicy}
-	if len(claims.tracked) > 0 {
-		claims.field = operator.ModuleInstanceSpecField(ctx, k8sClient, dataPolicyField)
+	return operatorClaims{
+		tracked:    trackedClaims(inv),
+		dataPolicy: inv.DataPolicy,
+		field:      operator.SpecFieldSupport(crd, dataPolicyField),
 	}
-	return claims
 }
 
 // fate decides what the operator does with the tracked claims. Only the
@@ -611,7 +644,7 @@ func (c operatorClaims) outcome() string {
 	case claimsKept:
 		return fmt.Sprintf(", PersistentVolumeClaims and the data on them kept (%s) unless the operator is older than its CRDs", c.reason())
 	case claimsUndecided:
-		return "; PersistentVolumeClaims are kept only by an operator that has spec.dataPolicy, and opm could not read the ModuleInstance CRD to tell"
+		return "; PersistentVolumeClaims are kept only by an operator that has spec.dataPolicy, and opm could not read the schema of the ModuleInstance CRD to tell"
 	case claimsNone:
 		return ""
 	}

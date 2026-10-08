@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
+	k8stesting "k8s.io/client-go/testing"
 
 	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
@@ -286,7 +287,7 @@ func moduleInstanceCRD(withDataPolicy bool) *unstructured.Unstructured {
 		"apiVersion": "apiextensions.k8s.io/v1", "kind": "CustomResourceDefinition",
 		"metadata": map[string]any{"name": inventory.CRDNameModuleInstances},
 		"spec": map[string]any{"versions": []any{map[string]any{
-			"name": "v1alpha1", "served": true,
+			"name": "v1alpha1", "served": true, "storage": true,
 			"schema": map[string]any{"openAPIV3Schema": map[string]any{
 				"properties": map[string]any{"spec": map[string]any{"properties": props}},
 			}},
@@ -295,19 +296,46 @@ func moduleInstanceCRD(withDataPolicy bool) *unstructured.Unstructured {
 	}}
 }
 
-// installCRD puts the ModuleInstance CRD of an operator release into the
-// scenario's cluster.
-func (s *claimScenario) installCRD(t *testing.T, withDataPolicy bool) {
+// readyOperator is a running operator whose ModuleInstance CRD is crd; nil
+// leaves the bare CRD of runningOperatorObjects, which has no schema.
+func readyOperator(crd *unstructured.Unstructured) []runtime.Object {
+	var objs []runtime.Object
+	for _, o := range runningOperatorObjects() {
+		if u := o.(*unstructured.Unstructured); crd == nil || u.GetName() != inventory.CRDNameModuleInstances {
+			objs = append(objs, o)
+		}
+	}
+	if crd != nil {
+		objs = append(objs, crd)
+	}
+	return objs
+}
+
+// installOperator puts a ready operator into the scenario's cluster.
+func (s *claimScenario) installOperator(t *testing.T, crd *unstructured.Unstructured) {
 	t.Helper()
-	require.NoError(t, s.fake.Tracker().Add(moduleInstanceCRD(withDataPolicy)))
+	for _, o := range readyOperator(crd) {
+		require.NoError(t, s.fake.Tracker().Add(o))
+	}
 }
 
 // The three operators a delete can meet, by what the ModuleInstance CRD says.
 const (
 	crdWithField    = "CRD has spec.dataPolicy"
 	crdWithoutField = "CRD has no spec.dataPolicy"
-	crdUnreadable   = "CRD cannot be read"
+	crdNoSchema     = "CRD has no readable schema"
 )
+
+func crdFor(kind string) *unstructured.Unstructured {
+	switch kind {
+	case crdWithField:
+		return moduleInstanceCRD(true)
+	case crdWithoutField:
+		return moduleInstanceCRD(false)
+	default:
+		return nil
+	}
+}
 
 const (
 	promptOperatorDeletesClaims = "so the operator deletes its tracked resources, PersistentVolumeClaims and the data on them included."
@@ -347,10 +375,10 @@ func TestConfirmAndDelete_OperatorManagedPromptSaysWhatTheOperatorDoes(t *testin
 			[]string{`spec.dataPolicy is "delete"`, promptOperatorKeepsClaims}, []string{promptOperatorDeletesClaims}},
 		{"operator without the field", crdWithoutField, true, "", []string{promptOldOperator}, []string{"keeps", "kept", keptClaimsHedge}},
 		{"operator without the field, no prune", crdWithoutField, false, "", []string{promptOperatorOrphans}, []string{"PersistentVolumeClaims"}},
-		{"unreadable CRD", crdUnreadable, true, "",
+		{"CRD without a schema", crdNoSchema, true, "",
 			[]string{"spec.prune is set and spec.dataPolicy is not set, so the operator deletes its tracked resources.\n", undecidedClaimsNote},
 			[]string{promptOperatorKeepsClaims, promptOperatorDeletesClaims}},
-		{"unreadable CRD, Delete", crdUnreadable, true, "Delete",
+		{"CRD without a schema, Delete", crdNoSchema, true, "Delete",
 			[]string{"spec.prune is set and spec.dataPolicy is Delete, " + promptOperatorDeletesClaims}, []string{undecidedClaimsNote}},
 	}
 	for _, tt := range tests {
@@ -358,9 +386,7 @@ func TestConfirmAndDelete_OperatorManagedPromptSaysWhatTheOperatorDoes(t *testin
 			t.Run(fmt.Sprintf("%s/deleteData=%v", tt.name, deleteData), func(t *testing.T) {
 				s := newClaimScenario()
 				s.operatorManaged(t, tt.prune, tt.dataPolicy)
-				if tt.crd != crdUnreadable {
-					s.installCRD(t, tt.crd == crdWithField)
-				}
+				s.installOperator(t, crdFor(tt.crd))
 				out, err := s.confirm(t, "demo", deleteFlags{DeleteData: deleteData}, "n\n")
 				require.NoError(t, err, out)
 
@@ -401,6 +427,57 @@ func TestOperatorManagedDeletePrompt_NoTrackedClaimSaysNothingAboutClaims(t *tes
 	assert.Contains(t, p, "This instance is operator-managed: spec.prune is set, so the operator deletes its tracked resources.\n")
 	assert.NotContains(t, p, "PersistentVolumeClaims")
 	assert.NotContains(t, p, "spec.dataPolicy")
+}
+
+// A delete that the readiness gate refuses asks nothing: the refusal comes
+// before the question, so nobody answers a question about their data for a
+// delete that is not attempted. The answer waiting on standard input is not
+// read, and nothing is deleted.
+func TestConfirmAndDelete_OperatorManagedRefusalComesBeforeTheQuestion(t *testing.T) {
+	notReady := readyOperator(moduleInstanceCRD(true))[1:] // one operator CRD is missing
+	for name, objs := range map[string][]runtime.Object{"no operator": nil, "operator not ready": notReady} {
+		t.Run(name, func(t *testing.T) {
+			s := newClaimScenario()
+			s.operatorManaged(t, true, "")
+			for _, o := range objs {
+				require.NoError(t, s.fake.Tracker().Add(o))
+			}
+			out, err := s.confirm(t, "demo", deleteFlags{}, "y\n")
+			requireExitCode(t, err, opmexit.ExitValidationError)
+			assert.Contains(t, err.Error(), "not ready")
+			assert.NotContains(t, out, "[y/N]", "no question before a refusal")
+			assert.NotContains(t, out, "This instance is operator-managed")
+			assert.True(t, s.exists(inventory.ModuleInstanceGVR, "demo"))
+			assert.True(t, s.exists(claimGVR, "data"))
+		})
+	}
+}
+
+// The question comes after the gate and before the delete: a "yes" deletes the
+// ModuleInstance, and the ModuleInstance CRD is read once for both the gate
+// and the question.
+func TestConfirmAndDelete_OperatorManagedAsksAfterTheGateAndReadsTheCRDOnce(t *testing.T) {
+	s := newClaimScenario()
+	s.operatorManaged(t, true, "")
+	s.installOperator(t, moduleInstanceCRD(true))
+
+	out, err := s.confirm(t, "demo", deleteFlags{Timeout: 5 * time.Second}, "y\n")
+	require.NoError(t, err, out)
+	assert.Contains(t, out, promptOperatorKeepsClaims)
+	assert.False(t, s.exists(inventory.ModuleInstanceGVR, "demo"), "a yes deletes the ModuleInstance")
+
+	reads, question := 0, -1
+	for i, a := range s.fake.Actions() {
+		get, ok := a.(k8stesting.GetAction)
+		if ok && a.GetResource().Resource == "customresourcedefinitions" && get.GetName() == inventory.CRDNameModuleInstances {
+			reads++
+			question = i
+		}
+		if a.GetVerb() == "delete" {
+			assert.Greater(t, i, question, "the gate reads before anything is deleted")
+		}
+	}
+	assert.Equal(t, 1, reads, "one read of the ModuleInstance CRD")
 }
 
 // With --yes there is no prompt; the note about --delete-data still prints.
@@ -450,23 +527,15 @@ func operatorClaimRecord(dataPolicy string) *inventory.Record {
 	}
 }
 
-// runOperatorOwnedDelete deletes rec against a cluster with a ready operator
-// whose ModuleInstance CRD has spec.dataPolicy or not, reading the claims the
-// way the command does.
+// runOperatorOwnedDelete deletes rec, with the question answered yes, against
+// a cluster with a ready operator whose ModuleInstance CRD has
+// spec.dataPolicy or not.
 func runOperatorOwnedDelete(t *testing.T, rec *inventory.Record, withDataPolicy, dryRun bool) string {
 	t.Helper()
-	var objs []runtime.Object
-	for _, o := range runningOperatorObjects() {
-		if u := o.(*unstructured.Unstructured); u.GetName() != inventory.CRDNameModuleInstances {
-			objs = append(objs, o)
-		}
-	}
-	objs = append(objs, moduleInstanceCRD(withDataPolicy), moduleInstanceObj(rec.Namespace, rec.Name))
-	client, _ := fakeClusterClient(objs...)
+	client, _ := fakeClusterClient(append(readyOperator(moduleInstanceCRD(withDataPolicy)), moduleInstanceObj(rec.Namespace, rec.Name))...)
 	var runErr error
 	out := captureOutput(t, func() {
-		claims := readOperatorClaims(context.Background(), client, rec)
-		runErr = deleteOperatorOwned(context.Background(), client, rec, claims, 5*time.Second, dryRun, output.InstanceLogger(rec.Name))
+		runErr = deleteOperatorOwned(context.Background(), client, rec, confirmYes, 5*time.Second, dryRun, output.InstanceLogger(rec.Name))
 	})
 	require.NoError(t, runErr, out)
 	return out
@@ -549,40 +618,27 @@ func TestDeleteOperatorOwned_DryRunStatesTheClaimOutcome(t *testing.T) {
 	assert.NotContains(t, out, "PersistentVolumeClaims")
 }
 
-// The CRD is read only when its answer changes a message: an operator-managed
-// instance with spec.prune set that tracks a claim.
-func TestReadOperatorClaims_ReadsTheCRDOnlyWhenItMatters(t *testing.T) {
-	noClaim := operatorClaimRecord("")
-	noClaim.Inventory.Entries = noClaim.Inventory.Entries[:1]
-	noPrune := operatorClaimRecord("")
-	noPrune.Prune = false
-	cliOwned := operatorClaimRecord("")
-	cliOwned.Owner = inventory.OwnerCLI
-	tests := []struct {
-		name      string
-		rec       *inventory.Record
-		wantReads int
-		wantFate  claimFate
-	}{
-		{"operator-managed, prune, claim", operatorClaimRecord(""), 1, claimsKept},
-		{"no claim tracked", noClaim, 0, claimsNone},
-		{"no prune", noPrune, 0, claimsNone},
-		{"CLI-owned", cliOwned, 0, claimsNone},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			client, fake := fakeClusterClient(moduleInstanceCRD(true))
-			claims := readOperatorClaims(context.Background(), client, tt.rec)
-			reads := 0
-			for _, a := range fake.Actions() {
-				if a.GetVerb() == "get" && a.GetResource().Resource == "customresourcedefinitions" {
-					reads++
-				}
-			}
-			assert.Equal(t, tt.wantReads, reads)
-			assert.Equal(t, tt.wantFate, claims.fate())
-		})
-	}
+// A CRD whose schema cannot be read decides nothing. The closing output then
+// names both operators that deleted the claims and says why opm cannot tell.
+func TestReportOperatorPrune_UndecidedSaysWhy(t *testing.T) {
+	rec := operatorClaimRecord("")
+	claims := operatorClaimsOf(rec, nil)
+	require.Equal(t, claimsUndecided, claims.fate())
+	out := captureOutput(t, func() { reportOperatorPrune(rec, claims, output.InstanceLogger(rec.Name)) })
+	assert.Contains(t, out, "An operator without spec.dataPolicy, or older than its CRDs, deleted them")
+	assert.Contains(t, out, "could not read")
+	assert.Contains(t, out, "kubectl delete pvc data -n apps")
+	assert.NotContains(t, out, "operator pruned 2 resources")
+}
+
+// Without spec.prune the operator leaves everything, so nothing is said
+// about claims whatever the CRD and the policy say.
+func TestOperatorClaimsOf_NoPruneTracksNothing(t *testing.T) {
+	rec := operatorClaimRecord("Delete")
+	rec.Prune = false
+	assert.Equal(t, claimsNone, operatorClaimsOf(rec, moduleInstanceCRD(true)).fate())
+	assert.Equal(t, claimsKept, operatorClaimsOf(operatorClaimRecord(""), moduleInstanceCRD(true)).fate())
+	assert.Equal(t, claimsDeleted, operatorClaimsOf(operatorClaimRecord("Keep"), moduleInstanceCRD(false)).fate())
 }
 
 // A core-group claim only: a kind of the same name in another API group is
