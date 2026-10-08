@@ -45,8 +45,9 @@ Steps 2, 3, 5 and 7 can refuse on a cluster where step 1 has just created the na
 // create: the flag is set and the instance namespace is missing. Read only.
 func namespaceToCreate(ctx context.Context, c *kubernetes.Client, namespace string, createNS, dryRun bool, l *log.Logger) (bool, error)
 
-// createNamespace creates the namespace namespaceToCreate found missing.
-func createNamespace(ctx context.Context, c *kubernetes.Client, namespace string, l *log.Logger) error
+// ensureNamespace creates the namespace when create is set, which the caller
+// derives from namespaceToCreate on a real run.
+func ensureNamespace(ctx context.Context, c *kubernetes.Client, namespace string, create bool, l *log.Logger) error
 ```
 
 New order on a real run:
@@ -59,7 +60,7 @@ New order on a real run:
 5  GateStatusRBAC
 6  GuardEmptyRender
 7  RunPreApplyExistenceCheck      a missing namespace answers NotFound: nothing there
-8  createNamespace                CREATE, only when step 1 found it missing    <- first write
+8  ensureNamespace                CREATE, only when step 1 found it missing    <- first write
 9  kubernetes.Apply, prune, record write
 ```
 
