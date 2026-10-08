@@ -305,8 +305,12 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		}
 	}
 
+	// The preview asks the verdict of the real prune, with the identity the
+	// record holds. A stale object it cannot read fails the dry run after
+	// the rest of the preview, as it fails the real apply after the prune.
+	var previewErr error
 	if dryRun && instanceID != "" && !req.Options.NoPrune {
-		previewPrune(prunable, protected, instanceLog)
+		previewErr = previewPrune(ctx, req.K8sClient, prunable, protected, recordedIdentity(prevRecord), instanceLog)
 		logKeptClaims(keptClaims, true, instanceLog)
 	}
 
@@ -372,6 +376,10 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("%d resource(s) failed to apply", len(applyResult.Errors)), Printed: true}
 	}
 
+	if previewErr != nil {
+		return previewErr
+	}
+
 	if req.Options.Wait && !dryRun {
 		return waitForHealthy(ctx, req, applyResources, timeout, instanceLog)
 	}
@@ -403,7 +411,8 @@ func pruneStale(ctx context.Context, client *kubernetes.Client, prunable []k8sin
 	leftBehind, err := inventory.PruneStaleResources(ctx, client, prunable, instanceUUID)
 	// Not the instance's any more: reported, left in the cluster, and out
 	// of the record, since the caller records only what it returns here.
-	for _, lb := range leftBehind {
+	for i := range leftBehind {
+		lb := &leftBehind[i]
 		instanceLog.Warn(output.FormatResourceLine(lb.Entry.Kind, lb.Entry.Namespace, lb.Entry.Name, output.StatusLeftBehind), "reason", lb.Reason)
 	}
 	if err == nil {
@@ -427,19 +436,56 @@ func pruneStale(ctx context.Context, client *kubernetes.Client, prunable []k8sin
 const statusPruneFailed = "prune failed"
 
 // previewPrune reports what a real apply would do with the stale set, without
-// deleting anything: the prunable half under "would prune", then the protected
-// half (inventory.SplitProtected) as left behind.
-func previewPrune(prunable, protected []k8sinventory.Entry, instanceLog *log.Logger) {
-	if len(prunable) > 0 {
-		instanceLog.Info(fmt.Sprintf("would prune %d stale resource(s)", len(prunable)))
-		for _, e := range prunable {
-			instanceLog.Info(output.FormatResourceLine(e.Kind, e.Namespace, e.Name, "would prune"))
+// deleting anything. It reads each prunable entry and asks the delete verdict
+// of the real prune for instanceUUID (inventory.PreviewPruneStaleResources):
+// what the prune would delete is listed under "would prune", what the verdict
+// leaves in place as "would keep" (not OPM's, or another instance's) or
+// "would let go" (another instance is adopting it) with the library's reason,
+// which names the owner; an entry that is already gone is not listed. Then
+// the protected half (inventory.SplitProtected) as left behind.
+//
+// An entry the preview could not read is listed as "cannot check" with the
+// error. The real prune fails on it, so the returned error carries the code
+// the real apply would exit with (see pruneStale); it is already printed.
+func previewPrune(ctx context.Context, client *kubernetes.Client, prunable, protected []k8sinventory.Entry, instanceUUID string, instanceLog *log.Logger) error {
+	wouldPrune, leftBehind, err := inventory.PreviewPruneStaleResources(ctx, client, prunable, instanceUUID)
+	if len(wouldPrune) > 0 {
+		instanceLog.Info(fmt.Sprintf("would prune %d stale resource(s)", len(wouldPrune)))
+		for _, e := range wouldPrune {
+			instanceLog.Info(output.FormatResourceLine(e.Kind, e.Namespace, e.Name, output.StatusWouldPrune))
 		}
+	}
+	for i := range leftBehind {
+		lb := &leftBehind[i]
+		status := output.StatusWouldKeep
+		if lb.Skip == ownership.SkipAdoptedElsewhere {
+			status = output.StatusWouldLetGo
+		}
+		instanceLog.Warn(output.FormatResourceLine(lb.Entry.Kind, lb.Entry.Namespace, lb.Entry.Name, status), "reason", lb.Reason)
 	}
 	if len(protected) > 0 {
 		instanceLog.Info(fmt.Sprintf("would leave %d resource(s) behind", len(protected)))
 		logLeftBehind(protected, instanceLog)
 	}
+	if err == nil {
+		return nil
+	}
+
+	var pruneErr *inventory.PruneError
+	if !errors.As(err, &pruneErr) {
+		instanceLog.Error("checking stale resources failed", "error", err)
+		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err, Printed: true}
+	}
+	exitCode := opmexit.ExitGeneralError
+	for i, e := range pruneErr.Failed {
+		instanceLog.Error(output.FormatResourceLine(e.Kind, e.Namespace, e.Name, output.StatusCannotCheck), "error", pruneErr.Errs[i])
+		if kubernetes.IsDiscoveryFailure(pruneErr.Errs[i]) {
+			exitCode = exitCodeFromK8sError(pruneErr.Errs[i])
+		}
+	}
+	failure := fmt.Errorf("dry run: %d stale resource(s) could not be checked, so a real apply could not prune them; fix the cause and run the dry run again", len(pruneErr.Failed))
+	instanceLog.Error(failure.Error())
+	return &opmexit.ExitError{Code: exitCode, Err: failure, Printed: true}
 }
 
 // logKeptClaims reports the stale PersistentVolumeClaims prune keeps because

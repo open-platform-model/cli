@@ -257,3 +257,125 @@ func TestExecute_PruneThatCannotJudgeOrWasOvertakenKeepsTheEntry(t *testing.T) {
 		})
 	}
 }
+
+// The prune preview of a dry run asks the verdict of the real prune: a stale
+// object the instance does not own is listed as "would keep", one another
+// instance is adopting as "would let go", each with the reason that names the
+// owner, and neither as "would prune". Nothing is deleted, no record is
+// written and the dry run passes. The real run on the same cluster leaves the
+// same object behind.
+func TestExecute_DryRunPrunePreviewShowsWhatThePruneLeaves(t *testing.T) {
+	tests := map[string]struct {
+		live       *unstructured.Unstructured
+		wantStatus string
+		wantReason string
+	}{
+		"a user's object took the recorded name": {
+			live:       liveConfigMap("old", "", "", ""),
+			wantStatus: "would keep",
+			wantReason: "ConfigMap/default/old is not managed by OPM; left in place",
+		},
+		"another instance owns it now": {
+			live:       liveConfigMap("old", opmlabels.ManagedByController, "uuid-other", ""),
+			wantStatus: "would keep",
+			wantReason: "ConfigMap/default/old belongs to module instance uuid-other, not this one; left in place",
+		},
+		"another instance is adopting it": {
+			live:       liveConfigMap("old", opmlabels.ManagedByCLI, renderIdentity, "uuid-other"),
+			wantStatus: "would let go",
+			wantReason: "ConfigMap/default/old is being adopted by module instance uuid-other, not this one; left in place",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			withReleasedCLIVersion(t)
+			logBuf := captureLog(t)
+			cluster := newApplyCluster(recordWithIdentity(renderIdentity, "keep", "old", "mine"), tc.live,
+				liveConfigMap("mine", opmlabels.ManagedByCLI, renderIdentity, ""))
+
+			require.NoError(t, Execute(context.Background(), cluster.request(Options{DryRun: true}, "keep")), "a left-behind object does not fail the dry run")
+
+			log := logBuf.String()
+			line := logLine(log, "ConfigMap/default/old", tc.wantStatus)
+			require.NotEmpty(t, line, log)
+			assert.Contains(t, line, tc.wantReason)
+			assert.Empty(t, logLine(log, "ConfigMap/default/old", "would prune"), "not listed as pruned")
+			assert.Contains(t, log, "would prune 1 stale resource(s)", "the count holds only what the prune deletes")
+			assert.NotEmpty(t, logLine(log, "ConfigMap/default/mine", "would prune"))
+			assert.Empty(t, cluster.deletes(), "a dry run deletes nothing")
+			_, written := cluster.writtenInventory(t)
+			assert.False(t, written, "and writes no record")
+
+			logBuf.Reset()
+			require.NoError(t, Execute(context.Background(), cluster.request(Options{}, "keep")))
+			assert.Contains(t, logLine(logBuf.String(), "ConfigMap/default/old", "left behind"), tc.wantReason, "the real run leaves the same object for the same reason")
+			assert.Equal(t, []string{"configmaps/mine"}, cluster.deletes())
+		})
+	}
+}
+
+// The preview judges with the identity the record holds, as the real prune
+// does: after a module moved to a new path the stale objects carry the old
+// identity and are still the instance's to prune.
+func TestExecute_DryRunPrunePreviewJudgesWithTheRecordedIdentity(t *testing.T) {
+	withReleasedCLIVersion(t)
+	logBuf := captureLog(t)
+	cluster := newApplyCluster(recordWithIdentity(oldIdentity, "old"),
+		liveConfigMap("old", opmlabels.ManagedByCLI, oldIdentity, ""))
+
+	require.NoError(t, Execute(context.Background(), cluster.request(Options{DryRun: true}, "keep")))
+
+	assert.NotEmpty(t, logLine(logBuf.String(), "ConfigMap/default/old", "would prune"), logBuf.String())
+	assert.NotContains(t, logBuf.String(), "would keep")
+}
+
+// A stale object that is already gone is on no line of the preview, and
+// --no-prune reads no stale object at all.
+func TestExecute_DryRunPrunePreviewReadsOnlyWhatItLists(t *testing.T) {
+	withReleasedCLIVersion(t)
+	logBuf := captureLog(t)
+	cluster := newApplyCluster(recordWithIdentity(renderIdentity, "keep", "old"))
+
+	require.NoError(t, Execute(context.Background(), cluster.request(Options{DryRun: true}, "keep")))
+	assert.NotContains(t, logBuf.String(), "ConfigMap/default/old", "an object that is gone is not listed")
+	assert.NotContains(t, logBuf.String(), "would prune")
+
+	cluster.dyn.ClearActions()
+	require.NoError(t, Execute(context.Background(), cluster.request(Options{DryRun: true, NoPrune: true}, "keep")))
+	for _, a := range cluster.dyn.Actions() {
+		if get, ok := a.(k8stesting.GetAction); ok && a.GetVerb() == "get" {
+			assert.NotEqual(t, "old", get.GetName(), "--no-prune reads no stale object")
+		}
+	}
+}
+
+// A stale object the preview cannot read is listed as "cannot check" and
+// fails the dry run with the code the real apply exits with after that
+// failed prune; the rest of the preview is still printed.
+func TestExecute_DryRunPrunePreviewFailsOnAnUnreadableStaleObject(t *testing.T) {
+	withReleasedCLIVersion(t)
+	logBuf := captureLog(t)
+	cluster := newApplyCluster(recordWithIdentity(renderIdentity, "keep", "old", "mine"),
+		liveConfigMap("old", opmlabels.ManagedByCLI, renderIdentity, ""),
+		liveConfigMap("mine", opmlabels.ManagedByCLI, renderIdentity, ""))
+	cluster.dyn.PrependReactor("get", "configmaps", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		if action.(k8stesting.GetAction).GetName() == "old" {
+			return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, "old", errors.New("no read access"))
+		}
+		return false, nil, nil
+	})
+
+	err := Execute(context.Background(), cluster.request(Options{DryRun: true}, "keep"))
+
+	requireExitCode(t, err, opmexit.ExitGeneralError)
+	log := logBuf.String()
+	line := logLine(log, "ConfigMap/default/old", "cannot check")
+	require.NotEmpty(t, line, log)
+	assert.Contains(t, line, "no read access")
+	assert.NotEmpty(t, logLine(log, "ConfigMap/default/mine", "would prune"), "the other stale object is still previewed")
+	assert.Contains(t, err.Error(), "1 stale resource(s) could not be checked")
+	assert.Empty(t, cluster.deletes())
+
+	realErr := Execute(context.Background(), cluster.request(Options{}, "keep"))
+	requireExitCode(t, realErr, opmexit.ExitGeneralError)
+}

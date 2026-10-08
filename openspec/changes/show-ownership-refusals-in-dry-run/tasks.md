@@ -7,9 +7,9 @@
 
 ## 2. The prune preview asks the delete verdict
 
-- [ ] 2.1 In `internal/inventory/stale.go`, add `PreviewPruneStaleResources`, sharing the deletion-plan run with `PruneStaleResources` and sending no delete; `LeftBehind` carries the skip reason. Verify with a test in `internal/inventory` that asserts the verdicts and that no delete is sent.
-- [ ] 2.2 In `internal/workflow/apply/apply.go`, make the dry-run prune preview list `would prune`, `would keep`, `would let go` and `cannot check` from that run, and exit as the real apply does when a stale object cannot be read. Verify with tests in `dryrunprune_test.go` and `pruneownership_test.go`.
-- [ ] 2.3 `task fmt`, `task vet`, `task lint`, `task test:unit` green, then commit `fix(apply): judge stale objects in the dry-run prune preview`.
+- [x] 2.1 In `internal/inventory/stale.go`, add `PreviewPruneStaleResources`, sharing the deletion-plan run with `PruneStaleResources` and sending no delete; `LeftBehind` carries the skip reason. Verify with a test in `internal/inventory` that asserts the verdicts and that no delete is sent.
+- [x] 2.2 In `internal/workflow/apply/apply.go`, make the dry-run prune preview list `would prune`, `would keep`, `would let go` and `cannot check` from that run, and exit as the real apply does when a stale object cannot be read. Verify with tests in `dryrunprune_test.go` and `pruneownership_test.go`.
+- [x] 2.3 `task fmt`, `task vet`, `task lint`, `task test:unit` green, then commit `fix(apply): judge stale objects in the dry-run prune preview`.
 
 ## 3. Docs
 

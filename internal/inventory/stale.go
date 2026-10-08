@@ -88,11 +88,13 @@ func (e *PruneError) Unwrap() []error {
 
 // LeftBehind is a stale entry the prune did not delete because the library's
 // delete verdict skipped it: its live object is not OPM-managed, belongs to
-// another instance, or is adopted by another instance. Reason is the
-// library's message. The object is not the instance's to track, so a caller
-// that records an inventory after the prune leaves the entry out.
+// another instance, or is adopted by another instance. Skip is the verdict's
+// reason and Reason the library's message for it. The object is not the
+// instance's to track, so a caller that records an inventory after the prune
+// leaves the entry out.
 type LeftBehind struct {
 	Entry  k8sinventory.Entry
+	Skip   ownership.SkipReason
 	Reason string
 }
 
@@ -125,39 +127,64 @@ type LeftBehind struct {
 // as failed, with the discovery error. When any failed, the error is a
 // *PruneError naming the entries that are still in the cluster.
 func PruneStaleResources(ctx context.Context, client *kubernetes.Client, stale []k8sinventory.Entry, instanceUUID string) (leftBehind []LeftBehind, err error) {
+	_, leftBehind, err = runPrune(ctx, client, stale, instanceUUID, false)
+	return leftBehind, err
+}
+
+// PreviewPruneStaleResources is PruneStaleResources without the deletes: it
+// runs the same deletion plan with the same reads and the same verdict, and
+// sends no delete. wouldPrune are the entries a prune would delete, in the
+// plan's order; an entry that is already gone is in neither result. The
+// error is the one a prune returns for the reads that failed: a *PruneError
+// naming the entries it could not judge.
+func PreviewPruneStaleResources(ctx context.Context, client *kubernetes.Client, stale []k8sinventory.Entry, instanceUUID string) (wouldPrune []k8sinventory.Entry, leftBehind []LeftBehind, err error) {
+	return runPrune(ctx, client, stale, instanceUUID, true)
+}
+
+// runPrune drives the prune's deletion plan; dryRun performs its reads and
+// sends no delete. deleted are the entries whose delete the plan named.
+func runPrune(ctx context.Context, client *kubernetes.Client, stale []k8sinventory.Entry, instanceUUID string, dryRun bool) (deleted []k8sinventory.Entry, leftBehind []LeftBehind, err error) {
 	if len(stale) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	var failed PruneError
 	plan := lifecycle.NewDeletionPlan(stale, lifecycle.Policy{Prune: true}, instanceUUID)
 	_, err = kubernetes.RunDeletion(ctx, client, plan, kubernetes.DeletionOptions{
+		DryRun:                 dryRun,
 		StopOnDiscoveryFailure: true,
 		OnStep: func(step kubernetes.StepResult) {
 			entry := step.Entry
 			switch {
 			case step.Outcome.Result == lifecycle.ResultFailed:
 				failed.Failed = append(failed.Failed, entry)
-				failed.Errs = append(failed.Errs, fmt.Errorf("deleting %s/%s: %w", entry.Kind, entry.Name, step.Err))
+				verb := "deleting"
+				if dryRun {
+					verb = "checking"
+				}
+				failed.Errs = append(failed.Errs, fmt.Errorf("%s %s/%s: %w", verb, entry.Kind, entry.Name, step.Err))
 			case step.Outcome.Skip == ownership.SkipAlreadyAbsent:
 				output.Debug("stale resource already gone", "kind", entry.Kind, "namespace", entry.Namespace, "name", entry.Name)
 			case step.Outcome.Skip == ownership.SkipSafetyExcluded:
 				output.Debug("leaving protected resource behind", "kind", entry.Kind, "name", entry.Name)
 			case step.Outcome.Skip != "":
-				leftBehind = append(leftBehind, LeftBehind{Entry: entry, Reason: step.Outcome.Message})
+				leftBehind = append(leftBehind, LeftBehind{Entry: entry, Skip: step.Outcome.Skip, Reason: step.Outcome.Message})
 			default:
-				output.Debug("pruned stale resource", "kind", entry.Kind, "namespace", entry.Namespace, "name", entry.Name)
+				deleted = append(deleted, entry)
+				if !dryRun {
+					output.Debug("pruned stale resource", "kind", entry.Kind, "namespace", entry.Namespace, "name", entry.Name)
+				}
 			}
 		},
 	})
 	if err != nil {
-		return leftBehind, err
+		return deleted, leftBehind, err
 	}
 
 	if len(failed.Failed) > 0 {
-		return leftBehind, &failed
+		return deleted, leftBehind, &failed
 	}
-	return leftBehind, nil
+	return deleted, leftBehind, nil
 }
 
 // entryObject is the ownership identity of an inventory entry.
