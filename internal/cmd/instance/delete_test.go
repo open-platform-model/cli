@@ -324,7 +324,7 @@ func newGuardScenario(namespace, name, modulePath string, targetArmed bool, extr
 			opmlabels.ManagedBy: opmlabels.ManagedByCLI, opmlabels.ModuleInstanceUUID: uuid,
 		}},
 	}}
-	entries := append([]k8sinventory.Entry{{Version: "v1", Kind: "ConfigMap", Name: cm.GetName(), Namespace: namespace}}, extraEntries...)
+	entries := append([]k8sinventory.Entry{{Kind: "ConfigMap", Name: cm.GetName(), Namespace: namespace}}, extraEntries...)
 	rec := &inventory.Record{
 		Name: name, Namespace: namespace, Owner: inventory.OwnerCLI, ModulePath: modulePath, InstanceUUID: uuid,
 		Inventory: inventory.Inventory{Entries: entries},

@@ -403,7 +403,7 @@ func TestUninstall_FailedRecordDeleteIsAnError(t *testing.T) {
 
 // "Recorded objects are deleted in the plan's order": the controller
 // Deployment before its ServiceAccount and ClusterRole, each delete with
-// foreground propagation.
+// foreground propagation and a precondition on the UID that was read.
 func TestUninstall_DeletesInThePlansOrder(t *testing.T) {
 	releasedCLI(t)
 	fastPolling(t)
@@ -422,9 +422,12 @@ func TestUninstall_DeletesInThePlansOrder(t *testing.T) {
 			continue
 		}
 		order = append(order, d.GetResource().Resource)
-		policy := d.GetDeleteOptions().PropagationPolicy
-		require.NotNil(t, policy)
-		assert.Equal(t, metav1.DeletePropagationForeground, *policy)
+		opts := d.GetDeleteOptions()
+		require.NotNil(t, opts.PropagationPolicy)
+		assert.Equal(t, metav1.DeletePropagationForeground, *opts.PropagationPolicy)
+		require.NotNil(t, opts.Preconditions, "each delete carries the UID of the object that was read")
+		require.NotNil(t, opts.Preconditions.UID)
+		assert.NotEmpty(t, *opts.Preconditions.UID)
 	}
 	require.Len(t, order, 3)
 	assert.Equal(t, "deployments", order[0], "highest weight first: %v", order)

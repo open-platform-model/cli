@@ -40,15 +40,11 @@ type DeleteOptions struct {
 	// preview lists the same left-behind set a real run would.
 	DryRun bool
 
-	// Entries are the entries of the instance's record, the list the
-	// deletion plan is built from. When nil, the plan is built from the
-	// objects of InventoryLive and Unreadable instead, for a caller that
-	// holds live objects and no record.
-	Entries []k8sinventory.Entry
-
 	// InventoryLive is the list of live resources pre-fetched from the
-	// ModuleInstance CR inventory by the caller: the claims Delete keeps are
-	// reported from it, and a dry run lists it. When nil or empty (and
+	// ModuleInstance CR inventory by the caller. The deletion plan is built
+	// from these objects and from Unreadable, and from nothing else: a
+	// recorded object the caller's read did not find is not in the plan, so
+	// it is never read again and never deleted. When nil or empty (and
 	// InventoryRecordExists is false, and nothing is unreadable), Delete
 	// returns noResourcesFoundError.
 	InventoryLive []*unstructured.Unstructured
@@ -125,8 +121,8 @@ const KeptClaimReason = "PersistentVolumeClaims are kept unless --delete-data is
 
 // Delete removes the resources belonging to an instance deployment, as the
 // library's deletion plan orders and judges them (RunDeletion). The plan is
-// built from opts.Entries, the entries of the instance's record, and judged
-// with opts.InstanceUUID. The ModuleInstance CR itself is deleted last by the
+// built from the recorded objects the caller's read found (opts.InventoryLive)
+// or could not read (opts.Unreadable), and judged with opts.InstanceUUID. The ModuleInstance CR itself is deleted last by the
 // caller, after Delete returns, and only when the hold verdict of
 // DeleteResult.Run releases it.
 //
@@ -216,28 +212,25 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 	return result, nil
 }
 
-// planEntries are the entries Delete plans over: the record's entries, or
-// else those of the live and unreadable objects the caller holds, without
-// the PersistentVolumeClaims Delete keeps.
+// planEntries are the entries Delete plans over: one per recorded object the
+// caller's read found or could not read, without the PersistentVolumeClaims
+// Delete keeps. A recorded object that read did not find has no entry here,
+// so the set of objects a delete can touch is the set the caller saw, which
+// is also what the confirmation prompt was built from. An unreadable object
+// carries no version; the plan never sends a request for it.
 func planEntries(opts DeleteOptions) []k8sinventory.Entry {
-	entries := opts.Entries
-	if entries == nil {
-		for _, res := range opts.InventoryLive {
-			gvk := res.GroupVersionKind()
-			entries = append(entries, k8sinventory.Entry{Group: gvk.Group, Version: gvk.Version, Kind: gvk.Kind, Namespace: res.GetNamespace(), Name: res.GetName()})
-		}
-		for _, u := range opts.Unreadable {
-			entries = append(entries, k8sinventory.Entry{Group: u.Group, Kind: u.Kind, Namespace: u.Namespace, Name: u.Name})
-		}
-	}
-	if opts.DeleteData {
-		return entries
-	}
-	planned := make([]k8sinventory.Entry, 0, len(entries))
-	for _, e := range entries {
-		if !IsDataClaim(e.Group, e.Kind) {
+	planned := make([]k8sinventory.Entry, 0, len(opts.InventoryLive)+len(opts.Unreadable))
+	keep := func(e k8sinventory.Entry) {
+		if opts.DeleteData || !IsDataClaim(e.Group, e.Kind) {
 			planned = append(planned, e)
 		}
+	}
+	for _, res := range opts.InventoryLive {
+		gvk := res.GroupVersionKind()
+		keep(k8sinventory.Entry{Group: gvk.Group, Version: gvk.Version, Kind: gvk.Kind, Namespace: res.GetNamespace(), Name: res.GetName()})
+	}
+	for _, u := range opts.Unreadable {
+		keep(k8sinventory.Entry{Group: u.Group, Kind: u.Kind, Namespace: u.Namespace, Name: u.Name})
 	}
 	return planned
 }

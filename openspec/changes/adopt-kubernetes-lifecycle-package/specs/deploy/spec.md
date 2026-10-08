@@ -2,7 +2,7 @@
 
 ### Requirement: Instance delete follows the shared deletion plan
 
-`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the operator, built from the entries of the instance's `ModuleInstance` record and the instance identity stored in it. It SHALL read a tracked resource, delete it or leave it in place only when the plan names that action as the next one, and it SHALL send each delete with the propagation policy and the precondition the plan names. The plan SHALL NOT hold a `PersistentVolumeClaim` that the command keeps ("Instance delete keeps PersistentVolumeClaims unless delete-data is set"). The command SHALL delete the `ModuleInstance` record only when the plan's release verdict allows it, which is when every planned resource was deleted or left in place and none failed. A dry run SHALL follow the same plan, SHALL send no delete, and SHALL NOT delete the record. The output lines, their wording and the exit codes of the command SHALL stay as the other requirements of this capability state them. The operator-owned delete path SHALL NOT be affected. Source: 0012:D4:R1, 0012:D4:R6.
+`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the operator, built from the resources of the instance's `ModuleInstance` record that the command found in the cluster or could not read, and from the instance identity stored in the record. A recorded resource that the command did not find when it read the instance SHALL NOT be in the plan: it is not read again and not deleted. It SHALL read a tracked resource, delete it or leave it in place only when the plan names that action as the next one, and it SHALL send each delete with the propagation policy and the precondition the plan names. The plan SHALL NOT hold a `PersistentVolumeClaim` that the command keeps ("Instance delete keeps PersistentVolumeClaims unless delete-data is set"). The command SHALL delete the `ModuleInstance` record only when the plan's release verdict allows it, which is when every planned resource was deleted or left in place and none failed. A dry run SHALL follow the same plan, SHALL send no delete, and SHALL NOT delete the record. The output lines, their wording and the exit codes of the command SHALL stay as the other requirements of this capability state them. The operator-owned delete path SHALL NOT be affected. Source: 0012:D4:R1, 0012:D4:R6.
 
 #### Scenario: Resources are deleted in the plan's order
 
@@ -32,6 +32,13 @@
 - **THEN** the claim SHALL NOT be read for a delete verdict and SHALL NOT be deleted
 - **AND** it SHALL be listed as `kept`
 - **AND** the `ModuleInstance` record SHALL be deleted when no other resource failed
+
+#### Scenario: Resource that appears after the instance was read
+
+- **WHEN** a recorded ConfigMap does not exist when the command reads the instance
+- **AND** it exists again before the deletes are sent
+- **THEN** the ConfigMap SHALL NOT be deleted
+- **AND** the `ModuleInstance` record SHALL be deleted when no planned resource failed
 
 #### Scenario: Dry run follows the plan without deleting
 

@@ -2,7 +2,7 @@
 
 ### Requirement: Uninstall follows the shared deletion plan
 
-`opm operator uninstall` SHALL take every action on a recorded object from the deletion plan `opm instance delete` uses (capability `deploy`, "Instance delete follows the shared deletion plan"), built from the entries of the operator's instance record and the identity stored in it. It SHALL read a recorded object, delete it or leave it in place only when the plan names that action as the next one, and SHALL delete the instance record only when the plan's release verdict allows it. The finalizer guard and the no-record refusal SHALL run before the plan is built. The output lines and the exit codes of the command SHALL stay as the other requirements of this capability state them. Source: 0012:D4:R1.
+`opm operator uninstall` SHALL take every action on a recorded object from the deletion plan `opm instance delete` uses (capability `deploy`, "Instance delete follows the shared deletion plan"), built from the objects of the operator's instance record that the command found or could not read, and from the identity stored in the record. It SHALL read a recorded object, delete it or leave it in place only when the plan names that action as the next one, and SHALL delete the instance record only when the plan's release verdict allows it. The finalizer guard and the no-record refusal SHALL run before the plan is built. The output lines and the exit codes of the command SHALL stay as the other requirements of this capability state them. Source: 0012:D4:R1.
 
 #### Scenario: Recorded objects are deleted in the plan's order
 

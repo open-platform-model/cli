@@ -140,12 +140,12 @@ The runner sets no propagation and no precondition of its own: it passes the act
 
 **Options considered**:
 
-1. Convert the live objects back to entries. Keeps the input, loses nothing visible, but builds the plan from a second-hand list, and 0012 says the plan comes from the persisted inventory.
-2. Build the plan from the record's entries. The discovery read stays, because the prompt needs it to name the claims `--delete-data` deletes.
+1. One entry per recorded object the discovery read found or could not read. The set of objects a delete can touch stays the set the command saw.
+2. Build the plan from every entry of the record. The proposal chose this, on the ground that it loses nothing visible.
 
-**Decision**: option 2. Instance delete and uninstall: `rec.Inventory.Entries`, minus every PersistentVolumeClaim unless `--delete-data`. `kubernetes.Delete` still accepts a call with no entries (a caller that holds live objects and no record); it then plans over the entries of the live and unreadable objects it was given. Prune: the prunable stale entries, exactly the slice `pruneStale` passes today (protected entries and kept claims are already split off by `SplitProtected` and `SplitDataClaims`).
+**Decision**: option 1 for instance delete and uninstall, minus every PersistentVolumeClaim unless `--delete-data`. Prune: the prunable stale entries, exactly the slice `pruneStale` passes today (protected entries and kept claims are already split off by `SplitProtected` and `SplitDataClaims`).
 
-**Rationale**: the claim rule is the cli's (cli#345), so it is applied before the plan and the plan never sees a kept claim. A kept claim is reported from the discovery read as today, and a claim that is already gone is not reported, as today. The policy is `lifecycle.Policy{Prune: true}` on every path: the user asked for the delete. The owner UUID is the record's `InstanceUUID`, as cli#347 settled, also for prune after an identity change.
+**Rationale**: the review of the build showed that option 2 changes behaviour. A recorded object that the discovery read did not find, and that exists again when the plan reads it, would be deleted; under `--delete-data` that includes a PersistentVolumeClaim the confirmation prompt did not name. Before this change such an object was never touched, and this change moves no behaviour. With option 1 the plan holds what the prompt was built from. The live objects are the record's entries as the discovery read found them, so the plan still comes from the persisted inventory. The claim rule is the cli's (cli#345), so it is applied before the plan and the plan never sees a kept claim. The policy is `lifecycle.Policy{Prune: true}` on every path: the user asked for the delete. The owner UUID is the record's `InstanceUUID`, as cli#347 settled, also for prune after an identity change.
 
 ### An entry the discovery read could not read
 
@@ -197,7 +197,7 @@ The runner sets no propagation and no precondition of its own: it passes the act
 
 ```text
 opm instance delete (CLI-owned) / opm operator uninstall
-  record ──► entries − kept claims ──► NewDeletionPlan(Prune, record UUID)
+  record ──► discovery read ──► found or unreadable − kept claims ──► NewDeletionPlan(Prune, record UUID)
                                              │
                     ┌────────────────────────▼─────────────────────────┐
                     │ RunDeletion: Advance ─► read / delete / skip ─► … │
@@ -216,12 +216,11 @@ opm instance apply / opm module apply (prune)
 
 ### Lines and codes that change
 
-Command syntax, flags, the prompt, every status word, every reason and every closing line stay. These are the only differences (the proposal named a third, the position of the error line of an unreadable object; the build keeps that line where it is):
+Command syntax, flags, the prompt, every status word, every reason and every closing line stay. This is the only difference. The proposal named two more: the position of the error line of an unreadable object, and a debug line for a recorded object already gone at discovery. The build keeps the first where it is and does not print the second, because such an object is not in the plan.
 
 | # | Command | Today | With this change | Reason |
 | --- | --- | --- | --- | --- |
-| 1 | `opm instance delete`, `opm operator uninstall`, debug level only | A recorded object that was already gone at the discovery read prints nothing | The debug line `resource already gone` | The plan is built from the record, so it reads that entry and finds it absent |
-| 2 | all three | Cannot occur | `reading <Kind>/<name>: reading <object> returned <other object>; not deleted`, counted as a failed object | The plan refuses to judge a read that returned another object than the step's. A conforming API server never does this |
+| 1 | all three | Cannot occur | The warning `reading <Kind>/<name>: reading <object> returned <other object>; not deleted`, counted as a failed object (exit 1, record kept) | The plan refuses to judge a read that returned another object than the step's. A conforming API server never does this |
 
 No exit code changes:
 
@@ -295,7 +294,7 @@ Kept:
 - [The runner changes a line or a count the tests do not pin] → the existing suites of cli#332 to cli#347 (`delete_test.go`, `keptclaims_test.go`, `prunefail_test.go`, `prunediscovery_test.go`, `pruneownership_test.go`, `uninstall_test.go`, `unreadable_test.go`) run unchanged except where a removed symbol is named; the status goldens stay.
 - [The plan's order differs from today's for objects of equal weight] → both are stable sorts over record order with the same weight table; section 1 adds a test that compares the plan's order with `SortObjects` over the same entries.
 - [The fake dynamic client does not enforce preconditions] → as in cli#347, unit tests assert the request and inject the Conflict; the real answer is step 3 of `tests/integration/delete-ownership`, in CI.
-- [A double read per object: discovery, then the plan's read] → already so today (`JudgedDelete` reads again). No new request.
+- [A double read per object: discovery, then the plan's read] → already so today (`JudgedDelete` reads again). The plan holds the same objects, so it sends the same requests.
 - [The library package may still change before v1] → the runner is the only importer of `lifecycle` besides the two callers that build plans; a break is absorbed in three files.
 
 ## Migration Plan

@@ -10,7 +10,6 @@ import (
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
-	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 	"github.com/open-platform-model/library/opm/k8s/lifecycle"
 )
 
@@ -80,10 +79,8 @@ func DeleteRecorded(ctx context.Context, req DeleteRequest) (*kubernetes.DeleteR
 	instanceLog.Info(fmt.Sprintf("deleting resources in namespace %q", req.Namespace))
 
 	uuid := ""
-	var entries []k8sinventory.Entry
 	if req.Record != nil {
 		uuid = req.Record.InstanceUUID
-		entries = req.Record.Inventory.Entries
 	}
 	deleteResult, err := kubernetes.Delete(ctx, req.Client, kubernetes.DeleteOptions{
 		InstanceName:          req.InstanceName,
@@ -92,7 +89,6 @@ func DeleteRecorded(ctx context.Context, req DeleteRequest) (*kubernetes.DeleteR
 		InstanceUUID:          uuid,
 		DryRun:                req.DryRun,
 		DeleteData:            req.DeleteData,
-		Entries:               entries,
 		InventoryLive:         req.Live,
 		InventoryRecordExists: req.Record != nil,
 		Unreadable:            req.Unreadable,

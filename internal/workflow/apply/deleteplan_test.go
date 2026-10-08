@@ -112,35 +112,48 @@ func TestDeleteRecorded_LeftBehindReleasesTheRecord(t *testing.T) {
 	assert.False(t, recordExists(dyn), "left-behind objects do not hold the record")
 }
 
-// A recorded object that was already gone when the instance was read. The
-// plan is built from the record, so it reads the entry and finds it absent.
-//
-// Before the plan: the entry was not in the live list, and nothing was
-// printed for it at any level.
-// With the plan: the debug line "resource already gone" names it. Nothing
-// above debug level changes, it is not counted, and the record is deleted.
-func TestDeleteRecorded_EntryGoneAtDiscovery(t *testing.T) {
-	output.SetupLogging(output.LogConfig{Verbose: true})
-	t.Cleanup(func() { output.SetupLogging(output.LogConfig{}) })
-	logs := captureLog(t)
-	dyn, rec, live := planCluster([]string{"web", "gone"}, "web")
+// A recorded object the discovery read did not find is outside the plan, as
+// it was outside the delete loop before the plan: it is not read again, and
+// when it exists again by the time the delete runs (created while the user
+// read the confirmation prompt, which did not name it) it is not deleted.
+// That holds for a PersistentVolumeClaim under --delete-data too.
+func TestDeleteRecorded_ObjectNotFoundAtDiscoveryIsOutsideThePlan(t *testing.T) {
+	captureLog(t)
+	// "late" and the claim are in the record and in the cluster, and not
+	// in the live list the discovery read returned.
+	dyn, rec, live := planCluster([]string{"web", "late"}, "web", "late")
+	pvcs := schema.GroupVersionResource{Version: "v1", Resource: "persistentvolumeclaims"}
+	require.NoError(t, dyn.Tracker().Create(pvcs, &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "v1", "kind": "PersistentVolumeClaim",
+		"metadata": map[string]any{"name": "data", "namespace": "apps", "labels": map[string]any{
+			opmlabels.ManagedBy: opmlabels.ManagedByCLI,
+		}},
+	}}, "apps"))
+	rec.Inventory.Entries = append(rec.Inventory.Entries, k8sinventory.Entry{Version: "v1", Kind: "PersistentVolumeClaim", Namespace: "apps", Name: "data"})
 
-	result := deleteRecorded(t, dyn, rec, live, nil)
+	result, err := DeleteRecorded(context.Background(), DeleteRequest{
+		Client:       &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: dyn},
+		InstanceName: "demo",
+		Namespace:    "apps",
+		Record:       rec,
+		Live:         live[:1],
+		DeleteData:   true,
+		Log:          output.InstanceLogger("demo"),
+	})
+	require.NoError(t, err)
 
-	assert.Equal(t, 1, result.Deleted)
+	assert.Equal(t, 1, result.Deleted, "only the object discovery found")
 	assert.Empty(t, result.Errors)
-	assert.Empty(t, result.LeftBehind)
-	assert.False(t, recordExists(dyn))
-
-	var goneLines []string
-	for _, line := range strings.Split(logs.String(), "\n") {
-		if strings.Contains(line, "name=gone") {
-			goneLines = append(goneLines, line)
+	_, err = dyn.Tracker().Get(configMaps, "apps", "late")
+	assert.NoError(t, err, "the object discovery did not find is not deleted")
+	_, err = dyn.Tracker().Get(pvcs, "apps", "data")
+	assert.NoError(t, err, "nor is a claim the prompt did not name")
+	for _, a := range dyn.Actions() {
+		if g, ok := a.(k8stesting.GetAction); ok && a.GetVerb() == "get" {
+			assert.Equal(t, "web", g.GetName(), "no read outside the plan")
 		}
 	}
-	require.Len(t, goneLines, 1, "one line for the absent entry:\n%s", logs.String())
-	assert.Contains(t, goneLines[0], "DEBU")
-	assert.Contains(t, goneLines[0], "resource already gone")
+	assert.False(t, recordExists(dyn), "the record is deleted, as before the plan")
 }
 
 // An entry the discovery read could not read is not read again: it is
