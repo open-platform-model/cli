@@ -29,7 +29,7 @@ Every `Lint` job that runs golangci-lint (in `.github/workflows/ci.yml` and `.gi
 - **THEN** the configuration check exits non-zero and names the workflow
 
 ### Requirement: One file names the linter version
-The file `.golangci-lint-version` SHALL be the only place that names the golangci-lint version CI installs. Every use of the golangci-lint action SHALL read it and SHALL NOT name a version of its own, every use SHALL pin the same action commit, and each workflow that uses the action SHALL run the configuration check. The committed schema SHALL be the one for that version's minor line, SHALL be the only schema file in its directory, and SHALL match its recorded SHA-256 checksum. The configuration check SHALL fail when any of these does not hold, and when the installed golangci-lint is of another minor line than the file names.
+The file `.golangci-lint-version` SHALL be the only place that names the golangci-lint version CI installs; `go.mod`, which the action reads first, SHALL NOT name one. Every use of the golangci-lint action, in any letter case and quoted or not, SHALL read it and SHALL NOT name a version of its own, every use SHALL pin the same action commit, and each workflow that uses the action SHALL run the configuration check. The committed schema SHALL be the one for that version's minor line, SHALL be the only schema file in its directory, and SHALL match its recorded SHA-256 checksum. The configuration check SHALL fail when any of these does not hold, and when the installed golangci-lint is of another minor line than the file names.
 
 #### Scenario: A workflow names its own version
 - **WHEN** a step that uses the golangci-lint action sets a `version` input, or does not read `.golangci-lint-version`
@@ -46,3 +46,11 @@ The file `.golangci-lint-version` SHALL be the only place that names the golangc
 #### Scenario: The two workflows pin different action commits
 - **WHEN** `pr.yml` and `ci.yml` use the golangci-lint action at different commit SHAs
 - **THEN** the configuration check exits non-zero and prints both
+
+#### Scenario: The installed linter is of another minor line
+- **WHEN** the golangci-lint on `PATH` reports a minor line other than the one `.golangci-lint-version` names
+- **THEN** the configuration check exits non-zero and prints both versions
+
+#### Scenario: go.mod names a linter version
+- **WHEN** `go.mod` holds a golangci-lint module line
+- **THEN** the configuration check exits non-zero, because the action would take the version from there

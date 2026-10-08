@@ -16,6 +16,8 @@
 #     SHA, reads the version file (version-file, never version) and has its
 #     own configuration check off (verify: false), and its workflow runs
 #     this script;
+#   - go.mod has no golangci-lint line (the action reads one before the
+#     version file);
 #   - the installed golangci-lint is of the same X.Y (a patch difference is
 #     allowed: the schema is per minor line);
 #   - golangci-lint config verify --schema <file> passes for .golangci.yml.
@@ -100,12 +102,13 @@ if [ -n "$minor" ]; then
 fi
 
 # The workflows. A step is the "uses:" line and the lines after it, up to the
-# next list item at the same or a lower indent.
+# next list item at the same or a lower indent. The action name is matched in
+# any letter case, quoted or not, as the forge resolves it.
 shas=""
 uses_total=0
 for wf in .github/workflows/*.yml .github/workflows/*.yaml; do
   [ -e "$wf" ] || continue
-  grep -Eq "^[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]*${action}@" "$wf" || continue
+  grep -Eiq "^[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]*[\"']?${action}@" "$wf" || continue
   while IFS=$'\t' read -r line ref verify vfile ver; do
     uses_total=$((uses_total + 1))
     if [[ "$ref" =~ ^[0-9a-f]{40}$ ]]; then
@@ -137,7 +140,7 @@ for wf in .github/workflows/*.yml .github/workflows/*.yaml; do
       body = substr(line, indent + 1)
       if (inblock && body ~ /^- / && indent <= item_indent) flush()
       if (inblock && body != "" && body !~ /^#/ && indent < item_indent) flush()
-      if (body ~ /^(- +)?uses:/ && index(body, action "@")) {
+      if (body ~ /^(- +)?uses:/ && index(tolower(body), action "@")) {
         flush()
         inblock = 1; start = NR
         item_indent = (body ~ /^- /) ? indent : indent - 2
@@ -159,6 +162,12 @@ if [ "$uses_total" -eq 0 ]; then
   fail "no workflow uses $action; this check has nothing to keep in step"
 elif [ "$(printf '%s' "$shas" | awk 'NF {print $1}' | sort -u | wc -l)" -gt 1 ]; then
   fail "$action is pinned to more than one commit: $(printf '%s' "$shas" | awk 'NF {printf "%s%s (%s)", sep, $1, $2; sep = ", "}')"
+fi
+
+# go.mod: the action takes a golangci-lint version from it before it reads
+# the version file.
+if [ -f go.mod ] && grep -q 'github.com/golangci/golangci-lint' go.mod; then
+  fail "go.mod names golangci-lint; the action would take its version from there, not from $version_file"
 fi
 
 # The installed linter, then the configuration itself.

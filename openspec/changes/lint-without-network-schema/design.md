@@ -48,7 +48,9 @@ The script `.github/scripts/lint-config-check.sh` MUST fail when:
 - `.golangci-lint-version` is not `vX.Y.Z`;
 - `.github/golangci-lint/golangci.vX.Y.jsonschema.json` is missing, or another `*.jsonschema.json` sits beside it;
 - the schema does not match the one line in `.github/golangci-lint/SHA256SUMS`;
-- no workflow uses the action (the check would be empty), or a use lacks `verify: false` or `version-file: .golangci-lint-version`, sets `version`, or is not SHA-pinned; or two uses pin different SHAs; or a workflow that uses the action does not run the script;
+- no workflow uses the action (the check would be empty), or a use lacks `verify: false` or `version-file: .golangci-lint-version`, sets `version`, or is not SHA-pinned; or two uses pin different SHAs; or a workflow that uses the action does not run the script (the action name is matched in any letter case, quoted or not);
+- `go.mod` names golangci-lint (the action reads a version there before the version file);
+- no `golangci-lint` is on `PATH`;
 - the installed `golangci-lint` is of another `X.Y` than the file names (a patch difference is allowed: the schema is per minor line, and a laptop may lag a patch);
 - `golangci-lint config verify --schema <file>` fails.
 

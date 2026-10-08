@@ -14,6 +14,20 @@ trap 'rm -rf "$work"' EXIT
 
 failed=0
 count=0
+bash_bin=$(command -v bash)
+
+# stub_linter DIR MINOR: a golangci-lint in DIR that reports MINOR.0 and, for
+# config verify, prints the proxy it was given and fails.
+stub_linter() {
+  mkdir -p "$1"
+  cat >"$1/golangci-lint" <<STUB
+#!/bin/sh
+if [ "\$1" = version ]; then echo "$2.0"; exit 0; fi
+echo "stub: HTTPS_PROXY=\$HTTPS_PROXY HTTP_PROXY=\$HTTP_PROXY NO_PROXY=[\$NO_PROXY]"
+exit 1
+STUB
+  chmod +x "$1/golangci-lint"
+}
 
 # fresh NAME: a copy of the files the check reads, in $work/NAME.
 fresh() {
@@ -26,11 +40,13 @@ fresh() {
 }
 
 # expect NAME STATUS PATTERN: the check on $work/NAME exits STATUS and its
-# output holds PATTERN (a fixed string; empty for none).
+# output holds PATTERN (a fixed string; empty for none). A non-empty
+# $use_path replaces PATH for that run.
+use_path=""
 expect() {
   local name=$1 status=$2 pattern=$3 out rc=0
   count=$((count + 1))
-  out=$(bash "$check" --root "$work/$name" 2>&1) || rc=$?
+  out=$(PATH="${use_path:-$PATH}" "$bash_bin" "$check" --root "$work/$name" 2>&1) || rc=$?
   if [ "$rc" -ne "$status" ]; then
     echo "FAIL $name: exit $rc, want $status"; echo "$out"; failed=$((failed + 1)); return
   fi
@@ -75,6 +91,17 @@ d=$(fresh no-check-step)
 sed -i '/run: bash \.github\/scripts\/lint-config-check\.sh$/d' "$d/.github/workflows/ci.yml"
 expect no-check-step 1 "ci.yml uses golangci/golangci-lint-action but has no step"
 
+d=$(fresh quoted-action)
+sed -i 's|uses: \(golangci/golangci-lint-action@[0-9a-f]*\)|uses: "\1"|; /^ *verify: false$/d' "$d/.github/workflows/ci.yml"
+grep -q 'uses: "golangci/golangci-lint-action@' "$d/.github/workflows/ci.yml"
+expect quoted-action 1 "ci.yml:"
+expect quoted-action 1 "needs 'verify: false'"
+
+d=$(fresh other-case-action)
+sed -i 's|uses: golangci/golangci-lint-action@|uses: GolangCI/GolangCI-Lint-Action@|; /^ *verify: false$/d' "$d/.github/workflows/pr.yml"
+expect other-case-action 1 "pr.yml:"
+expect other-case-action 1 "needs 'verify: false'"
+
 d=$(fresh no-action)
 sed -i '/golangci\/golangci-lint-action@/d' "$d/.github/workflows/pr.yml" "$d/.github/workflows/ci.yml"
 expect no-action 1 "no workflow uses golangci/golangci-lint-action"
@@ -99,6 +126,37 @@ expect edited-schema 1 "does not match .github/golangci-lint/SHA256SUMS"
 d=$(fresh no-checksum)
 rm "$d/.github/golangci-lint/SHA256SUMS"
 expect no-checksum 1 "SHA256SUMS is missing"
+
+d=$(fresh two-checksum-lines)
+cat "$d/.github/golangci-lint/SHA256SUMS" "$d/.github/golangci-lint/SHA256SUMS" >"$d/sums" && mv "$d/sums" "$d/.github/golangci-lint/SHA256SUMS"
+expect two-checksum-lines 1 "SHA256SUMS must hold one line"
+
+d=$(fresh go-mod-names-linter)
+printf 'module example.test/m\n\nrequire github.com/golangci/golangci-lint/v2 v2.10.0\n' >"$d/go.mod"
+expect go-mod-names-linter 1 "go.mod names golangci-lint"
+
+# The installed linter is of another minor line than the version file names.
+d=$(fresh other-minor-installed)
+stub_linter "$work/stub-other-minor" 2.99
+use_path="$work/stub-other-minor:$PATH"
+expect other-minor-installed 1 "installed golangci-lint is '2.99.0' but .golangci-lint-version names"
+use_path=""
+
+# The linter runs with its proxy variables at a closed local port.
+d=$(fresh proxy-guard)
+minor=$(sed 's/^v\([0-9]*\.[0-9]*\)\..*$/\1/' "$repo/.golangci-lint-version")
+stub_linter "$work/stub-same-minor" "$minor"
+use_path="$work/stub-same-minor:$PATH"
+expect proxy-guard 1 "stub: HTTPS_PROXY=http://127.0.0.1:9 HTTP_PROXY=http://127.0.0.1:9 NO_PROXY=[]"
+use_path=""
+
+# No linter on PATH: a PATH that holds only the tools the check needs.
+d=$(fresh no-linter)
+mkdir -p "$work/tools"
+for t in awk basename cat dirname grep sha256sum sort tr wc; do ln -s "$(command -v "$t")" "$work/tools/$t"; done
+use_path="$work/tools"
+expect no-linter 1 "golangci-lint not found on PATH"
+use_path=""
 
 d=$(fresh stale-schema)
 cp "$d"/.github/golangci-lint/golangci.v*.jsonschema.json "$d/.github/golangci-lint/golangci.v2.0.jsonschema.json"
