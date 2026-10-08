@@ -16,5 +16,5 @@
 
 ## 3. Docs
 
-- [ ] 3.1 Update the publish pages under `docs/site` that list the exit codes and the registry failures
-- [ ] 3.2 task docs:bundle:check and task openspec:check green, then commit docs(publish): list the registry failure classes
+- [x] 3.1 Update the publish pages under `docs/site` that list the exit codes and the registry failures
+- [x] 3.2 task docs:bundle:check and task openspec:check green, then commit docs(publish): list the registry failure classes
