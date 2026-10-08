@@ -1,0 +1,8 @@
+## 1. Login hint and exit 4 for a refused credential on a platform build
+
+- [ ] 1.1 `internal/config`: add `RegistryLoginHint(host)` (the text `cmdutil` prints today) and the single-host reader of the registry mapping; `internal/cmdutil/publish.go` calls `config.RegistryLoginHint`; the publish and vet tests stay green unchanged
+- [ ] 1.2 `internal/config/platform.go`: `platformBuildHint` returns the login hint when `cuemod.IsUnauthorized(err)`, before the fetch-or-resolution case; `platformBuildError` wraps `oerrors.ErrPermission` for that cause and `ErrValidation` for every other
+- [ ] 1.3 `internal/config` tests: the row "registry answers 401" of `TestPlatformBuildHint_Forms` moves to the login hint with the host and `ErrPermission`; new rows for an archive blob that answers 401 and 403, and for a mapping with two hosts (bare command); every other row keeps its hint and `ErrValidation`; the three known limits (403 on the tag lookup, token endpoint 403, token endpoint 401) are pinned with the pin hint. The changed rows fail before 1.2 and pass after
+- [ ] 1.4 `internal/cmd/platform/check.go`: exit 4 when the build error is `ErrPermission`, exit 2 otherwise; the help states the code; a command test drives a 401 (exit 4, login hint, no report) and holds exit 2 for an unpublished pin
+- [ ] 1.5 Regenerate the command reference the docs bundle checks, if the help text is part of it
+- [ ] 1.6 `task fmt`, `task vet`, `task lint`, `task openspec:check`, `task docs:bundle:check`, `task test:unit` and `task cascade:wiring:check` green, then commit `fix(config): hint the registry login when a platform build meets a refused credential`
