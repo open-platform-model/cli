@@ -3,11 +3,13 @@ package config
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"cuelang.org/go/cue/cuecontext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -70,4 +72,19 @@ func TestPlatformBuildHint_Pinned(t *testing.T) {
 func TestPlatformBuildHint_NotFoundWithoutImportPrefix(t *testing.T) {
 	hint := platformBuildHint(t.TempDir(), errors.New("cannot fetch example.com/dep@v0.9.0: module not found"))
 	assert.Contains(t, hint, "Pin a published build in ")
+}
+
+// TestPlatformBuildHint_CUEErrorPath holds the #registry hint for an
+// evaluation error at a path under #registry, and the default hint for one
+// at any other path, without a registry.
+func TestPlatformBuildHint_CUEErrorPath(t *testing.T) {
+	ctx := cuecontext.New()
+	under := ctx.CompileString("#registry: \"example.com/x@v1\": enable: true & false\n").Validate()
+	require.Error(t, under)
+	other := ctx.CompileString("metadata: name: 1 & 2\n").Validate()
+	require.Error(t, other)
+
+	wrap := func(err error) error { return fmt.Errorf("building platform package from dir: %w", err) }
+	assert.Contains(t, platformBuildHint(t.TempDir(), wrap(under)), hintKey)
+	assert.Contains(t, platformBuildHint(t.TempDir(), wrap(other)), hintDefault)
 }

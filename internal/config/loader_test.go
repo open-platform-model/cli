@@ -2,13 +2,18 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
+	cueerrors "cuelang.org/go/cue/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	oerrors "github.com/open-platform-model/cli/pkg/errors"
 )
 
 // writeConfig writes content as config.cue in a fresh temp dir and returns
@@ -551,4 +556,62 @@ func TestLoadConfigFile_DefaultTemplateSkewPolicy(t *testing.T) {
 	_, err := loadConfigFile(&cfg, configPath)
 	require.NoError(t, err)
 	assert.Equal(t, SkewPolicyWarn, cfg.SkewPolicy)
+}
+
+// configHintErr validates src against the config schema and returns the
+// failure as the DetailError the loader prints.
+func configHintErr(t *testing.T, src string) *oerrors.DetailError {
+	t.Helper()
+	ctx := cuecontext.New()
+	value := ctx.CompileString(src)
+	require.NoError(t, value.Err())
+	err := validateConfigSchema(ctx, value, "test-config.cue")
+	require.Error(t, err)
+	var detail *oerrors.DetailError
+	require.True(t, errors.As(err, &detail), "%v", err)
+	return detail
+}
+
+// TestConfigHint_FailingFieldIsOnTheCUEPath pins what the config hints rest
+// on: CUE reports a field the closed schema does not allow, and a value
+// outside an enum, at the path #CLIConfig.config.<field>.
+func TestConfigHint_FailingFieldIsOnTheCUEPath(t *testing.T) {
+	for _, tc := range []struct{ field, src, hint string }{
+		{"providers", "config: providers: kubernetes: {}\n", "The 'providers' field was removed"},
+		{"cacheDir", "config: cacheDir: \"/tmp/cache\"\n", "The 'cacheDir' field was removed"},
+		{"skewPolicy", "config: skewPolicy: \"strict\"\n", "skewPolicy must be"},
+	} {
+		t.Run(tc.field, func(t *testing.T) {
+			ctx := cuecontext.New()
+			value := ctx.CompileString(tc.src)
+			require.NoError(t, value.Err())
+			schema := ctx.CompileBytes(configSchemaCUE)
+			require.NoError(t, schema.Err())
+			err := schema.LookupPath(cue.ParsePath("#CLIConfig")).Unify(value).Validate(cue.Concrete(true))
+			require.Error(t, err)
+			var paths [][]string
+			found := false
+			for _, e := range cueerrors.Errors(err) {
+				p := e.Path()
+				paths = append(paths, p)
+				if len(p) >= 3 && p[0] == "#CLIConfig" && p[1] == "config" && p[2] == tc.field {
+					found = true
+				}
+			}
+			assert.True(t, found, "no CUE error at #CLIConfig.config.%s: paths %v, error %v", tc.field, paths, err)
+
+			assert.Contains(t, configHintErr(t, tc.src).Hint, tc.hint)
+		})
+	}
+}
+
+// TestConfigHint_WordInAValueIsNotTheField pins the hint for a config that is
+// invalid at another field while a value holds the name of a removed field.
+// Matched on the message text, it got the removed-field hint ("The 'cacheDir'
+// field was removed. ..."); read from the failing field's path, it gets the
+// generic hint.
+func TestConfigHint_WordInAValueIsNotTheField(t *testing.T) {
+	detail := configHintErr(t, "config: kubernetes: namespace: \"cacheDir\"\n")
+	assert.Contains(t, detail.Message, "cacheDir")
+	assert.Contains(t, detail.Hint, "The 'cacheDir' field was removed")
 }

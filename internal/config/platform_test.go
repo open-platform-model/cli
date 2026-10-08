@@ -3,6 +3,7 @@ package config
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +14,8 @@ import (
 	"cuelang.org/go/mod/modfile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	liberrors "github.com/open-platform-model/library/opm/errors"
 
 	oerrors "github.com/open-platform-model/cli/pkg/errors"
 )
@@ -189,4 +192,34 @@ func TestBuildPlatformModule_KeyImportDriftNamesTheEntry(t *testing.T) {
 	assert.Contains(t, msg, `#registry."`+rekeyed+`"`)
 	assert.Contains(t, msg, "conflicting values")
 	assert.Contains(t, msg, "must equal the module path")
+	var detail *oerrors.DetailError
+	require.True(t, errors.As(err, &detail), "%v", err)
+	assert.Contains(t, detail.Hint, hintKey)
+	assert.Contains(t, detail.Hint, cuePath)
+}
+
+func TestBuildPlatformModule_EntryWithoutCatalogIsRefusedByShape(t *testing.T) {
+	// Registry-backed: a second entry that embeds no catalog is refused by
+	// the library's shape check, which names #registry in its text only and
+	// keeps no CUE path. Matched on the word "#registry", it got the hint
+	// "Each #registry entry's key must equal the module path of the catalog
+	// it imports (#catalog); fix the entry named above in <dir>/platform.cue".
+	dir := copyHackPlatform(t)
+	cuePath := filepath.Join(dir, "platform.cue")
+	content, err := os.ReadFile(cuePath)
+	require.NoError(t, err)
+	const entry = `"` + DefaultCatalogPath + `": #catalog: opm`
+	bare := strings.Replace(string(content), entry, entry+"\n\t\"example.com/x@v1\": {}", 1)
+	require.NotEqual(t, string(content), bare)
+	require.NoError(t, os.WriteFile(cuePath, []byte(bare), 0o600))
+
+	_, err = BuildPlatformModule(buildCtx(t), dir, DefaultRegistry)
+	skipIfRegistryUnavailable(t, err)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, oerrors.ErrValidation)
+	assert.ErrorIs(t, err, liberrors.ErrMissingRequiredField)
+	var detail *oerrors.DetailError
+	require.True(t, errors.As(err, &detail), "%v", err)
+	assert.Contains(t, detail.Message, `required field "#registry" entry "example.com/x@v1"`)
+	assert.Contains(t, detail.Hint, hintKey)
 }

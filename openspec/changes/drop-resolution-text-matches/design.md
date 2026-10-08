@@ -83,19 +83,12 @@ One helper in `internal/config`:
 
 ```go
 // cueErrorUnder reports whether the chain of err holds a CUE error whose
-// path starts with the selector first.
-func cueErrorUnder(err error, first string) bool {
-	for _, e := range cueerrors.Errors(err) {
-		if p := e.Path(); len(p) > 0 && p[0] == first {
-			return true
-		}
-	}
-	return false
-}
+// path starts with the selectors of prefix.
+func cueErrorUnder(err error, prefix ...string) bool
 ```
 
-`removedFieldHint` takes the error, not its text, and asks `cueErrorUnder(err, "providers")`,
-then `"cacheDir"`, then `"skewPolicy"`, in today's order.
+`removedFieldHint` takes the error, not its text, and asks for a CUE error under
+`#CLIConfig.config.providers`, then `.cacheDir`, then `.skewPolicy`, in today's order.
 
 ### D4. The guard test
 
@@ -139,8 +132,12 @@ no CUE path is left in the chain; `#registry` is only in the text.
 **Decision**: Option 1, as the recommended answer to report question 1.
 **Rationale**: The key-and-import hint does not describe an incomplete entry, so the word match
 gave it a wrong hint. Option 3 stays open as a library follow-up; it is additive.
-**Unverified**: whether a platform file can reach this branch at all, or the schema's own
-evaluation always fails first with a typed path. Section 1 pins what it meets.
+**Measured (section 1)**: a platform file reaches this branch. A second entry that embeds no
+catalog (`"example.com/x@v1": {}`) is refused with `required field "#registry" entry
+"example.com/x@v1" is incomplete at "version" ...`, `errors.Is(err, ErrMissingRequiredField)` is
+true, and the chain holds no CUE path. `TestBuildPlatformModule_EntryWithoutCatalogIsRefusedByShape`
+pins it. An entry with a wrong `enable` type fails in the schema's own evaluation instead, at a
+path under `#registry`, and keeps the key-and-import hint.
 
 ### The two hint rows the library change named
 
@@ -160,10 +157,11 @@ not parse is, whichever path met it. Both moves make the hint truer.
 
 **Context**: `removedFieldHint` matches a field name anywhere in the message.
 **Decision**: Read the path, as D3.
-**Unverified**: that CUE reports a field the closed schema does not allow, and a `skewPolicy`
-value outside its enum, at a path whose first selector is the field. Section 1 pins both before
-the code moves. If either has no path, that row keeps its text match, joins the allowlist with
-the reason, and the finding is written here.
+**Measured (section 1)**: CUE reports all three at the path `#CLIConfig.config.<field>`
+(`TestConfigHint_FailingFieldIsOnTheCUEPath`). The path carries the schema definition and the
+`config` struct first, so `cueErrorUnder` takes a path prefix, not one selector:
+`cueErrorUnder(err, "#CLIConfig", "config", "providers")` and `cueErrorUnder(err, "#registry")`.
+No row keeps a text match.
 
 ### The unset required value at `module build` (T9.20)
 
