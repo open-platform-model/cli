@@ -54,8 +54,8 @@ func TestPruneStaleResources_ReportsTheEntriesItCouldNotDelete(t *testing.T) {
 	ctx := context.Background()
 	denied := apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, "stuck", errors.New("no delete access"))
 	dyn := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(),
-		liveObject("v1", "ConfigMap", "default", "stuck"),
-		liveObject("v1", "ConfigMap", "default", "gone"),
+		staleObject("v1", "ConfigMap", "stuck"),
+		staleObject("v1", "ConfigMap", "gone"),
 	)
 	dyn.PrependReactor("delete", "configmaps", func(action k8stesting.Action) (bool, runtime.Object, error) {
 		if action.(k8stesting.DeleteAction).GetName() == "stuck" {
@@ -69,7 +69,8 @@ func TestPruneStaleResources_ReportsTheEntriesItCouldNotDelete(t *testing.T) {
 	gone := k8sinventory.Entry{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "gone"}
 	absent := k8sinventory.Entry{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "absent"}
 
-	err := PruneStaleResources(ctx, client, []k8sinventory.Entry{stuck, gone, absent})
+	leftBehind, err := PruneStaleResources(ctx, client, []k8sinventory.Entry{stuck, gone, absent}, "")
+	assert.Empty(t, leftBehind, "a failed delete is not a left-behind object")
 
 	var pruneErr *PruneError
 	require.ErrorAs(t, err, &pruneErr)

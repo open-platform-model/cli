@@ -2,6 +2,7 @@ package operator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -70,15 +71,16 @@ func MoveOwnership(ctx context.Context, client *kubernetes.Client, plan *Migrati
 // DeleteSuperseded deletes what the migration replaces (0012:D8:R7): first
 // the earlier controller Deployment, with foreground propagation, waiting
 // until it is gone under ctx's deadline (since is when that budget started),
-// then the superseded role bindings. Each delete is preconditioned on the
-// uid the plan proved, so an object replaced since then is never deleted. A
+// then the superseded role bindings. Each delete was allowed by the library's
+// delete verdict when the plan was made and is preconditioned on the UID that
+// verdict judged, so an object replaced since then is never deleted. A
 // missing object is done.
 func DeleteSuperseded(ctx context.Context, client *kubernetes.Client, plan *MigrationPlan, since time.Time) error {
 	if plan == nil {
 		return nil
 	}
 	if d := plan.RecreateDeployment; d != nil {
-		if err := deleteProven(ctx, client, d); err != nil {
+		if err := deleteProven(ctx, client, plan, d); err != nil {
 			return err
 		}
 		if err := kubernetes.WaitAbsent(ctx, client, []*unstructured.Unstructured{d}, since); err != nil {
@@ -86,27 +88,31 @@ func DeleteSuperseded(ctx context.Context, client *kubernetes.Client, plan *Migr
 		}
 	}
 	for _, b := range plan.DeleteBindings {
-		if err := deleteProven(ctx, client, b.Live); err != nil {
+		if err := deleteProven(ctx, client, plan, b.Live); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func deleteProven(ctx context.Context, client *kubernetes.Client, obj *unstructured.Unstructured) error {
-	uid := obj.GetUID()
-	propagation := metav1.DeletePropagationForeground
-	opts := metav1.DeleteOptions{PropagationPolicy: &propagation}
-	if uid != "" {
-		opts.Preconditions = &metav1.Preconditions{UID: &uid}
+// deleteProven deletes one object the plan's delete verdict allowed, with
+// that verdict's UID precondition. An object the plan holds no proceed
+// verdict for is not deleted: the migration stops.
+func deleteProven(ctx context.Context, client *kubernetes.Client, plan *MigrationPlan, obj *unstructured.Unstructured) error {
+	step := "deleting " + objPath(obj.GetKind(), obj.GetNamespace(), obj.GetName())
+	verdict, judged := plan.deleteVerdicts[keyOf(obj)]
+	if !judged || !verdict.Proceed() {
+		return &MigrationStoppedError{Step: step, Err: errors.New("the migration plan holds no delete verdict for it")}
 	}
+	propagation := metav1.DeletePropagationForeground
+	opts := metav1.DeleteOptions{PropagationPolicy: &propagation, Preconditions: verdict.Preconditions()}
 	// A kind that cannot be resolved is a stop, never "done".
 	resource, err := client.ResourceClientFor(ctx, obj.GroupVersionKind(), obj.GetNamespace())
 	if err == nil {
 		err = resource.Delete(ctx, obj.GetName(), opts)
 	}
 	if err != nil && !apierrors.IsNotFound(err) {
-		return &MigrationStoppedError{Step: "deleting " + objPath(obj.GetKind(), obj.GetNamespace(), obj.GetName()), Err: err}
+		return &MigrationStoppedError{Step: step, Err: err}
 	}
 	return nil
 }

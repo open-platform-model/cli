@@ -17,6 +17,7 @@ import (
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
 	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
 // Prometheus is served as "prometheuses"; the guessed plural was "prometheus".
@@ -100,8 +101,11 @@ func TestPruneStaleResources_ResolvesByDiscovery(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("served under an irregular name is deleted", func(t *testing.T) {
-		client, dyn := promCluster(t, promServed, livePrometheus())
-		require.NoError(t, PruneStaleResources(ctx, client, []k8sinventory.Entry{promEntry}))
+		owned := livePrometheus()
+		owned.SetLabels(map[string]string{opmlabels.ManagedBy: opmlabels.ManagedByCLI})
+		client, dyn := promCluster(t, promServed, owned)
+		_, pruneErr := PruneStaleResources(ctx, client, []k8sinventory.Entry{promEntry}, "")
+		require.NoError(t, pruneErr)
 		_, err := dyn.Tracker().Get(promGVR, "default", "main")
 		assert.True(t, apierrors.IsNotFound(err), "the stale object must be gone: %v", err)
 	})
@@ -112,7 +116,7 @@ func TestPruneStaleResources_ResolvesByDiscovery(t *testing.T) {
 			// A ConfigMap beside it is still pruned.
 			cm := k8sinventory.Entry{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "absent"}
 
-			err := PruneStaleResources(ctx, client, []k8sinventory.Entry{promEntry, cm})
+			_, err := PruneStaleResources(ctx, client, []k8sinventory.Entry{promEntry, cm}, "")
 
 			var pruneErr *PruneError
 			require.ErrorAs(t, err, &pruneErr, "the entry must not count as pruned")
@@ -165,14 +169,14 @@ func TestPruneStaleResources_DiscoveryFailureStopsThePrune(t *testing.T) {
 	ctx := context.Background()
 	cm := k8sinventory.Entry{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "stale"}
 	ns := k8sinventory.Entry{Version: "v1", Kind: "Namespace", Name: "apps"}
-	liveCM := liveObject("v1", "ConfigMap", "default", "stale")
+	liveCM := staleObject("v1", "ConfigMap", "stale")
 
 	// Prune order is highest weight first: the Prometheus before the ConfigMap.
 	client, _ := promCluster(t, promForbidden, livePrometheus())
 	_, err := client.Dynamic.Resource(kubetest.GVR(liveCM)).Namespace("default").Create(ctx, liveCM, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	err = PruneStaleResources(ctx, client, []k8sinventory.Entry{cm, promEntry, ns})
+	_, err = PruneStaleResources(ctx, client, []k8sinventory.Entry{cm, promEntry, ns}, "")
 
 	var pruneErr *PruneError
 	require.ErrorAs(t, err, &pruneErr)

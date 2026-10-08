@@ -326,3 +326,43 @@ func TestInstall_ResumesAfterAPartialInstanceApply(t *testing.T) {
 	assert.False(t, fc.exists(crbGVR, "", "opm-operator-metrics-auth-rolebinding"))
 	assert.False(t, fc.exists(rbGVR, OperatorNamespace, "opm-operator-leader-election-rolebinding"))
 }
+
+// Each delete of the migration carries the UID the plan's delete verdict
+// judged, so an object replaced since the check phase is not deleted.
+func TestDeleteSuperseded_SendsTheJudgedUID(t *testing.T) {
+	fastPolling(t)
+	cluster := manifestObjects(t, beta8, originOPMCLI)
+	findObj(cluster, kindDeployment, ControllerDeploymentName).SetUID("uid-deployment")
+	findObj(cluster, "ClusterRoleBinding", "opm-operator-manager-rolebinding").SetUID("uid-binding")
+	fc := newFakeCluster(t, cluster...)
+	plan := planFor(t, fc)
+
+	require.NoError(t, DeleteSuperseded(context.Background(), fc.client, plan, time.Now()))
+
+	uids := map[string]string{}
+	for _, a := range fc.fake.Actions() {
+		d, ok := a.(k8stesting.DeleteAction)
+		if !ok {
+			continue
+		}
+		if pre := d.GetDeleteOptions().Preconditions; pre != nil && pre.UID != nil {
+			uids[d.GetName()] = string(*pre.UID)
+		}
+	}
+	assert.Equal(t, "uid-deployment", uids[ControllerDeploymentName])
+	assert.Equal(t, "uid-binding", uids["opm-operator-manager-rolebinding"])
+}
+
+// An object the plan holds no delete verdict for is never deleted.
+func TestDeleteProven_WithoutAVerdictStops(t *testing.T) {
+	cluster := manifestObjects(t, beta8, originOPMCLI)
+	fc := newFakeCluster(t, cluster...)
+	deployment := findObj(cluster, kindDeployment, ControllerDeploymentName)
+
+	err := deleteProven(context.Background(), fc.client, &MigrationPlan{}, deployment)
+
+	var stopped *MigrationStoppedError
+	require.ErrorAs(t, err, &stopped)
+	assert.Empty(t, fc.Writes())
+	assert.True(t, fc.exists(deploymentGVR, OperatorNamespace, ControllerDeploymentName))
+}

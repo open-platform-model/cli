@@ -13,6 +13,7 @@ import (
 
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
+	"github.com/open-platform-model/library/opm/k8s/ownership"
 )
 
 // clientSideApplyManager is the field manager a client-side `kubectl apply`
@@ -65,6 +66,11 @@ type MigrationPlan struct {
 	// LeftInPlace are proven earlier-manifest objects the module does not
 	// render and the migration does not delete; they are only reported.
 	LeftInPlace []LegacyObject
+
+	// deleteVerdicts holds the proceed verdict of the library's delete
+	// verdict for RecreateDeployment and every binding of DeleteBindings.
+	// PlanMigration fills it; an object without one is never deleted.
+	deleteVerdicts map[objKey]ownership.DeleteVerdict
 }
 
 // Migrates reports whether the plan adopts, recreates or deletes anything,
@@ -177,6 +183,8 @@ func PlanMigration(ctx context.Context, client *kubernetes.Client, rendered []*u
 		}
 	}
 
+	blocks = append(blocks, plan.judgeDeletes(instanceUUID)...)
+
 	if len(blocks) > 0 {
 		return nil, &MigrationRefusalError{Blocks: blocks}
 	}
@@ -188,6 +196,44 @@ func PlanMigration(ctx context.Context, client *kubernetes.Client, rendered []*u
 		}
 	}
 	return plan, nil
+}
+
+// judgeDeletes asks the library's delete verdict for every object the
+// migration deletes: the proven earlier Deployment and the proven superseded
+// bindings, each as the proof read it, admitted because the proof holds
+// (0012:D8:R7). It keeps each proceed verdict, whose UID precondition the
+// delete then sends. A skip verdict, in practice an adopt annotation that
+// names another instance, is returned as a block: install cannot complete
+// without these deletes, so it refuses before any write where another delete
+// path would leave the object behind (owner decision of 2026-10-08).
+func (p *MigrationPlan) judgeDeletes(instanceUUID string) []MigrationBlock {
+	var doomed []*unstructured.Unstructured
+	if p.RecreateDeployment != nil {
+		doomed = append(doomed, p.RecreateDeployment)
+	}
+	for _, b := range p.DeleteBindings {
+		doomed = append(doomed, b.Live)
+	}
+
+	var blocks []MigrationBlock
+	for _, live := range doomed {
+		key := keyOf(live)
+		verdict := ownership.CanDelete(ownership.DeleteInput{
+			Object:       ownership.Object{Group: key.Group, Kind: key.Kind, Namespace: key.Namespace, Name: key.Name},
+			Live:         live,
+			InstanceUUID: instanceUUID,
+			Admit:        true,
+		})
+		if !verdict.Proceed() {
+			blocks = append(blocks, MigrationBlock{Kind: key.Kind, Namespace: key.Namespace, Name: key.Name, Reason: verdict.Message})
+			continue
+		}
+		if p.deleteVerdicts == nil {
+			p.deleteVerdicts = map[objKey]ownership.DeleteVerdict{}
+		}
+		p.deleteVerdicts[key] = verdict
+	}
+	return blocks
 }
 
 // classify sorts one proof-list entry into the plan, or returns the block

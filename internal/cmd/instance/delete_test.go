@@ -215,7 +215,7 @@ func TestExecuteInstanceDelete_LeavesNamespaceBehind(t *testing.T) {
 			assert.Contains(t, out, output.StatusLeftBehind)
 			assert.Contains(t, out, kubernetes.ProtectedKindReason)
 			assert.Contains(t, out, "ConfigMap/apps/shared")
-			assert.Contains(t, out, "owned by another instance")
+			assert.Contains(t, out, "belongs to module instance uuid-other, not this one")
 			assert.NotContains(t, out, "all resources have been deleted")
 
 			_, nsErr := fake.Tracker().Get(schema.GroupVersionResource{Version: "v1", Resource: "namespaces"}, "", "apps")

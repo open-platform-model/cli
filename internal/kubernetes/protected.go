@@ -1,5 +1,7 @@
 package kubernetes
 
+import "github.com/open-platform-model/library/opm/k8s/ownership"
+
 // ProtectedKindReason is the reason printed beside every CRD or Namespace
 // that prune or delete leaves behind.
 const ProtectedKindReason = "CRDs and Namespaces are never deleted"
@@ -16,15 +18,10 @@ const (
 // instance delete all leave such objects behind; there is no override.
 //
 // The match is on group and kind, so a kind of the same name in another API
-// group is not protected by accident.
+// group is not protected by accident. The rule is the library's
+// ownership.SafetyExcluded, shared with the operator.
 func IsProtectedKind(group, kind string) bool {
-	switch {
-	case group == "" && kind == "Namespace":
-		return true
-	case group == groupAPIExtensions && kind == kindCustomResourceDefinition:
-		return true
-	}
-	return false
+	return ownership.SafetyExcluded(group, kind)
 }
 
 // KindPersistentVolumeClaim is the kind of the claims delete and prune keep.

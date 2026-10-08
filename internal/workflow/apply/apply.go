@@ -286,7 +286,10 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 			if len(prunable) > 0 {
 				instanceLog.Info(fmt.Sprintf("pruning %d stale resource(s)", len(prunable)))
 				var err error
-				notPruned, pruneExit, err = pruneStale(ctx, req.K8sClient, prunable, instanceLog)
+				// Judged with the identity the record holds, the one that
+				// applied the stale objects; the write below is what moves
+				// the record to the render's identity.
+				notPruned, pruneExit, err = pruneStale(ctx, req.K8sClient, prunable, recordedIdentity(prevRecord), instanceLog)
 				if err != nil {
 					return err
 				}
@@ -332,16 +335,33 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	return nil
 }
 
-// pruneStale deletes the prunable stale resources. It returns the entries it
+// recordedIdentity is the instance identity the record holds; empty when
+// there is no record or it stores none, which disables the UUID comparison of
+// the delete verdict.
+func recordedIdentity(rec *inventory.Record) string {
+	if rec == nil {
+		return ""
+	}
+	return rec.InstanceUUID
+}
+
+// pruneStale deletes the prunable stale resources the delete verdict allows
+// for instanceUUID, the identity the instance's record holds, and reports
+// each one the verdict leaves behind on its own line. It returns the entries it
 // could not delete, each already reported on its own line with the delete
 // error; the caller keeps them in the record and fails the command after the
 // write with exitCode: 1, or, when a failed API discovery request stopped the
 // prune, the code of that failure (4 denied, 3 unavailable). The error result
 // is for a failure that names no entries, where the caller must stop before
 // the write so that no entry is dropped unseen.
-func pruneStale(ctx context.Context, client *kubernetes.Client, prunable []k8sinventory.Entry, instanceLog *log.Logger) (notPruned []k8sinventory.Entry, exitCode int, err error) {
+func pruneStale(ctx context.Context, client *kubernetes.Client, prunable []k8sinventory.Entry, instanceUUID string, instanceLog *log.Logger) (notPruned []k8sinventory.Entry, exitCode int, err error) {
 	exitCode = opmexit.ExitGeneralError
-	err = inventory.PruneStaleResources(ctx, client, prunable)
+	leftBehind, err := inventory.PruneStaleResources(ctx, client, prunable, instanceUUID)
+	// Not the instance's any more: reported, left in the cluster, and out
+	// of the record, since the caller records only what it returns here.
+	for _, lb := range leftBehind {
+		instanceLog.Warn(output.FormatResourceLine(lb.Entry.Kind, lb.Entry.Namespace, lb.Entry.Name, output.StatusLeftBehind), "reason", lb.Reason)
+	}
 	if err == nil {
 		return nil, exitCode, nil
 	}
