@@ -106,8 +106,8 @@ func errorTextVars(fn *ast.FuncDecl) map[string]bool {
 }
 
 // predicateOver reports whether call is a strings or regexp predicate with
-// an argument isText accepts.
-func predicateOver(call *ast.CallExpr, isText func(ast.Expr) bool) bool {
+// an argument holdsText accepts.
+func predicateOver(call *ast.CallExpr, holdsText func(ast.Expr) bool) bool {
 	sel, ok := call.Fun.(*ast.SelectorExpr)
 	if !ok {
 		return false
@@ -118,7 +118,7 @@ func predicateOver(call *ast.CallExpr, isText func(ast.Expr) bool) bool {
 		return false
 	}
 	for _, arg := range call.Args {
-		if isText(arg) {
+		if holdsText(arg) {
 			return true
 		}
 	}
@@ -127,26 +127,27 @@ func predicateOver(call *ast.CallExpr, isText func(ast.Expr) bool) bool {
 
 // errorTextMatches reports every place in fn that tests an error's text: a
 // strings or regexp predicate over an error text or a variable holding one,
-// a comparison of an Error() call, and a switch over one. It follows text
-// inside one function only, so a text handed to another function as a
-// string is not seen there; pass the error instead.
+// a comparison of an Error() call, and a switch over one. The text may be
+// wrapped in other calls (strings.ToLower(err.Error())).
+//
+// Two forms are not seen, because the guard reads syntax and no types: a
+// text made by formatting the error (fmt.Sprint(err), fmt.Sprintf("%v",
+// err)), and a text handed to another function as a string, which is not
+// followed there. Pass the error, not its text. TestErrorTextMatches_Detects
+// holds both limits as rows.
 func errorTextMatches(fset *token.FileSet, fn *ast.FuncDecl) []token.Position {
 	if fn.Body == nil {
 		return nil
 	}
 	tainted := errorTextVars(fn)
-	isText := func(expr ast.Expr) bool {
-		if isErrorText(expr) {
-			return true
-		}
-		id, ok := expr.(*ast.Ident)
-		return ok && tainted[id.Name]
-	}
+	// An argument holds the text when the text is anywhere inside it, so a
+	// lower-cased or trimmed text counts: strings.ToLower(err.Error()).
+	holdsText := func(expr ast.Expr) bool { return mentions(expr, tainted) }
 	var found []token.Position
 	ast.Inspect(fn.Body, func(n ast.Node) bool {
 		switch x := n.(type) {
 		case *ast.CallExpr:
-			if predicateOver(x, isText) {
+			if predicateOver(x, holdsText) {
 				found = append(found, fset.Position(x.Pos()))
 			}
 		case *ast.BinaryExpr:
@@ -154,7 +155,7 @@ func errorTextMatches(fset *token.FileSet, fn *ast.FuncDecl) []token.Position {
 				found = append(found, fset.Position(x.Pos()))
 			}
 		case *ast.SwitchStmt:
-			if x.Tag != nil && isText(x.Tag) {
+			if x.Tag != nil && holdsText(x.Tag) {
 				found = append(found, fset.Position(x.Pos()))
 			}
 		}
@@ -249,7 +250,13 @@ func TestErrorTextMatches_Detects(t *testing.T) {
 		{"comparison of the text", `return err.Error() == "x"`, true},
 		{"switch over the text", `switch err.Error() { case "x": return true }; return false`, true},
 		{"CUE message accessor", `format, _ := ce.Msg(); return strings.Contains(format, "x")`, true},
+		{"predicate on a lower-cased text", `return strings.Contains(strings.ToLower(err.Error()), "x")`, true},
+		{"predicate on a lower-cased variable", `msg := err.Error(); return strings.HasSuffix(strings.TrimSpace(msg), "x")`, true},
+		{"switch over a trimmed text", `switch strings.TrimSpace(err.Error()) { case "x": return true }; return false`, true},
 		{"typed check", `return errors.Is(err, errX)`, false},
+		// Known limits: the guard reads syntax, not types.
+		{"limit: a formatted error is not seen", `msg := fmt.Sprint(err); return strings.Contains(msg, "x")`, false},
+		{"limit: a text handed to a helper is not followed", `return helper(err.Error())`, false},
 		{"predicate on another string", `return strings.HasPrefix(name, "x")`, false},
 		{"text only printed", `msg := err.Error(); fmt.Println(msg); return false`, false},
 	} {

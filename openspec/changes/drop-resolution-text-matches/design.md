@@ -100,8 +100,10 @@ a switch over one. An error's text is an `Error()` call, a CUE error's `Msg()`, 
 assigned from either or from an expression over such a variable, inside one function. The four
 sites that stay are an allowlist of `file: function` pairs, each with its reason, and an entry
 that is no longer in the code fails the test too. The pattern follows `TestNoLocalHealthEvaluator`
-(`internal/kubernetes/health_refusal_test.go`). Limit: a text handed to another function as a
-string is not followed there.
+(`internal/kubernetes/health_refusal_test.go`). The text may be wrapped in other calls
+(`strings.ToLower(err.Error())`). Two limits remain, because the guard reads syntax and no types:
+a text made by formatting the error (`fmt.Sprint(err)`), and a text handed to another function as
+a string. `TestErrorTextMatches_Detects` holds both as rows.
 
 Justification under Principle VII: without it the rule is prose, and the search for this change
 found four text matches where the swarm's notes named two.

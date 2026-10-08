@@ -16,7 +16,11 @@ failure:
 - dropping CUE's disjunction summary line from grouped validation output;
 - splitting the library's duplicate-identities message into a header and its rows.
 
-A test SHALL fail when non-test cli code gains an error-text predicate outside that list.
+A test SHALL fail when non-test cli code gains an error-text predicate outside that list. The
+test reads the source, not its types: it sees a string or pattern predicate, a comparison or a
+switch over an error's message inside one function, also when the message is wrapped in other
+calls. It does not see a message made by formatting the error, or a message handed to another
+function as a string.
 
 #### Scenario: A predecessor package with an unprovided import reads as absent
 

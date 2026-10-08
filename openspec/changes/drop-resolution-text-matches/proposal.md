@@ -25,7 +25,7 @@ error:
 
 - Sites 1 to 4 lose their text match. No exit code moves: site 1 keeps "absent" against a
   `*ConnectivityError`, and sites 2 to 4 pick a hint, never an exit code.
-- **Three hint answers change**, because the text matched forms the types do not cover, or missed
+- **Three platform build hint answers change**, because the text matched forms the types do not cover, or missed
   one they do. All three are in `platformBuildHint`, exit code 2 before and after:
   - A directly imported dependency whose module file does not parse
     (`ResolutionModuleFileInvalid`, direct path) gets the "Pin a published build" hint. Today it
@@ -38,8 +38,11 @@ error:
     and wraps `ErrMissingRequiredField`) gets the default hint. Today the `#registry` word in the
     text gives it the key-and-import hint, which does not describe that defect.
 
-  These are an owner question (report T2.7, question 1). The proposal takes the recommended
-  answer: accept the three, each pinned by a test.
+  These were an owner question (report T2.7, question 1), accepted at the proposal gate: each is
+  pinned by a test.
+- **One config hint answer changes** in `removedFieldHint`, exit code unchanged: a config that is
+  invalid at another field while a value holds the word `providers`, `cacheDir` or `skewPolicy`
+  gets the generic hint. Today the word in the message gives it that field's hint.
 - Every other message and hint stays byte-identical, pinned by the tests named in `tasks.md`.
 - A guard test refuses a new error-text predicate in non-test code, with sites 5 to 8 as its
   allowlist.
@@ -56,7 +59,7 @@ Not in this change:
   a CUE error the kernel wraps with `%w`, and the shared printer reads its path.
 - Sites 5 and 6 would each need a new library or CUE surface (report T2.7, question 2).
 
-SemVer: PATCH after GA (a refactor plus three corrected hints). Beta ships it as the next
+SemVer: PATCH after GA (a refactor plus four corrected hints). Beta ships it as the next
 `-beta.N`.
 
 ## Capabilities
