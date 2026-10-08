@@ -100,7 +100,9 @@ func TestExecute_DryRunFirstInstallOverManagedResourcesWarns(t *testing.T) {
 func TestExecute_DryRunFirstInstallLookRefusesNothing(t *testing.T) {
 	withReleasedCLIVersion(t)
 	logBuf := captureLog(t)
-	cluster := newApplyCluster(renderedConfigMap("a")) // exists, no managed-by label
+	foreign := renderedConfigMap("a")
+	foreign.SetLabels(nil) // exists, no managed-by label
+	cluster := newApplyCluster(foreign)
 
 	require.NoError(t, Execute(context.Background(), cluster.request(Options{WarnUnrecorded: true, DryRun: true}, "a")))
 	assert.NotContains(t, logBuf.String(), firstInstallWarning)

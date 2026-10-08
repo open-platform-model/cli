@@ -15,6 +15,7 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 
 	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/output"
@@ -30,10 +31,12 @@ func configMapEntry(name string) map[string]any {
 	return map[string]any{"group": "", "kind": "ConfigMap", "namespace": "default", "name": name, "v": "v1", "component": "app"}
 }
 
+// liveClaim is a claim the instance applied, so it carries the OPM
+// managed-by label and a prune of it passes the delete verdict.
 func liveClaim(name string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "v1", "kind": "PersistentVolumeClaim",
-		"metadata": map[string]any{"name": name, "namespace": "default"},
+		"metadata": map[string]any{"name": name, "namespace": "default", "labels": map[string]any{opmlabels.ManagedBy: opmlabels.ManagedByCLI}},
 	}}
 }
 

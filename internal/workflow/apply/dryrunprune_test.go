@@ -27,6 +27,7 @@ import (
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
 	workflowrender "github.com/open-platform-model/cli/internal/workflow/render"
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
 // cliOwnedInstance is a CLI-owned ModuleInstance CR whose recorded inventory
@@ -62,11 +63,13 @@ func cliOwnedInstanceWith(name, namespace string, entries ...any) *unstructured.
 	}}
 }
 
+// renderedConfigMap is a ConfigMap as the instance renders and applies it:
+// with the OPM managed-by label, so a prune of it passes the delete verdict.
 func renderedConfigMap(name string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "v1",
 		"kind":       "ConfigMap",
-		"metadata":   map[string]any{"name": name, "namespace": "default", "labels": map[string]any{"component.opmodel.dev/name": "app"}},
+		"metadata":   map[string]any{"name": name, "namespace": "default", "labels": map[string]any{"component.opmodel.dev/name": "app", opmlabels.ManagedBy: opmlabels.ManagedByCLI}},
 		"data":       map[string]any{"k": "v"},
 	}}
 }

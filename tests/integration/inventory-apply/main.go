@@ -166,7 +166,8 @@ func main() {
 	fmt.Printf("   OK: %d resources applied\n", applyResult3.Applied)
 
 	// Prune stale resources.
-	err = inventory.PruneStaleResources(ctx, client, stale58)
+	// Judged with the identity that applied cm-b, as the apply workflow does.
+	_, err = inventory.PruneStaleResources(ctx, client, stale58, instanceID)
 	check("pruning stale resources", err)
 	fmt.Println("   OK: pruning complete")
 

@@ -196,6 +196,7 @@ Migration note for the PR body and the release:
 
 - Prune now reads each stale object before it deletes it. It leaves in the cluster, and removes from the inventory, an object that OPM does not manage, that belongs to another instance, or whose `opmodel.dev/adopt` annotation names another instance. Each is printed as `left behind` with the reason. Delete it with `kubectl delete` when nothing else needs it.
 - `opm instance delete` and `opm operator uninstall` leave behind an object whose `opmodel.dev/adopt` annotation names another instance. The left-behind reasons have new wording.
+- Prune judges a stale object with the identity stored in the instance's record. If a prune fails on the first apply after the module moved to a new path, the next apply leaves that object behind with a warning, because the record then holds the new identity. Delete it with `kubectl delete`.
 - `opm instance apply --dry-run` does not run this check: it can list a stale object as `would prune` that the real run leaves behind.
 - This release honours the adopt annotation when it deletes and not yet when it applies: an instance whose object is annotated for another instance still re-applies it until the release that carries the apply guard.
 - `opm operator install` refuses, with exit 2 and nothing changed, when the earlier operator Deployment or a superseded role binding is annotated for another instance. Remove the annotation, then run the install again.
