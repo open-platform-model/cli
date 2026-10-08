@@ -41,7 +41,7 @@ func gateAlreadyPublished(ctx context.Context, p *Plan, opts Options) error {
 	}
 	versions, err := client.ModuleVersions(ctx, p.DeclaredPath)
 	if err != nil {
-		return RegistryFailure(fmt.Sprintf("listing published versions of %s", p.DeclaredPath), err)
+		return RegistryFailure(fmt.Sprintf("listing published versions of %s", p.DeclaredPath), RegistryHost(opts.Registry, p.DeclaredPath), err)
 	}
 	p.RegistryChecked = true
 	p.registryClient = client
@@ -104,7 +104,7 @@ func Push(ctx context.Context, opts Options, p *Plan) error {
 		}
 	}
 	if err := client.PutModule(ctx, mv, zipFile, info.Size()); err != nil {
-		return RegistryFailure(fmt.Sprintf("pushing %s:%s", p.RegistryRepo, p.Tag), err)
+		return RegistryFailure(fmt.Sprintf("pushing %s:%s", p.RegistryRepo, p.Tag), RegistryHost(opts.Registry, p.DeclaredPath), err)
 	}
 	return nil
 }

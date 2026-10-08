@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -77,7 +78,10 @@ func TestPublishError_LoginHint(t *testing.T) {
 	const hint = "opm registry login"
 	cause := errors.New("401 Unauthorized: unauthorized: authentication required")
 
-	refused := publishError(&publish.RegistryError{Op: "pushing example.com/modules/demo:v1.2.0", Unauthorized: true, Err: cause})
+	refused := publishError(&publish.RegistryError{Op: "pushing example.com/modules/demo:v1.2.0", Unauthorized: true, Host: "ghcr.io", Err: cause})
+	assert.True(t, strings.HasSuffix(refused.Error(), "then retry:  opm registry login ghcr.io"), "the hint names the host: %s", refused)
+	noHost := publishError(&publish.RegistryError{Op: "push", Unauthorized: true, Err: cause})
+	assert.True(t, strings.HasSuffix(noHost.Error(), "then retry:  opm registry login"), "no known host: the bare command: %s", noHost)
 	assert.Contains(t, refused.Error(), "registry refused the credentials (authentication or permission)")
 	assert.Contains(t, refused.Error(), "pushing example.com/modules/demo:v1.2.0")
 	assert.Contains(t, refused.Error(), cause.Error())
@@ -139,12 +143,14 @@ func TestRunPublish_SchemaFetchFailureIsNamed(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cuemodtest.ColdCache(t)
-			err := runPublish(t, &config.GlobalConfig{Registry: tc.registry(t)})
+			registry := tc.registry(t)
+			err := runPublish(t, &config.GlobalConfig{Registry: registry})
 			var exitErr *opmexit.ExitError
 			require.ErrorAs(t, err, &exitErr)
 			assert.Equal(t, opmexit.ExitConnectivityError, exitErr.Code, "%v", err)
 			assert.Contains(t, err.Error(), tc.want)
-			assert.Equal(t, tc.login, bytes.Contains([]byte(err.Error()), []byte(registryLoginHint)), "%v", err)
+			// The hint names the host the schema fetch was routed to.
+			assert.Equal(t, tc.login, strings.HasSuffix(err.Error(), "opm registry login "+registry), "%v", err)
 		})
 	}
 }

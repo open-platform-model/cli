@@ -54,7 +54,7 @@ func RunPublish(cmd *cobra.Command, cfg *config.GlobalConfig, kind publish.Kind,
 		// The schema fetch is a registry round-trip like the lookup and the
 		// push: its failure is a registry failure, not a verdict on the
 		// artifact.
-		return publishError(publish.RegistryFailure("loading core schema", err))
+		return publishError(publish.RegistryFailure("loading core schema", publish.RegistryHost(cfg.Registry, coreModulePath), err))
 	}
 	identitySchema := schemaVal.LookupPath(cue.MakePath(cue.Def("IdentityPackage")))
 	if !identitySchema.Exists() {
@@ -159,10 +159,21 @@ func PrintRefusals(refusals []publish.Refusal) {
 	}
 }
 
-// registryLoginHint is the next step after a registry refused the caller.
-// Without a host argument the login command resolves the configured mapping
-// to its host, or lists the hosts when it names several.
-const registryLoginHint = "Log in to the registry, then retry:  opm registry login"
+// coreModulePath is the module the core schema is fetched from; the registry
+// mapping routes it to the host a refused schema fetch names.
+const coreModulePath = "opmodel.dev/core"
+
+// registryLoginHint is the next step after a registry refused the caller:
+// the login command for the host the failed operation was routed to. With no
+// known host it is the bare command, which resolves the configured mapping
+// and lists the hosts when it names several.
+func registryLoginHint(host string) string {
+	const hint = "Log in to the registry, then retry:  opm registry login"
+	if host == "" {
+		return hint
+	}
+	return hint + " " + host
+}
 
 // publishError maps pipeline errors to exit codes: a failed registry
 // operation is exit 3, whether the registry gave no response
@@ -173,7 +184,7 @@ func publishError(err error) error {
 	var regErr *publish.RegistryError
 	if errors.As(err, &regErr) {
 		if regErr.Unauthorized {
-			err = fmt.Errorf("%w\n  %s", err, registryLoginHint)
+			err = fmt.Errorf("%w\n  %s", err, registryLoginHint(regErr.Host))
 		}
 		return &opmexit.ExitError{Code: opmexit.ExitConnectivityError, Err: err}
 	}

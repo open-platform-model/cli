@@ -30,8 +30,8 @@ declares.
 	overwrites one.
 
 	Exit codes: 0 published (or dry-run GO), 2 refused or no registry
-	configured, 3 registry operation
-	failed (unreachable, credentials refused, or another registry error).
+	configured, 3 a registry operation failed (unreachable, credentials
+	refused, or another registry error).
 
 	Arguments:
 	  path    Path to the module directory (default: current directory)

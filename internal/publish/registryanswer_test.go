@@ -116,3 +116,55 @@ func TestPush_UnreachableRegistryIsConnectivity(t *testing.T) {
 	require.ErrorAs(t, err, &connErr)
 	assert.Contains(t, err.Error(), "registry unreachable: pushing example.com/modules/demo:v1.2.0")
 }
+
+// CUE's registry client reads a 403 answer to the tag listing as "no such
+// module", so the lookup of a registry that forbids everything reports
+// nothing published and the plan is GO; the push is where the refusal shows.
+func TestGate_AlreadyPublished_ForbiddenLookupReadsAsNotPublished(t *testing.T) {
+	p, _, err := runAgainst(t, cuemodtest.StatusRegistry(t, http.StatusForbidden))
+	require.NoError(t, err)
+	assert.True(t, p.RegistryChecked)
+	assert.True(t, p.Go(), refusalHeadlines(p))
+}
+
+// A refused credential names the host the operation was routed to, in the
+// form `opm registry login` takes.
+func TestRegistryFailure_CarriesTheHost(t *testing.T) {
+	registry := cuemodtest.StatusRegistry(t, http.StatusUnauthorized)
+	_, _, err := runAgainst(t, registry)
+	var regErr *RegistryError
+	require.ErrorAs(t, err, &regErr)
+	assert.Equal(t, registry, regErr.Host, "host with its +insecure suffix")
+
+	assert.Equal(t, "ghcr.io", RegistryHost("example.com=ghcr.io/acme,registry.cue.works", "example.com/modules/demo@v1"))
+	assert.Equal(t, "registry.cue.works", RegistryHost("example.com=ghcr.io/acme,registry.cue.works", "other.example/x@v0"))
+	assert.Equal(t, "", RegistryHost("::nonsense::", "example.com/modules/demo@v1"))
+}
+
+// A token endpoint that answers 401 is a refused credential on the lookup.
+func TestGate_AlreadyPublished_TokenEndpointRefusal(t *testing.T) {
+	t.Setenv("DOCKER_CONFIG", t.TempDir())
+	_, _, err := runAgainst(t, cuemodtest.TokenRegistry(t, http.StatusUnauthorized))
+	var regErr *RegistryError
+	require.ErrorAs(t, err, &regErr)
+	assert.True(t, regErr.Unauthorized, "%v", err)
+}
+
+// TestPush_TokenEndpointRefusal_Pinned records a known gap, it does not
+// state the wanted answer. A token endpoint that answers 403 lets the lookup
+// pass (a 403 reads as "no such module"), and the push then fails with
+// "cannot do HTTP request: ...: 403 Forbidden", which the library's text
+// classification reads as no response. The registry did answer, so the
+// wanted answer is a *RegistryError marked Unauthorized. When the library
+// reads that form as an answer, this test fails: change it to assert that.
+func TestPush_TokenEndpointRefusal_Pinned(t *testing.T) {
+	t.Setenv("DOCKER_CONFIG", t.TempDir())
+	p, opts, err := runAgainst(t, cuemodtest.TokenRegistry(t, http.StatusForbidden))
+	require.NoError(t, err)
+	require.True(t, p.Go(), refusalHeadlines(p))
+
+	err = Push(context.Background(), opts, p)
+	var connErr *ConnectivityError
+	require.ErrorAs(t, err, &connErr, "the gap closed: assert *RegistryError with Unauthorized instead")
+	assert.Contains(t, err.Error(), "403 Forbidden", "the registry's answer is at least visible")
+}

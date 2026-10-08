@@ -61,7 +61,7 @@ func (e *NoRegistryError) Error() string {
 	}
 	next := "To write a config file with the default registry, run:  opm config init"
 	if e.ConfigExists {
-		next = "To replace the config file with the default one, run:  opm config init --force"
+		next = "The config file exists and sets none. Add a registry field to it, or replace the whole file\n  with the default one (this drops its other settings):  opm config init --force"
 	}
 	return fmt.Sprintf("no registry is configured: %s: %v\n  Set one with --registry, OPM_REGISTRY or the registry field of %s.\n  %s",
 		e.Op, e.Err, file, next)
