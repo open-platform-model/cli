@@ -70,14 +70,14 @@ type DiffError struct {
 `opm instance delete <name> [flags]`, `opm operator uninstall [flags]`, `opm instance diff <instance.cue> [flags]`. No flag changes.
 
 ```text
-ERRO deleting ModuleInstance apps/demo: its tracked resources were deleted, but the record remains: <cause>
+ERRO deleting ModuleInstance apps/demo: its tracked resources were deleted, but the record remains error=<cause>
 
 The ModuleInstance still lists resources that are gone.
 Fix the cause (for example missing RBAC) and re-run; re-running is safe.
 ```
 
 ```text
-ERRO could not read resource  kind=ConfigMap namespace=apps name=web error=<cause>
+ERRO could not diff resource kind=ConfigMap namespace=apps name=web error="reading the live object: <cause>"
 ERRO diff is incomplete: 1 object(s) could not be read or compared
 
 Fix the cause (for example missing RBAC) and run the diff again.

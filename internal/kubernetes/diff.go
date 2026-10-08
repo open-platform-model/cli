@@ -57,11 +57,31 @@ type DiffResult struct {
 	Orphaned int
 	// Unchanged is the count of unchanged resources.
 	Unchanged int
-	// Warnings contains non-fatal warnings (e.g., from partial render).
-	Warnings []string
+	// Errors lists the rendered resources that could not be read (any error
+	// other than NotFound) or compared. Such a resource is in no count above,
+	// so a result with Errors is incomplete whatever IsEmpty says.
+	Errors []*DiffError
 }
 
-// IsEmpty returns true if there are no differences.
+// DiffError is a rendered resource Diff could not read or compare.
+type DiffError struct {
+	Kind      string
+	Namespace string
+	Name      string
+	Err       error
+}
+
+func (e *DiffError) Error() string {
+	if e.Namespace == "" {
+		return fmt.Sprintf("%s/%s: %v", e.Kind, e.Name, e.Err)
+	}
+	return fmt.Sprintf("%s/%s/%s: %v", e.Kind, e.Namespace, e.Name, e.Err)
+}
+
+func (e *DiffError) Unwrap() error { return e.Err }
+
+// IsEmpty returns true if there are no differences among the resources that
+// were compared. It says nothing about the resources in Errors.
 func (r *DiffResult) IsEmpty() bool {
 	return r.Modified == 0 && r.Added == 0 && r.Orphaned == 0
 }
@@ -325,6 +345,9 @@ type DiffOptions struct {
 }
 
 // Diff compares rendered resources against the live cluster state and returns categorized results.
+// A resource whose live read fails with anything but NotFound, or whose comparison fails, is
+// returned in DiffResult.Errors and the remaining resources are still compared; the caller must
+// not report a result with Errors as free of differences.
 // instanceName is unused but kept for caller context (logging reserved for future use).
 func Diff(ctx context.Context, client *Client, resources []*unstructured.Unstructured, instanceName string, comparer comparer, opts ...DiffOptions) (*DiffResult, error) {
 	var diffOpts DiffOptions
@@ -360,8 +383,12 @@ func Diff(ctx context.Context, client *Client, resources []*unstructured.Unstruc
 				result.Added++
 				continue
 			}
-			// Other errors are warnings
-			result.Warnings = append(result.Warnings, fmt.Sprintf("fetching %s/%s: %v", kind, name, err))
+			// Any other error: the live state is unknown, so the resource
+			// is neither changed nor unchanged.
+			result.Errors = append(result.Errors, &DiffError{
+				Kind: kind, Namespace: ns, Name: name,
+				Err: fmt.Errorf("reading the live object: %w", err),
+			})
 			continue
 		}
 
@@ -373,7 +400,10 @@ func Diff(ctx context.Context, client *Client, resources []*unstructured.Unstruc
 		// Resource exists on both sides — compare
 		diffOutput, err := comparer.Compare(res, live)
 		if err != nil {
-			result.Warnings = append(result.Warnings, fmt.Sprintf("comparing %s/%s: %v", kind, name, err))
+			result.Errors = append(result.Errors, &DiffError{
+				Kind: kind, Namespace: ns, Name: name,
+				Err: fmt.Errorf("comparing with the live object: %w", err),
+			})
 			continue
 		}
 

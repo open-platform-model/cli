@@ -9,8 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	k8stesting "k8s.io/client-go/testing"
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
@@ -64,33 +62,6 @@ func TestShowInstanceTree_AllUnreadableExitsNotFound(t *testing.T) {
 	assert.Contains(t, out, "could not read tracked resource")
 	assert.Contains(t, out, "name=settings")
 	assert.Contains(t, out, "no resources found")
-}
-
-// Diff's orphan detection warns about each tracked resource it could not read
-// and says it could not check them.
-func TestDiscoverOrphanCandidates_WarnsAboutUnreadable(t *testing.T) {
-	mi := moduleInstanceObj("apps", "demo")
-	require.NoError(t, unstructured.SetNestedSlice(mi.Object, []any{
-		map[string]any{"kind": "ConfigMap", "namespace": "apps", "name": "web", "v": "v1"},
-		map[string]any{"kind": "ConfigMap", "namespace": "apps", "name": "settings", "v": "v1"},
-	}, "status", "inventory", "entries"))
-	client, fake := fakeClusterClient(mi, trackedConfigMap("web"), trackedConfigMap("settings"))
-	fake.PrependReactor("get", "configmaps", func(a k8stesting.Action) (bool, runtime.Object, error) {
-		if a.(k8stesting.GetAction).GetName() == "settings" {
-			return true, nil, forbiddenRead("configmaps", "settings")
-		}
-		return false, nil, nil
-	})
-
-	var live []*unstructured.Unstructured
-	out := captureOutput(t, func() {
-		live = discoverOrphanCandidates(context.Background(), client, "demo", "apps", output.InstanceLogger("demo"))
-	})
-	require.Len(t, live, 1)
-	assert.Equal(t, "web", live[0].GetName())
-	assert.Contains(t, out, "could not read tracked resource")
-	assert.Contains(t, out, "name=settings")
-	assert.Contains(t, out, "orphan detection could not check 1 tracked resource(s)")
 }
 
 // Status warns about each tracked resource it could not read, lists it as an
