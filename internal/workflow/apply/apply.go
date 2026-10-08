@@ -18,6 +18,7 @@ import (
 	"github.com/open-platform-model/cli/internal/version"
 	workflowrender "github.com/open-platform-model/cli/internal/workflow/render"
 	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+	"github.com/open-platform-model/library/opm/k8s/ownership"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -78,6 +79,12 @@ type Options struct {
 	// nothing was changed. Only `opm operator install` sets it: it applies
 	// the render's CRDs and its migration first.
 	AfterCallerWrites bool
+
+	// RefuseLetGo makes the ownership guard refuse the apply for a rendered
+	// object another instance is adopting or has adopted, where any other
+	// apply leaves that object out and goes on. Only `opm operator install`
+	// sets it: it needs every object it renders.
+	RefuseLetGo bool
 }
 
 type Request struct {
@@ -85,8 +92,8 @@ type Request struct {
 	K8sClient *kubernetes.Client
 	Log       *log.Logger
 	Options   Options
-	// Admit are existing objects the first-install existence check lets
-	// pass its untracked test. Only `opm operator install` sets it, to the
+	// Admit are existing objects the ownership guard lets pass its
+	// foreign-object test. Only `opm operator install` sets it, to the
 	// objects its migration proved; nil for every other apply.
 	Admit inventory.AdmitSet
 }
@@ -185,23 +192,46 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		return ensureNamespace(ctx, req.K8sClient, namespace, createNamespace && !dryRun, instanceLog)
 	}
 
-	// Gate 6: existence check, first-ever apply only (no previous inventory).
-	// Objects in a namespace this apply creates cannot exist yet.
+	// Gate 6: the ownership guard over every rendered object, on a first
+	// install and on every later apply (0012:D8:R1). Objects in a namespace
+	// this apply creates cannot exist yet. A dry run refuses nothing: it only
+	// looks, for the first-install warning below.
 	checkEntries := currentEntries
 	if createNamespace {
 		checkEntries = entriesOutside(currentEntries, namespace)
 	}
-	alreadyManaged, err := RunPreApplyExistenceCheck(ctx, req.K8sClient, prevRecord != nil, dryRun, checkEntries, req.Admit, nothingChanged)
-	if err != nil {
-		return err
+	guardInput := inventory.GuardInput{
+		Entries:      checkEntries,
+		Previous:     prevEntries,
+		InstanceUUID: instanceID,
+		Admit:        req.Admit,
+		RefuseLetGo:  req.Options.RefuseLetGo,
 	}
-	if req.Options.WarnUnrecorded {
-		if dryRun && prevRecord == nil {
-			alreadyManaged = previewAlreadyManaged(ctx, req.K8sClient, checkEntries)
+	var guard inventory.GuardResult
+	switch {
+	case !dryRun:
+		guard, err = RunOwnershipGuard(ctx, req.K8sClient, guardInput, prevRecord == nil, nothingChanged)
+		if err != nil {
+			return err
 		}
-		if len(alreadyManaged) > 0 {
-			instanceLog.Warn(unrecordedResourcesWarning(len(alreadyManaged), len(currentEntries), name, instanceID, dryRun))
+	case req.Options.WarnUnrecorded && prevRecord == nil:
+		guard.Managed = previewAlreadyManaged(ctx, req.K8sClient, guardInput)
+	}
+	if req.Options.WarnUnrecorded && prevRecord == nil && len(guard.Managed) > 0 {
+		instanceLog.Warn(unrecordedResourcesWarning(len(guard.Managed), len(currentEntries), name, instanceID, dryRun))
+	}
+
+	// An object another instance adopted is not this instance's any more: it
+	// is not applied and not recorded, and nothing deletes it (0012:D8:R8).
+	// The stale set above is computed from the full render, so the prune
+	// never sees it either.
+	applyResources := result.Resources
+	recordedRender := currentEntries
+	if len(guard.LetGo) > 0 {
+		for _, lg := range guard.LetGo {
+			instanceLog.Warn(lg.Message)
 		}
+		applyResources, recordedRender = withoutLetGo(result.Resources, guard.LetGo)
 	}
 
 	// The first write of the apply: every check that can refuse has passed.
@@ -212,8 +242,8 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	if dryRun {
 		instanceLog.Info("dry run - no changes will be made")
 	}
-	if len(result.Resources) > 0 {
-		instanceLog.Info(fmt.Sprintf("applying %d resources", len(result.Resources)))
+	if len(applyResources) > 0 {
+		instanceLog.Info(fmt.Sprintf("applying %d resources", len(applyResources)))
 	}
 
 	// The CustomResourceDefinition establish wait inside the apply is charged
@@ -223,9 +253,9 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	budgetStart := now()
 
 	var applyResult *kubernetes.ApplyResult
-	if len(result.Resources) > 0 {
+	if len(applyResources) > 0 {
 		var err error
-		applyResult, err = kubernetes.Apply(ctx, req.K8sClient, result.Resources, name, kubernetes.ApplyOptions{
+		applyResult, err = kubernetes.Apply(ctx, req.K8sClient, applyResources, name, kubernetes.ApplyOptions{
 			DryRun:            dryRun,
 			EstablishDeadline: budgetStart.Add(timeout),
 			BudgetStart:       budgetStart,
@@ -279,7 +309,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 
 		// Entries prune failed to delete are still in the cluster: they stay
 		// in the record, so the next apply finds them stale and retries.
-		recordEntries := currentEntries
+		recordEntries := recordedRender
 		var notPruned []k8sinventory.Entry
 		pruneExit := opmexit.ExitGeneralError
 		if !req.Options.NoPrune {
@@ -293,7 +323,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 				if err != nil {
 					return err
 				}
-				recordEntries = append(append([]k8sinventory.Entry{}, currentEntries...), notPruned...)
+				recordEntries = append(append([]k8sinventory.Entry{}, recordedRender...), notPruned...)
 			}
 			if len(protected) > 0 {
 				instanceLog.Warn(fmt.Sprintf("leaving %d resource(s) behind", len(protected)))
@@ -329,7 +359,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	}
 
 	if req.Options.Wait && !dryRun {
-		return waitForHealthy(ctx, req, timeout, instanceLog)
+		return waitForHealthy(ctx, req, applyResources, timeout, instanceLog)
 	}
 
 	return nil
@@ -644,43 +674,80 @@ func GuardEmptyRender(resourceCount int, prevEntries []k8sinventory.Entry, force
 	return nil
 }
 
-// RunPreApplyExistenceCheck runs the first-install existence check: never on
-// a dry run and never when a previous inventory exists. It returns the
-// rendered entries that already exist under OPM management
-// (inventory.FirstInstallCheck). nothingChanged makes a refusal say that the
-// apply stopped before any change.
-func RunPreApplyExistenceCheck(ctx context.Context, k8sClient *kubernetes.Client, hasPrevInventory, dryRun bool, currentEntries []k8sinventory.Entry, admit inventory.AdmitSet, nothingChanged bool) ([]k8sinventory.Entry, error) {
-	if hasPrevInventory || dryRun {
-		return nil, nil
+// RunOwnershipGuard runs the ownership guard of a real apply
+// (inventory.Guard) and words its refusal. A refused object exits 1 and the
+// error names every refused object with the library's message. An object the
+// guard could not read carries the API error, so the exit code follows it.
+// firstApply adds, when an object carries another instance's identity, what
+// to do if the objects are the instance's own under an earlier identity: the
+// library cannot know that. nothingChanged makes a refusal say that the apply
+// stopped before any change.
+func RunOwnershipGuard(ctx context.Context, k8sClient *kubernetes.Client, in inventory.GuardInput, firstApply, nothingChanged bool) (inventory.GuardResult, error) {
+	guard, err := inventory.Guard(ctx, k8sClient, in)
+	if err == nil {
+		return guard, nil
 	}
-	managed, err := inventory.FirstInstallCheck(ctx, k8sClient, currentEntries, admit)
-	if err != nil {
-		// An object the check could not read carries the API error, so the
-		// exit code follows it; an untracked or terminating object maps to
-		// the general code.
-		stopped := ""
-		if nothingChanged {
-			stopped = "\napply stopped before any change"
-		}
-		return nil, &opmexit.ExitError{
+	stopped := ""
+	if nothingChanged {
+		stopped = "\napply stopped before any change"
+	}
+	var refusal *inventory.GuardRefusalError
+	if !errors.As(err, &refusal) {
+		return inventory.GuardResult{}, &opmexit.ExitError{
 			Code: exitCodeFromK8sError(err),
 			Err:  fmt.Errorf("pre-apply existence check failed: %w%s", err, stopped),
 		}
 	}
-	return managed, nil
+	hint := ""
+	if firstApply && refusal.Has(ownership.RefuseOtherInstance) {
+		hint = "\n" + earlierIdentityHint
+	}
+	return inventory.GuardResult{}, &opmexit.ExitError{
+		Code: opmexit.ExitGeneralError,
+		Err:  fmt.Errorf("apply refused: %w%s%s", refusal, hint, stopped),
+	}
 }
 
-// previewAlreadyManaged is the read-only half of the first-install check for
-// a dry run: the rendered entries that already exist under OPM management. A
-// dry run refuses nothing here, so an object the check would refuse on a real
-// run only ends the look.
-func previewAlreadyManaged(ctx context.Context, k8sClient *kubernetes.Client, currentEntries []k8sinventory.Entry) []k8sinventory.Entry {
-	managed, err := inventory.FirstInstallCheck(ctx, k8sClient, currentEntries, nil)
-	if err != nil {
+// earlierIdentityHint is the line a first apply adds to a refusal of objects
+// that carry another instance's identity.
+const earlierIdentityHint = "If these are this instance's own objects under an earlier identity (its module path, name or namespace changed, " +
+	"its ModuleInstance record was deleted, or opm v1.0.0-alpha.1 or older recorded it in a Secret), " +
+	"annotate each object as shown above; nothing has to be removed first"
+
+// previewAlreadyManaged is the look of a dry run for the first-install
+// warning: the rendered entries that already exist under OPM management and
+// that the guard would allow. A dry run refuses nothing, so the guard's
+// refusals are dropped here, and an object it cannot read only ends the look.
+func previewAlreadyManaged(ctx context.Context, k8sClient *kubernetes.Client, in inventory.GuardInput) []k8sinventory.Entry {
+	guard, err := inventory.Guard(ctx, k8sClient, in)
+	var refusal *inventory.GuardRefusalError
+	if err != nil && !errors.As(err, &refusal) {
 		output.Debug("first-install preview stopped", "error", err)
 		return nil
 	}
-	return managed
+	return guard.Managed
+}
+
+// withoutLetGo is the rendered resources and their inventory entries without
+// the objects the guard let go, in render order.
+func withoutLetGo(resources []*unstructured.Unstructured, letGo []inventory.LetGo) ([]*unstructured.Unstructured, []k8sinventory.Entry) {
+	kept := make([]*unstructured.Unstructured, 0, len(resources))
+	entries := make([]k8sinventory.Entry, 0, len(resources))
+	for _, r := range resources {
+		entry := k8sinventory.NewEntry(r)
+		gone := false
+		for _, lg := range letGo {
+			if k8sinventory.SameObject(lg.Entry, entry) {
+				gone = true
+				break
+			}
+		}
+		if !gone {
+			kept = append(kept, r)
+			entries = append(entries, entry)
+		}
+	}
+	return kept, entries
 }
 
 // lastMigratingRelease is the last opm release that moved an inventory kept

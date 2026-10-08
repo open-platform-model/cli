@@ -237,7 +237,11 @@ func PlanInstall(ctx context.Context, env InstallEnv, res *modref.Resolution, ta
 	// the migration's proof.
 	if rec == nil {
 		entries := workflowapply.CurrentInventoryEntries(plan.Objects())
-		if err := inventory.PreApplyExistenceCheck(ctx, env.Client, entries, plan.Migration.Admit()); err != nil {
+		if _, err := inventory.Guard(ctx, env.Client, inventory.GuardInput{
+			Entries:      entries,
+			InstanceUUID: result.Instance.UUID,
+			Admit:        plan.Migration.Admit(),
+		}); err != nil {
 			return nil, &GuardError{Err: err}
 		}
 	}

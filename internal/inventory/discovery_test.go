@@ -134,28 +134,29 @@ func TestPruneStaleResources_ResolvesByDiscovery(t *testing.T) {
 	}
 }
 
-// The first-install check asks whether a rendered object exists. A kind the
-// cluster does not serve has no objects; a failed discovery request leaves
-// the question open and stops the apply.
-func TestFirstInstallCheck_ResolvesByDiscovery(t *testing.T) {
+// The apply guard asks whether a rendered object exists. A kind the cluster
+// does not serve has no objects; a failed discovery request leaves the
+// question open and stops the apply.
+func TestGuard_ResolvesByDiscovery(t *testing.T) {
 	ctx := context.Background()
-	entries := []k8sinventory.Entry{promEntry}
+	in := GuardInput{Entries: []k8sinventory.Entry{promEntry}, InstanceUUID: "uuid-self"}
 
 	t.Run("an untracked object under an irregular name is refused", func(t *testing.T) {
 		client, _ := promCluster(t, promServed, livePrometheus())
-		err := PreApplyExistenceCheck(ctx, client, entries, nil)
+		_, err := Guard(ctx, client, in)
 		require.Error(t, err, "the object exists and is not managed by OPM")
-		assert.Contains(t, err.Error(), "Prometheus/main")
+		assert.Contains(t, err.Error(), "Prometheus/default/main")
 	})
 
 	t.Run("a kind that is not served has no object", func(t *testing.T) {
 		client, _ := promCluster(t, promNotServed)
-		require.NoError(t, PreApplyExistenceCheck(ctx, client, entries, nil))
+		_, err := Guard(ctx, client, in)
+		require.NoError(t, err)
 	})
 
 	t.Run("a failed discovery request stops the check", func(t *testing.T) {
 		client, _ := promCluster(t, promDown)
-		err := PreApplyExistenceCheck(ctx, client, entries, nil)
+		_, err := Guard(ctx, client, in)
 		require.Error(t, err)
 		assert.True(t, apierrors.IsServiceUnavailable(err), "the API error stays in the chain")
 		assert.Contains(t, err.Error(), "Prometheus/main")

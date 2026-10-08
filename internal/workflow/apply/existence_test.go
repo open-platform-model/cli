@@ -47,15 +47,23 @@ func TestExecute_FirstInstallRefusesUnreadableObject(t *testing.T) {
 	}
 }
 
-// With a record, the check does not run: an unreadable object does not stop
-// a later apply.
-func TestExecute_LaterApplySkipsTheExistenceCheck(t *testing.T) {
+// With a record the guard runs too: an unreadable object stops a later
+// apply before any change, with the exit code of the read error.
+func TestExecute_LaterApplyRefusesUnreadableObject(t *testing.T) {
 	withReleasedCLIVersion(t)
-	captureLog(t)
+	logBuf := captureLog(t)
 	cluster := newApplyCluster(cliOwnedInstance("demo", "default", "app"))
+	cause := apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, "app", errors.New("no access"))
 	cluster.dyn.PrependReactor("get", "configmaps", func(k8stesting.Action) (bool, runtime.Object, error) {
-		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, "app", errors.New("no access"))
+		return true, nil, cause
 	})
 
-	assert.NoError(t, Execute(context.Background(), cluster.request(Options{}, "app")))
+	err := Execute(context.Background(), cluster.request(Options{}, "app"))
+
+	requireExitCode(t, err, opmexit.ExitPermissionDenied)
+	assert.Contains(t, err.Error(), "ConfigMap/app", "the error names the resource")
+	assert.Contains(t, err.Error(), "apply stopped before any change")
+	assert.ErrorIs(t, err, cause, "the cause stays in the chain")
+	assert.Empty(t, cluster.writes(), "nothing is applied and no record is written")
+	assert.NotContains(t, logBuf.String(), "applying", "the apply never starts")
 }
