@@ -7,9 +7,7 @@ import (
 	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
@@ -60,7 +58,12 @@ func UnreadableResources(unreadable []UnreadableEntry) []kubernetes.UnreadableRe
 //   - live: resources that currently exist on the cluster
 //   - missing: inventory entries whose GET returned NotFound
 //   - unreadable: inventory entries whose GET failed with any other error
-//     (Forbidden, a timeout, a 5xx), with that error
+//     (Forbidden, a timeout, a 5xx), with that error, and entries whose kind
+//     could not be resolved (the cluster does not serve it at the recorded
+//     version, or the discovery request failed): never missing
+//
+// Besides the GETs it costs one discovery request per group and version the
+// entries span, the first time a command resolves each.
 //
 // The error result is always nil: a failed read is reported per entry.
 func DiscoverResourcesFromInventory(ctx context.Context, client *kubernetes.Client, inv *Record) (live []*unstructured.Unstructured, missing []k8sinventory.Entry, unreadable []UnreadableEntry, err error) {
@@ -89,13 +92,7 @@ func DiscoverResourcesFromInventory(ctx context.Context, client *kubernetes.Clie
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			gvr := schema.GroupVersionResource{
-				Group:    entry.Group,
-				Version:  entry.Version,
-				Resource: kubernetes.KindToResource(entry.Kind),
-			}
-
-			obj, getErr := client.ResourceClient(gvr, entry.Namespace).Get(ctx, entry.Name, metav1.GetOptions{})
+			obj, getErr := getEntry(ctx, client, entry)
 			if getErr != nil {
 				if apierrors.IsNotFound(getErr) {
 					results[idx] = entryResult{missing: true}

@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	authorizationv1 "k8s.io/api/authorization/v1"
@@ -127,7 +129,7 @@ func TestExecute_CRDNotEstablishedSkipsPruneAndInventoryWrite(t *testing.T) {
 			Resources: []*unstructured.Unstructured{renderedConfigMap("fresh"), fooCRD()},
 			Instance:  module.InstanceMetadata{Name: "demo", Namespace: "default", UUID: "uuid-1"},
 		},
-		K8sClient: &kubernetes.Client{Dynamic: fake, Clientset: cs},
+		K8sClient: &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: fake, Clientset: cs},
 		Log:       output.InstanceLogger("demo"),
 		Options:   Options{Timeout: time.Hour + 300*time.Millisecond, SuccessAppliedMessage: "applied", SuccessUpToDateMessage: "up to date"},
 	}

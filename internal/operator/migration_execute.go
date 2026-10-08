@@ -42,7 +42,10 @@ func MoveOwnership(ctx context.Context, client *kubernetes.Client, plan *Migrati
 	}
 	for _, planned := range plan.MoveOwnership {
 		step := "moving the field ownership of " + objPath(planned.GetKind(), planned.GetNamespace(), planned.GetName())
-		ri := client.ResourceClient(kubernetes.GVRFromUnstructured(planned), planned.GetNamespace())
+		ri, err := client.ResourceClientFor(ctx, planned.GroupVersionKind(), planned.GetNamespace())
+		if err != nil {
+			return &MigrationStoppedError{Step: step, Err: err}
+		}
 		live, err := ri.Get(ctx, planned.GetName(), metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			continue
@@ -97,7 +100,11 @@ func deleteProven(ctx context.Context, client *kubernetes.Client, obj *unstructu
 	if uid != "" {
 		opts.Preconditions = &metav1.Preconditions{UID: &uid}
 	}
-	err := client.ResourceClient(kubernetes.GVRFromUnstructured(obj), obj.GetNamespace()).Delete(ctx, obj.GetName(), opts)
+	// A kind that cannot be resolved is a stop, never "done".
+	resource, err := client.ResourceClientFor(ctx, obj.GroupVersionKind(), obj.GetNamespace())
+	if err == nil {
+		err = resource.Delete(ctx, obj.GetName(), opts)
+	}
 	if err != nil && !apierrors.IsNotFound(err) {
 		return &MigrationStoppedError{Step: "deleting " + objPath(obj.GetKind(), obj.GetNamespace(), obj.GetName()), Err: err}
 	}

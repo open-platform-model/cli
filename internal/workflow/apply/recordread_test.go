@@ -8,6 +8,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	authorizationv1 "k8s.io/api/authorization/v1"
@@ -63,7 +65,7 @@ func newApplyCluster(objs ...*unstructured.Unstructured) *applyCluster {
 	clientset.PrependReactor("create", "selfsubjectaccessreviews", func(k8stesting.Action) (bool, runtime.Object, error) {
 		return true, &authorizationv1.SelfSubjectAccessReview{Status: authorizationv1.SubjectAccessReviewStatus{Allowed: true}}, nil
 	})
-	return &applyCluster{dyn: dyn, client: &kubernetes.Client{Dynamic: dyn, Clientset: clientset}}
+	return &applyCluster{dyn: dyn, client: &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: dyn, Clientset: clientset}}
 }
 
 // request is an apply of the instance "demo" in "default" rendering the named

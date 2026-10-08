@@ -1,6 +1,7 @@
 package apply
 
 import (
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -48,7 +49,7 @@ func recordingDynamicClient(objs ...*unstructured.Unstructured) (*kubernetes.Cli
 		return false, nil, nil // passthrough to the tracker
 	})
 
-	return &kubernetes.Client{Dynamic: fake}, rec
+	return &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: fake}, rec
 }
 
 // makeModuleInstanceCRD builds a ModuleInstance CRD object with configurable

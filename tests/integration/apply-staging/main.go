@@ -85,7 +85,11 @@ func main() {
 		fail("applied %d skipped %d, want 4 and 0", res.Applied, res.Skipped)
 	}
 	cr := objs[0]
-	if _, err := client.ResourceClient(kubernetes.GVRFromUnstructured(cr), namespace).Get(ctx, cr.GetName(), metav1.GetOptions{}); err != nil {
+	crClient, err := client.ResourceClientFor(ctx, cr.GroupVersionKind(), namespace)
+	if err != nil {
+		fail("resolving the custom resource kind: %v", err)
+	}
+	if _, err := crClient.Get(ctx, cr.GetName(), metav1.GetOptions{}); err != nil {
 		fail("custom resource not readable after apply: %v", err)
 	}
 	fmt.Println("   OK: all four applied on the first call")
@@ -151,7 +155,10 @@ func resources() []*unstructured.Unstructured {
 // gone, so a second run starts from a clean cluster.
 func cleanup(ctx context.Context, client *kubernetes.Client, objs []*unstructured.Unstructured) {
 	for _, obj := range objs {
-		err := client.ResourceClient(kubernetes.GVRFromUnstructured(obj), obj.GetNamespace()).Delete(ctx, obj.GetName(), metav1.DeleteOptions{})
+		resource, err := client.ResourceClientFor(ctx, obj.GroupVersionKind(), obj.GetNamespace())
+		if err == nil {
+			err = resource.Delete(ctx, obj.GetName(), metav1.DeleteOptions{})
+		}
 		if err != nil && !apierrors.IsNotFound(err) {
 			fmt.Printf("   note: deleting %s/%s: %v\n", obj.GetKind(), obj.GetName(), err)
 		}

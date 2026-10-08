@@ -9,7 +9,6 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
@@ -149,85 +148,4 @@ func (r *discoveryResolver) fetch(ctx context.Context, gv schema.GroupVersion) (
 		}
 	}
 	return kinds, nil
-}
-
-// GVRFromUnstructured derives GroupVersionResource from an unstructured object.
-func GVRFromUnstructured(obj *unstructured.Unstructured) schema.GroupVersionResource {
-	gvk := obj.GroupVersionKind()
-	return schema.GroupVersionResource{
-		Group:    gvk.Group,
-		Version:  gvk.Version,
-		Resource: KindToResource(gvk.Kind),
-	}
-}
-
-// knownKindResources maps Kind to its plural resource name for well-known types.
-// This avoids incorrect heuristic pluralization (e.g., Endpoints -> endpointses).
-var knownKindResources = map[string]string{
-	"Namespace":                        "namespaces",
-	"ServiceAccount":                   "serviceaccounts",
-	"Secret":                           "secrets",
-	"ConfigMap":                        "configmaps",
-	"PersistentVolume":                 "persistentvolumes",
-	"PersistentVolumeClaim":            "persistentvolumeclaims",
-	"Service":                          "services",
-	"Endpoints":                        "endpoints",
-	"EndpointSlice":                    "endpointslices",
-	"ClusterRole":                      "clusterroles",
-	"ClusterRoleBinding":               "clusterrolebindings",
-	"Role":                             "roles",
-	"RoleBinding":                      "rolebindings",
-	"StorageClass":                     "storageclasses",
-	"Deployment":                       "deployments",
-	"StatefulSet":                      "statefulsets",
-	"DaemonSet":                        "daemonsets",
-	"ReplicaSet":                       "replicasets",
-	"Job":                              "jobs",
-	"CronJob":                          "cronjobs",
-	"Ingress":                          "ingresses",
-	"IngressClass":                     "ingressclasses",
-	"NetworkPolicy":                    "networkpolicies",
-	"HorizontalPodAutoscaler":          "horizontalpodautoscalers",
-	"VerticalPodAutoscaler":            "verticalpodautoscalers",
-	"PodDisruptionBudget":              "poddisruptionbudgets",
-	"ValidatingWebhookConfiguration":   "validatingwebhookconfigurations",
-	"MutatingWebhookConfiguration":     "mutatingwebhookconfigurations",
-	kindCustomResourceDefinition:       "customresourcedefinitions",
-	"ResourceQuota":                    "resourcequotas",
-	"LimitRange":                       "limitranges",
-	"Pod":                              "pods",
-	"Node":                             "nodes",
-	"Event":                            "events",
-	"PriorityClass":                    "priorityclasses",
-	"ValidatingAdmissionPolicy":        "validatingadmissionpolicies",
-	"ValidatingAdmissionPolicyBinding": "validatingadmissionpolicybindings",
-}
-
-// KindToResource converts a Kind to its plural resource name.
-// Uses a known lookup table for common types, falls back to heuristic.
-func KindToResource(kind string) string {
-	if resource, ok := knownKindResources[kind]; ok {
-		return resource
-	}
-	return HeuristicPluralize(kind)
-}
-
-// HeuristicPluralize applies simple English pluralization rules.
-func HeuristicPluralize(kind string) string {
-	lower := strings.ToLower(kind)
-	switch {
-	case strings.HasSuffix(lower, "ss") || strings.HasSuffix(lower, "sh") || strings.HasSuffix(lower, "ch") || strings.HasSuffix(lower, "x"):
-		return lower + "es"
-	case strings.HasSuffix(lower, "s"):
-		// Already plural (e.g., Endpoints)
-		return lower
-	case strings.HasSuffix(lower, "y") && !isVowel(lower[len(lower)-2]):
-		return lower[:len(lower)-1] + "ies"
-	default:
-		return lower + "s"
-	}
-}
-
-func isVowel(b byte) bool {
-	return b == 'a' || b == 'e' || b == 'i' || b == 'o' || b == 'u'
 }

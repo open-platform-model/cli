@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+
 	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 
 	"github.com/stretchr/testify/assert"
@@ -35,7 +37,8 @@ func emptyClusterClient() *kubernetes.Client {
 		inventory.ModuleInstanceGVR: "ModuleInstanceList",
 	}
 	return &kubernetes.Client{
-		Dynamic: fakedynamic.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), listKinds),
+		Resources: kubetest.Resources(),
+		Dynamic:   fakedynamic.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), listKinds),
 	}
 }
 
@@ -101,7 +104,7 @@ func runningOperatorObjects() []runtime.Object {
 func fakeClusterClient(objs ...runtime.Object) (*kubernetes.Client, *fakedynamic.FakeDynamicClient) {
 	fake := fakedynamic.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(),
 		map[schema.GroupVersionResource]string{inventory.ModuleInstanceGVR: "ModuleInstanceList"}, objs...)
-	return &kubernetes.Client{Dynamic: fake}, fake
+	return &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: fake}, fake
 }
 
 // An operator applied with kubectl has no instance record; the readiness check
@@ -199,7 +202,7 @@ func TestExecuteInstanceDelete_LeavesNamespaceBehind(t *testing.T) {
 			fake := fakedynamic.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(),
 				map[schema.GroupVersionResource]string{inventory.ModuleInstanceGVR: "ModuleInstanceList"},
 				cm.DeepCopy(), foreign.DeepCopy(), ns.DeepCopy(), mi.DeepCopy())
-			client := &kubernetes.Client{Dynamic: fake}
+			client := &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: fake}
 
 			var runErr error
 			out := captureOutput(t, func() {
@@ -261,7 +264,7 @@ func TestExecuteInstanceDelete_ReadErrorKeepsModuleInstance(t *testing.T) {
 			dyn.PrependReactor("get", "configmaps", func(k8stesting.Action) (bool, runtime.Object, error) {
 				return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, "web", errors.New("denied"))
 			})
-			client := &kubernetes.Client{Dynamic: dyn}
+			client := &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: dyn}
 
 			var runErr error
 			out := captureOutput(t, func() {

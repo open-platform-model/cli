@@ -7,6 +7,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -67,7 +69,7 @@ func runNamespaceDryRun(t *testing.T, createNS, nsExists bool) (*namespaceDryRun
 			Resources: []*unstructured.Unstructured{renderedConfigMap("cfg")},
 			Instance:  module.InstanceMetadata{Name: "demo", Namespace: "default"},
 		},
-		K8sClient: &kubernetes.Client{Dynamic: fake, Clientset: cs},
+		K8sClient: &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: fake, Clientset: cs},
 		Log:       output.InstanceLogger("demo"),
 		Options:   Options{DryRun: true, CreateNS: createNS},
 	})

@@ -9,6 +9,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+
 	authorizationv1 "k8s.io/api/authorization/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -234,7 +236,7 @@ func newFakeCluster(t *testing.T, objs ...*unstructured.Unstructured) *fakeClust
 			Status: authorizationv1.SubjectAccessReviewStatus{Allowed: !fc.denyStatusRBAC, Reason: "test"},
 		}, nil
 	})
-	fc.client = &kubernetes.Client{Dynamic: fc.fake, Clientset: cs}
+	fc.client = &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: fc.fake, Clientset: cs}
 	return fc
 }
 

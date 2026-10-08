@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -35,7 +37,7 @@ func TestDiff_FailedReadIsAnError(t *testing.T) {
 		return false, nil, nil
 	})
 
-	result, err := Diff(context.Background(), &Client{Dynamic: dyn},
+	result, err := Diff(context.Background(), &Client{Resources: kubetest.Resources(), Dynamic: dyn},
 		[]*unstructured.Unstructured{diffConfigMap("same"), diffConfigMap("denied"), diffConfigMap("new")},
 		"demo", NewComparer())
 	require.NoError(t, err)
@@ -63,7 +65,7 @@ func TestDiff_FailedComparisonIsAnError(t *testing.T) {
 	dyn := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), diffConfigMap("web"))
 	cause := errors.New("cannot marshal")
 
-	result, err := Diff(context.Background(), &Client{Dynamic: dyn},
+	result, err := Diff(context.Background(), &Client{Resources: kubetest.Resources(), Dynamic: dyn},
 		[]*unstructured.Unstructured{diffConfigMap("web")}, "demo", failingComparer{err: cause})
 	require.NoError(t, err)
 

@@ -8,6 +8,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/open-platform-model/cli/internal/kubernetes"
@@ -23,9 +24,10 @@ import (
 //   - If the resource exists with a deletionTimestamp → error (terminating)
 //   - If the resource exists without OPM managed-by label → error (untracked),
 //     unless admit holds it
-//   - If the resource does not exist → OK
-//   - If the read fails with anything but NotFound → error (unreadable), with
-//     the read error in the chain
+//   - If the resource does not exist, or the cluster does not serve its kind → OK
+//   - If the read, or the discovery request that resolves the kind, fails
+//     with anything but NotFound → error (unreadable), with the error in the
+//     chain
 //
 // admit passes the untracked test only, never the terminating one and never
 // the unreadable one. Only
@@ -47,16 +49,12 @@ func PreApplyExistenceCheck(ctx context.Context, client *kubernetes.Client, entr
 // not OPM-managed and is not reported.
 func FirstInstallCheck(ctx context.Context, client *kubernetes.Client, entries []k8sinventory.Entry, admit AdmitSet) (managed []k8sinventory.Entry, err error) {
 	for _, entry := range entries {
-		gvr := schema.GroupVersionResource{
-			Group:    entry.Group,
-			Version:  entry.Version,
-			Resource: kubernetes.KindToResource(entry.Kind),
-		}
-
 		var obj interface{ GetDeletionTimestamp() *metav1.Time }
-		unstrObj, err := client.ResourceClient(gvr, entry.Namespace).Get(ctx, entry.Name, metav1.GetOptions{})
+		unstrObj, err := getEntry(ctx, client, entry)
 		if err != nil {
-			if apierrors.IsNotFound(err) {
+			// A kind the cluster does not serve has no objects: typically the
+			// module renders its CustomResourceDefinition in the same apply.
+			if apierrors.IsNotFound(err) || kubernetes.IsKindNotServed(err) {
 				continue // Resource doesn't exist — OK for first install
 			}
 			// Any other answer leaves the question open, and the forced apply
@@ -131,7 +129,10 @@ func (e *PruneError) Unwrap() []error {
 // A core Namespace or a CRD (kubernetes.IsProtectedKind) is never deleted,
 // even when the caller passes one; callers that report what was left behind
 // split the set first with SplitProtected.
-// 404 (not found) errors are treated as success (idempotent).
+// 404 (not found) errors are treated as success (idempotent). An entry whose
+// kind cannot be resolved (not served at the recorded version, or a failed
+// discovery request) is a failed delete, never a success: the object may
+// still be in the cluster.
 //
 // A delete that fails does not stop the loop. When any failed, the error is a
 // *PruneError naming the entries that are still in the cluster.
@@ -154,16 +155,7 @@ func PruneStaleResources(ctx context.Context, client *kubernetes.Client, stale [
 			continue
 		}
 
-		gvr := schema.GroupVersionResource{
-			Group:    entry.Group,
-			Version:  entry.Version,
-			Resource: kubernetes.KindToResource(entry.Kind),
-		}
-
-		propagation := metav1.DeletePropagationForeground
-		err := client.ResourceClient(gvr, entry.Namespace).Delete(ctx, entry.Name, metav1.DeleteOptions{
-			PropagationPolicy: &propagation,
-		})
+		err := deleteEntry(ctx, client, entry)
 
 		if err != nil && !apierrors.IsNotFound(err) {
 			failed.Failed = append(failed.Failed, entry)
@@ -178,4 +170,30 @@ func PruneStaleResources(ctx context.Context, client *kubernetes.Client, stale [
 		return &failed
 	}
 	return nil
+}
+
+// entryGVK is the group, version and kind an inventory entry records.
+func entryGVK(entry k8sinventory.Entry) schema.GroupVersionKind {
+	return schema.GroupVersionKind{Group: entry.Group, Version: entry.Version, Kind: entry.Kind}
+}
+
+// getEntry reads the live object of an inventory entry, under the resource
+// the cluster serves its kind as.
+func getEntry(ctx context.Context, client *kubernetes.Client, entry k8sinventory.Entry) (*unstructured.Unstructured, error) {
+	resource, err := client.ResourceClientFor(ctx, entryGVK(entry), entry.Namespace)
+	if err != nil {
+		return nil, err
+	}
+	return resource.Get(ctx, entry.Name, metav1.GetOptions{})
+}
+
+// deleteEntry deletes the live object of an inventory entry with foreground
+// propagation.
+func deleteEntry(ctx context.Context, client *kubernetes.Client, entry k8sinventory.Entry) error {
+	resource, err := client.ResourceClientFor(ctx, entryGVK(entry), entry.Namespace)
+	if err != nil {
+		return err
+	}
+	propagation := metav1.DeletePropagationForeground
+	return resource.Delete(ctx, entry.Name, metav1.DeleteOptions{PropagationPolicy: &propagation})
 }

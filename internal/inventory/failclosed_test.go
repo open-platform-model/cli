@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,7 +32,7 @@ func TestPreApplyExistenceCheck_UnreadableObjectRefuses(t *testing.T) {
 	dyn.PrependReactor("get", "configmaps", func(k8stesting.Action) (bool, runtime.Object, error) {
 		return true, nil, forbidden
 	})
-	client := &kubernetes.Client{Dynamic: dyn}
+	client := &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: dyn}
 
 	err := PreApplyExistenceCheck(ctx, client, []k8sinventory.Entry{entry}, nil)
 	require.Error(t, err, "an unreadable object is refused")
@@ -41,7 +43,7 @@ func TestPreApplyExistenceCheck_UnreadableObjectRefuses(t *testing.T) {
 	admit := AdmitSet{{Kind: "ConfigMap", Namespace: "default", Name: "taken"}: {}}
 	require.Error(t, PreApplyExistenceCheck(ctx, client, []k8sinventory.Entry{entry}, admit), "admission does not pass an unreadable object")
 
-	absent := &kubernetes.Client{Dynamic: dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())}
+	absent := &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())}
 	require.NoError(t, PreApplyExistenceCheck(ctx, absent, []k8sinventory.Entry{entry}, nil), "an absent object passes")
 }
 
@@ -61,7 +63,7 @@ func TestPruneStaleResources_ReportsTheEntriesItCouldNotDelete(t *testing.T) {
 		}
 		return false, nil, nil
 	})
-	client := &kubernetes.Client{Dynamic: dyn}
+	client := &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: dyn}
 
 	stuck := k8sinventory.Entry{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "stuck"}
 	gone := k8sinventory.Entry{Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "gone"}
