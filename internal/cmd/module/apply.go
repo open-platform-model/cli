@@ -30,12 +30,13 @@ func NewModuleApplyCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var nameFlag, versionFlag string
 
 	var (
-		dryRunFlag   bool
-		createNSFlag bool
-		noPruneFlag  bool
-		forceFlag    bool
-		waitFlag     bool
-		timeoutFlag  time.Duration
+		dryRunFlag     bool
+		createNSFlag   bool
+		noPruneFlag    bool
+		deleteDataFlag bool
+		forceFlag      bool
+		waitFlag       bool
+		timeoutFlag    time.Duration
 	)
 
 	c := &cobra.Command{
@@ -65,6 +66,13 @@ orphan inventory:
 
   opm instance delete <module>-debug
 
+Pruning keeps PersistentVolumeClaims: a claim the module no longer renders
+stays in the cluster and in the inventory, is listed with the status "kept",
+and does not fail the apply. Pass --delete-data to prune such claims and the
+data on them; a claim kept by an earlier apply is pruned then too. On an
+operator-managed instance the operator decides what is pruned, and
+--delete-data has no effect.
+
 Arguments:
   path          Module package directory (default: current directory).
                 "." or a ./, ../ or absolute path is always a directory.
@@ -91,7 +99,8 @@ Examples:
 			return runModuleApply(args, cfg, &rf, &kf, applyOpts{
 				name: nameFlag, version: versionFlag,
 				dryRun: dryRunFlag, createNS: createNSFlag, noPrune: noPruneFlag, force: forceFlag,
-				wait: waitFlag, timeout: timeoutFlag,
+				deleteData: deleteDataFlag,
+				wait:       waitFlag, timeout: timeoutFlag,
 			})
 		},
 	}
@@ -104,6 +113,8 @@ Examples:
 	c.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Server-side dry run (no changes made); skips objects whose CustomResourceDefinition or namespace the apply creates, which the server cannot validate yet")
 	c.Flags().BoolVar(&createNSFlag, "create-namespace", false, "Create target namespace if it does not exist")
 	c.Flags().BoolVar(&noPruneFlag, "no-prune", false, "Skip stale resource pruning")
+	c.Flags().BoolVar(&deleteDataFlag, "delete-data", false, cmdutil.DeleteDataPruneFlagHelp)
+	c.MarkFlagsMutuallyExclusive("no-prune", "delete-data")
 	c.Flags().BoolVar(&forceFlag, "force", false, "Allow empty render to prune all previously tracked resources")
 	c.Flags().BoolVar(&waitFlag, "wait", false,
 		"Wait until every applied resource is healthy before returning (skipped on --dry-run; operator-managed instances always wait for the operator)")
@@ -118,8 +129,10 @@ Examples:
 type applyOpts struct {
 	name, version                    string
 	dryRun, createNS, noPrune, force bool
-	wait                             bool
-	timeout                          time.Duration
+	// deleteData is --delete-data: prune stale PersistentVolumeClaims too.
+	deleteData bool
+	wait       bool
+	timeout    time.Duration
 }
 
 // debugValuesWarning is printed whenever module apply deploys the module's
@@ -185,6 +198,7 @@ func runModuleApply(args []string, cfg *config.GlobalConfig, rf *cmdutil.RenderF
 			DryRun:                 opts.dryRun,
 			CreateNS:               opts.createNS,
 			NoPrune:                opts.noPrune,
+			DeleteData:             opts.deleteData,
 			Force:                  opts.force,
 			Wait:                   opts.wait,
 			Timeout:                opts.timeout,

@@ -79,11 +79,11 @@ Use `opm instance` when you are starting from an instance file or when you want 
 | `instance init` | Create a standalone instance package (`cue.mod/module.cue`, `instance.cue`, `values.cue`) for a published module, pinned and ready to build |
 | `instance vet` | Validate an instance file without generating manifests |
 | `instance build` | Render an instance file or instance package directory to manifests (a module directory is refused: use `module build`) |
-| `instance apply` | Deploy an instance file to a cluster (`--wait` blocks until every resource is healthy) |
+| `instance apply` | Deploy an instance file to a cluster (`--wait` blocks until every resource is healthy; for a CLI-managed instance the prune keeps PersistentVolumeClaims unless `--delete-data`) |
 | `instance diff` | Compare an instance file with live cluster state |
 | `instance status` | Show resource status for a deployed instance |
 | `instance tree` | Show instance resource hierarchy |
-| `instance delete` | Delete instance resources from a cluster |
+| `instance delete` | Delete instance resources from a cluster (for a CLI-managed instance, PersistentVolumeClaims are kept unless `--delete-data`) |
 | `instance list` | List deployed instances |
 | `instance events` | Show events for an instance |
 

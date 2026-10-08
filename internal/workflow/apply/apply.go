@@ -27,10 +27,15 @@ import (
 var now = time.Now
 
 type Options struct {
-	DryRun                 bool
-	CreateNS               bool
-	NoPrune                bool
-	Force                  bool
+	DryRun   bool
+	CreateNS bool
+	NoPrune  bool
+	Force    bool
+	// DeleteData is the command's --delete-data: prune stale
+	// PersistentVolumeClaims like any other stale resource. When false, a
+	// stale claim is kept in the cluster and in the written inventory. It has
+	// no effect on an operator-managed instance, which only gets a warning.
+	DeleteData             bool
 	SuccessUpToDateMessage string
 	SuccessAppliedMessage  string
 
@@ -249,8 +254,20 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	// are listed as left behind instead, in the preview and the real run.
 	prunable, protected := inventory.SplitProtected(staleSet)
 
+	// A stale PersistentVolumeClaim is pruned only with --delete-data. Kept,
+	// it stays in the record, so a later apply with the flag finds it stale.
+	var keptClaims []k8sinventory.Entry
+	if !req.Options.DeleteData {
+		prunable, keptClaims = inventory.SplitDataClaims(prunable)
+		if !req.Options.NoPrune {
+			// A claim that is already gone is not kept and leaves the record.
+			keptClaims = inventory.ClaimsInCluster(ctx, req.K8sClient, keptClaims)
+		}
+	}
+
 	if dryRun && instanceID != "" && !req.Options.NoPrune {
 		previewPrune(prunable, protected, instanceLog)
+		logKeptClaims(keptClaims, true, instanceLog)
 	}
 
 	if !dryRun && instanceID != "" {
@@ -278,6 +295,10 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 			if len(protected) > 0 {
 				instanceLog.Warn(fmt.Sprintf("leaving %d resource(s) behind", len(protected)))
 				logLeftBehind(protected, instanceLog)
+			}
+			if len(keptClaims) > 0 {
+				logKeptClaims(keptClaims, false, instanceLog)
+				recordEntries = append(append([]k8sinventory.Entry{}, recordEntries...), keptClaims...)
 			}
 		}
 
@@ -354,6 +375,25 @@ func previewPrune(prunable, protected []k8sinventory.Entry, instanceLog *log.Log
 	if len(protected) > 0 {
 		instanceLog.Info(fmt.Sprintf("would leave %d resource(s) behind", len(protected)))
 		logLeftBehind(protected, instanceLog)
+	}
+}
+
+// logKeptClaims reports the stale PersistentVolumeClaims prune keeps because
+// --delete-data is not set: a count line that names the flag, then one line
+// per claim with the status "kept". The claims are kept on purpose, so every
+// line is informational and none is a warning. preview words the count line
+// for a dry run.
+func logKeptClaims(claims []k8sinventory.Entry, preview bool, instanceLog *log.Logger) {
+	if len(claims) == 0 {
+		return
+	}
+	verb := "keeping"
+	if preview {
+		verb = "would keep"
+	}
+	instanceLog.Info(fmt.Sprintf("%s %d stale PersistentVolumeClaim(s) and the data on them; pass --delete-data to prune them", verb, len(claims)))
+	for _, e := range claims {
+		instanceLog.Info(output.FormatResourceLine(e.Kind, e.Namespace, e.Name, output.StatusKept))
 	}
 }
 

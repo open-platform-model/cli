@@ -173,3 +173,6 @@ func ResolveInstanceIdentifier(arg string) (name, uuid string) {
 	}
 	return arg, ""
 }
+
+// DeleteDataPruneFlagHelp is the help of --delete-data on the apply commands.
+const DeleteDataPruneFlagHelp = "Also prune stale PersistentVolumeClaims and the data on them (kept by default)"

@@ -395,3 +395,84 @@ func TestDelete_DeletesInDescendingWeightOrder(t *testing.T) {
 	assert.Equal(t, 4, result.Deleted)
 	assert.Equal(t, []string{"deploy", "svc", "cm-1", "cm-2"}, deletedNames(t, dyn))
 }
+
+// A tracked PersistentVolumeClaim is kept unless DeleteData is set, whether
+// discovery read it or not, and is reported in Kept, never as left behind or
+// as an error. A kind of the same name in another API group is not a claim.
+func TestDelete_KeepsClaimsUnlessDeleteData(t *testing.T) {
+	claim := func() *unstructured.Unstructured {
+		return owned("v1", "PersistentVolumeClaim", "data", "default", opmlabels.ManagedByCLI, testInstanceUUID)
+	}
+	lookalike := func() *unstructured.Unstructured {
+		return owned("example.io/v1", "PersistentVolumeClaim", "data", "default", opmlabels.ManagedByCLI, testInstanceUUID)
+	}
+	unreadableClaim := []UnreadableResource{{Kind: "PersistentVolumeClaim", Namespace: "default", Name: "data", Err: errors.New("denied")}}
+
+	tests := []struct {
+		name        string
+		live        *unstructured.Unstructured
+		unreadable  []UnreadableResource
+		deleteData  bool
+		wantKept    int
+		wantDeleted int
+		wantErrors  int
+	}{
+		{name: "kept by default", live: claim(), wantKept: 1},
+		{name: "deleted with DeleteData", live: claim(), deleteData: true, wantDeleted: 1},
+		{name: "another group is deleted", live: lookalike(), wantDeleted: 1},
+		{name: "unreadable claim is kept by default", unreadable: unreadableClaim, wantKept: 1},
+		{name: "unreadable claim is an error with DeleteData", unreadable: unreadableClaim, deleteData: true, wantErrors: 1},
+	}
+	for _, tc := range tests {
+		for _, dryRun := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/dryRun=%v", tc.name, dryRun), func(t *testing.T) {
+				var objs []runtime.Object
+				var inv []*unstructured.Unstructured
+				if tc.live != nil {
+					objs = append(objs, tc.live.DeepCopy())
+					inv = append(inv, tc.live.DeepCopy())
+				}
+				dyn := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), objs...)
+				client := &Client{Resources: kubetest.Resources(), Dynamic: dyn}
+
+				result, err := Delete(context.Background(), client, DeleteOptions{
+					InstanceName:          "demo",
+					Namespace:             "default",
+					InstanceUUID:          testInstanceUUID,
+					DryRun:                dryRun,
+					DeleteData:            tc.deleteData,
+					InventoryLive:         inv,
+					InventoryRecordExists: true,
+					Unreadable:            tc.unreadable,
+				})
+				require.NoError(t, err)
+
+				assert.Len(t, result.Kept, tc.wantKept)
+				assert.Equal(t, tc.wantDeleted, result.Deleted)
+				assert.Len(t, result.Errors, tc.wantErrors)
+				assert.Empty(t, result.LeftBehind, "a kept claim is not a left-behind resource")
+				if tc.wantKept == 1 {
+					assert.Equal(t, LeftBehindResource{Kind: "PersistentVolumeClaim", Namespace: "default", Name: "data", Reason: KeptClaimReason}, result.Kept[0])
+				}
+
+				if tc.live == nil {
+					return
+				}
+				_, getErr := dyn.Tracker().Get(kubetest.GVR(tc.live), "default", "data")
+				if tc.wantKept == 1 || dryRun {
+					assert.NoError(t, getErr, "the claim is still on the cluster")
+				} else {
+					assert.True(t, apierrors.IsNotFound(getErr), "the object was deleted")
+				}
+			})
+		}
+	}
+}
+
+func TestIsDataClaim(t *testing.T) {
+	assert.True(t, IsDataClaim("", "PersistentVolumeClaim"))
+	assert.False(t, IsDataClaim("example.io", "PersistentVolumeClaim"))
+	assert.False(t, IsDataClaim("", "PersistentVolume"))
+	assert.False(t, IsDataClaim("", "ConfigMap"))
+	assert.False(t, IsProtectedKind("", "PersistentVolumeClaim"), "a claim has an override, so it is not a protected kind")
+}

@@ -95,3 +95,33 @@ func walkCommands(c *cobra.Command, fn func(*cobra.Command)) {
 		walkCommands(sub, fn)
 	}
 }
+
+// --delete-data is the one flag that lets delete and prune remove
+// PersistentVolumeClaims: the three commands offer it, off by default and
+// spelled in full, and each help says claims are kept without it.
+func TestDeleteDataFlagOnDeleteAndBothApplies(t *testing.T) {
+	for _, path := range []string{"instance delete", "instance apply", "module apply"} {
+		c := findCommand(t, path)
+		f := c.Flags().Lookup("delete-data")
+		require.NotNil(t, f, "%s offers --delete-data", path)
+		assert.Equal(t, "bool", f.Value.Type(), path)
+		assert.Equal(t, "false", f.DefValue, "%s: data is kept by default", path)
+		assert.Empty(t, f.Shorthand, "%s: a flag that deletes data has no shorthand", path)
+		assert.Empty(t, f.Deprecated, path)
+		assert.False(t, f.Hidden, path)
+		assert.Contains(t, f.Usage, "PersistentVolumeClaims", path)
+		assert.Contains(t, f.Usage, "kept by default", path)
+		assert.Contains(t, c.Long, "PersistentVolumeClaims", "%s: the help says claims are kept", path)
+		assert.Contains(t, c.Long, "--delete-data", path)
+	}
+}
+
+// No other command offers --delete-data, so the flag keeps one meaning.
+func TestDeleteDataFlagIsOnNoOtherCommand(t *testing.T) {
+	allowed := map[string]bool{"opm instance delete": true, "opm instance apply": true, "opm module apply": true}
+	walkCommands(NewRootCmd(), func(c *cobra.Command) {
+		if c.Flags().Lookup("delete-data") != nil {
+			assert.True(t, allowed[c.CommandPath()], "%s offers --delete-data", c.CommandPath())
+		}
+	})
+}

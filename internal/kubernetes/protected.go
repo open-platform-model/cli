@@ -26,3 +26,17 @@ func IsProtectedKind(group, kind string) bool {
 	}
 	return false
 }
+
+// KindPersistentVolumeClaim is the kind of the claims delete and prune keep.
+const KindPersistentVolumeClaim = "PersistentVolumeClaim"
+
+// IsDataClaim reports whether the object is a PersistentVolumeClaim of the
+// core API group. Deleting one deletes the data on its volume under the usual
+// reclaim policy, so instance delete and prune keep it unless the user passes
+// --delete-data. Unlike a protected kind (IsProtectedKind) it has that
+// override, so the two tests stay apart.
+//
+// The match is on group and kind, as in IsProtectedKind.
+func IsDataClaim(group, kind string) bool {
+	return group == "" && kind == KindPersistentVolumeClaim
+}

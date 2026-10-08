@@ -29,6 +29,8 @@ func TestRun_UsageErrorExitsOne(t *testing.T) {
 		{"too many arguments", []string{"module", "template", "list", "extra"}, `unknown command "extra" for "opm module template list"`},
 		{"flag value of the wrong type", []string{"instance", "delete", "x", "--timeout", "soon"}, `invalid argument "soon" for "--timeout" flag`},
 		{"flags that exclude each other", []string{"module", "vet", "--name", "a", "--instance-name", "b"}, "[instance-name name] were all set"},
+		{"instance apply: delete-data with no-prune", []string{"instance", "apply", "x.cue", "--no-prune", "--delete-data"}, "[delete-data no-prune] were all set"},
+		{"module apply: delete-data with no-prune", []string{"module", "apply", "--no-prune", "--delete-data"}, "[delete-data no-prune] were all set"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

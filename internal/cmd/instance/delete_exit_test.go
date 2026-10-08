@@ -70,7 +70,7 @@ func TestExecuteInstanceDelete_ExitCodeOfAnUnresolvedKind(t *testing.T) {
 			var runErr error
 			out := captureOutput(t, func() {
 				runErr = executeInstanceDelete(ctx, client, &cmdutil.InstanceSelectorFlags{InstanceName: "demo"}, "apps", inv,
-					live, unreadable, false, output.InstanceLogger("demo"))
+					live, unreadable, false, false, output.InstanceLogger("demo"))
 			})
 
 			var exitErr *opmexit.ExitError

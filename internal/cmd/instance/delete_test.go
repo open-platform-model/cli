@@ -207,7 +207,7 @@ func TestExecuteInstanceDelete_LeavesNamespaceBehind(t *testing.T) {
 			var runErr error
 			out := captureOutput(t, func() {
 				runErr = executeInstanceDelete(ctx, client, rsf, "apps", inv,
-					[]*unstructured.Unstructured{cm.DeepCopy(), foreign.DeepCopy(), ns.DeepCopy()}, nil, dryRun, output.InstanceLogger("demo"))
+					[]*unstructured.Unstructured{cm.DeepCopy(), foreign.DeepCopy(), ns.DeepCopy()}, nil, dryRun, false, output.InstanceLogger("demo"))
 			})
 			require.NoError(t, runErr, out)
 
@@ -269,7 +269,7 @@ func TestExecuteInstanceDelete_ReadErrorKeepsModuleInstance(t *testing.T) {
 			var runErr error
 			out := captureOutput(t, func() {
 				runErr = executeInstanceDelete(ctx, client, &cmdutil.InstanceSelectorFlags{InstanceName: "demo"}, "apps", inv,
-					[]*unstructured.Unstructured{cm.DeepCopy()}, nil, dryRun, output.InstanceLogger("demo"))
+					[]*unstructured.Unstructured{cm.DeepCopy()}, nil, dryRun, false, output.InstanceLogger("demo"))
 			})
 			require.Error(t, runErr)
 			assert.NotContains(t, out, "Instance deleted")
@@ -340,7 +340,7 @@ func (g *guardScenario) run(t *testing.T, dryRun bool) (string, error) {
 	var runErr error
 	out := captureOutput(t, func() {
 		runErr = deleteResolvedInstance(context.Background(), g.client, &cmdutil.InstanceSelectorFlags{InstanceName: g.rec.Name}, g.rec.Namespace,
-			g.rec, []*unstructured.Unstructured{g.cm.DeepCopy()}, nil, 5*time.Second, dryRun, output.InstanceLogger(g.rec.Name))
+			g.rec, []*unstructured.Unstructured{g.cm.DeepCopy()}, nil, 5*time.Second, dryRun, false, output.InstanceLogger(g.rec.Name))
 	})
 	return out, runErr
 }
@@ -533,7 +533,7 @@ func TestExecuteInstanceDelete_UnreadableKeepsModuleInstance(t *testing.T) {
 			var runErr error
 			out := captureOutput(t, func() {
 				runErr = executeInstanceDelete(context.Background(), client, &cmdutil.InstanceSelectorFlags{InstanceName: "demo"}, "apps", inv,
-					[]*unstructured.Unstructured{deploy.DeepCopy()}, unreadable, dryRun, output.InstanceLogger("demo"))
+					[]*unstructured.Unstructured{deploy.DeepCopy()}, unreadable, dryRun, false, output.InstanceLogger("demo"))
 			})
 			requireExitCode(t, runErr, opmexit.ExitGeneralError)
 			assert.NotContains(t, out, "Instance deleted")
@@ -575,7 +575,7 @@ func TestExecuteInstanceDelete_UnreadableNamespaceIsLeftBehind(t *testing.T) {
 	var runErr error
 	out := captureOutput(t, func() {
 		runErr = executeInstanceDelete(context.Background(), client, &cmdutil.InstanceSelectorFlags{InstanceName: "demo"}, "apps", inv,
-			nil, unreadable, false, output.InstanceLogger("demo"))
+			nil, unreadable, false, false, output.InstanceLogger("demo"))
 	})
 	require.NoError(t, runErr, out)
 	assert.Contains(t, out, "Namespace/apps")
@@ -599,7 +599,7 @@ func TestDeleteResolvedInstance_OperatorOwnedIgnoresUnreadable(t *testing.T) {
 	var runErr error
 	out := captureOutput(t, func() {
 		runErr = deleteResolvedInstance(context.Background(), client, &cmdutil.InstanceSelectorFlags{InstanceName: rec.Name}, rec.Namespace,
-			rec, nil, unreadable, 5*time.Second, false, output.InstanceLogger(rec.Name))
+			rec, nil, unreadable, 5*time.Second, false, false, output.InstanceLogger(rec.Name))
 	})
 	require.NoError(t, runErr, out)
 	assert.Contains(t, out, "operator pruned")
@@ -640,7 +640,7 @@ func TestExecuteInstanceDelete_FailedRecordDeleteFails(t *testing.T) {
 			var runErr error
 			out := captureOutput(t, func() {
 				runErr = executeInstanceDelete(context.Background(), client, rsf, "apps", inv,
-					[]*unstructured.Unstructured{cm.DeepCopy()}, nil, false, output.InstanceLogger("demo"))
+					[]*unstructured.Unstructured{cm.DeepCopy()}, nil, false, false, output.InstanceLogger("demo"))
 			})
 			requireExitCode(t, runErr, tt.wantCode)
 			assert.NotContains(t, out, "Instance deleted")
@@ -656,7 +656,7 @@ func TestExecuteInstanceDelete_FailedRecordDeleteFails(t *testing.T) {
 
 			failing = false
 			out = captureOutput(t, func() {
-				runErr = executeInstanceDelete(context.Background(), client, rsf, "apps", inv, nil, nil, false, output.InstanceLogger("demo"))
+				runErr = executeInstanceDelete(context.Background(), client, rsf, "apps", inv, nil, nil, false, false, output.InstanceLogger("demo"))
 			})
 			require.NoError(t, runErr, out)
 			assert.Contains(t, out, "Instance deleted")
@@ -685,8 +685,8 @@ func TestInstanceDeleteCmd_YesAndItsDeprecatedAliasSkipThePrompt(t *testing.T) {
 			var got, called bool
 			orig := runDelete
 			t.Cleanup(func() { runDelete = orig })
-			runDelete = func(_ context.Context, _ string, _ *config.GlobalConfig, _ *cmdutil.K8sFlags, _ string, skipConfirm, _ bool, _ time.Duration) error {
-				got, called = skipConfirm, true
+			runDelete = func(_ context.Context, _ string, _ *config.GlobalConfig, _ *cmdutil.K8sFlags, _ string, flags deleteFlags) error {
+				got, called = flags.SkipConfirm, true
 				return nil
 			}
 

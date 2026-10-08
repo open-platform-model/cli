@@ -54,8 +54,14 @@ type DeleteOptions struct {
 	// Unreadable lists tracked resources the caller's discovery could not
 	// read. Each is a per-resource error (DeleteResult.Errors), so the caller
 	// keeps the ModuleInstance and a re-run retries, except a protected kind,
-	// which is left behind as it would be if read.
+	// which is left behind as it would be if read, and a claim Delete keeps
+	// (DeleteData false), which is kept.
 	Unreadable []UnreadableResource
+
+	// DeleteData is the command's --delete-data: delete tracked
+	// PersistentVolumeClaims (IsDataClaim) like any other resource. When
+	// false, each is kept and listed in DeleteResult.Kept.
+	DeleteData bool
 }
 
 // UnreadableResource is a tracked resource whose discovery read failed with an
@@ -82,6 +88,11 @@ type DeleteResult struct {
 	// longer OPM-managed or belongs to another instance. They are not errors.
 	LeftBehind []LeftBehindResource
 
+	// Kept lists the PersistentVolumeClaims Delete kept because
+	// DeleteOptions.DeleteData was false. They are kept on purpose: not
+	// errors, and reported apart from LeftBehind.
+	Kept []LeftBehindResource
+
 	// Errors contains per-resource errors (non-fatal).
 	Errors []resourceError
 }
@@ -98,6 +109,9 @@ type LeftBehindResource struct {
 // Reasons a tracked resource is left behind by Delete, besides
 // ProtectedKindReason.
 const (
+	// KeptClaimReason is the reason of every entry in DeleteResult.Kept.
+	KeptClaimReason = "PersistentVolumeClaims are kept unless --delete-data is set"
+
 	reasonNotManaged    = "no longer managed by OPM"
 	reasonOtherInstance = "owned by another instance"
 )
@@ -107,7 +121,8 @@ const (
 // the caller. Resources are deleted in reverse weight order. The ModuleInstance
 // CR itself is deleted last by the caller, after Delete returns.
 //
-// A CRD or Namespace is never deleted. Every other object is read again just
+// A CRD or Namespace is never deleted, and a PersistentVolumeClaim only with
+// opts.DeleteData (DeleteResult.Kept otherwise). Every other object is read again just
 // before its delete and deleted only while it is still OPM-managed and, when
 // both sides carry one, still has this instance's UUID; otherwise it is left
 // behind (DeleteResult.LeftBehind). An object that is already gone counts
@@ -146,7 +161,7 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 
 	instanceLog.Debug("resources to delete", "count", len(resources))
 
-	recordUnreadable(result, opts.Unreadable, instanceLog)
+	recordUnreadable(result, opts.Unreadable, opts.DeleteData, instanceLog)
 
 	// Sort in reverse weight order (highest weight first = delete webhooks before deployments)
 	SortObjects(resources, object.Descending)
@@ -156,6 +171,11 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 		kind := res.GetKind()
 		name := res.GetName()
 		ns := res.GetNamespace()
+
+		if !opts.DeleteData && IsDataClaim(res.GroupVersionKind().Group, kind) {
+			result.Kept = append(result.Kept, LeftBehindResource{Kind: kind, Namespace: ns, Name: name, Reason: KeptClaimReason})
+			continue
+		}
 
 		reason, gone, err := checkDeletable(ctx, client, res, opts.InstanceUUID)
 		switch {
@@ -203,10 +223,15 @@ func Delete(ctx context.Context, client *Client, opts DeleteOptions) (*DeleteRes
 }
 
 // recordUnreadable adds the resources discovery could not read to result: a
-// protected kind is left behind, as checkDeletable would leave it if read, and
-// any other is a per-resource error worded like a failed re-read.
-func recordUnreadable(result *DeleteResult, unreadable []UnreadableResource, instanceLog *log.Logger) {
+// protected kind is left behind, as checkDeletable would leave it if read, a
+// claim is kept unless deleteData, and any other is a per-resource error
+// worded like a failed re-read.
+func recordUnreadable(result *DeleteResult, unreadable []UnreadableResource, deleteData bool, instanceLog *log.Logger) {
 	for _, u := range unreadable {
+		if !deleteData && IsDataClaim(u.Group, u.Kind) {
+			result.Kept = append(result.Kept, LeftBehindResource{Kind: u.Kind, Namespace: u.Namespace, Name: u.Name, Reason: KeptClaimReason})
+			continue
+		}
 		if IsProtectedKind(u.Group, u.Kind) {
 			result.LeftBehind = append(result.LeftBehind, LeftBehindResource{Kind: u.Kind, Namespace: u.Namespace, Name: u.Name, Reason: ProtectedKindReason})
 			continue

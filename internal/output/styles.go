@@ -57,8 +57,11 @@ const (
 	// StatusLeftBehind marks an object prune or delete declined to remove:
 	// a protected kind, or one that no longer belongs to the instance.
 	StatusLeftBehind = "left behind"
-	StatusValid      = "valid"
-	statusFailed     = "failed"
+	// StatusKept marks a PersistentVolumeClaim prune or delete kept on
+	// purpose because --delete-data was not set.
+	StatusKept   = "kept"
+	StatusValid  = "valid"
+	statusFailed = "failed"
 )
 
 // StatusStyle returns the lipgloss style for a given resource status string.
@@ -71,7 +74,7 @@ func statusStyle(status string) lipgloss.Style {
 		return lipgloss.NewStyle().Foreground(colorGreen)
 	case StatusConfigured:
 		return lipgloss.NewStyle().Foreground(ColorYellow)
-	case StatusUnchanged:
+	case StatusUnchanged, StatusKept:
 		return lipgloss.NewStyle().Faint(true)
 	case StatusDeleted:
 		return lipgloss.NewStyle().Foreground(colorRed)
@@ -97,7 +100,7 @@ func statusIcon(status string) string {
 		return "+"
 	case StatusConfigured:
 		return "~"
-	case StatusUnchanged:
+	case StatusUnchanged, StatusKept:
 		return "="
 	case StatusDeleted:
 		return "-"

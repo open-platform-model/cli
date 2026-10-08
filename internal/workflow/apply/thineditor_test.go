@@ -109,3 +109,36 @@ func TestThinEditor_RefusesSkipUnprovided(t *testing.T) {
 		})
 	}
 }
+
+// The operator decides what an operator-managed instance prunes, so
+// --delete-data only draws a warning there, on the real edit and on the
+// dry-run preview, and without the flag nothing mentions it. The local-source
+// refusal ends both runs before any write.
+func TestThinEditor_DeleteDataWarnsOnOperatorManaged(t *testing.T) {
+	result := &workflowrender.Result{
+		Instance:    module.InstanceMetadata{Name: "podinfo", Namespace: "demo"},
+		Module:      module.ModuleMetadata{Name: "podinfo"},
+		SourceLocal: true,
+	}
+	rec := &inventory.Record{Owner: inventory.OwnerOperator, Name: "podinfo", Namespace: "demo"}
+
+	for _, deleteData := range []bool{true, false} {
+		for name, run := range map[string]func(Request) error{
+			"apply":   func(req Request) error { return executeThinEditor(context.Background(), req, rec) },
+			"dry-run": func(req Request) error { return previewThinEditor(req, rec) },
+		} {
+			// The request's logger binds the log writer when it is built.
+			logBuf := captureLog(t)
+			req := operatorOwnedRequest(result)
+			req.Options.DeleteData = deleteData
+			require.Error(t, run(req), name)
+			if deleteData {
+				line := logLine(logBuf.String(), DeleteDataOperatorManagedNote)
+				require.NotEmpty(t, line, "%s: %s", name, logBuf.String())
+				assert.Contains(t, line, "WARN", name)
+				continue
+			}
+			assert.NotContains(t, logBuf.String(), "--delete-data", name)
+		}
+	}
+}
