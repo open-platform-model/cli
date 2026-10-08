@@ -1,19 +1,12 @@
-# Resource Conversion
+## REMOVED Requirements
 
-## Purpose
+### Requirement: Object order comes from the library weight table
 
-Defines how the CLI turns a render's compiled objects into Kubernetes objects: it converts them through the library's `opm/k8s/object` single export, which feeds both the render digest and the objects it applies, reads OPM label keys from `opm/k8s/labels`, and orders objects by the library weight table.
+**Reason**: Library v1.0.0-beta.7 aligns the weight table with Flux's staged apply order, so the promise that every weight of the retired CLI table keeps its value no longer holds.
 
-## Requirements
+**Migration**: The requirement "Object order follows the library weight table" replaces it. A user who relied on the old position of a kind reads the new order there.
 
-### Requirement: Label keys come from the library
-
-The CLI SHALL read every OPM label key and managed-by value, and decide whether a managed-by value is an OPM runtime, through the library's `opm/k8s/labels` (`ManagedBy`, `ManagedByCLI`, `ManagedByController`, `ManagedByLegacy`, `Component`, `ComponentName`, `ModuleInstanceName`, `ModuleInstanceNamespace`, `ModuleInstanceUUID`, `IsOPMManagedBy`), and SHALL NOT keep a copy of them (0012:D1).
-
-#### Scenario: Label values are unchanged
-
-- **WHEN** the CLI writes its inventory record or checks a live object's managed-by label
-- **THEN** it uses the keys and values `app.kubernetes.io/managed-by`, `opm-cli`, `opm-controller`, `open-platform-model`, `opmodel.dev/component`, `component.opmodel.dev/name` and `module-instance.opmodel.dev/{name,namespace,uuid}`, as before
+## ADDED Requirements
 
 ### Requirement: Object order follows the library weight table
 
@@ -57,17 +50,3 @@ The CLI SHALL pin this order in a unit test of its own, holding every weight con
 
 - **WHEN** the CLI is built against a library whose `object.Weight` returns another weight for a constant, a table row or a fallback the CLI's order test pins
 - **THEN** the order test fails and names the entry
-
-### Requirement: One export feeds the apply objects and the shared render digest
-
-The CLI SHALL convert a render's compiled objects with the library's `opm/k8s/object`: it SHALL wrap them with `object.Resources` and export them with exactly one `object.Export` call per render. The objects the CLI applies SHALL be the exported objects, in render order, and the render digest SHALL be the library's `opm/k8s/inventory.RenderDigest` of the same exported set, so no compiled object is exported from CUE twice and the CLI keeps no render digest algorithm of its own (0012:D6). An export failure SHALL exit with the general error code and name the failing resource.
-
-#### Scenario: The digest and the apply objects come from one export
-
-- **WHEN** `opm instance apply` or `opm module apply` renders a module
-- **THEN** the render digest and the objects passed to apply both come from one `object.Export` over the render's compiled objects
-
-#### Scenario: The render digest is the library's
-
-- **WHEN** the CLI digests an exported object set
-- **THEN** the digest equals `inventory.RenderDigest` of that set
