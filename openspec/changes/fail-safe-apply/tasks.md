@@ -1,8 +1,8 @@
 ## 1. Unreadable record stops the apply
 
-- [ ] 1.1 Add a test in `internal/workflow/apply` that runs `Execute` with a `ModuleInstance` read failing (internal error, Forbidden; real run and dry run) and asserts an error, the exit code, no resource patch and no record write; see it fail on the current code
-- [ ] 1.2 Make `LoadPreviousInventory` return the read error and `Execute` return it as an `ExitError` on both reads; update the call in `tests/integration/migration/main.go`; verify the 1.1 test passes and `go vet ./...` compiles the integration programs
-- [ ] 1.3 `task lint` and `task test:unit` green, then commit `fix(apply): stop when the instance record cannot be read`
+- [x] 1.1 Add a test in `internal/workflow/apply` that runs `Execute` with a `ModuleInstance` read failing (internal error, Forbidden; real run and dry run) and asserts an error, the exit code, no resource patch and no record write; see it fail on the current code
+- [x] 1.2 Make `LoadPreviousInventory` return the read error and `Execute` return it as an `ExitError` on both reads; update the call in `tests/integration/migration/main.go`; verify the 1.1 test passes and `go vet ./...` compiles the integration programs
+- [x] 1.3 `task lint` and `task test:unit` green, then commit `fix(apply): stop when the instance record cannot be read`
 
 ## 2. First-install existence check refuses an unreadable object
 

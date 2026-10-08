@@ -111,8 +111,9 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	if dryRun && instanceID != "" {
 		rec, err := inventory.GetRecord(ctx, req.K8sClient, name, namespace)
 		if err != nil {
-			instanceLog.Warn("could not read inventory CR, previewing as CLI-managed", "error", err)
-		} else if inventory.ResolveOwnership(rec) == inventory.ModeOperatorOwned {
+			return unreadableRecordError(name, namespace, err)
+		}
+		if inventory.ResolveOwnership(rec) == inventory.ModeOperatorOwned {
 			return previewThinEditor(req, rec)
 		}
 	}
@@ -120,7 +121,10 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	// Load the previous inventory from the CR; when absent, look for a legacy
 	// Secret to migrate. Both are read-only, so a dry-run loads them too and
 	// can report what a real apply would prune.
-	prevRecord, legacy := LoadPreviousInventory(ctx, req.K8sClient, name, namespace, instanceID, dryRun, instanceLog)
+	prevRecord, legacy, err := LoadPreviousInventory(ctx, req.K8sClient, name, namespace, instanceID, dryRun, instanceLog)
+	if err != nil {
+		return unreadableRecordError(name, namespace, err)
+	}
 
 	// Gate 4: ownership — the single branch point (0006:D18). An operator-owned
 	// instance takes the thin-editor path and returns; everything below this
@@ -316,37 +320,53 @@ func EnsureNamespaceIfRequested(ctx context.Context, k8sClient *kubernetes.Clien
 
 // LoadPreviousInventory reads the ModuleInstance CR for an instance. When no
 // CR exists, it looks for a legacy inventory Secret to migrate (0006:D6).
-// Returns (nil, nil) on a missing instance ID or a first apply with no legacy
-// Secret. Both reads are read-only, so dryRun only changes the wording of the
-// migration message.
-func LoadPreviousInventory(ctx context.Context, k8sClient *kubernetes.Client, name, namespace, instanceID string, dryRun bool, instanceLog *log.Logger) (*inventory.Record, *inventory.LegacyInventory) {
+// Returns no record and no legacy inventory on a missing instance ID or a
+// first apply with no legacy Secret. Both reads are read-only, so dryRun only
+// changes the wording of the migration message.
+//
+// A CR read that fails with anything but NotFound is returned as the error:
+// only a NotFound answer proves there is no record, and a caller that went on
+// without one would run a first install over an existing instance.
+func LoadPreviousInventory(ctx context.Context, k8sClient *kubernetes.Client, name, namespace, instanceID string, dryRun bool, instanceLog *log.Logger) (*inventory.Record, *inventory.LegacyInventory, error) {
 	if instanceID == "" {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	prevRecord, err := inventory.GetRecord(ctx, k8sClient, name, namespace)
 	if err != nil {
-		instanceLog.Warn("could not read inventory CR, proceeding without it", "error", err)
-		return nil, nil
+		return nil, nil, err
 	}
 	if prevRecord != nil {
-		return prevRecord, nil
+		return prevRecord, nil, nil
 	}
 
 	legacy, err := inventory.FindLegacySecretInventory(ctx, k8sClient, name, namespace, instanceID)
 	if err != nil {
 		instanceLog.Warn("could not read legacy inventory Secret, proceeding as first apply", "error", err)
-		return nil, nil
+		return nil, nil, nil
 	}
 	if legacy == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if dryRun {
 		instanceLog.Info("legacy inventory Secret would be migrated to ModuleInstance CR")
 	} else {
 		instanceLog.Info("migrating legacy inventory Secret to ModuleInstance CR")
 	}
-	return nil, legacy
+	return nil, legacy, nil
+}
+
+// unreadableRecordError is the refusal for a ModuleInstance read that failed
+// with anything but NotFound. The exit code follows the cause: permission
+// denied, connectivity, or general.
+func unreadableRecordError(name, namespace string, cause error) error {
+	return &opmexit.ExitError{
+		Code: exitCodeFromK8sError(cause),
+		Err: fmt.Errorf("cannot read the ModuleInstance record %q in namespace %q: %w\n"+
+			"apply stopped: without the record it cannot tell a first install from an existing instance.\n"+
+			"Check that you can read moduleinstances.%s in that namespace, then run the command again",
+			name, namespace, cause, inventory.GroupOpmodel),
+	}
 }
 
 // WriteInstanceRecord writes the ModuleInstance CR spec, then its status subset
