@@ -14,6 +14,6 @@
 
 ## 3. Output formats on version and template list
 
-- [ ] 3.1 `internal/cmd/version.go`: add `-o`/`--output` (`text`, `json`, `yaml`), writing to the command's standard output; tests in `version_test.go` fail before and pass after (JSON fields, default text unchanged, invalid value exits 1 with the message)
-- [ ] 3.2 `internal/cmd/module/template.go`: add `-o`/`--output` (`table`, `json`, `yaml`); tests fail before and pass after
-- [ ] 3.3 `task fmt`, `task vet`, `task lint`, `task openspec:check`, `task docs:bundle:check`, `task test:unit` and `task cascade:wiring:check` green, then commit `feat(cmd): add --output to version and module template list`
+- [x] 3.1 `internal/cmd/version.go`: add `-o`/`--output` (`text`, `json`, `yaml`), writing to the command's standard output; tests in `version_test.go` fail before and pass after (JSON fields, default text unchanged, invalid value exits 1 with the message)
+- [x] 3.2 `internal/cmd/module/template.go`: add `-o`/`--output` (`table`, `json`, `yaml`); tests fail before and pass after
+- [x] 3.3 `task fmt`, `task vet`, `task lint`, `task openspec:check`, `task docs:bundle:check`, `task test:unit` and `task cascade:wiring:check` green, then commit `feat(cmd): add --output to version and module template list`
