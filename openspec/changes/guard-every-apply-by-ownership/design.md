@@ -1,6 +1,6 @@
 ## Context
 
-See `proposal.md` for the motivation. This change lands after `adopt-kubernetes-ownership-package` (the delete half), which adds the import of `opm/k8s/ownership`, `kubernetes.JudgedDelete` and the prune that judges with the recorded identity. The state of the apply side at cli `main` 4d4884fa:
+See `proposal.md` for the motivation. This change builds on `adopt-kubernetes-ownership-package` (the delete half), merged as cli#347 and archived: it added the import of `opm/k8s/ownership`, `kubernetes.JudgedDelete`, the prune that judges with the recorded identity, and the call-site test `internal/kubernetes/deletesites_test.go`. The state of the apply side at cli `main` 4bf7f04b:
 
 - `internal/inventory/stale.go`: `FirstInstallCheck` reads every rendered entry and refuses a terminating, an untracked or an unreadable object. It passes every OPM-managed object, whichever instance its UUID label names. `RunPreApplyExistenceCheck` in `internal/workflow/apply/apply.go` skips it when a record exists and on a dry run.
 - `internal/kubernetes/apply.go`: `applyOne` reads the object, ignores a read error, and patches with `Force: true`.
@@ -186,7 +186,7 @@ Other risks:
 - [The window between the guard's read and the patch] -> A label or annotation change inside the window is not closed; the server-side apply has no matching precondition. The operator has the same window. Accepted.
 - [One more GET per rendered object on every apply] -> The first apply already pays it. `applyOne` reads the object once more for its status line; reusing the guard's read there is allowed and not required.
 - [An instance with no UUID in its render] -> The library then compares no identity inside the inventory and refuses every non-empty UUID outside it. The cli passes what it has and adds no rule.
-- [This change lands without the delete half] -> Not supported: the tasks build on `JudgedDelete` and the delta builds on the delete half's spec text.
+- [This change lands without the delete half] -> Cannot happen: the delete half is on `main` (cli#347), and the delta builds on its spec text.
 
 ## Migration Plan
 

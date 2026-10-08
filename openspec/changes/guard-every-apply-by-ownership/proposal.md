@@ -4,7 +4,7 @@ The cli's apply guard runs only on an instance's first apply, passes any OPM-man
 
 The library holds the rule, `ownership.CanApply` in `opm/k8s/ownership` (library `v1.0.0-beta.7`, already pinned). Enhancement 0012 decided that both frontends ask it for every object on every apply, with a per-object adopt annotation as the only override (0012:D4:R2, 0012:D8).
 
-This change is the apply half of the cli's adoption. The delete half is the change `adopt-kubernetes-ownership-package`; this change lands after it and builds on its code and its spec text.
+This change is the apply half of the cli's adoption. The delete half is the change `adopt-kubernetes-ownership-package`, merged as cli#347 and archived; this change builds on its code and its spec text.
 
 ## What Changes
 
@@ -26,7 +26,7 @@ This change is the apply half of the cli's adoption. The delete half is the chan
 
 Not in this change: the delete side (change `adopt-kubernetes-ownership-package`); the deletion protocol; flags; publish; the operator repo; the `--rbac` objects of `opm operator install`, which belong to no instance and stay outside the guard (a follow-up issue decides their ownership).
 
-SemVer: MAJOR after GA (an apply that succeeded now refuses). Before GA it ships as the next beta, as `feat!` in the PR title, with the migration note in the PR body. It is meant for the same beta as the delete half.
+SemVer: MAJOR after GA (an apply that succeeded now refuses). Before GA it ships as the next beta, as `feat!` in the PR title, with the migration note in the PR body. It is meant for the same beta as the delete half. A dry run can preview an apply that the real run refuses; the migration note says so.
 
 ## Capabilities
 
@@ -46,6 +46,6 @@ None.
 - Code: `internal/inventory/` (the guard, the admit set), `internal/workflow/apply/` (apply flow, record entries, messages), `internal/operator/` (plan, install), a docs page, one integration script.
 - Imports: `opm/k8s/ownership`, which the delete half already imports. No `go.mod` change.
 - Stability: whether the `opm/k8s` tier is in the library's v1 promise is still open; the cli takes the dependency either way.
-- Order: the delta for `apply-pruning` "Apply flow orchestration" contains the text the delete half gives that requirement. This change MUST be archived after `adopt-kubernetes-ownership-package`.
+- Order: the delta for `apply-pruning` "Apply flow orchestration" contains the text the delete half gives that requirement. `adopt-kubernetes-ownership-package` is archived, so the main spec holds that text.
 - Users: a migration note (text in `design.md`) and a docs page on adopting an existing object.
 - Enhancement: implements part of 0012 (`enhancement.yaml`). The refusal of `opm operator install` on an object annotated for another instance needs a revision note on 0012:D8:R8, which words that case as a skip.
