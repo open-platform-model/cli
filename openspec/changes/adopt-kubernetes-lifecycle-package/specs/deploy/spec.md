@@ -40,19 +40,19 @@
 - **AND** no delete request SHALL be sent
 - **AND** the `ModuleInstance` record SHALL still exist
 
-### Requirement: Instance delete does not wait for deleted resources to disappear
+### Requirement: Instance delete reports a resource as deleted when its delete is accepted
 
-`opm instance delete` of a CLI-owned instance SHALL report a tracked resource as deleted when the API server accepts its delete request, and SHALL NOT wait for the resource to disappear. Because each delete uses Foreground propagation, a deleted resource MAY still exist, with a `deletionTimestamp`, when the command exits. A resource that a finalizer keeps from disappearing SHALL be reported like any other accepted delete: listed as `deleted`, not counted as a failure, with the `ModuleInstance` record deleted and exit code 0 when no other resource failed. `--timeout` SHALL bound the operator-cleanup wait of an operator-managed instance only.
+`opm instance delete` of a CLI-owned instance SHALL report a tracked resource as deleted when the API server accepts its delete request. Each delete uses Foreground propagation, so a deleted resource can still exist, with a `deletionTimestamp`, when the command exits: the command returns once every planned action is done. A resource whose delete was accepted SHALL NOT count as a failure because it still exists, also when a finalizer keeps it; with no other failure the `ModuleInstance` record is deleted and the exit code is 0. This requirement describes when a resource counts as deleted. It does not rule out a later, bounded wait for the resources to disappear.
 
 #### Scenario: Resource held by a finalizer
 
 - **WHEN** running `opm instance delete` for a CLI-owned instance that tracks a ConfigMap carrying a finalizer that no controller removes
 - **THEN** the ConfigMap SHALL be listed as `deleted`
-- **AND** the command SHALL NOT wait for the ConfigMap to disappear
 - **AND** the `ModuleInstance` record SHALL be deleted
 - **AND** the command SHALL exit 0
 
-#### Scenario: Command returns while dependents are still being collected
+#### Scenario: Accepted delete of a resource with dependents
 
 - **WHEN** running `opm instance delete` for a CLI-owned instance that tracks a Deployment with running Pods
-- **THEN** the command SHALL exit 0 once every delete request is accepted, whether or not the Deployment still exists
+- **AND** the API server accepts every delete request
+- **THEN** the Deployment SHALL be listed as `deleted` and the command SHALL exit 0

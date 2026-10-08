@@ -20,10 +20,10 @@ One runner in `internal/kubernetes` drives a `lifecycle.DeletionPlan` to its end
 | The record delete (`inventory.DeleteCR`) | Sent when no object failed | Sent only on a release verdict of `MayReleaseHold` | The delete itself |
 
 - **No changed delete behaviour.** Foreground propagation, descending weight order, the read before each delete, the ownership verdict and the UID precondition are all in `main` today (`internal/kubernetes/delete.go`, `internal/inventory/stale.go`). The plan gives the same order: both sort with the library's `object.Sort`, descending and stable, over the record's entry order.
-- **Output and exit codes stay.** `design.md` has the table of every line that moves or is new. There are three, none at the default log level changes a word, and no exit code changes.
-- **No wait, as today.** The cli sends each delete and reports it when the API server accepts it. It does not wait for the object to disappear. A script that runs `opm instance delete` and then expects the objects to be gone has always had to wait itself, and still has to. `design.md` states what happens to an object that holds a finalizer nobody removes.
+- **Output and exit codes stay.** `design.md` has the table of every line that moves or is new. There are two, neither at the default log level, and no exit code changes.
+- **Waiting is not part of this change.** The cli sends each delete and reports it when the API server accepts it, as today. A script that runs `opm instance delete` and then expects the objects to be gone has always had to wait itself. A bounded wait is a possible later change; nothing here rules it out. `design.md` states what happens to an object that holds a finalizer nobody removes.
 - **What of cli#347 this replaces.** `kubernetes.JudgedDelete`, `DeleteOutcome`, the live-read error marker and the two loops around them go; the runner takes their place as the cli's single delete site. `ErrReplaced`, the protected-kind test, the recorded identity for prune, the left-behind reporting, the migration's check-phase verdict, the call-site test and the integration script stay. `design.md` lists both sets by symbol.
-- **Order of landing.** The apply half of the ownership work, the change `guard-every-apply-by-ownership`, is being built in `internal/workflow/apply` and `internal/operator`. It lands first. This change is implemented on a base that holds it.
+- **Order of landing.** The apply half of the ownership work, the change `guard-every-apply-by-ownership`, merged as cli#349. This change is built on a base that holds it.
 - No new command, no new flag, no `go.mod` change.
 
 Not in this change: waiting for deleted objects to disappear; the apply path; flags; the dry-run prune preview (it still reads no stale object); the operator repo.
@@ -38,7 +38,7 @@ None.
 
 ### Modified Capabilities
 
-- `deploy`: `opm instance delete` of a CLI-owned instance takes every read, delete and skip from the shared deletion plan and deletes the record only on its release verdict; it does not wait for deleted resources to disappear.
+- `deploy`: `opm instance delete` of a CLI-owned instance takes every read, delete and skip from the shared deletion plan and deletes the record only on its release verdict; a resource counts as deleted when its delete is accepted.
 - `apply-pruning`: prune takes every read, delete and skip from the shared deletion plan.
 - `operator-lifecycle`: `opm operator uninstall` follows the same plan and release verdict as instance delete.
 

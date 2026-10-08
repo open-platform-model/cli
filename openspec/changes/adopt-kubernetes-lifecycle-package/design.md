@@ -73,7 +73,10 @@ type DeletionOptions struct {
 	// Unreadable holds the read error of entries the caller already
 	// failed to read. The runner answers the plan's read of such an entry
 	// with that error and sends no second request.
-	Unreadable map[k8sinventory.Entry]error
+	Unreadable map[ownership.Object]error
+	// OnStep, when set, is called for each step as it finishes, in plan
+	// order, so a caller prints its lines while the run goes on.
+	OnStep func(StepResult)
 }
 
 // StepResult is what happened to one step of the plan.
@@ -140,7 +143,7 @@ The runner sets no propagation and no precondition of its own: it passes the act
 1. Convert the live objects back to entries. Keeps the input, loses nothing visible, but builds the plan from a second-hand list, and 0012 says the plan comes from the persisted inventory.
 2. Build the plan from the record's entries. The discovery read stays, because the prompt needs it to name the claims `--delete-data` deletes.
 
-**Decision**: option 2. Instance delete and uninstall: `rec.Inventory.Entries`, minus every PersistentVolumeClaim unless `--delete-data`. Prune: the prunable stale entries, exactly the slice `pruneStale` passes today (protected entries and kept claims are already split off by `SplitProtected` and `SplitDataClaims`).
+**Decision**: option 2. Instance delete and uninstall: `rec.Inventory.Entries`, minus every PersistentVolumeClaim unless `--delete-data`. `kubernetes.Delete` still accepts a call with no entries (a caller that holds live objects and no record); it then plans over the entries of the live and unreadable objects it was given. Prune: the prunable stale entries, exactly the slice `pruneStale` passes today (protected entries and kept claims are already split off by `SplitProtected` and `SplitDataClaims`).
 
 **Rationale**: the claim rule is the cli's (cli#345), so it is applied before the plan and the plan never sees a kept claim. A kept claim is reported from the discovery read as today, and a claim that is already gone is not reported, as today. The policy is `lifecycle.Policy{Prune: true}` on every path: the user asked for the delete. The owner UUID is the record's `InstanceUUID`, as cli#347 settled, also for prune after an identity change.
 
@@ -155,7 +158,7 @@ The runner sets no propagation and no precondition of its own: it passes the act
 
 **Decision**: option 2.
 
-**Rationale**: no behaviour change. The outcome is a failed step, so the hold verdict holds and the record is kept, as today. An unreadable CRD or Namespace is skipped by the plan before any read, so it is left behind, as today. Option 1 is a fair follow-up, with its own spec change.
+**Rationale**: no behaviour change (confirmed at the proposal gate). `kubernetes.Delete` reports these entries first, before the run, exactly as it does today, so their lines do not move. The plan still holds them: the outcome is a failed step, so the hold verdict holds and the record is kept, as today. An unreadable CRD or Namespace is skipped by the plan before any read, so it is left behind, as today. Option 1 is a fair follow-up, with its own spec change.
 
 ### The stop at a failed discovery request (prune)
 
@@ -213,13 +216,12 @@ opm instance apply / opm module apply (prune)
 
 ### Lines and codes that change
 
-Command syntax, flags, the prompt, every status word, every reason and every closing line stay. These are the only differences:
+Command syntax, flags, the prompt, every status word, every reason and every closing line stay. These are the only differences (the proposal named a third, the position of the error line of an unreadable object; the build keeps that line where it is):
 
 | # | Command | Today | With this change | Reason |
 | --- | --- | --- | --- | --- |
-| 1 | `opm instance delete`, `opm operator uninstall` | The error line of an object the discovery read could not read is printed first, before any `deleted` line | The same line, in the object's place in the delete order | The plan reports steps in plan order |
-| 2 | `opm instance delete`, `opm operator uninstall`, debug level only | A recorded object that was already gone at the discovery read prints nothing | The debug line `resource already gone` | The plan is built from the record, so it reads that entry and finds it absent |
-| 3 | all three | Cannot occur | `reading <Kind>/<name>: reading <object> returned <other object>; not deleted`, counted as a failed object | The plan refuses to judge a read that returned another object than the step's. A conforming API server never does this |
+| 1 | `opm instance delete`, `opm operator uninstall`, debug level only | A recorded object that was already gone at the discovery read prints nothing | The debug line `resource already gone` | The plan is built from the record, so it reads that entry and finds it absent |
+| 2 | all three | Cannot occur | `reading <Kind>/<name>: reading <object> returned <other object>; not deleted`, counted as a failed object | The plan refuses to judge a read that returned another object than the step's. A conforming API server never does this |
 
 No exit code changes:
 
@@ -238,7 +240,7 @@ Nothing here changes, and a script sees no difference:
 
 - **Foreground propagation.** The cli has sent it since its first delete command. The delete call returns when the API server has accepted it; the object is then Terminating until the garbage collector has removed its dependents.
 - **Order.** Descending kind weight, stable, as today. Both the cli and the plan sort with the library's `object.Sort`.
-- **No wait.** `opm instance delete` and `opm operator uninstall` report an object as `deleted` when its delete is accepted, delete the record, and exit. They do not wait for the object to disappear (`operator-lifecycle`: "SHALL NOT wait for deletion to complete"). A script that needs the objects gone after `opm instance delete` must wait itself, for example with `kubectl wait --for=delete`. That was true before this change.
+- **Waiting.** `opm instance delete` and `opm operator uninstall` report an object as `deleted` when its delete is accepted, delete the record, and exit, as today. A script that needs the objects gone after `opm instance delete` waits itself, for example with `kubectl wait --for=delete`. That was true before this change. This change does not decide whether the cli waits later.
 
 ### An object that holds a finalizer nobody removes
 
@@ -247,9 +249,9 @@ The delete of such an object is accepted: the API server sets its `deletionTimes
 - **How long the cli waits**: it does not wait.
 - **What it prints**: the object's line with the status `deleted`, then the closing line `Instance deleted` (or the prune's normal lines).
 - **Exit code**: 0.
-- **What is left**: the object stays Terminating. After `opm instance delete` the record is gone, so no opm command tracks or retries it. After a prune the entry is out of the written record. A later first apply of an instance that renders the same object stops with the "is terminating (deletionTimestamp set)" error of the first-install check (`internal/inventory/stale.go:72`); `opm operator install` waits for it under `--timeout`.
+- **What is left**: the object stays Terminating. After `opm instance delete` the record is gone, so no opm command tracks or retries it. After a prune the entry is out of the written record. `opm operator install` waits for a terminating object of its render under `--timeout`.
 
-This is today's behaviour, and the package gives no other: its hold verdict is about the instance, and it counts an accepted delete as deleted. Whether the cli should wait is owner question 1.
+This is today's behaviour, and the package gives no other: its hold verdict is about the instance, and it counts an accepted delete as deleted. The gate ruled that this change adds no wait and that the specs do not forbid one.
 
 ## What of cli#347 this replaces, and what stays
 
@@ -270,7 +272,7 @@ Kept:
 - `TestDeleteCallSites` and `tests/integration/delete-ownership`
 - every spec requirement cli#347 wrote: none is modified
 
-The two changes do not fight over files as long as `guard-every-apply-by-ownership` lands first: it works in `internal/workflow/apply` (the apply stages) and `internal/operator` (install), this one in the delete and prune functions of the same packages. The implementing agent merges the base that holds it before the first edit.
+`guard-every-apply-by-ownership` merged as cli#349 and the delete prompt order as cli#348. The branch holds both (merge of `origin/main` at `3cba1982`). cli#349 moved the first-install check out of `internal/inventory/stale.go` and left the prune functions as cli#347 wrote them.
 
 ## Error handling
 
@@ -286,7 +288,7 @@ The two changes do not fight over files as long as `guard-every-apply-by-ownersh
 - Trust boundary: the API server's answers. The cluster content is untrusted input to the verdict; the verdict itself is the library's.
 - Threats and mitigations: a delete of an object the instance does not own (every step is judged by `ownership.CanDelete` inside `Advance`; the cli cannot skip it); a delete of an object recreated since the read (UID precondition from the action); a delete added later that bypasses the plan (`TestDeleteCallSites`, with the runner as the only instance delete site); loss of the record while objects remain (release verdict).
 - The change adds no credential, no network endpoint and no input. It removes a place where the cli could decide a delete on its own.
-- Residual risk: an object held by a finalizer is reported as deleted and is no longer tracked. Unchanged by this change; owner: the cli maintainers, through owner question 1.
+- Residual risk: an object held by a finalizer is reported as deleted and is no longer tracked. Unchanged by this change; owner: the cli maintainers, in a later change on waiting.
 
 ## Risks / Trade-offs
 
@@ -302,15 +304,8 @@ No user migration. Rollback is a revert of the PR. The change is three sections,
 
 ## Open Questions
 
-Owner decisions, each with a recommendation:
+None. The proposal gate (2026-10-08) ruled on the three questions of the proposal:
 
-1. **Should `opm instance delete` wait for the deleted objects to disappear?**
-   - a. No, as today. The command stays fire-and-report. (Recommended for this change: the brief keeps output and exit codes, and flags are out of scope.)
-   - b. Yes, in a follow-up change: wait under `--timeout`, name the objects still Terminating, exit non-zero and keep the record. This is the only way a stuck finalizer becomes visible; it changes output, exit codes and the meaning of `--timeout`, so it needs its own proposal. (Recommended as the next step.)
-   - c. Yes, in this change. Not recommended: it makes this refactor a behaviour change.
-2. **An entry the discovery read could not read: keep it a failure, or let the plan read it again?**
-   - a. Keep it a failure with no second read, as cli#338 specified. (Recommended: no behaviour change.)
-   - b. Read again; a transient read error then no longer fails the delete. Needs a `deploy` and `operator-lifecycle` spec change.
-3. **Does this change claim 0012:D4 in the delivery log?**
-   - a. No decision claimed; the log takes 0012:D4 when the operator's deletion adoption has merged too. (Recommended; it follows the ownership change.)
-   - b. Claim 0012:D4 now for the cli half.
+1. `opm instance delete` does not wait for deleted objects in this change. The specs describe when a resource counts as deleted and do not forbid a later, bounded wait.
+2. An entry the discovery read could not read stays a failure, with no second read, as cli#338 specified.
+3. This change claims no decision of 0012 in the delivery log; 0012:D4 is claimed after the operator's deletion adoption.
