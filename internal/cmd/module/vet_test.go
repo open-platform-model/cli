@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/open-platform-model/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/cuemod/cuemodtest"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 	"github.com/open-platform-model/cli/internal/output"
 )
@@ -41,7 +42,7 @@ func TestNewModuleVetCmd_NoLocalVerboseFlag(t *testing.T) {
 // an underscore, which the default instance name hyphenates. The fixture imports
 // opmodel.dev/core@v2, so it resolves only when a registry (or a warm CUE
 // cache) is available; without one the core schema load fails with a
-// connectivity error before the vet check is reached, and the test skips
+// connectivity or no-registry error before the vet check is reached, and the test skips
 // rather than false-failing — matching the repo's other registry-backed tests.
 func TestModVet_ValidModule(t *testing.T) {
 	fixtureDir := filepath.Join("..", "..", "..", "tests", "fixtures", "valid", "simple-module")
@@ -69,7 +70,8 @@ func TestModVet_ValidModule(t *testing.T) {
 
 	err := cmd.Execute()
 	var exitErr *opmexit.ExitError
-	if errors.As(err, &exitErr) && exitErr.Code == opmexit.ExitConnectivityError {
+	var noRegistry *config.NoRegistryError
+	if errors.As(err, &noRegistry) || (errors.As(err, &exitErr) && exitErr.Code == opmexit.ExitConnectivityError) {
 		t.Skipf("core@v2 not resolvable (registry/cache unavailable?): %v", err)
 	}
 	require.NoError(t, err, "identity, #config and a zero-object render all pass")
@@ -200,4 +202,56 @@ language: {
 	}
 
 	return tmpHome, cleanup
+}
+
+// unusableCUECache points CUE_CACHE_DIR at a regular file, so a module fetch
+// fails before it asks any registry: the failing schema load needs no network.
+func unusableCUECache(t *testing.T) {
+	t.Helper()
+	notADir := filepath.Join(t.TempDir(), "cache")
+	require.NoError(t, os.WriteFile(notADir, nil, 0o600))
+	t.Setenv("CUE_CACHE_DIR", notADir)
+}
+
+// With no registry configured anywhere, a core schema that cannot be loaded
+// is reported as the missing configuration (exit 2, opm config init), not as
+// a connectivity failure.
+func TestModVet_NoRegistryConfigured(t *testing.T) {
+	unusableCUECache(t)
+	t.Setenv("OPM_REGISTRY", "")
+	t.Setenv("CUE_REGISTRY", "")
+
+	configPath := filepath.Join(t.TempDir(), "config.cue")
+	cmd := NewModuleVetCmd(&config.GlobalConfig{ConfigPath: configPath})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{t.TempDir()})
+
+	err := cmd.Execute()
+	var exitErr *opmexit.ExitError
+	require.ErrorAs(t, err, &exitErr)
+	assert.Equal(t, opmexit.ExitValidationError, exitErr.Code, "%v", err)
+	assert.Contains(t, err.Error(), "no registry is configured: loading core schema: ")
+	assert.Contains(t, err.Error(), "the registry field of "+configPath)
+	assert.Contains(t, err.Error(), "opm config init")
+}
+
+// A run with only CUE_REGISTRY set has a registry: the same failure keeps its
+// connectivity exit code and is not called a missing configuration.
+func TestModVet_OnlyCUERegistryIsConfigured(t *testing.T) {
+	unusableCUECache(t)
+	t.Setenv("OPM_REGISTRY", "")
+	t.Setenv("CUE_REGISTRY", cuemodtest.UnreachableRegistry)
+
+	cmd := NewModuleVetCmd(&config.GlobalConfig{})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{t.TempDir()})
+
+	err := cmd.Execute()
+	var exitErr *opmexit.ExitError
+	require.ErrorAs(t, err, &exitErr)
+	assert.Equal(t, opmexit.ExitConnectivityError, exitErr.Code, "%v", err)
+	assert.NotContains(t, err.Error(), "no registry is configured")
+	assert.Contains(t, err.Error(), "loading core schema: ")
 }

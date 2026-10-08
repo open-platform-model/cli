@@ -1,19 +1,28 @@
 package cmdutil
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/open-platform-model/cli/internal/config"
+	"github.com/open-platform-model/cli/internal/cuemod/cuemodtest"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 	"github.com/open-platform-model/cli/internal/publish"
 )
 
 // TestPublishError_ExitCodes pins the pipeline-error → exit-code mapping:
-// registry unreachability is 3, anything else unexpected is 1.
+// a refused registry credential is 4, any other failed registry operation
+// is 3, anything else unexpected is 1.
 func TestPublishError_ExitCodes(t *testing.T) {
 	tests := []struct {
 		name string
@@ -38,6 +47,21 @@ func TestPublishError_ExitCodes(t *testing.T) {
 			want: opmexit.ExitConnectivityError,
 		},
 		{
+			name: "a registry answer maps to ExitConnectivityError",
+			err:  &publish.RegistryError{Op: "listing published versions", Err: errors.New("503 Service Unavailable")},
+			want: opmexit.ExitConnectivityError,
+		},
+		{
+			name: "a refused credential maps to ExitPermissionDenied",
+			err:  &publish.RegistryError{Op: "push", Unauthorized: true, Err: errors.New("401 Unauthorized")},
+			want: opmexit.ExitPermissionDenied,
+		},
+		{
+			name: "a wrapped refused credential still maps to ExitPermissionDenied",
+			err:  fmt.Errorf("publishing: %w", &publish.RegistryError{Op: "push", Unauthorized: true, Err: errors.New("403 Forbidden")}),
+			want: opmexit.ExitPermissionDenied,
+		},
+		{
 			name: "anything else maps to ExitGeneralError",
 			err:  errors.New("zipping failed"),
 			want: opmexit.ExitGeneralError,
@@ -50,6 +74,91 @@ func TestPublishError_ExitCodes(t *testing.T) {
 			var exitErr *opmexit.ExitError
 			require.ErrorAs(t, err, &exitErr)
 			assert.Equal(t, tt.want, exitErr.Code)
+		})
+	}
+}
+
+// TestPublishError_LoginHint: only a refused credential points to the login
+// command, and the registry's own answer stays in the message.
+func TestPublishError_LoginHint(t *testing.T) {
+	const hint = "opm registry login"
+	cause := errors.New("401 Unauthorized: unauthorized: authentication required")
+
+	refused := publishError(&publish.RegistryError{Op: "pushing example.com/modules/demo:v1.2.0", Unauthorized: true, Host: "ghcr.io", Err: cause})
+	assert.True(t, strings.HasSuffix(refused.Error(), "then retry:  opm registry login ghcr.io"), "the hint names the host: %s", refused)
+	noHost := publishError(&publish.RegistryError{Op: "push", Unauthorized: true, Err: cause})
+	assert.True(t, strings.HasSuffix(noHost.Error(), "then retry:  opm registry login"), "no known host: the bare command: %s", noHost)
+	assert.Contains(t, refused.Error(), "registry refused the credentials (authentication or permission)")
+	assert.Contains(t, refused.Error(), "pushing example.com/modules/demo:v1.2.0")
+	assert.Contains(t, refused.Error(), cause.Error())
+	assert.Contains(t, refused.Error(), hint)
+	assert.NotContains(t, refused.Error(), "unreachable")
+	assert.ErrorIs(t, refused, cause, "the cause stays wrapped")
+
+	for _, err := range []error{
+		&publish.RegistryError{Op: "push", Err: errors.New("503 Service Unavailable")},
+		&publish.ConnectivityError{Op: "push", Err: errors.New("dial tcp: refused")},
+		errors.New("zipping failed"),
+	} {
+		assert.NotContains(t, publishError(err).Error(), hint, "%v", err)
+	}
+}
+
+// runPublish runs the shared publish body on an empty directory: every case
+// below fails at the core schema fetch, before the directory is read.
+func runPublish(t *testing.T, cfg *config.GlobalConfig) error {
+	t.Helper()
+	cmd := &cobra.Command{}
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	return RunPublish(cmd, cfg, publish.KindModule, []string{t.TempDir()}, &PublishFlags{DryRun: true})
+}
+
+// With no registry configured anywhere, a core schema that cannot be loaded
+// is reported as the missing configuration (exit 2, opm config init), not as
+// an unreachable registry.
+func TestRunPublish_NoRegistryConfigured(t *testing.T) {
+	// CUE_CACHE_DIR names a regular file, so the fetch fails before it asks
+	// any registry and the test needs no network.
+	notADir := filepath.Join(t.TempDir(), "cache")
+	require.NoError(t, os.WriteFile(notADir, nil, 0o600))
+	t.Setenv("CUE_CACHE_DIR", notADir)
+	t.Setenv("CUE_REGISTRY", "")
+
+	err := runPublish(t, &config.GlobalConfig{})
+	var exitErr *opmexit.ExitError
+	require.ErrorAs(t, err, &exitErr)
+	assert.Equal(t, opmexit.ExitValidationError, exitErr.Code, "%v", err)
+	assert.Contains(t, err.Error(), "no registry is configured: loading core schema: ")
+	assert.Contains(t, err.Error(), "opm config init")
+	assert.NotContains(t, err.Error(), "unreachable")
+}
+
+// The core schema fetch is classified like the lookup and the push: only no
+// response is unreachable, and a refused credential exits 4 and points to
+// the login.
+func TestRunPublish_SchemaFetchFailureIsNamed(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		registry func(t *testing.T) string
+		want     string
+		code     int
+		login    bool
+	}{
+		{"refused connection", func(*testing.T) string { return cuemodtest.UnreachableRegistry }, "registry unreachable: loading core schema: ", opmexit.ExitConnectivityError, false},
+		{"401", func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusUnauthorized) }, "registry refused the credentials (authentication or permission): loading core schema: ", opmexit.ExitPermissionDenied, true},
+		{"503", func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusServiceUnavailable) }, "registry operation failed: loading core schema: ", opmexit.ExitConnectivityError, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cuemodtest.ColdCache(t)
+			registry := tc.registry(t)
+			err := runPublish(t, &config.GlobalConfig{Registry: registry})
+			var exitErr *opmexit.ExitError
+			require.ErrorAs(t, err, &exitErr)
+			assert.Equal(t, tc.code, exitErr.Code, "%v", err)
+			assert.Contains(t, err.Error(), tc.want)
+			// The hint names the host the schema fetch was routed to.
+			assert.Equal(t, tc.login, strings.HasSuffix(err.Error(), "opm registry login "+registry), "%v", err)
 		})
 	}
 }

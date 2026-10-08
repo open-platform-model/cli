@@ -39,17 +39,22 @@ func (f *PublishFlags) AddTo(cmd *cobra.Command) {
 // RunPublish is the shared body of both publish commands: resolve core's
 // #IdentityPackage from the kernel schema cache, compute the plan, print it,
 // print any refusals through the validation funnel, and push on GO outside
-// --dry-run. Exit codes: refusal 2, registry unreachable 3, unexpected 1.
+// --dry-run. Exit codes: refusal 2 (and a core schema that cannot be loaded
+// because no registry is configured), failed registry operation 3, refused
+// registry credential 4, unexpected 1.
 func RunPublish(cmd *cobra.Command, cfg *config.GlobalConfig, kind publish.Kind, args []string, flags *PublishFlags) error {
 	dir := ResolveModulePath(args)
 
 	k := config.NewKernel(cfg.Registry)
 	schemaVal, err := k.SchemaCache().Get()
 	if err != nil {
+		if noReg := NoRegistryError(cfg, "loading core schema", err); noReg != nil {
+			return noReg
+		}
 		// The schema fetch is a registry round-trip like the lookup and the
-		// push: failing to reach it is a connectivity failure, not a verdict
-		// on the artifact.
-		return publishError(&publish.ConnectivityError{Op: "loading core schema", Err: err})
+		// push: its failure is a registry failure, not a verdict on the
+		// artifact.
+		return publishError(publish.RegistryFailure("loading core schema", publish.RegistryHost(cfg.Registry, coreModulePath), err))
 	}
 	identitySchema := schemaVal.LookupPath(cue.MakePath(cue.Def("IdentityPackage")))
 	if !identitySchema.Exists() {
@@ -154,14 +159,43 @@ func PrintRefusals(refusals []publish.Refusal) {
 	}
 }
 
-// publishError maps pipeline errors to exit codes: registry unreachability
-// is a connectivity failure (3) — the artifact was never judged — and
-// anything else is unexpected (1).
+// coreModulePath is the module the core schema is fetched from; the registry
+// mapping routes it to the host a refused schema fetch names.
+const coreModulePath = "opmodel.dev/core"
+
+// registryLoginHint is the next step after a registry refused the caller:
+// the login command for the host the failed operation was routed to. With no
+// known host it is the bare command, which resolves the configured mapping
+// and lists the hosts when it names several.
+func registryLoginHint(host string) string {
+	const hint = "Log in to the registry, then retry:  opm registry login"
+	if host == "" {
+		return hint
+	}
+	return hint + " " + host
+}
+
+// publishError maps pipeline errors to exit codes. A registry that refused
+// the caller (a *publish.RegistryError marked Unauthorized: a 401 or 403) is
+// a permission failure, exit 4, and gains the login hint. Any other failed
+// registry operation is exit 3, whether the registry gave no response
+// (*publish.ConnectivityError) or answered with another failure
+// (*publish.RegistryError). In none of them was the artifact judged.
+// Anything else is unexpected (1).
 func publishError(err error) error {
-	code := opmexit.ExitGeneralError
+	var regErr *publish.RegistryError
+	if errors.As(err, &regErr) {
+		if regErr.Unauthorized {
+			return &opmexit.ExitError{
+				Code: opmexit.ExitPermissionDenied,
+				Err:  fmt.Errorf("%w\n  %s", err, registryLoginHint(regErr.Host)),
+			}
+		}
+		return &opmexit.ExitError{Code: opmexit.ExitConnectivityError, Err: err}
+	}
 	var connErr *publish.ConnectivityError
 	if errors.As(err, &connErr) {
-		code = opmexit.ExitConnectivityError
+		return &opmexit.ExitError{Code: opmexit.ExitConnectivityError, Err: err}
 	}
-	return &opmexit.ExitError{Code: code, Err: err}
+	return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err}
 }
