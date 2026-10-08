@@ -116,12 +116,13 @@ func platformBuildHint(dir, registry string, err error) string {
 	// A registry that refused the credentials (a 401, or a 403 that reaches
 	// the library as a refusal): no other pin cures it, the user logs in.
 	// The refused fetch may be any module of the dependency graph, so the
-	// host is named only when the mapping holds exactly one.
+	// host is named only when every declared dependency routes to one.
 	case cuemod.IsUnauthorized(err):
-		return RegistryLoginHint(soleRegistryHost(registry))
+		return RegistryLoginHint(platformRegistryHost(dir, registry))
 	// Any other failed registry interaction (an unpublished pin, an archive
-	// blob 404, a registry that gives no response) and a dependency that does not resolve (an import no module provides, an
-	// ambiguous import, a dependency module file that does not parse) get
+	// blob 404, a registry that gives no response) and a dependency that
+	// does not resolve (an import no module provides, an ambiguous import,
+	// a dependency module file that does not parse) get
 	// this hint. Both are read from the library's typed classification,
 	// never from the message (0021:D8:R12). A failed import that is neither,
 	// such as a package-name mismatch, is a defect in the platform module's

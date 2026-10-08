@@ -55,22 +55,27 @@ is empty for it (observed in the spike), and the host is only in the message tex
 **Options considered**:
 
 1. Read the host from the message text. Refused: a text match.
-2. Route each dependency the platform's `cue.mod/module.cue` declares to its host and name
-   the host when all agree. Not certain: the refused fetch may be a transitive dependency
-   that routes elsewhere.
-3. Name the host when the configured registry mapping holds exactly one host; otherwise print
-   the bare `opm registry login`.
+2. Name the host when the configured registry mapping holds exactly one host; otherwise print
+   the bare `opm registry login`. First choice, dropped after review: CUE adds its central
+   registry as the catch-all of every prefix mapping, so the cli's default mapping
+   (`config.DefaultRegistry`) and every `prefix=host` mapping hold two hosts, and the default
+   setup would never get a host.
+3. Route each dependency the platform's `cue.mod/module.cue` declares to its host through the
+   mapping and name the host when all agree; otherwise print the bare command.
 
 **Decision**: option 3.
-**Rationale**: with one host the name is certain. The bare command resolves the same mapping
-and, with several hosts, refuses and lists each as a runnable `opm registry login <host>`
-line, so the user still reaches the right command and the cli never names a host the refusal
-did not come from.
+**Rationale**: a tidy CUE module file lists every module of the build, the indirect ones
+included, so when all of them route to one host the refusal came from that host. A platform
+on `opmodel.dev` modules under the default mapping names `ghcr.io`. Remaining limit: a module
+file that is not tidy can miss the dependency that was refused; the hint then names the host
+of the declared ones. With dependencies on several hosts, none declared, or a module file or
+mapping that does not parse, the hint is the bare command, which resolves the mapping and
+lists each host as a runnable `opm registry login <host>` line.
 
 ```go
 // internal/config
 func RegistryLoginHint(host string) string // "Log in to the registry, then retry:  opm registry login[ <host>]"
-func soleRegistryHost(registry string) string // "" unless the mapping holds exactly one host; "+insecure" for plain HTTP
+func platformRegistryHost(dir, registry string) string // the one host every declared dependency routes to, else ""; "+insecure" for plain HTTP
 ```
 
 ### Where the hint text lives
@@ -140,7 +145,10 @@ Exit codes of `opm platform check` for a build failure: 4 for a refused registry
 
 - A script that read exit 2 as "bad credentials" sees 4. → Stated in the proposal and the PR
   body; the help names the code.
-- A mapping with several hosts gives the bare command, one step more for the user. → The bare
-  command lists the hosts as runnable lines.
+- A platform whose declared dependencies route to several hosts gets the bare command, one
+  step more for the user. → The bare command lists the hosts as runnable lines.
+- The exit code now follows the library's classification, its text fallback included: a
+  platform whose own CUE error text holds a registry refusal form would read as a refusal. →
+  Low likelihood; the reading of error text is the library's alone.
 - The three known limits still print the pin hint. → Pinned by tests that fail when the
   library types those answers as refusals.

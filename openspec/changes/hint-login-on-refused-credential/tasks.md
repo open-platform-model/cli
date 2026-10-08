@@ -6,3 +6,9 @@
 - [x] 1.4 `internal/cmd/platform/check.go`: exit 4 when the build error is `ErrPermission`, exit 2 otherwise; a refused credential prints whole (the registry's answer and the hint), every other cause through the validation funnel as before; the help states the code; a command test drives a 401 (exit 4, login hint, no report) and holds exit 2 and today's print for an unpublished pin
 - [x] 1.5 `task docs:bundle:check` decides whether the help change needs a regenerated reference; no page under `docs/site` describes a platform build failure
 - [x] 1.6 `task fmt`, `task vet`, `task lint`, `task openspec:check`, `task docs:bundle:check`, `task test:unit` and `task cascade:wiring:check` green, then commit `fix(config): hint the registry login when a platform build meets a refused credential`
+
+## 2. Review fixes
+
+- [x] 2.1 `internal/config/registry_login.go`: name the host every dependency the platform's module file declares routes to, in place of the one host of the mapping, so the default mapping and a prefix mapping get a host; `TestPlatformRegistryHost` and the two prefix-mapping rows of `TestPlatformBuildHint_RefusedCredential` hold it
+- [x] 2.2 Delta specs, proposal and design state the condition under which the host is named
+- [x] 2.3 `task fmt`, `task vet`, `task lint`, `task openspec:check`, `task docs:bundle:check`, `task test:unit` and `task cascade:wiring:check` green, then commit `fix(config): name the registry host the platform's dependencies route to`

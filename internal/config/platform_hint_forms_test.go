@@ -178,30 +178,47 @@ func blobAnswers(status int) func(t *testing.T) string {
 // TestPlatformBuildHint_RefusedCredential holds the login hint, and the
 // permission cause, for a platform build the registry refuses. Before, each
 // row got "Pin a published build in <dir>/cue.mod/module.cue, then try
-// again" and the validation cause. The hint names the host when the registry
-// mapping holds exactly one, and is the bare command when it holds two.
+// again" and the validation cause. The hint names the host every declared
+// dependency routes to, also under a prefix mapping with a catch-all, the
+// shape of the cli's default mapping. It is the bare command when the
+// declared dependencies route to two hosts.
 func TestPlatformBuildHint_RefusedCredential(t *testing.T) {
-	sole := func(registry string) string { return hintLogin + " " + registry }
+	sole := func(host string) string { return hintLogin + " " + host }
 	bare := func(string) string { return hintLogin }
+	// otherDep is declared and never imported: it routes to the catch-all.
+	const otherDep = "deps: \"other.example/x@v0\": v: \"v0.1.0\"\n"
+	var refusing string
+	prefixed := func(t *testing.T) string {
+		refusing = cuemodtest.StatusRegistry(t, http.StatusUnauthorized)
+		return "example.com=" + refusing + ",registry.invalid"
+	}
 	for _, tc := range []struct {
 		name     string
 		registry func(t *testing.T) string
+		deps     string
 		contains string
 		want     func(registry string) string
 	}{
 		{
 			name:     "registry answers 401",
 			registry: func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusUnauthorized) },
+			deps:     depPinned,
 			contains: "401 Unauthorized",
 			want:     sole,
 		},
-		{"archive blob answers 401", blobAnswers(http.StatusUnauthorized), "401 Unauthorized", sole},
-		{"archive blob answers 403", blobAnswers(http.StatusForbidden), "403 Forbidden", sole},
+		{"archive blob answers 401", blobAnswers(http.StatusUnauthorized), depPinned, "401 Unauthorized", sole},
+		{"archive blob answers 403", blobAnswers(http.StatusForbidden), depPinned, "403 Forbidden", sole},
 		{
-			name: "registry mapping with two hosts",
-			registry: func(t *testing.T) string {
-				return "example.com/dep=" + cuemodtest.StatusRegistry(t, http.StatusUnauthorized) + ",registry.invalid"
-			},
+			name:     "prefix mapping with a catch-all, dependencies on one host",
+			registry: prefixed,
+			deps:     depPinned,
+			contains: "401 Unauthorized",
+			want:     func(string) string { return sole(refusing) },
+		},
+		{
+			name:     "prefix mapping with a catch-all, dependencies on two hosts",
+			registry: prefixed,
+			deps:     depPinned + otherDep,
 			contains: "401 Unauthorized",
 			want:     bare,
 		},
@@ -209,7 +226,7 @@ func TestPlatformBuildHint_RefusedCredential(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("DOCKER_CONFIG", t.TempDir())
 			cuemodtest.ColdCache(t)
-			dir := hintPlatform(t, depPinned, importsDep)
+			dir := hintPlatform(t, tc.deps, importsDep)
 			registry := tc.registry(t)
 			_, err := BuildPlatformModule(context.Background(), dir, registry)
 			require.Error(t, err)
@@ -257,4 +274,31 @@ func TestPlatformBuildHint_RefusalNotTypedAsOne_Pinned(t *testing.T) {
 			assert.Contains(t, detail.Hint, hintPin, "the gap closed: move the row to TestPlatformBuildHint_RefusedCredential")
 		})
 	}
+}
+
+// TestPlatformRegistryHost holds the host the login hint names, without a
+// registry: the one host every declared dependency routes to, and none when
+// they route to several, when none is declared, or when the module file is
+// not there. Under the cli's default mapping a platform on opmodel.dev
+// modules names ghcr.io, although that mapping holds two hosts.
+func TestPlatformRegistryHost(t *testing.T) {
+	const core = "deps: \"opmodel.dev/core@v2\": v: \"v2.0.0\"\n"
+	for _, tc := range []struct {
+		name     string
+		deps     string
+		registry string
+		want     string
+	}{
+		{"default mapping, opmodel.dev dependencies", core + "deps: \"opmodel.dev/catalogs/opm@v4\": v: \"v4.0.0\"\n", DefaultRegistry, "ghcr.io"},
+		{"default mapping, one dependency on the catch-all", core + "deps: \"example.com/dep@v0\": v: \"v0.2.0\"\n", DefaultRegistry, ""},
+		{"one catch-all registry over plain HTTP", core, "localhost:5000+insecure", "localhost:5000+insecure"},
+		{"no dependency declared", "", DefaultRegistry, ""},
+		{"mapping that does not parse", core, "=,", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := hintPlatform(t, tc.deps, "package platform\n")
+			assert.Equal(t, tc.want, platformRegistryHost(dir, tc.registry))
+		})
+	}
+	assert.Empty(t, platformRegistryHost(t.TempDir(), DefaultRegistry), "no module file")
 }

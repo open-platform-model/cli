@@ -1,6 +1,13 @@
 package config
 
-import "cuelang.org/go/mod/modconfig"
+import (
+	"os"
+	"path/filepath"
+	"strings"
+
+	"cuelang.org/go/mod/modconfig"
+	"cuelang.org/go/mod/modfile"
+)
 
 // RegistryLoginHint is the next step after a registry refused the caller:
 // the login command for host, in the form `opm registry login` takes. With
@@ -14,23 +21,49 @@ func RegistryLoginHint(host string) string {
 	return hint + " " + host
 }
 
-// soleRegistryHost names the one host the registry mapping (CUE_REGISTRY
-// syntax; empty reads CUE_REGISTRY from the environment) holds, in the form
-// `opm registry login` takes: the host, with +insecure when it is served
-// over plain HTTP. It returns "" when the mapping holds several hosts, none,
-// or does not parse: a refusal met somewhere in a dependency graph is then
-// not known to come from any one of them.
-func soleRegistryHost(registry string) string {
+// platformRegistryHost names the registry host a platform module's
+// dependencies are fetched from, in the form `opm registry login` takes: the
+// host, with +insecure when it is served over plain HTTP. It routes every
+// dependency the module file at dir declares through the registry mapping
+// (CUE_REGISTRY syntax; empty reads CUE_REGISTRY from the environment) and
+// answers only when all of them reach one host. A refused fetch is met
+// somewhere in the dependency graph and its error names no host, so with
+// dependencies on several hosts, with none declared, or with a module file
+// or a mapping that does not parse, it returns "": no single host is known
+// to be the one that refused.
+//
+// The mapping's own host count is not the measure: CUE adds its central
+// registry as the catch-all of every prefix mapping, the cli's default
+// included, so such a mapping always holds two hosts.
+func platformRegistryHost(dir, registry string) string {
+	modPath := filepath.Join(dir, filepath.FromSlash(PlatformModuleFileName))
+	data, err := os.ReadFile(modPath)
+	if err != nil {
+		return ""
+	}
+	mf, err := modfile.ParseNonStrict(data, modPath)
+	if err != nil {
+		return ""
+	}
 	resolver, err := modconfig.NewResolver(&modconfig.Config{CUERegistry: registry})
 	if err != nil {
 		return ""
 	}
-	hosts := resolver.AllHosts()
-	if len(hosts) != 1 {
-		return ""
+	host := ""
+	for dep, pin := range mf.Deps {
+		base, _, _ := strings.Cut(dep, "@")
+		loc, ok := resolver.ResolveToLocation(base, pin.Version)
+		if !ok || loc.Host == "" {
+			return ""
+		}
+		h := loc.Host
+		if loc.Insecure {
+			h += "+insecure"
+		}
+		if host != "" && h != host {
+			return ""
+		}
+		host = h
 	}
-	if hosts[0].Insecure {
-		return hosts[0].Name + "+insecure"
-	}
-	return hosts[0].Name
+	return host
 }

@@ -12,8 +12,11 @@ place that picks the hint, and publish and `module vet` already answer the same 
 - A platform module build that fails on a refused registry credential (a 401, or a 403 that
   reaches the cli as a refusal) gets the hint
   `Log in to the registry, then retry:  opm registry login <host>`, the text publish prints.
-  The host is named when the configured registry mapping holds exactly one host. With several
-  hosts, or none, the hint is the bare `opm registry login`, which lists the hosts itself.
+  The host is named when every dependency the platform's `cue.mod/module.cue` declares routes
+  to one registry host through the configured mapping; that covers the cli's default mapping
+  for a platform on `opmodel.dev` modules. When the declared dependencies route to several
+  hosts, or none is declared, the hint is the bare `opm registry login`, which lists the hosts
+  of the mapping itself.
 - `opm platform check` exits 4 for that failure. Before, it exited 2. Its help states the
   code.
 - Every other cause keeps its hint and exit code 2: a missing version, a registry that gives

@@ -7,8 +7,8 @@ When a platform module fails to build, the cli SHALL add one hint chosen from th
 - the package is not a single `#Platform` package: the hint names the expected shape;
 - the registry refused the credentials (a 401 answer, or a 403 answer that reaches the cli as
   a refusal): the hint says to log in to the registry and names the command
-  `opm registry login`, followed by the registry host when the configured registry mapping
-  holds exactly one host;
+  `opm registry login`, followed by the registry host when every dependency the platform's
+  `cue.mod/module.cue` declares routes to one host through the configured registry mapping;
 - any other registry fetch failed, or a dependency did not resolve (an import no module
   provides, an ambiguous import, a dependency module file that does not parse): the hint says
   to pin a published build in the platform's `cue.mod/module.cue`;
@@ -33,16 +33,23 @@ exit code 2, and its hint SHALL NOT change the exit code.
 
 #### Scenario: A refused credential
 
-- **WHEN** the registry answers 401 while the platform module's imports resolve, and the
-  configured registry mapping holds one host
+- **WHEN** the registry answers 401 while the platform module's imports resolve, and every
+  dependency the platform declares routes to one registry host
 - **THEN** the build fails with exit code 4, the hint is
   `Log in to the registry, then retry:  opm registry login <host>` with that host, and the
   hint does not say to pin a published build
 
-#### Scenario: A refused credential with several registry hosts
+#### Scenario: A refused credential under a prefix mapping
 
-- **WHEN** the registry refuses the credentials and the configured registry mapping holds
-  more than one host
+- **WHEN** the registry refuses the credentials, the configured registry mapping routes a
+  module path prefix to one host and everything else to another, and every dependency the
+  platform declares is under that prefix
+- **THEN** the hint names `opm registry login` with the host of the prefix
+
+#### Scenario: A refused credential with dependencies on several registry hosts
+
+- **WHEN** the registry refuses the credentials and the dependencies the platform declares
+  route to more than one host
 - **THEN** the hint names `opm registry login` without a host
 
 #### Scenario: A refusal the cli receives as not found
