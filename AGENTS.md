@@ -129,12 +129,13 @@ Read when entering `cli/`:
 - `hack/docskit-dump/` - the program docs-kit runs to build the cli's docs bundle (`docs-kit.cue`): it prints the cobra command tree through `github.com/open-platform-model/docs-kit/cobradump`, or with `pins` the library, core and opm-controller versions this build compiles in (the linked library, that library's `schema.DefaultSchemaModule`, `controller.PinnedControllerVersion`, the controller release the pinned controller module deploys). Not linked into `opm`; its test keeps the pins equal to `go.mod`, the library's `opm/schema/loader.go` and `internal/controller/pin.go`.
 - `hack/controller-pin/` - the only writer of `internal/controller/pin.go` (`PinnedModuleVersion`, the controller module version `opm controller install` installs by default, and `PinnedControllerVersion`, the controller release that version deploys, read from the module's `controller` package without a render) and of the CRD manifests in `internal/controller/crds/` (the CRDs that version renders for the controller's instance, embedded for the offline `opm controller install --crds-only`): `task controller:pin VERSION=<module version>`. `--check` is release-pin step 5 (G1) and also compares the manifests with a fresh render; `--crds-from <module-dir>` writes only the manifests from a local checkout before a module version is published; `select <max> <cli-version>` is the cascade lane's walk. Not linked into `opm`. Help text and flags are the command reference; check with `task docs:bundle:check`.
 - `internal/dockercfg/` - single-entry read-modify-write of the standard OCI/docker credential file (`auths[host]` upsert; everything else passes through untouched; used by `registry login`).
-- `internal/kubernetes/` - cluster ops, status, apply, delete, events.
+- `internal/kubernetes/` - cluster ops, status, apply, delete, events. `RunDeletion` (`deletion.go`) is the one way an object of an instance is deleted: it performs the reads and deletes that the library's deletion plan names (`opm/k8s/lifecycle`, imported as `lifecycle`), for `instance delete`, `controller uninstall` and prune; the instance record is deleted only on the plan's release verdict (`lifecycle.MayReleaseHold`). `TestDeleteCallSites` (`deletesites_test.go`) lists the only functions that may send a DELETE.
 - `internal/output/` - terminal formatting, log output, tables, manifests.
 - `internal/platform/` - platform-source resolution by precedence (`--platform` dir > cluster Platform CR > a platform generated from the render's own dependency pins; `module build`/`module vet` skip the cluster), cluster-CR and deps module generation into the OPM home cache, catalog version resolution and the write-if-absent Platform seed for `controller install`.
 - `internal/workflow/` - shared render/apply/query orchestration; `render` holds the kernel env and the single `Kernel.Render` call.
 - `pkg/loader/` - local-replacement provenance (module root lookup, `cue.mod/local-module.cue` replacements); instance packages load through the kernel.
 - `pkg/errors/` - shared structured errors; alias as `oerrors`.
+- No decision on the text of an error: a registry fetch or dependency resolution answer is read from the library's typed errors (`liberrors.Classify`, `*FetchError`, `*ResolutionError`; 0021:D8:R12), and a CUE evaluation failure from its error path (`internal/config` `cueErrorUnder`). `TestNoErrorTextMatch` (`pkg/errors/textmatch_refusal_test.go`) refuses a new text match in non-test code and lists the four that stay, each with the typed cause that is missing. It reads syntax, not types: it does not see a message made by formatting the error (`fmt.Sprint(err)`) or one handed to another function as a string, so pass the error, never its text.
 - No local Kubernetes object, label, order, inventory or health package: the object wrapper and its single export, the OPM label vocabulary and the kind-class weight table are the library's `opm/k8s/object` and `opm/k8s/labels` (import the labels as `opmlabels`), and the inventory entry, the component-blind stale set and both digests (inventory and render) are the library's `opm/k8s/inventory` (import it as `k8sinventory`). Readiness (the status vocabulary, the per-kind evaluation, the healthy set and the aggregate) is the library's `opm/k8s/health`, imported as `health`. A `depguard` rule refuses the retired `pkg/core`, `pkg/resourceorder` and `pkg/inventory` paths, and `TestNoLocalHealthEvaluator` (`internal/kubernetes/health_refusal_test.go`) refuses a local readiness evaluator.
 - `tests/integration/` - integration programs via `go run`.
 - `tests/e2e/` - end-to-end Go tests.
@@ -255,7 +256,8 @@ export OPM_REGISTRY="$CUE_REGISTRY"
 
 - `task fmt` - run `go fmt ./...` and `goimports -w .`.
 - `task vet` - run `go vet ./...`.
-- `task lint` - run `golangci-lint run ./...`.
+- `task lint` - run `task lint:config`, then `golangci-lint run ./...`.
+- `task lint:config` - verify `.golangci.yml` against the schema committed under `.github/golangci-lint/`, with no network, and check that `.golangci-lint-version`, that schema and the workflows' use of the golangci-lint action agree (`.github/scripts/lint-config-check.sh`; CI's `Lint` jobs run the same script). `task lint:config:test` is its scenario test.
 - `task lint:fix` - run `golangci-lint run --fix ./...`.
 - `task tidy` - run `go mod tidy`.
 - `task openspec:check` - run `openspec validate --all --strict` over `openspec/` (main specs and active changes); `task openspec:install` installs the pinned openspec CLI once.
@@ -355,6 +357,14 @@ export OPM_REGISTRY="$CUE_REGISTRY"
 - `gocyclo` threshold: 15; refactor before complexity grows.
 - Tests relax `dupl`, `errcheck`, `goconst`, `gosec`.
 - `examples/`, `experiments/`, `third_party/`, `builtin/` excluded from lint/format.
+
+### Moving the golangci-lint version
+
+`.golangci-lint-version` is the only place that names the version CI installs; the action reads it through `version-file`, and no workflow sets `version`. The action's own configuration check stays off (`verify: false`) because it downloads the schema from golangci-lint.run on every run, which failed the required `Lint` job twice on 2026-10-08.
+
+- A patch move (`v2.11.4` to `v2.11.5`): edit `.golangci-lint-version`. The schema is per minor line and stays.
+- A minor or major move: edit `.golangci-lint-version`, replace the schema in `.github/golangci-lint/` with `jsonschema/golangci.jsonschema.json` of `github.com/golangci/golangci-lint` at the new tag, saved as `golangci.vX.Y.jsonschema.json`, remove the old file, and rewrite `SHA256SUMS` (`sha256sum golangci.vX.Y.jsonschema.json > SHA256SUMS` in that directory). Say in the PR body where the file came from, so the reviewer can compare the checksum.
+- `task lint:config` must pass with a local golangci-lint of the same minor line. It uses the hidden `--schema` flag of `golangci-lint config verify`; if a release drops the flag, the check fails on the bump PR and needs a new design, not a silent `verify: false`.
 
 ## Documentation And Output Conventions
 

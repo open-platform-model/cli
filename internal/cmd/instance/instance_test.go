@@ -253,3 +253,19 @@ func TestNewInstanceCmd(t *testing.T) {
 		assert.True(t, subcommands[expected], "instance group should have %q subcommand", expected)
 	}
 }
+
+// The root help points at this command as the example of a command whose
+// exit codes differ, so its own help has to state them.
+func TestNewInstanceStatusCmd_HelpStatesTheExitCodes(t *testing.T) {
+	long := NewInstanceStatusCmd(&config.GlobalConfig{}).Long
+	for _, row := range []string{
+		"0  every tracked resource is healthy",
+		"1  usage error, or the instance record could not be read",
+		"2  a resource is not ready, or a tracked resource could not be read",
+		"3  the cluster could not be reached",
+		"4  permission denied",
+		"5  the instance or its resources were not found",
+	} {
+		assert.Contains(t, long, row)
+	}
+}

@@ -194,6 +194,20 @@ func servedStorageSchema(crd *unstructured.Unstructured) (map[string]any, error)
 	return root, nil
 }
 
+// ModuleInstanceCRDHasField reports whether the storage version of a
+// ModuleInstance CRD object (the first served one when none is marked) has
+// <parent>.<child> in its schema, for example spec.dataPolicy. It is the one
+// reading of the CRD schema: CheckCRDFieldFloor asks it the same way, so two
+// callers cannot disagree about which version counts. A CRD with no version
+// or no schema is an error, not "no such field".
+func ModuleInstanceCRDHasField(crd *unstructured.Unstructured, parent, child string) (bool, error) {
+	root, err := servedStorageSchema(crd)
+	if err != nil {
+		return false, err
+	}
+	return hasSchemaProperty(root, parent, child), nil
+}
+
 // hasSchemaProperty reports whether openAPIV3Schema.properties.<parent>.properties.<child>
 // exists as an object.
 func hasSchemaProperty(root map[string]any, parent, child string) bool {

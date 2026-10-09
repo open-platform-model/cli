@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+
 	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 
 	"github.com/stretchr/testify/assert"
@@ -35,7 +37,8 @@ func emptyClusterClient() *kubernetes.Client {
 		inventory.ModuleInstanceGVR: "ModuleInstanceList",
 	}
 	return &kubernetes.Client{
-		Dynamic: fakedynamic.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), listKinds),
+		Resources: kubetest.Resources(),
+		Dynamic:   fakedynamic.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), listKinds),
 	}
 }
 
@@ -48,12 +51,15 @@ func controllerOwnedRecord() *inventory.Record {
 	}
 }
 
+// confirmYes answers the delete question with yes, as --yes does.
+func confirmYes(controllerClaims) bool { return true }
+
 // Deleting a finalizer-armed ModuleInstance with no controller running does not
 // delete anything — it wedges the CR in Terminating with its workloads
 // orphaned. So the readiness guard refuses rather than proceeding, and it says
 // why.
 func TestDeleteControllerOwned_RefusesWhenControllerIsNotReady(t *testing.T) {
-	err := deleteControllerOwned(context.Background(), emptyClusterClient(), controllerOwnedRecord(),
+	err := deleteControllerOwned(context.Background(), emptyClusterClient(), controllerOwnedRecord(), confirmYes,
 		time.Second, false, output.InstanceLogger("test"))
 
 	require.Error(t, err)
@@ -67,7 +73,7 @@ func TestDeleteControllerOwned_RefusesWhenControllerIsNotReady(t *testing.T) {
 // "would delete" against a down controller would be describing an outcome that
 // cannot happen.
 func TestDeleteControllerOwned_DryRunStillRequiresAReadyController(t *testing.T) {
-	err := deleteControllerOwned(context.Background(), emptyClusterClient(), controllerOwnedRecord(),
+	err := deleteControllerOwned(context.Background(), emptyClusterClient(), controllerOwnedRecord(), confirmYes,
 		time.Second, true, output.InstanceLogger("test"))
 
 	require.Error(t, err)
@@ -101,7 +107,7 @@ func runningControllerObjects() []runtime.Object {
 func fakeClusterClient(objs ...runtime.Object) (*kubernetes.Client, *fakedynamic.FakeDynamicClient) {
 	fake := fakedynamic.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(),
 		map[schema.GroupVersionResource]string{inventory.ModuleInstanceGVR: "ModuleInstanceList"}, objs...)
-	return &kubernetes.Client{Dynamic: fake}, fake
+	return &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: fake}, fake
 }
 
 // A controller applied with kubectl has no instance record; the readiness check
@@ -116,7 +122,7 @@ func TestDeleteControllerOwned_KubectlInstalledControllerIsFound(t *testing.T) {
 
 	var runErr error
 	captureOutput(t, func() {
-		runErr = deleteControllerOwned(context.Background(), client, rec, 5*time.Second, false, output.InstanceLogger("test"))
+		runErr = deleteControllerOwned(context.Background(), client, rec, confirmYes, 5*time.Second, false, output.InstanceLogger("test"))
 	})
 	require.NoError(t, runErr)
 
@@ -199,12 +205,12 @@ func TestExecuteInstanceDelete_LeavesNamespaceBehind(t *testing.T) {
 			fake := fakedynamic.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(),
 				map[schema.GroupVersionResource]string{inventory.ModuleInstanceGVR: "ModuleInstanceList"},
 				cm.DeepCopy(), foreign.DeepCopy(), ns.DeepCopy(), mi.DeepCopy())
-			client := &kubernetes.Client{Dynamic: fake}
+			client := &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: fake}
 
 			var runErr error
 			out := captureOutput(t, func() {
 				runErr = executeInstanceDelete(ctx, client, rsf, "apps", inv,
-					[]*unstructured.Unstructured{cm.DeepCopy(), foreign.DeepCopy(), ns.DeepCopy()}, nil, dryRun, output.InstanceLogger("demo"))
+					[]*unstructured.Unstructured{cm.DeepCopy(), foreign.DeepCopy(), ns.DeepCopy()}, nil, deleteFlags{DryRun: dryRun}, output.InstanceLogger("demo"))
 			})
 			require.NoError(t, runErr, out)
 
@@ -212,7 +218,7 @@ func TestExecuteInstanceDelete_LeavesNamespaceBehind(t *testing.T) {
 			assert.Contains(t, out, output.StatusLeftBehind)
 			assert.Contains(t, out, kubernetes.ProtectedKindReason)
 			assert.Contains(t, out, "ConfigMap/apps/shared")
-			assert.Contains(t, out, "owned by another instance")
+			assert.Contains(t, out, "belongs to module instance uuid-other, not this one")
 			assert.NotContains(t, out, "all resources have been deleted")
 
 			_, nsErr := fake.Tracker().Get(schema.GroupVersionResource{Version: "v1", Resource: "namespaces"}, "", "apps")
@@ -261,12 +267,12 @@ func TestExecuteInstanceDelete_ReadErrorKeepsModuleInstance(t *testing.T) {
 			dyn.PrependReactor("get", "configmaps", func(k8stesting.Action) (bool, runtime.Object, error) {
 				return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, "web", errors.New("denied"))
 			})
-			client := &kubernetes.Client{Dynamic: dyn}
+			client := &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: dyn}
 
 			var runErr error
 			out := captureOutput(t, func() {
 				runErr = executeInstanceDelete(ctx, client, &cmdutil.InstanceSelectorFlags{InstanceName: "demo"}, "apps", inv,
-					[]*unstructured.Unstructured{cm.DeepCopy()}, nil, dryRun, output.InstanceLogger("demo"))
+					[]*unstructured.Unstructured{cm.DeepCopy()}, nil, deleteFlags{DryRun: dryRun}, output.InstanceLogger("demo"))
 			})
 			require.Error(t, runErr)
 			assert.NotContains(t, out, "Instance deleted")
@@ -337,7 +343,7 @@ func (g *guardScenario) run(t *testing.T, dryRun bool) (string, error) {
 	var runErr error
 	out := captureOutput(t, func() {
 		runErr = deleteResolvedInstance(context.Background(), g.client, &cmdutil.InstanceSelectorFlags{InstanceName: g.rec.Name}, g.rec.Namespace,
-			g.rec, []*unstructured.Unstructured{g.cm.DeepCopy()}, nil, 5*time.Second, dryRun, output.InstanceLogger(g.rec.Name))
+			g.rec, []*unstructured.Unstructured{g.cm.DeepCopy()}, nil, confirmYes, deleteFlags{Timeout: 5 * time.Second, DryRun: dryRun}, output.InstanceLogger(g.rec.Name))
 	})
 	return out, runErr
 }
@@ -413,7 +419,7 @@ func TestDeleteResolvedInstance_TargetItselfArmed(t *testing.T) {
 
 	_, err := g.run(t, false)
 	requireExitCode(t, err, opmexit.ExitValidationError)
-	assert.Contains(t, err.Error(), "opm-controller-system/opm-controller (the instance being deleted)")
+	assert.Contains(t, err.Error(), "opm-system/opm-controller (the instance being deleted)")
 	g.assertUntouched(t)
 }
 
@@ -530,7 +536,7 @@ func TestExecuteInstanceDelete_UnreadableKeepsModuleInstance(t *testing.T) {
 			var runErr error
 			out := captureOutput(t, func() {
 				runErr = executeInstanceDelete(context.Background(), client, &cmdutil.InstanceSelectorFlags{InstanceName: "demo"}, "apps", inv,
-					[]*unstructured.Unstructured{deploy.DeepCopy()}, unreadable, dryRun, output.InstanceLogger("demo"))
+					[]*unstructured.Unstructured{deploy.DeepCopy()}, unreadable, deleteFlags{DryRun: dryRun}, output.InstanceLogger("demo"))
 			})
 			requireExitCode(t, runErr, opmexit.ExitGeneralError)
 			assert.NotContains(t, out, "Instance deleted")
@@ -572,7 +578,7 @@ func TestExecuteInstanceDelete_UnreadableNamespaceIsLeftBehind(t *testing.T) {
 	var runErr error
 	out := captureOutput(t, func() {
 		runErr = executeInstanceDelete(context.Background(), client, &cmdutil.InstanceSelectorFlags{InstanceName: "demo"}, "apps", inv,
-			nil, unreadable, false, output.InstanceLogger("demo"))
+			nil, unreadable, deleteFlags{}, output.InstanceLogger("demo"))
 	})
 	require.NoError(t, runErr, out)
 	assert.Contains(t, out, "Namespace/apps")
@@ -596,10 +602,105 @@ func TestDeleteResolvedInstance_ControllerOwnedIgnoresUnreadable(t *testing.T) {
 	var runErr error
 	out := captureOutput(t, func() {
 		runErr = deleteResolvedInstance(context.Background(), client, &cmdutil.InstanceSelectorFlags{InstanceName: rec.Name}, rec.Namespace,
-			rec, nil, unreadable, 5*time.Second, false, output.InstanceLogger(rec.Name))
+			rec, nil, unreadable, confirmYes, deleteFlags{Timeout: 5 * time.Second}, output.InstanceLogger(rec.Name))
 	})
 	require.NoError(t, runErr, out)
 	assert.Contains(t, out, "controller pruned")
 	_, miErr := fake.Tracker().Get(inventory.ModuleInstanceGVR, rec.Namespace, rec.Name)
 	assert.True(t, apierrors.IsNotFound(miErr), "the ModuleInstance is deleted")
+}
+
+// The tracked ConfigMap is deleted and the delete of the ModuleInstance record
+// then fails: the command prints no success line, says the record remains and
+// that a re-run is safe, and exits with the code of the cause. The re-run,
+// with the cause gone, deletes the record and exits 0.
+func TestExecuteInstanceDelete_FailedRecordDeleteFails(t *testing.T) {
+	miGR := schema.GroupResource{Group: inventory.GroupOpmodel, Resource: inventory.ModuleInstanceGVR.Resource}
+	tests := []struct {
+		name     string
+		cause    error
+		wantCode int
+	}{
+		{"forbidden", apierrors.NewForbidden(miGR, "demo", errors.New("no delete access")), opmexit.ExitPermissionDenied},
+		{"internal error", apierrors.NewInternalError(errors.New("etcd is down")), opmexit.ExitGeneralError},
+	}
+	inv := &inventory.Record{Name: "demo", Namespace: "apps", Owner: inventory.OwnerCLI}
+	rsf := &cmdutil.InstanceSelectorFlags{InstanceName: "demo"}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cm := trackedConfigMap("web")
+			cm.SetLabels(map[string]string{opmlabels.ManagedBy: opmlabels.ManagedByCLI})
+			client, fake := fakeClusterClient(cm.DeepCopy(), moduleInstanceObj("apps", "demo"))
+			failing := true
+			fake.PrependReactor("delete", inventory.ModuleInstanceGVR.Resource, func(k8stesting.Action) (bool, runtime.Object, error) {
+				if failing {
+					return true, nil, tt.cause
+				}
+				return false, nil, nil
+			})
+
+			var runErr error
+			out := captureOutput(t, func() {
+				runErr = executeInstanceDelete(context.Background(), client, rsf, "apps", inv,
+					[]*unstructured.Unstructured{cm.DeepCopy()}, nil, deleteFlags{}, output.InstanceLogger("demo"))
+			})
+			requireExitCode(t, runErr, tt.wantCode)
+			assert.NotContains(t, out, "Instance deleted")
+			assert.NotContains(t, out, "all resources have been deleted")
+			assert.Contains(t, out, "apps/demo")
+			assert.Contains(t, out, "the record remains")
+			assert.Contains(t, out, "re-running is safe")
+
+			_, cmErr := fake.Tracker().Get(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, "apps", "web")
+			assert.True(t, apierrors.IsNotFound(cmErr), "the tracked ConfigMap is deleted")
+			_, miErr := fake.Tracker().Get(inventory.ModuleInstanceGVR, "apps", "demo")
+			require.NoError(t, miErr, "the ModuleInstance is still there")
+
+			failing = false
+			out = captureOutput(t, func() {
+				runErr = executeInstanceDelete(context.Background(), client, rsf, "apps", inv, nil, nil, deleteFlags{}, output.InstanceLogger("demo"))
+			})
+			require.NoError(t, runErr, out)
+			assert.Contains(t, out, "Instance deleted")
+			_, miErr = fake.Tracker().Get(inventory.ModuleInstanceGVR, "apps", "demo")
+			assert.True(t, apierrors.IsNotFound(miErr), "the re-run deletes the ModuleInstance")
+		})
+	}
+}
+
+// Both spellings reach the delete as "skip the prompt": --yes, its shorthand,
+// and the deprecated --force. Without any of them the delete confirms.
+func TestInstanceDeleteCmd_YesAndItsDeprecatedAliasSkipThePrompt(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want bool
+	}{
+		{"no flag confirms", []string{"jellyfin"}, false},
+		{"--yes", []string{"jellyfin", "--yes"}, true},
+		{"-y", []string{"jellyfin", "-y"}, true},
+		{"deprecated --force", []string{"jellyfin", "--force"}, true},
+		{"--dry-run alone does not skip", []string{"jellyfin", "--dry-run"}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got, called bool
+			orig := runDelete
+			t.Cleanup(func() { runDelete = orig })
+			runDelete = func(_ context.Context, _ string, _ *config.GlobalConfig, _ *cmdutil.K8sFlags, _ string, flags deleteFlags) error {
+				got, called = flags.SkipConfirm, true
+				return nil
+			}
+
+			cmd := NewInstanceDeleteCmd(&config.GlobalConfig{})
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
+			cmd.SetArgs(tt.args)
+			require.NoError(t, cmd.Execute())
+
+			require.True(t, called)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }

@@ -18,9 +18,9 @@ func NewRegistryCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Short: "Authenticate to OCI registries",
 		Long: `Work with the OCI registries OPM publishes to and pulls from.
 
-	Use this command group to manage registry credentials: they are stored in
-	the standard docker credential file, the store OPM's push and pull both
-	read — the same file 'docker login' writes.`,
+Use this command group to manage registry credentials: they are stored in
+the standard docker credential file, the store OPM's push and pull both
+read — the same file 'docker login' writes.`,
 	}
 
 	c.AddCommand(NewRegistryLoginCmd(cfg))

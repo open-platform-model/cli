@@ -45,7 +45,7 @@ func NewControllerInstallCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Use:   "install",
 		Short: "Install the opm-controller on a cluster",
 		Long: `Install the opm-controller from its OPM module, opmodel.dev/modules/opm_controller,
-as the CLI-owned ModuleInstance opm-controller in opm-controller-system, wait for
+as the CLI-owned ModuleInstance opm-controller in opm-system, wait for
 it to roll out, and give it a Platform to reconcile.
 
 Install pulls the module from the configured registry (--registry,
@@ -81,11 +81,13 @@ existing Platform is reported and left untouched, never rewritten.
 lifecycle without a running controller. They are the CRDs the pinned module
 version renders, carried in this CLI, so --crds-only needs no registry and
 talks only to the cluster: it resolves and renders no module, reads no
-ModuleInstance, and takes no --version, -f or --reset-values. It refuses
-opmodel.dev CRDs an earlier installer applied (no OPM labels): such a
-cluster starts fresh, since --crds-only adopts and migrates nothing. It also
-refuses CRDs a newer module version installed: run --crds-only from a CLI
-that pins that version or newer, or install that version in full.
+ModuleInstance, and takes no --version, -f or --reset-values. A CRD that
+exists is judged as on a full install: one without OPM's managed-by label,
+or with another instance's identity, is refused, and the refusal prints the
+annotation that lets this instance take it over; --crds-only adopts nothing
+by itself. It also refuses CRDs a newer module version installed: run
+--crds-only from a CLI that pins that version or newer, or install that
+version in full.
 
 Examples:
   # Install the pinned controller module and seed the cluster Platform

@@ -23,12 +23,12 @@ func TestDeploysController(t *testing.T) {
 	}{
 		{
 			name:       "coordinates with any module path",
-			rec:        &inventory.Record{Name: "opm-controller", Namespace: "opm-controller-system", ModulePath: "example.com/modules/other@v3"},
+			rec:        &inventory.Record{Name: "opm-controller", Namespace: "opm-system", ModulePath: "example.com/modules/other@v3"},
 			wantSignal: SignalCoordinates, wantOK: true,
 		},
 		{
 			name:       "coordinates with no module path",
-			rec:        &inventory.Record{Name: "opm-controller", Namespace: "opm-controller-system"},
+			rec:        &inventory.Record{Name: "opm-controller", Namespace: "opm-system"},
 			wantSignal: SignalCoordinates, wantOK: true,
 		},
 		{
@@ -66,7 +66,7 @@ func TestDeploysController(t *testing.T) {
 		},
 		{
 			name: "another instance in the controller's namespace",
-			rec:  &inventory.Record{Name: "hello", Namespace: "opm-controller-system", ModulePath: "example.com/modules/hello@v0"},
+			rec:  &inventory.Record{Name: "hello", Namespace: "opm-system", ModulePath: "example.com/modules/hello@v0"},
 		},
 		{
 			name: "a CRD of a subgroup of opmodel.dev",

@@ -1,7 +1,7 @@
 ## Context
 
 `opm controller install` resolves the controller module `opmodel.dev/modules/opm_controller` through the registry,
-renders it as the instance `opm-controller` in `opm-controller-system` against the module's own dependency pins, and
+renders it as the instance `opm-controller` in `opm-system` against the module's own dependency pins, and
 applies the render's CRDs before the instance. `--crds-only` stops after the CRD step, but it still resolves, fetches and
 renders the module (catalogs included) and reads the controller's instance record for recorded values. The pin task
 (`hack/controller-pin`) writes `internal/controller/pin.go` from the module's controller package without a render.

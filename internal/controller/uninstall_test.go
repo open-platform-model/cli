@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -13,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	k8stesting "k8s.io/client-go/testing"
 
-	"github.com/open-platform-model/cli/internal/kubernetes"
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
 func moduleInstanceFixture(namespace, name string, finalizers ...string) *unstructured.Unstructured {
@@ -84,27 +85,27 @@ func TestFinalizerGuardError_DefaultsToUninstall(t *testing.T) {
 }
 
 func TestFinalizerGuardError_NamesActionTargetAndRemedy(t *testing.T) {
-	target := ArmedInstance{Namespace: "opm-controller-system", Name: "opm-controller"}
+	target := ArmedInstance{Namespace: "opm-system", Name: "opm-controller"}
 	err := &FinalizerGuardError{
 		Armed:  []ArmedInstance{{Namespace: "default", Name: "hello"}, target},
-		Action: "delete opm-controller-system/opm-controller, which deploys the controller",
+		Action: "delete opm-system/opm-controller, which deploys the controller",
 		Target: target,
 		Remedy: "run 'opm controller uninstall --remove-finalizers' to remove that finalizer, orphaning their workloads, then retry",
 	}
 	assert.EqualError(t, err,
-		"refusing to delete opm-controller-system/opm-controller, which deploys the controller: 2 instance(s) still carry the opmodel.dev/cleanup finalizer: "+
-			"default/hello, opm-controller-system/opm-controller (the instance being deleted) "+
+		"refusing to delete opm-system/opm-controller, which deploys the controller: 2 instance(s) still carry the opmodel.dev/cleanup finalizer: "+
+			"default/hello, opm-system/opm-controller (the instance being deleted) "+
 			"(run 'opm controller uninstall --remove-finalizers' to remove that finalizer, orphaning their workloads, then retry)")
 }
 
 func TestOwnInstanceOwnerError_NamesSignalAndRemedy(t *testing.T) {
-	err := &OwnInstanceOwnerError{Namespace: "opm-controller-system", Name: "opm-controller", Signal: SignalCoordinates}
+	err := &OwnInstanceOwnerError{Namespace: "opm-system", Name: "opm-controller", Signal: SignalCoordinates}
 	msg := err.Error()
-	assert.Contains(t, msg, "refusing to delete opm-controller-system/opm-controller")
+	assert.Contains(t, msg, "refusing to delete opm-system/opm-controller")
 	assert.Contains(t, msg, "matched by coordinates")
 	assert.Contains(t, msg, "controller-owned")
 	assert.Contains(t, msg, "set spec.owner to cli")
-	assert.Contains(t, msg, `kubectl patch moduleinstance opm-controller -n opm-controller-system --type=merge -p '{"spec":{"owner":"cli"}}'`)
+	assert.Contains(t, msg, `kubectl patch moduleinstance opm-controller -n opm-system --type=merge -p '{"spec":{"owner":"cli"}}'`)
 }
 
 func TestRemoveCleanupFinalizer_RemovesOnlyTheCleanupFinalizer(t *testing.T) {
@@ -214,6 +215,29 @@ func TestUninstall_DeletesTheRecordedInventory(t *testing.T) {
 	assert.Nil(t, fc.record(), "the record is deleted last")
 }
 
+// "Recorded object adopted by another instance is left behind": uninstall
+// does not delete it, counts it, and still deletes the record.
+func TestUninstall_LeavesAnObjectAdoptedByAnotherInstance(t *testing.T) {
+	releasedCLI(t)
+	fastPolling(t)
+	fc := newFakeCluster(t)
+	_, err := install(t, fc, &fakeRender{objs: moduleObjects(renderOpts{})}, PlanOptions{})
+	require.NoError(t, err)
+
+	role := fc.mustGet(clusterRoleGVR, "", "opm-controller-manager-role")
+	role.SetAnnotations(map[string]string{opmlabels.AnnotationAdopt: "uuid-of-another-instance"})
+	_, err = fc.client.ResourceClient(clusterRoleGVR, "").Update(context.Background(), role, metav1.UpdateOptions{})
+	require.NoError(t, err)
+
+	result, err := Uninstall(context.Background(), fc.client, UninstallOptions{})
+	require.NoError(t, err)
+	assert.Empty(t, result.Errors)
+	assert.Equal(t, 2, result.Deleted, "ServiceAccount, Deployment")
+	assert.Equal(t, 6, result.LeftBehind, "four CRDs, the Namespace and the adopted ClusterRole")
+	assert.True(t, fc.exists(clusterRoleGVR, "", "opm-controller-manager-role"), "the adopted ClusterRole is still there")
+	assert.Nil(t, fc.record(), "a left-behind object does not keep the record")
+}
+
 // "Object an older release installed is removed".
 func TestUninstall_RemovesWhatAnOlderReleaseRecorded(t *testing.T) {
 	releasedCLI(t)
@@ -253,7 +277,7 @@ func TestUninstall_ReRunDeletesTheRecord(t *testing.T) {
 		if obj.GetKind() == kindCustomResourceDefinition || obj.GetKind() == kindNamespace {
 			continue
 		}
-		require.NoError(t, fc.client.ResourceClient(kubernetes.GVRFromUnstructured(obj), obj.GetNamespace()).
+		require.NoError(t, fc.client.ResourceClient(kubetest.GVR(obj), obj.GetNamespace()).
 			Delete(context.Background(), obj.GetName(), metav1.DeleteOptions{}))
 	}
 
@@ -348,4 +372,64 @@ func TestUninstall_UnreadableObjectKeepsTheRecord(t *testing.T) {
 	assert.False(t, fc.exists(deploymentGVR, ControllerNamespace, ControllerDeploymentName))
 	assert.True(t, fc.exists(clusterRoleGVR, "", "opm-controller-manager-role"), "the unreadable object is not deleted")
 	assert.NotNil(t, fc.record(), "the record is kept and still tracks the unreadable object")
+}
+
+// "Forbidden record delete": every recorded object is deleted and the delete
+// of the record then fails. Uninstall returns the error, with the cause
+// reachable, so the command reports no uninstall; the record stays.
+func TestUninstall_FailedRecordDeleteIsAnError(t *testing.T) {
+	releasedCLI(t)
+	fastPolling(t)
+	fc := newFakeCluster(t)
+	_, err := install(t, fc, &fakeRender{objs: moduleObjects(renderOpts{})}, PlanOptions{})
+	require.NoError(t, err)
+
+	fc.fake.PrependReactor("delete", moduleInstanceGVR.Resource, func(action k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewForbidden(moduleInstanceGVR.GroupResource(), ControllerInstanceName, errors.New("no RBAC"))
+	})
+
+	result, err := Uninstall(context.Background(), fc.client, UninstallOptions{})
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.True(t, apierrors.IsForbidden(err), "the cause is reachable through unwrapping")
+	assert.Contains(t, err.Error(), ControllerNamespace+"/"+ControllerInstanceName)
+	assert.Contains(t, err.Error(), "the record remains")
+	assert.Contains(t, err.Error(), "re-running is safe")
+
+	assert.False(t, fc.exists(deploymentGVR, ControllerNamespace, ControllerDeploymentName), "the recorded objects are deleted")
+	assert.False(t, fc.exists(clusterRoleGVR, "", "opm-controller-manager-role"))
+	assert.NotNil(t, fc.record(), "the record is still there")
+}
+
+// "Recorded objects are deleted in the plan's order": the controller
+// Deployment before its ServiceAccount and ClusterRole, each delete with
+// foreground propagation and a precondition on the UID that was read.
+func TestUninstall_DeletesInThePlansOrder(t *testing.T) {
+	releasedCLI(t)
+	fastPolling(t)
+	fc := newFakeCluster(t)
+	_, err := install(t, fc, &fakeRender{objs: moduleObjects(renderOpts{})}, PlanOptions{})
+	require.NoError(t, err)
+	fc.fake.ClearActions()
+
+	_, err = Uninstall(context.Background(), fc.client, UninstallOptions{})
+	require.NoError(t, err)
+
+	var order []string
+	for _, a := range fc.fake.Actions() {
+		d, ok := a.(k8stesting.DeleteAction)
+		if !ok || d.GetResource().Resource == moduleInstancesResource {
+			continue
+		}
+		order = append(order, d.GetResource().Resource)
+		opts := d.GetDeleteOptions()
+		require.NotNil(t, opts.PropagationPolicy)
+		assert.Equal(t, metav1.DeletePropagationForeground, *opts.PropagationPolicy)
+		require.NotNil(t, opts.Preconditions, "each delete carries the UID of the object that was read")
+		require.NotNil(t, opts.Preconditions.UID)
+		assert.NotEmpty(t, *opts.Preconditions.UID)
+	}
+	require.Len(t, order, 3)
+	assert.Equal(t, "deployments", order[0], "highest weight first: %v", order)
+	assert.ElementsMatch(t, []string{"serviceaccounts", "clusterroles"}, order[1:])
 }

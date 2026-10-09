@@ -6,7 +6,7 @@
 ## REMOVED Requirements
 
 ### Requirement: Operator install task needs no local registry
-**Reason**: Renamed with the product: the operator is now the controller (`opm controller`, `opm-controller-system`, `spec.owner: controller`). Restated under the new title.
+**Reason**: Renamed with the product: the operator is now the controller (`opm controller`, `opm-system`, `spec.owner: controller`). Restated under the new title.
 **Migration**: None.
 
 ## MODIFIED Requirements

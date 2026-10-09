@@ -4,7 +4,6 @@ package config
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
@@ -240,7 +239,7 @@ func validateConfigSchema(ctx *cue.Context, value cue.Value, configPath string) 
 			Type:     "schema validation failed",
 			Message:  err.Error(),
 			Location: configPath,
-			Hint:     removedFieldHint(err.Error()),
+			Hint:     removedFieldHint(err),
 			Cause:    oerrors.ErrValidation,
 		}
 	}
@@ -248,17 +247,20 @@ func validateConfigSchema(ctx *cue.Context, value cue.Value, configPath string) 
 	return nil
 }
 
-// removedFieldHint returns a targeted hint when the validation error points
+// removedFieldHint returns a targeted hint when the validation error sits
 // at a field removed by 0006:D39 (providers, cacheDir) or at a
 // closed-enum key whose CUE error elides the allowed values (skewPolicy),
-// and the generic vet hint otherwise.
-func removedFieldHint(errMsg string) string {
+// and the generic vet hint otherwise. The field is read from the path of the
+// CUE error, never from its message, so a value that holds one of those
+// words picks no hint.
+func removedFieldHint(err error) string {
+	at := func(field string) bool { return cueErrorUnder(err, "#CLIConfig", "config", field) }
 	switch {
-	case strings.Contains(errMsg, "providers"):
+	case at("providers"):
 		return "The 'providers' field was removed; catalog selection lives in the platform a render resolves (--platform, the cluster Platform, or the render's own deps). Re-run 'opm config init' (or delete the providers block and any ~/.opm/cue.mod/)"
-	case strings.Contains(errMsg, "cacheDir"):
+	case at("cacheDir"):
 		return "The 'cacheDir' field was removed. Re-run 'opm config init' (or delete the field)"
-	case strings.Contains(errMsg, "skewPolicy"):
+	case at("skewPolicy"):
 		return fmt.Sprintf("skewPolicy must be %q or %q (default %q when omitted)", SkewPolicyWarn, SkewPolicyRefuse, SkewPolicyWarn)
 	default:
 		return "Check your config.cue against the expected schema. Run 'opm config vet' for validation."

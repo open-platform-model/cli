@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
 	"github.com/charmbracelet/log"
@@ -31,7 +33,8 @@ func makeCRClient(objs ...*unstructured.Unstructured) *kubernetes.Client {
 		inventory.ModuleInstanceGVR: "ModuleInstanceList",
 	}
 	return &kubernetes.Client{
-		Dynamic: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, listKinds, runtimeObjs...),
+		Resources: kubetest.Resources(),
+		Dynamic:   dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, listKinds, runtimeObjs...),
 	}
 }
 

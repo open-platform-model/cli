@@ -1,8 +1,10 @@
 package controller
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"os"
 	"testing"
 	"time"
 
@@ -15,7 +17,10 @@ import (
 	"github.com/open-platform-model/cli/internal/controller/crds"
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/version"
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
 // terminatingFixture returns obj with a deletionTimestamp set, as the
@@ -39,8 +44,10 @@ func deleteLater(t *testing.T, client *kubernetes.Client, obj *unstructured.Unst
 	t.Helper()
 	go func() {
 		time.Sleep(after)
-		err := client.ResourceClient(kubernetes.GVRFromUnstructured(obj), obj.GetNamespace()).Delete(context.Background(), obj.GetName(), metav1.DeleteOptions{})
-		assert.NoError(t, err)
+		resource, err := client.ResourceClientFor(context.Background(), obj.GroupVersionKind(), obj.GetNamespace())
+		if assert.NoError(t, err) {
+			assert.NoError(t, resource.Delete(context.Background(), obj.GetName(), metav1.DeleteOptions{}))
+		}
 	}()
 }
 
@@ -104,10 +111,16 @@ func TestInstall_FreshCluster(t *testing.T) {
 	fastPolling(t)
 	fc := newFakeCluster(t)
 
+	var logBuf bytes.Buffer
+	output.SetLogWriter(&logBuf)
+	t.Cleanup(func() { output.SetLogWriter(os.Stderr) })
+
 	result, err := install(t, fc, &fakeRender{objs: moduleObjects(renderOpts{})}, PlanOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, 4, result.CRDs)
 	assert.True(t, result.Recorded)
+	assert.NotContains(t, logBuf.String(), "already exist and are managed by OPM",
+		"install applies the CRDs itself first: a fresh install is not warned about them")
 
 	writes := fc.Writes()
 	require.GreaterOrEqual(t, len(writes), 4)
@@ -163,14 +176,14 @@ func TestInstall_UnchangedReinstall(t *testing.T) {
 	type ident struct{ uid, rv string }
 	before := map[string]ident{}
 	for _, obj := range r.objs {
-		live := fc.mustGet(kubernetes.GVRFromUnstructured(obj), obj.GetNamespace(), obj.GetName())
+		live := fc.mustGet(kubetest.GVR(obj), obj.GetNamespace(), obj.GetName())
 		before[obj.GetKind()+"/"+obj.GetName()] = ident{string(live.GetUID()), live.GetResourceVersion()}
 	}
 
 	_, err = install(t, fc, r, PlanOptions{})
 	require.NoError(t, err)
 	for _, obj := range r.objs {
-		live := fc.mustGet(kubernetes.GVRFromUnstructured(obj), obj.GetNamespace(), obj.GetName())
+		live := fc.mustGet(kubetest.GVR(obj), obj.GetNamespace(), obj.GetName())
 		assert.Equal(t, before[obj.GetKind()+"/"+obj.GetName()], ident{string(live.GetUID()), live.GetResourceVersion()},
 			"%s/%s changed on an unchanged reinstall", obj.GetKind(), obj.GetName())
 	}
@@ -231,6 +244,28 @@ func TestInstall_RolloutTimeoutKeepsEverything(t *testing.T) {
 	assert.NotNil(t, fc.record(), "the record remains")
 }
 
+// embeddedForTestInstance makes the embedded CRDs carry the instance UUID the
+// fixture render stamps, as they do in a released cli: the pin renders them
+// for the same instance a full install renders, so both carry one UUID, and
+// the apply guard judges the objects of either as the instance's own.
+func embeddedForTestInstance(t *testing.T) {
+	t.Helper()
+	prev := embeddedCRDs
+	embeddedCRDs = func() ([]*unstructured.Unstructured, error) {
+		objs, err := prev()
+		if err != nil {
+			return nil, err
+		}
+		for _, obj := range objs {
+			labels := obj.GetLabels()
+			labels[opmlabels.ModuleInstanceUUID] = testInstanceUUID
+			obj.SetLabels(labels)
+		}
+		return objs, nil
+	}
+	t.Cleanup(func() { embeddedCRDs = prev })
+}
+
 // installCRDsOnly plans and installs the embedded CRDs on the fake cluster.
 func installCRDsOnly(t *testing.T, fc *fakeCluster, r *fakeRender, opts PlanOptions) (*InstallResult, error) {
 	t.Helper()
@@ -278,23 +313,24 @@ func TestInstall_CRDsOnlyAppliesTheEmbeddedCRDsOffline(t *testing.T) {
 	assert.Equal(t, "controller", fc.record().Owner, "the record is untouched")
 }
 
-// "CRDs an earlier installer applied are refused, not adopted": an
-// opmodel.dev CRD without OPM's labels is an exit-2 guard error that says an
-// earlier installer bootstrapped the cluster and to start fresh; nothing is
-// applied.
-func TestPlanCRDsOnly_RefusesCRDsAnEarlierInstallerApplied(t *testing.T) {
+// "CRDs OPM does not manage are refused, not adopted": a CRD without OPM's
+// managed-by label is an exit-2 guard error with the shared guard's message,
+// which names the adopt annotation and the UUID of the controller's instance;
+// nothing is applied.
+func TestPlanCRDsOnly_RefusesCRDsOPMDoesNotManage(t *testing.T) {
 	foreign := renderedCRDObject(inventory.CRDNameModuleInstances, true)
 	fc := newFakeCluster(t, foreign)
+	embedded, err := crds.Objects()
+	require.NoError(t, err)
 
-	_, err := installCRDsOnly(t, fc, &fakeRender{}, PlanOptions{})
+	_, err = installCRDsOnly(t, fc, &fakeRender{}, PlanOptions{})
 	var guardErr *GuardError
 	require.ErrorAs(t, err, &guardErr)
-	assert.Contains(t, err.Error(), inventory.CRDNameModuleInstances)
-	assert.Contains(t, err.Error(), "without OPM's labels")
-	assert.Contains(t, err.Error(), "an earlier installer bootstrapped this cluster")
-	assert.Contains(t, err.Error(), "neither adopts nor migrates")
-	assert.Contains(t, err.Error(), "start fresh on a new cluster")
-	assert.NotContains(t, err.Error(), "no opmodel.dev CRDs", "never invite deleting the CRDs")
+	assert.Contains(t, err.Error(), "refusing to install: 1 object(s) cannot be applied by this instance:")
+	assert.Contains(t, err.Error(), "CustomResourceDefinition/"+inventory.CRDNameModuleInstances+" exists and is not managed by OPM")
+	assert.Contains(t, err.Error(), opmlabels.AnnotationAdopt+"="+embeddedInstanceUUID(embedded))
+	assert.NotContains(t, err.Error(), "start fresh")
+	assert.NotContains(t, err.Error(), "remove or rename")
 	assert.Empty(t, fc.Writes())
 }
 
@@ -316,14 +352,15 @@ func TestPlanCRDsOnly_RefusesCRDsOfANewerModuleVersion(t *testing.T) {
 	assert.Empty(t, fc.Writes())
 }
 
-// A newer version of another module (here the retired opm_operator) is not
-// compared with the pin: the CRD goes on to the apply guard, which accepts an
-// OPM-managed CRD, and is applied over.
+// A newer version of another module is not compared with the pin: the CRD
+// goes on to the apply guard, which accepts a CRD that carries OPM's
+// managed-by label and the instance's UUID, and is applied over.
 func TestInstall_CRDsOnlyIgnoresAnotherModulesVersion(t *testing.T) {
 	fastPolling(t)
+	embeddedForTestInstance(t)
 	other := labeled(renderedCRDObject(inventory.CRDNameModuleInstances, true), "crds", "9.0.0")
 	labels := other.GetLabels()
-	labels[moduleNameLabel] = "opm_operator"
+	labels[moduleNameLabel] = "another_module"
 	other.SetLabels(labels)
 	fc := newFakeCluster(t, other)
 
@@ -335,6 +372,7 @@ func TestInstall_CRDsOnlyIgnoresAnotherModulesVersion(t *testing.T) {
 // CRDs an older or the same module version installed are applied over.
 func TestInstall_CRDsOnlyOverCRDsOfAnOlderModuleVersion(t *testing.T) {
 	fastPolling(t)
+	embeddedForTestInstance(t)
 	older := labeled(renderedCRDObject(inventory.CRDNameModuleInstances, true), "crds", "0.0.9")
 	fc := newFakeCluster(t, older)
 
@@ -349,6 +387,7 @@ func TestInstall_CRDsOnlyOverCRDsOfAnOlderModuleVersion(t *testing.T) {
 func TestInstall_CRDsOnlyThenFullInstall(t *testing.T) {
 	releasedCLI(t)
 	fastPolling(t)
+	embeddedForTestInstance(t)
 	fc := newFakeCluster(t)
 	r := &fakeRender{objs: moduleObjects(renderOpts{})}
 

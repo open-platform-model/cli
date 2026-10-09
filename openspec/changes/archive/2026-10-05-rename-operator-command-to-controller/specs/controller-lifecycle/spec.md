@@ -96,18 +96,18 @@ Resolution failures SHALL map to the CLI's standard exit codes: a catalog major 
 
 ### Requirement: Install deploys the controller module as a CLI-owned instance in two steps
 
-`opm controller install` SHALL obtain the controller module `opmodel.dev/modules/opm_controller` from the CLI's configured module registry, render it as an instance named `opm-controller` in the namespace `opm-controller-system`, apply the rendered `CustomResourceDefinition` objects with server-side apply as field manager `opm-cli` and wait until each reports `Established=True`, and then apply the whole render as a CLI-owned ModuleInstance (`spec.owner: cli`) through the same apply the CLI uses for every instance. The instance record SHALL be written only after the CRDs are served. Every object the module renders, the CRDs and the Namespace included, SHALL be recorded in the instance's inventory, and no step SHALL refuse an object the same install applied. Install SHALL NOT create the Namespace outside the render. Apart from the render, install SHALL create only the cluster Platform and the opt-in `opm-cli-user` role. Re-running install with an unchanged module version and unchanged values SHALL change no live object, and installing another module version over the instance SHALL apply what changed and remove every object the previous version rendered and the new one does not, except CRDs and the Namespace. Source: 0021:D11:R1, 0021:D11:R2, 0032:D1:R5.
+`opm controller install` SHALL obtain the controller module `opmodel.dev/modules/opm_controller` from the CLI's configured module registry, render it as an instance named `opm-controller` in the namespace `opm-system`, apply the rendered `CustomResourceDefinition` objects with server-side apply as field manager `opm-cli` and wait until each reports `Established=True`, and then apply the whole render as a CLI-owned ModuleInstance (`spec.owner: cli`) through the same apply the CLI uses for every instance. The instance record SHALL be written only after the CRDs are served. Every object the module renders, the CRDs and the Namespace included, SHALL be recorded in the instance's inventory, and no step SHALL refuse an object the same install applied. Install SHALL NOT create the Namespace outside the render. Apart from the render, install SHALL create only the cluster Platform and the opt-in `opm-cli-user` role. Re-running install with an unchanged module version and unchanged values SHALL change no live object, and installing another module version over the instance SHALL apply what changed and remove every object the previous version rendered and the new one does not, except CRDs and the Namespace. Source: 0021:D11:R1, 0021:D11:R2, 0032:D1:R5.
 
 #### Scenario: Fresh cluster
 
 - **WHEN** `opm controller install` runs against a cluster with none of OPM's CRDs
 - **THEN** the four CRDs are applied and `Established` before any other object is applied
-- **AND** the ModuleInstance `opm-controller` in `opm-controller-system` exists with `spec.owner: cli`, and its inventory lists every rendered object, the four CRDs and the Namespace included
+- **AND** the ModuleInstance `opm-controller` in `opm-system` exists with `spec.owner: cli`, and its inventory lists every rendered object, the four CRDs and the Namespace included
 - **AND** the controller Deployment is running
 
 #### Scenario: The module's Namespace is not refused
 
-- **WHEN** install runs on a cluster where `opm-controller-system` does not exist
+- **WHEN** install runs on a cluster where `opm-system` does not exist
 - **THEN** the Namespace is created by the instance apply as one of its objects, and the apply does not refuse it as a foreign object
 
 #### Scenario: Unchanged reinstall
@@ -122,16 +122,16 @@ Resolution failures SHALL map to the CLI's standard exit codes: a catalog major 
 
 ### Requirement: Install refuses a controller instance record that is not CLI-owned
 
-Before any object changes, install SHALL refuse when the controller's instance record `opm-controller` in `opm-controller-system` exists and its `spec.owner` is not `cli`, an absent owner included, since the CLI treats a record without an owner as controller-owned. The refusal SHALL exit 2, name the record, state that its `spec.owner` is not `cli`, and give the command that sets `spec.owner: cli`. Install SHALL NOT change the owner itself: the instance apply would otherwise only edit the record's spec, and the controller never reconciles the instance that deploys it, so nothing would install.
+Before any object changes, install SHALL refuse when the controller's instance record `opm-controller` in `opm-system` exists and its `spec.owner` is not `cli`, an absent owner included, since the CLI treats a record without an owner as controller-owned. The refusal SHALL exit 2, name the record, state that its `spec.owner` is not `cli`, and give the command that sets `spec.owner: cli`. Install SHALL NOT change the owner itself: the instance apply would otherwise only edit the record's spec, and the controller never reconciles the instance that deploys it, so nothing would install.
 
 #### Scenario: Controller-owned record
 
-- **WHEN** install runs on a cluster whose record `opm-controller` in `opm-controller-system` has `spec.owner: controller`
+- **WHEN** install runs on a cluster whose record `opm-controller` in `opm-system` has `spec.owner: controller`
 - **THEN** install exits 2 naming the record, saying its `spec.owner` is not `cli` and how to set it, and nothing changed
 
 #### Scenario: Record without an owner
 
-- **WHEN** install runs on a cluster whose record `opm-controller` in `opm-controller-system` has no `spec.owner`
+- **WHEN** install runs on a cluster whose record `opm-controller` in `opm-system` has no `spec.owner`
 - **THEN** install refuses in the same way, and nothing changed
 
 ### Requirement: The CLI pins a default controller module version and the controller it deploys
@@ -261,7 +261,7 @@ After the controller's rollout, and unless `--skip-platform` or `--crds-only` is
 
 ### Requirement: Uninstall deletes the controller instance's recorded inventory
 
-`opm controller uninstall` SHALL read the controller's instance record `opm-controller` in `opm-controller-system`. When none exists, it SHALL delete nothing and exit 2 naming `opm controller install` as the step that records the running controller. Otherwise, after the finalizer guard, it SHALL delete every object the record's inventory lists except CRDs and the Namespace, in descending resource-weight order, leaving behind any object that no longer carries this instance's identity, then, when no object failed, delete the record. It SHALL delete no object the inventory does not list, SHALL NOT wait for deletion to complete, and SHALL treat an already absent object as deleted. Source: 0006:D34, 0021:D11:R11.
+`opm controller uninstall` SHALL read the controller's instance record `opm-controller` in `opm-system`. When none exists, it SHALL delete nothing and exit 2 naming `opm controller install` as the step that records the running controller. Otherwise, after the finalizer guard, it SHALL delete every object the record's inventory lists except CRDs and the Namespace, in descending resource-weight order, leaving behind any object that no longer carries this instance's identity, then, when no object failed, delete the record. It SHALL delete no object the inventory does not list, SHALL NOT wait for deletion to complete, and SHALL treat an already absent object as deleted. Source: 0006:D34, 0021:D11:R11.
 
 #### Scenario: Uninstall after a module install
 
@@ -316,7 +316,7 @@ Install SHALL run, before it writes any object, every check that can refuse it: 
 
 #### Scenario: An existing Namespace OPM does not manage is refused
 
-- **WHEN** install runs on a cluster with no record of the controller's instance, and `Namespace opm-controller-system` exists without OPM's managed-by label
+- **WHEN** install runs on a cluster with no record of the controller's instance, and `Namespace opm-system` exists without OPM's managed-by label
 - **THEN** the apply guard refuses naming that Namespace, and nothing has been applied
 
 ### Requirement: Install resolves another module version as the registry serves it
@@ -342,13 +342,13 @@ Install SHALL run, before it writes any object, every check that can refuse it: 
 
 Every CLI command that checks for a running controller before it acts SHALL locate the controller by its fixed names, reading no instance record.
 
-The controller's objects SHALL be its fixed names, which every install of the controller module keeps: the `Deployment` `opm-controller-manager` in the namespace `opm-controller-system`, and the `CustomResourceDefinition`s `moduleinstances.opmodel.dev`, `modulepackages.opmodel.dev`, `platforms.opmodel.dev` and `transformerregistrations.opmodel.dev`. The `Namespace` is checked only as the `Deployment`'s namespace; the check reads no `Namespace` object and no instance record. A controller that lacks one of these CRDs SHALL be reported as not ready.
+The controller's objects SHALL be its fixed names, which every install of the controller module keeps: the `Deployment` `opm-controller-manager` in the namespace `opm-system`, and the `CustomResourceDefinition`s `moduleinstances.opmodel.dev`, `modulepackages.opmodel.dev`, `platforms.opmodel.dev` and `transformerregistrations.opmodel.dev`. The `Namespace` is checked only as the `Deployment`'s namespace; the check reads no `Namespace` object and no instance record. A controller that lacks one of these CRDs SHALL be reported as not ready.
 
 The controller SHALL count as running only when every one of these `CustomResourceDefinition`s reports `Established=True` and the `Deployment` has completed its rollout. Otherwise the check SHALL report the controller as not ready, name each object that failed, and point at `opm controller install`. A read of any of these objects that fails SHALL count that object as not ready, so the command proceeds only on a positive finding.
 
 #### Scenario: Module-installed controller is found by its fixed names
 
-- **WHEN** the cluster holds the `ModuleInstance` `opm-controller` in `opm-controller-system` whose render created the four CRDs and the `Deployment` `opm-controller-manager` in `opm-controller-system`
+- **WHEN** the cluster holds the `ModuleInstance` `opm-controller` in `opm-system` whose render created the four CRDs and the `Deployment` `opm-controller-manager` in `opm-system`
 - **AND** every CRD is `Established` and the `Deployment` has rolled out
 - **THEN** the running-controller check SHALL report the controller as running
 

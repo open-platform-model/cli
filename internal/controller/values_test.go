@@ -43,7 +43,7 @@ func TestMergeValues(t *testing.T) {
 		assert.True(t, v.FromRecord)
 		got := decoded(t, v)
 		assert.Equal(t, "opmodel.dev=mirror.example", got["registry"])
-		assert.Contains(t, v.Source.Origin, "values recorded on opm-controller-system/opm-controller")
+		assert.Contains(t, v.Source.Origin, "values recorded on opm-system/opm-controller")
 	})
 
 	t.Run("changing one value keeps the others", func(t *testing.T) {

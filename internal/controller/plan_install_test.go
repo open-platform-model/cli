@@ -44,10 +44,21 @@ func TestResolveTarget(t *testing.T) {
 	require.ErrorAs(t, err, &verr)
 	assert.Contains(t, err.Error(), "opm_controller 0.3.0")
 
+	// "Unserved version": an opm-controller release tag, with and without its
+	// "v", is refused as any other selector and gets no message of its own.
+	for _, old := range []string{"v1.0.0-beta.5", "1.0.0-beta.5"} {
+		_, _, err = ResolveTarget(ctx, src, reg, old)
+		var refusal *modref.RefusalError
+		require.ErrorAs(t, err, &refusal, old)
+		assert.NotContains(t, err.Error(), "--version now takes", old)
+		assert.Contains(t, err.Error(), old)
+	}
+
 	// An unserved module version is a plain refusal.
 	_, _, err = ResolveTarget(ctx, src, reg, "0.9.0")
 	var refusal *modref.RefusalError
 	require.ErrorAs(t, err, &refusal)
+	assert.NotContains(t, err.Error(), "release tag")
 
 	// An unreachable registry is a connectivity failure.
 	unreachable := "opmodel.dev=127.0.0.1:1+insecure"
@@ -124,6 +135,9 @@ func TestPlanInstall_RecordedValuesAreTheBase(t *testing.T) {
 // Every refusal path returns before any write.
 func TestPlanInstall_RefusalsWriteNothing(t *testing.T) {
 	validation := &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: errors.New("values.bogus: field not allowed")}
+	foreignNS := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "v1", "kind": "Namespace", "metadata": map[string]any{"name": ControllerNamespace},
+	}}
 	foreignRole := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "rbac.authorization.k8s.io/v1", "kind": "ClusterRole", "metadata": map[string]any{"name": "team-a-role"},
 	}}
@@ -182,6 +196,16 @@ func TestPlanInstall_RefusalsWriteNothing(t *testing.T) {
 			cluster: []*unstructured.Unstructured{foreignRole},
 			render:  &fakeRender{objs: moduleObjects(renderOpts{extraRole: "team-a-role"})},
 			want:    []string{"ClusterRole/team-a-role", "not managed by OPM"},
+			check: func(t *testing.T, err error) {
+				var ge *GuardError
+				require.ErrorAs(t, err, &ge)
+			},
+		},
+		{
+			name:    "an object of an earlier manifest is refused as any other",
+			cluster: []*unstructured.Unstructured{foreignNS},
+			render:  &fakeRender{objs: moduleObjects(renderOpts{})},
+			want:    []string{"refusing to install", "Namespace/opm-system exists and is not managed by OPM", "opmodel.dev/adopt="},
 			check: func(t *testing.T, err error) {
 				var ge *GuardError
 				require.ErrorAs(t, err, &ge)

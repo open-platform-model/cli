@@ -377,8 +377,8 @@ func TestSyntheticIdentity_ExplicitNamespace(t *testing.T) {
 	k8s.Namespace.Value = "from-flag"
 	k8s.Namespace.Source = config.SourceFlag
 
-	_, _, ns := syntheticIdentity(mod, ModuleOpts{K8sConfig: k8s, Namespace: "opm-controller-system"}, "from-flag")
-	assert.Equal(t, "opm-controller-system", ns)
+	_, _, ns := syntheticIdentity(mod, ModuleOpts{K8sConfig: k8s, Namespace: "opm-system"}, "from-flag")
+	assert.Equal(t, "opm-system", ns)
 
 	_, _, ns = syntheticIdentity(mod, ModuleOpts{K8sConfig: k8s}, "from-flag")
 	assert.Equal(t, "from-flag", ns)

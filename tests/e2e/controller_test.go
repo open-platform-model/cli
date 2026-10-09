@@ -195,16 +195,18 @@ func resetControllerCluster(t *testing.T, kubeconfig string) {
 	stripAllModuleInstanceFinalizers(t, kubeconfig)
 	kubectlDeleteIfExists(t, kubeconfig, "moduleinstances.opmodel.dev", "--all-namespaces", "--all")
 	kubectlDeleteIfExists(t, kubeconfig, append([]string{"crd"}, controller.CRDNames()...)...)
-	kubectlDeleteIfExists(t, kubeconfig, "namespace", "opm-controller-system")
+	kubectlDeleteIfExists(t, kubeconfig, "namespace", "opm-system")
 	kubectlDeleteIfExists(t, kubeconfig, "clusterrole", "opm-cli-user",
 		"opm-controller-manager-role", "opm-controller-metrics-auth-role", "opm-controller-metrics-reader",
 		"opm-controller-moduleinstance-admin-role", "opm-controller-moduleinstance-editor-role", "opm-controller-moduleinstance-viewer-role",
 		"opm-controller-transformerregistration-admin-role",
 		"opm-controller-platform-viewer-role", "opm-controller-modulepackage-viewer-role",
 		"opm-controller-transformerregistration-viewer-role")
-	// The module names each binding after its role.
+	// The module names each binding after its role; an earlier manifest
+	// install named them "-rolebinding".
 	kubectlDeleteIfExists(t, kubeconfig, "clusterrolebinding", "opm-cli-user",
-		"opm-controller-manager-role", "opm-controller-metrics-auth-role")
+		"opm-controller-manager-role", "opm-controller-metrics-auth-role",
+		"opm-operator-manager-rolebinding", "opm-operator-metrics-auth-rolebinding")
 	// kubectl delete gives up after its timeout and the error is ignored;
 	// a CRD still terminating when the next case applies the manifest
 	// makes that case's install refuse to apply over it.
@@ -241,7 +243,7 @@ func waitGone(t *testing.T, kubeconfig string, kindAndNames ...string) {
 // uninstall's refusal without a record, and a solo --crds-only install onto
 // a freshly reset cluster.
 // This test is DESTRUCTIVE: resetControllerCluster deletes the CRDs, the
-// opm-controller-system Namespace, and every ModuleInstance, which tears down the
+// opm-system Namespace, and every ModuleInstance, which tears down the
 // reconciling controller that the controller-owned tests require. Those tests
 // hard-fail without one, so the teardown is followed by a rebuild via
 // `task cluster:controller` — otherwise a full suite run would poison the next
@@ -276,7 +278,7 @@ func TestE2E_Controller_InstallUninstallLifecycle(t *testing.T) {
 
 		if pullable {
 			require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
-			assertResourceHealthy(t, kubeconfig, "deployment", "opm-controller-system", "opm-controller-manager")
+			assertResourceHealthy(t, kubeconfig, "deployment", "opm-system", "opm-controller-manager")
 		} else {
 			// The apply phase (before the readiness wait) still ran —
 			// only the Deployment rollout wait times out.
@@ -287,15 +289,15 @@ func TestE2E_Controller_InstallUninstallLifecycle(t *testing.T) {
 		assertCRDEstablished(t, kubeconfig, "modulepackages.opmodel.dev")
 		assertCRDEstablished(t, kubeconfig, "platforms.opmodel.dev")
 		assertCRDEstablished(t, kubeconfig, "transformerregistrations.opmodel.dev")
-		assertResourceExists(t, kubeconfig, "namespace", "", "opm-controller-system")
-		assertResourceExists(t, kubeconfig, "deployment", "opm-controller-system", "opm-controller-manager")
+		assertResourceExists(t, kubeconfig, "namespace", "", "opm-system")
+		assertResourceExists(t, kubeconfig, "deployment", "opm-system", "opm-controller-manager")
 
 		// The install is recorded: a CLI-owned instance of the pinned module
 		// whose inventory lists the CRDs and the Namespace too.
-		owner := kubectlOut(t, kubeconfig, "get", "moduleinstance", "opm-controller", "-n", "opm-controller-system",
+		owner := kubectlOut(t, kubeconfig, "get", "moduleinstance", "opm-controller", "-n", "opm-system",
 			"-o", "jsonpath={.spec.owner}")
 		assert.Equal(t, "cli", owner)
-		kinds := kubectlOut(t, kubeconfig, "get", "moduleinstance", "opm-controller", "-n", "opm-controller-system",
+		kinds := kubectlOut(t, kubeconfig, "get", "moduleinstance", "opm-controller", "-n", "opm-system",
 			"-o", "jsonpath={.status.inventory.entries[*].kind}")
 		assert.Equal(t, 4, strings.Count(kinds, "CustomResourceDefinition"), "inventory kinds: %s", kinds)
 		assert.Contains(t, kinds, "Namespace")
@@ -328,7 +330,7 @@ func TestE2E_Controller_InstallUninstallLifecycle(t *testing.T) {
 		assert.Contains(t, stderr, "--remove-finalizers")
 		// Refused: the Deployment this scenario relies on for the "survives"
 		// check further down must still be present.
-		assertResourceExists(t, kubeconfig, "deployment", "opm-controller-system", "opm-controller-manager")
+		assertResourceExists(t, kubeconfig, "deployment", "opm-system", "opm-controller-manager")
 
 		_, stderr, err = runOPMWithEnv(t, tmpDir, homeDir, 30*time.Second,
 			"controller", "uninstall", "--remove-finalizers",
@@ -341,8 +343,8 @@ func TestE2E_Controller_InstallUninstallLifecycle(t *testing.T) {
 
 		// CRDs and the Namespace survive uninstall; the record is gone.
 		assertCRDEstablished(t, kubeconfig, "moduleinstances.opmodel.dev")
-		assertResourceExists(t, kubeconfig, "namespace", "", "opm-controller-system")
-		out := kubectlOut(t, kubeconfig, "get", "moduleinstance", "opm-controller", "-n", "opm-controller-system",
+		assertResourceExists(t, kubeconfig, "namespace", "", "opm-system")
+		out := kubectlOut(t, kubeconfig, "get", "moduleinstance", "opm-controller", "-n", "opm-system",
 			"--ignore-not-found", "-o", "name")
 		assert.Empty(t, out, "uninstall deletes the controller's instance record")
 	})
@@ -373,13 +375,13 @@ func TestE2E_Controller_InstallUninstallLifecycle(t *testing.T) {
 
 		if pullable {
 			require.NoError(t, err, "stdout=%s stderr=%s", stdout, stderr)
-			assertResourceHealthy(t, kubeconfig, "deployment", "opm-controller-system", "opm-controller-manager")
+			assertResourceHealthy(t, kubeconfig, "deployment", "opm-system", "opm-controller-manager")
 		} else {
 			// Only the rollout wait may fail; the Deployment existing
 			// post-apply (asserted below) shows the guard let apply run.
 			require.Error(t, err, "stdout=%s stderr=%s", stdout, stderr)
 		}
-		assertResourceExists(t, kubeconfig, "deployment", "opm-controller-system", "opm-controller-manager")
+		assertResourceExists(t, kubeconfig, "deployment", "opm-system", "opm-controller-manager")
 	})
 
 	t.Run("crds-only on a fresh cluster installs only the CRDs", func(t *testing.T) {
@@ -395,7 +397,7 @@ func TestE2E_Controller_InstallUninstallLifecycle(t *testing.T) {
 		assertCRDEstablished(t, kubeconfig, "platforms.opmodel.dev")
 		assertCRDEstablished(t, kubeconfig, "transformerregistrations.opmodel.dev")
 
-		out := kubectlOut(t, kubeconfig, "get", "namespace", "opm-controller-system", "--ignore-not-found", "-o", "name")
+		out := kubectlOut(t, kubeconfig, "get", "namespace", "opm-system", "--ignore-not-found", "-o", "name")
 		assert.Empty(t, out, "no Namespace should exist after a --crds-only install")
 	})
 }

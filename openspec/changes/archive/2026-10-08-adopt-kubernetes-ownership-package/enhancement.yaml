@@ -1,0 +1,10 @@
+# Implements part of enhancement 0012 (cli adoption of the Kubernetes tier's
+# ownership package). Decisions are deliberately not claimed here: 0012:D4 and
+# 0012:D8 bind both frontends, and 0012:D4:R1 (deletes named by the deletion
+# transition) waits for the cli's adoption of opm/k8s/lifecycle, so the
+# delivery log records them after the operator's ownership adoption and both
+# deletion adoptions have merged. Under-claiming is the safe direction.
+implements:
+  - enhancement: "0012"
+    decisions: []
+    resolves: []

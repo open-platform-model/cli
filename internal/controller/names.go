@@ -12,14 +12,15 @@ import (
 )
 
 // The controller's fixed names. The running-controller check (CheckReady) locates
-// the controller by these names alone, never by its instance record. They are
-// the contract between the CLI and the controller module; a module version that
-// renames one updates it here.
+// the controller by these names alone, never by its instance record: every
+// install of the controller module keeps every one of them. They are the
+// contract that check relies on. A module version that renames one updates it
+// here.
 const (
 	// ControllerInstanceName and ControllerNamespace are the coordinates of the
 	// ModuleInstance that deploys the controller when it is installed as a module.
 	ControllerInstanceName = "opm-controller"
-	ControllerNamespace    = "opm-controller-system"
+	ControllerNamespace    = "opm-system"
 
 	// ControllerDeploymentName is the controller's Deployment, in
 	// ControllerNamespace.

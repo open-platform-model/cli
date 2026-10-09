@@ -6,7 +6,7 @@
 ## REMOVED Requirements
 
 ### Requirement: Release PRs refuse local, unpublished or mismatched pins, the operator module pin included
-**Reason**: Renamed with the product: the operator is now the controller (`opm controller`, `opm-controller-system`, `spec.owner: controller`). Restated under the new title.
+**Reason**: Renamed with the product: the operator is now the controller (`opm controller`, `opm-system`, `spec.owner: controller`). Restated under the new title.
 **Migration**: None.
 
 ## MODIFIED Requirements

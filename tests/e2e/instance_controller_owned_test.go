@@ -57,7 +57,7 @@ func runControllerOwnedOPM(t *testing.T, timeout time.Duration, args ...string) 
 }
 
 const (
-	controllerNamespace  = "opm-controller-system"
+	controllerNamespace  = "opm-system"
 	controllerDeployment = "opm-controller-manager"
 	controllerSA         = "system:serviceaccount:" + controllerNamespace + ":" + controllerDeployment
 	defaultSAFlag        = "--default-service-account="
@@ -351,7 +351,7 @@ func TestE2E_Delete_ControllerOwnedDelegates(t *testing.T) {
 		makeControllerOwned(t, kubeconfig)
 
 		stdout, stderr, err := runControllerOwnedOPM(t, 10*time.Minute,
-			"instance", "delete", controllerOwnedInstance, "--force")
+			"instance", "delete", controllerOwnedInstance, "--yes")
 		require.NoError(t, err, "delete failed: %s%s", stdout, stderr)
 
 		combined := stdout + stderr
@@ -375,7 +375,7 @@ func TestE2E_Delete_ControllerOwnedDelegates(t *testing.T) {
 			"--type=merge", "-p", `{"spec":{"prune":true}}`)
 
 		stdout, stderr, err := runControllerOwnedOPM(t, 10*time.Minute,
-			"instance", "delete", controllerOwnedInstance, "--force")
+			"instance", "delete", controllerOwnedInstance, "--yes")
 		require.NoError(t, err, "delete failed: %s%s", stdout, stderr)
 
 		assert.Contains(t, stdout+stderr, "controller pruned")

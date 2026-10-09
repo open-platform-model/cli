@@ -109,7 +109,7 @@ The job SHALL run a registry container seeded from the tree with `hack/fixtures.
 #### Scenario: The pinned controller module is what runs
 
 - **WHEN** the job has prepared the cluster
-- **THEN** the ModuleInstance `opm-controller` in `opm-controller-system` records the `PinnedModuleVersion` of the pull request's head commit, and the controller Deployment runs the controller release `PinnedControllerVersion` names
+- **THEN** the ModuleInstance `opm-controller` in `opm-system` records the `PinnedModuleVersion` of the pull request's head commit, and the controller Deployment runs the controller release `PinnedControllerVersion` names
 
 #### Scenario: Bumped fixture before it is published
 

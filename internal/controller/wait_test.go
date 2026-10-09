@@ -3,6 +3,8 @@ package controller
 import (
 	"testing"
 
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,7 +36,7 @@ func deploymentFixture(ready bool) *unstructured.Unstructured {
 		"kind":       "Deployment",
 		"metadata": map[string]any{
 			"name":      "opm-controller-manager",
-			"namespace": "opm-controller-system",
+			"namespace": "opm-system",
 		},
 	}}
 	if ready {
@@ -82,5 +84,5 @@ func fakeClientWith(objs ...*unstructured.Unstructured) *kubernetes.Client {
 	listKinds := map[schema.GroupVersionResource]string{
 		moduleInstanceGVR: "ModuleInstanceList",
 	}
-	return &kubernetes.Client{Dynamic: fakedynamic.NewSimpleDynamicClientWithCustomListKinds(scheme, listKinds, runtimeObjs...)}
+	return &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: fakedynamic.NewSimpleDynamicClientWithCustomListKinds(scheme, listKinds, runtimeObjs...)}
 }

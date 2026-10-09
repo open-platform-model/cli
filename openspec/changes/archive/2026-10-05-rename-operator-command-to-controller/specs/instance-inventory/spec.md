@@ -1,7 +1,7 @@
 ## REMOVED Requirements
 
 ### Requirement: CLI writes a strict status subset via the status subresource
-**Reason**: Renamed with the product: the operator is now the controller (`opm controller`, `opm-controller-system`, `spec.owner: controller`). Restated under the new title.
+**Reason**: Renamed with the product: the operator is now the controller (`opm controller`, `opm-system`, `spec.owner: controller`). Restated under the new title.
 **Migration**: None.
 
 ## MODIFIED Requirements

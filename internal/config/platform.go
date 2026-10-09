@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"cuelang.org/go/cue/ast"
 
@@ -57,8 +56,10 @@ func LegacyPlatformDirPath(configPath string) string {
 // Failures surface as a DetailError naming the module directory, with the
 // loader/CUE cause kept for errors.Is/As and a hint keyed on the cause: a
 // missing directory or a directory that is not a CUE module names the
-// expected shape, an unresolvable dependency the cue.mod pin, and a
-// #registry conflict the entry's key/import pairing.
+// expected shape, a refused registry credential the login command, an
+// unresolvable dependency the cue.mod pin, and a #registry conflict the
+// entry's key/import pairing. A refused credential wraps
+// oerrors.ErrPermission; every other failure wraps oerrors.ErrValidation.
 func BuildPlatformModule(ctx context.Context, dir, registry string) (*platform.Platform, error) {
 	if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(PlatformModuleFileName))); err != nil {
 		return nil, &oerrors.DetailError{
@@ -75,47 +76,74 @@ func BuildPlatformModule(ctx context.Context, dir, registry string) (*platform.P
 	k := NewKernel(registry)
 	p, err := k.AcquirePlatformFromDir(ctx, dir)
 	if err != nil {
-		return nil, platformBuildError(dir, err)
+		return nil, platformBuildError(dir, registry, err)
 	}
 	return p, nil
 }
 
 // platformBuildError wraps a loader/CUE failure for dir in a DetailError
-// with a cause-specific hint.
-func platformBuildError(dir string, err error) error {
+// with a cause-specific hint. A registry that refused the credentials is a
+// permission failure, not a verdict on the platform module: it wraps
+// oerrors.ErrPermission, so a caller can give it the permission exit code.
+// Every other failure wraps oerrors.ErrValidation.
+func platformBuildError(dir, registry string, err error) error {
+	class := oerrors.ErrValidation
+	if cuemod.IsUnauthorized(err) {
+		class = oerrors.ErrPermission
+	}
 	return &oerrors.DetailError{
 		Type:     platformModuleErrType,
 		Message:  err.Error(),
 		Location: dir,
-		Hint:     platformBuildHint(dir, err),
-		Cause:    fmt.Errorf("%w: %w", oerrors.ErrValidation, err),
+		Hint:     platformBuildHint(dir, registry, err),
+		Cause:    fmt.Errorf("%w: %w", class, err),
 	}
 }
 
 // platformBuildHint picks the remediation for a platform module build
 // failure from the shape of the underlying error. The hints name no command
-// to re-run: the caller decides what the user runs next.
-func platformBuildHint(dir string, err error) string {
+// to re-run: the caller decides what the user runs next. The one command a
+// hint does name is the login a refused credential needs first. registry is
+// the mapping the build resolved through.
+func platformBuildHint(dir, registry string, err error) string {
 	modFile := filepath.Join(dir, filepath.FromSlash(PlatformModuleFileName))
-	msg := err.Error()
+	classified := liberrors.Classify(err)
+	var fetchErr *liberrors.FetchError
+	var resolutionErr *liberrors.ResolutionError
 	switch {
 	case errors.Is(err, liberrors.ErrWrongKind), errors.Is(err, liberrors.ErrInvalidPackage):
 		return "platform.cue must be a single package embedding core.#Platform"
-	// "cannot find package" is cue/load's prefix for every failed import, so
-	// it catches registry failures (an unpublished pin, an archive blob 404, a
-	// refused registry) as well as an import no declared dependency provides;
-	// each gets this hint, as before. "cannot expand module graph" wraps a
-	// dependency module file that does not parse. The library's not-found
-	// classification covers a registry answer that reaches this function
-	// without the import prefix. The switch picks a hint, never an exit code.
-	case cuemod.IsFetchNotFound(err), strings.Contains(msg, "cannot find package"), strings.Contains(msg, "cannot expand module graph"):
+	// A registry that refused the credentials (a 401, or a 403 that reaches
+	// the library as a refusal): no other pin cures it, the user logs in.
+	// The refused fetch may be any module of the dependency graph, so the
+	// host is named only when every declared dependency routes to one.
+	case cuemod.IsUnauthorized(err):
+		return RegistryLoginHint(platformRegistryHost(dir, registry))
+	// Any other failed registry interaction (an unpublished pin, an archive
+	// blob 404, a registry that gives no response) and a dependency that
+	// does not resolve (an import no module provides, an ambiguous import,
+	// a dependency module file that does not parse) get
+	// this hint. Both are read from the library's typed classification,
+	// never from the message (0021:D8:R12). A failed import that is neither,
+	// such as a package-name mismatch, is a defect in the platform module's
+	// own files and takes the default hint. The switch picks a hint, never an
+	// exit code.
+	case errors.As(classified, &fetchErr), errors.As(classified, &resolutionErr):
 		return "Pin a published build in " + modFile + ", then try again"
-	case strings.Contains(msg, "#registry"):
+	// An evaluation error at a path under #registry: the schema's
+	// key-to-import binding, or another check on an entry. An entry the
+	// library's shape check refuses carries no CUE path and takes the
+	// default hint.
+	case cueErrorUnder(err, registrySelector):
 		return "Each #registry entry's key must equal the module path of the catalog it imports (#catalog); fix the entry named above in " + filepath.Join(dir, PlatformCUEFileName)
 	default:
 		return "Fix the platform module at " + dir + " (pins in " + modFile + "), then try again"
 	}
 }
+
+// registrySelector is the first selector of a CUE error path inside a
+// platform's registry.
+const registrySelector = "#registry"
 
 // fileHasImports reports whether the parsed CUE file contains any import
 // declaration. The config file is data-only by contract (0006:D39).

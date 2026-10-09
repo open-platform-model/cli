@@ -61,26 +61,26 @@ before anything is written; a rejected credential leaves the file
 untouched, and everything in the file outside the one host entry is
 preserved.
 
-	With a host argument the host is taken literally (docker-login semantics);
-	append +insecure to a host served over plain HTTP. Without one, the
-	configured registry mapping (--registry > OPM_REGISTRY > config.registry)
-	is resolved to its host set: a single host proceeds; several refuse,
-	listing each as a runnable command.
+With a host argument the host is taken literally (docker-login semantics);
+append +insecure to a host served over plain HTTP. Without one, the
+configured registry mapping (--registry > OPM_REGISTRY > config.registry)
+is resolved to its host set: a single host proceeds; several refuse,
+listing each as a runnable command.
 
-	This command is interactive by design and prompts for the username and
-	secret. In CI, use 'docker login' — it writes the same file.
+This command is interactive by design and prompts for the username and
+secret. In CI, use 'docker login' — it writes the same file.
 
-	Exit codes: 0 written, 2 refusal, 3 registry unreachable.
+Exit codes: 0 written, 2 refusal, 3 registry unreachable.
 
-	Examples:
-	  # Log in to the host the configured registry resolves to
-	  opm registry login
+Examples:
+  # Log in to the host the configured registry resolves to
+  opm registry login
 
-	  # Log in to a named host
-	  opm registry login ghcr.io
+  # Log in to a named host
+  opm registry login ghcr.io
 
-	  # A local registry served over plain HTTP
-	  opm registry login localhost:5000+insecure`,
+  # A local registry served over plain HTTP
+  opm registry login localhost:5000+insecure`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			return runLogin(c, cfg, args)

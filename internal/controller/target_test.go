@@ -40,7 +40,7 @@ func TestRenderedControllerImage(t *testing.T) {
 
 	_, err := RenderedControllerImage(moduleObjects(renderOpts{noDeployment: true}))
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no Deployment opm-controller-system/opm-controller-manager")
+	assert.Contains(t, err.Error(), "no Deployment opm-system/opm-controller-manager")
 
 	other := deploymentWithImage("x:v1")
 	_ = unstructured.SetNestedSlice(other.Object, []any{map[string]any{"name": "sidecar", "image": "x:v1"}},

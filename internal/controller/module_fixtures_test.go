@@ -9,6 +9,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+
 	authorizationv1 "k8s.io/api/authorization/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -128,6 +130,16 @@ func moduleObjects(o renderOpts) []*unstructured.Unstructured {
 	return objs
 }
 
+// findObj returns the object of a kind and name in objs, or nil.
+func findObj(objs []*unstructured.Unstructured, kind, name string) *unstructured.Unstructured {
+	for _, o := range objs {
+		if o.GetKind() == kind && o.GetName() == name {
+			return o
+		}
+	}
+	return nil
+}
+
 // renderResult wraps fixture objects as the render workflow returns them.
 func renderResult(objs []*unstructured.Unstructured, values map[string]any, moduleVersion string) *workflowrender.Result {
 	return &workflowrender.Result{
@@ -243,7 +255,7 @@ func newFakeCluster(t *testing.T, objs ...*unstructured.Unstructured) *fakeClust
 			Status: authorizationv1.SubjectAccessReviewStatus{Allowed: !fc.denyStatusRBAC, Reason: "test"},
 		}, nil
 	})
-	fc.client = &kubernetes.Client{Dynamic: fc.fake, Clientset: cs}
+	fc.client = &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: fc.fake, Clientset: cs}
 	return fc
 }
 

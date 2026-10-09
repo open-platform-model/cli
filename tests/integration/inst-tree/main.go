@@ -437,7 +437,7 @@ func main() {
 
 	// ── Steps 8–10: Argument resolution chain ────────────────────────────────
 	// These steps exercise ResolveInstanceArg + ResolveInventory using the
-	// inventory Secret written in Step 1. A minimal GlobalConfig suffices:
+	// ModuleInstance record written in Step 1. A minimal GlobalConfig suffices:
 	// Registry comes from OPM_REGISTRY (same as the Taskfile integration env).
 	cfg := &config.GlobalConfig{
 		Registry: os.Getenv("OPM_REGISTRY"),

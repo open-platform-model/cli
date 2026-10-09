@@ -30,40 +30,40 @@ func NewModuleInitCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Long: `Create a new OPM module by fetching a published template module and
 re-identifying it to your module path, or repair an existing module tree.
 
-	A bare-word template (letters, digits, underscores) is a shortcut into the
-	official set at opmodel.dev/templates/<name>; run 'opm module template list'
-	to see it. A reference containing '/' or '.' is a literal module path and is
-	never expanded — any published module can seed a scaffold. An '@vN' suffix
-	floats to the newest release within that major (stable preferred), a full
-	SemVer pins the exact tag, and no suffix takes the template's default major.
+A bare-word template (letters, digits, underscores) is a shortcut into the
+official set at opmodel.dev/templates/<name>; run 'opm module template list'
+to see it. A reference containing '/' or '.' is a literal module path and is
+never expanded — any published module can seed a scaffold. An '@vN' suffix
+floats to the newest release within that major (stable preferred), a full
+SemVer pins the exact tag, and no suffix takes the template's default major.
 
-	Scaffolding requires the registry once for an uncached template; after any
-	successful fetch, CUE's module cache serves repeats offline. No template is
-	embedded in the binary.
+Scaffolding requires the registry once for an uncached template; after any
+successful fetch, CUE's module cache serves repeats offline. No template is
+embedded in the binary.
 
-	Run against a directory that already holds a module, init detects a missing
-	or disagreeing cue.mod module line or identity package, shows exactly what
-	it would create or edit, and asks before writing. It never invents
-	identity: the module path and version always come from the tree or from
-	your arguments.
+Run against a directory that already holds a module, init detects a missing
+or disagreeing cue.mod module line or identity package, shows exactly what
+it would create or edit, and asks before writing. It never invents
+identity: the module path and version always come from the tree or from
+your arguments.
 
-	Exit codes: 0 scaffolded or repaired, 2 refused, 3 registry unreachable.
+Exit codes: 0 scaffolded or repaired, 2 refused, 3 registry unreachable.
 
-	Examples:
-	  # Scaffold from the default template (standard)
-	  opm mod init example.com/modules/my_app@v0
+Examples:
+  # Scaffold from the default template (standard)
+  opm mod init example.com/modules/my_app@v0
 
-	  # A specific official template, floating within its v1 line
-	  opm mod init example.com/modules/my_app@v0 standard@v1
+  # A specific official template, floating within its v1 line
+  opm mod init example.com/modules/my_app@v0 standard@v1
 
-	  # Prompt for the module path (interactive)
-	  opm mod init standard
+  # Prompt for the module path (interactive)
+  opm mod init standard
 
-	  # Clone any published module as the starting point
-	  opm mod init example.com/modules/my_app@v0 --from example.com/modules/donor@v2
+  # Clone any published module as the starting point
+  opm mod init example.com/modules/my_app@v0 --from example.com/modules/donor@v2
 
-	  # Repair the module in the current directory
-	  opm mod init`,
+  # Repair the module in the current directory
+  opm mod init`,
 		Args: cobra.MaximumNArgs(2),
 		RunE: func(c *cobra.Command, args []string) error {
 			return runModuleInit(c, cfg, args, initFlags{

@@ -11,152 +11,191 @@ import (
 	"github.com/open-platform-model/library/opm/k8s/object"
 )
 
-// The literals below are the kind-class weight table the cli applied, deleted
-// and printed by in its own pkg/resourceorder before the move to the
-// library's opm/k8s/object (0012:D5:R2); while both tables existed, this test
-// asserted each literal against both. They pin what the cli orders by: a
-// library release that moves any of these weights fails here on the bump PR,
-// so an order change is a reviewed edit in both repositories. A row the
-// library adds is the library's own TestWeightTableGuard, not this test.
+// The literals below are the cli's reviewed copy of the library's kind-class
+// weight table (opm/k8s/object), which the cli applies, prunes, deletes and
+// prints by. They pin that order: a library release that moves any of these
+// weights fails here on the bump PR, so an order change is an edit a cli
+// reviewer reads, never a side effect of a pin bump. The values are the
+// library's since v1.0.0-beta.7, which follow Flux's staged apply order
+// (0012:D5:R1). The table the cli carried in its own pkg/resourceorder
+// before the move to the library is history and is no longer compared here.
+// A row the library adds is the library's own TestWeightTableGuard, not this
+// test.
 
-// retiredWeightConstants is every Weight* constant of the retired table.
-var retiredWeightConstants = map[string]struct{ lib, want int }{
+// pinnedWeightConstants is every Weight* constant of the library's table.
+var pinnedWeightConstants = map[string]struct{ lib, want int }{
 	"WeightCRD":                {object.WeightCRD, -100},
 	"WeightNamespace":          {object.WeightNamespace, 0},
 	"WeightClusterRole":        {object.WeightClusterRole, 5},
-	"WeightClusterRoleBinding": {object.WeightClusterRoleBinding, 5},
+	"WeightClass":              {object.WeightClass, 6},
+	"WeightStorageClass":       {object.WeightStorageClass, 6},
+	"WeightClusterRoleBinding": {object.WeightClusterRoleBinding, 7},
+	"WeightResourceQuota":      {object.WeightResourceQuota, 8},
 	"WeightServiceAccount":     {object.WeightServiceAccount, 10},
 	"WeightRole":               {object.WeightRole, 10},
 	"WeightRoleBinding":        {object.WeightRoleBinding, 10},
 	"WeightSecret":             {object.WeightSecret, 15},
 	"WeightConfigMap":          {object.WeightConfigMap, 15},
-	"WeightStorageClass":       {object.WeightStorageClass, 20},
-	"WeightPersistentVolume":   {object.WeightPersistentVolume, 20},
-	"WeightPVC":                {object.WeightPVC, 20},
 	"WeightService":            {object.WeightService, 50},
+	"WeightLimitRange":         {object.WeightLimitRange, 60},
 	"WeightDeployment":         {object.WeightDeployment, 100},
 	"WeightStatefulSet":        {object.WeightStatefulSet, 100},
-	"WeightDaemonSet":          {object.WeightDaemonSet, 100},
-	"WeightJob":                {object.WeightJob, 110},
-	"WeightCronJob":            {object.WeightCronJob, 110},
-	"WeightIngress":            {object.WeightIngress, 150},
-	"WeightNetworkPolicy":      {object.WeightNetworkPolicy, 150},
-	"WeightHPA":                {object.WeightHPA, 200},
-	"WeightVPA":                {object.WeightVPA, 200},
-	"WeightPDB":                {object.WeightPDB, 200},
-	"WeightWebhook":            {object.WeightWebhook, 500},
+	"WeightCronJob":            {object.WeightCronJob, 105},
+	"WeightPDB":                {object.WeightPDB, 108},
+	"WeightPersistentVolume":   {object.WeightPersistentVolume, 1000},
+	"WeightPVC":                {object.WeightPVC, 1000},
+	"WeightDaemonSet":          {object.WeightDaemonSet, 1000},
+	"WeightJob":                {object.WeightJob, 1000},
+	"WeightIngress":            {object.WeightIngress, 1000},
+	"WeightNetworkPolicy":      {object.WeightNetworkPolicy, 1000},
+	"WeightHPA":                {object.WeightHPA, 1000},
+	"WeightVPA":                {object.WeightVPA, 1000},
 	"WeightDefault":            {object.WeightDefault, 1000},
+	"WeightWebhook":            {object.WeightWebhook, 2000},
 }
 
-// retiredGVKWeights is every exact group-version-kind entry of the table.
-var retiredGVKWeights = map[schema.GroupVersionKind]int{
+// pinnedGVKWeights is every exact group-version-kind entry of the table.
+var pinnedGVKWeights = map[schema.GroupVersionKind]int{
 	{Group: "apiextensions.k8s.io", Version: "v1", Kind: "CustomResourceDefinition"}: -100,
 
 	{Group: "", Version: "v1", Kind: "Namespace"}:             0,
+	{Group: "", Version: "v1", Kind: "ResourceQuota"}:         8,
 	{Group: "", Version: "v1", Kind: "ServiceAccount"}:        10,
 	{Group: "", Version: "v1", Kind: "Secret"}:                15,
 	{Group: "", Version: "v1", Kind: "ConfigMap"}:             15,
-	{Group: "", Version: "v1", Kind: "PersistentVolume"}:      20,
-	{Group: "", Version: "v1", Kind: "PersistentVolumeClaim"}: 20,
 	{Group: "", Version: "v1", Kind: "Service"}:               50,
+	{Group: "", Version: "v1", Kind: "LimitRange"}:            60,
+	{Group: "", Version: "v1", Kind: "PersistentVolume"}:      1000,
+	{Group: "", Version: "v1", Kind: "PersistentVolumeClaim"}: 1000,
 
 	{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRole"}:        5,
-	{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRoleBinding"}: 5,
+	{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRoleBinding"}: 7,
 	{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "Role"}:               10,
 	{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "RoleBinding"}:        10,
 
-	{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClass"}: 20,
+	{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClass"}:     6,
+	{Group: "scheduling.k8s.io", Version: "v1", Kind: "PriorityClass"}: 6,
+	{Group: "node.k8s.io", Version: "v1", Kind: "RuntimeClass"}:        6,
+	{Group: "networking.k8s.io", Version: "v1", Kind: "IngressClass"}:  6,
 
 	{Group: "apps", Version: "v1", Kind: "Deployment"}:  100,
 	{Group: "apps", Version: "v1", Kind: "StatefulSet"}: 100,
-	{Group: "apps", Version: "v1", Kind: "DaemonSet"}:   100,
-	{Group: "apps", Version: "v1", Kind: "ReplicaSet"}:  100,
+	{Group: "apps", Version: "v1", Kind: "DaemonSet"}:   1000,
+	{Group: "apps", Version: "v1", Kind: "ReplicaSet"}:  1000,
 
-	{Group: "batch", Version: "v1", Kind: "Job"}:     110,
-	{Group: "batch", Version: "v1", Kind: "CronJob"}: 110,
+	{Group: "batch", Version: "v1", Kind: "Job"}:     1000,
+	{Group: "batch", Version: "v1", Kind: "CronJob"}: 105,
 
-	{Group: "networking.k8s.io", Version: "v1", Kind: "Ingress"}:       150,
-	{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicy"}: 150,
+	{Group: "networking.k8s.io", Version: "v1", Kind: "Ingress"}:       1000,
+	{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicy"}: 1000,
 
-	{Group: "autoscaling", Version: "v2", Kind: "HorizontalPodAutoscaler"}:      200,
-	{Group: "autoscaling", Version: "v1", Kind: "HorizontalPodAutoscaler"}:      200,
-	{Group: "autoscaling.k8s.io", Version: "v1", Kind: "VerticalPodAutoscaler"}: 200,
+	{Group: "autoscaling", Version: "v2", Kind: "HorizontalPodAutoscaler"}:      1000,
+	{Group: "autoscaling", Version: "v1", Kind: "HorizontalPodAutoscaler"}:      1000,
+	{Group: "autoscaling.k8s.io", Version: "v1", Kind: "VerticalPodAutoscaler"}: 1000,
 
-	{Group: "policy", Version: "v1", Kind: "PodDisruptionBudget"}: 200,
+	{Group: "policy", Version: "v1", Kind: "PodDisruptionBudget"}: 108,
 
-	{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "ValidatingWebhookConfiguration"}: 500,
-	{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "MutatingWebhookConfiguration"}:   500,
+	{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "ValidatingWebhookConfiguration"}: 2000,
+	{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "MutatingWebhookConfiguration"}:   2000,
 }
 
-// retiredKindWeights is every kind-only entry of the table. Each kind here
-// also has an exact row above, so the test reaches the kind table through a
-// group and version the exact rows do not hold.
-var retiredKindWeights = map[string]int{
-	"Namespace":                      0,
+// pinnedDefinitionWeights is the three cluster definitions, which keep their
+// weight in any version of their own group. Each is read here through a
+// version the exact rows do not hold.
+var pinnedDefinitionWeights = map[schema.GroupVersionKind]int{
+	{Group: "apiextensions.k8s.io", Version: "v9", Kind: "CustomResourceDefinition"}: -100,
+	{Group: "", Version: "v9", Kind: "Namespace"}:                                    0,
+	{Group: "rbac.authorization.k8s.io", Version: "v9", Kind: "ClusterRole"}:         5,
+}
+
+// pinnedKindWeights is every kind-only entry of the table, read through a
+// group and version no other row holds. A kind with a cluster definition's
+// name in another group weighs as a class kind.
+var pinnedKindWeights = map[string]int{
+	"CustomResourceDefinition":       6,
+	"Namespace":                      6,
+	"ClusterRole":                    6,
+	"ClusterClass":                   6,
+	"RuntimeClass":                   6,
+	"PriorityClass":                  6,
+	"StorageClass":                   6,
+	"VolumeSnapshotClass":            6,
+	"IngressClass":                   6,
+	"GatewayClass":                   6,
+	"ClusterRoleBinding":             7,
+	"ResourceQuota":                  8,
 	"ServiceAccount":                 10,
-	"Secret":                         15,
-	"ConfigMap":                      15,
-	"PersistentVolume":               20,
-	"PersistentVolumeClaim":          20,
-	"Service":                        50,
-	"ClusterRole":                    5,
-	"ClusterRoleBinding":             5,
 	"Role":                           10,
 	"RoleBinding":                    10,
-	"StorageClass":                   20,
+	"Secret":                         15,
+	"ConfigMap":                      15,
+	"Service":                        50,
+	"LimitRange":                     60,
 	"Deployment":                     100,
 	"StatefulSet":                    100,
-	"DaemonSet":                      100,
-	"ReplicaSet":                     100,
-	"Job":                            110,
-	"CronJob":                        110,
-	"Ingress":                        150,
-	"NetworkPolicy":                  150,
-	"HorizontalPodAutoscaler":        200,
-	"VerticalPodAutoscaler":          200,
-	"PodDisruptionBudget":            200,
-	"ValidatingWebhookConfiguration": 500,
-	"MutatingWebhookConfiguration":   500,
-	"CustomResourceDefinition":       -100,
+	"CronJob":                        105,
+	"PodDisruptionBudget":            108,
+	"PersistentVolume":               1000,
+	"PersistentVolumeClaim":          1000,
+	"DaemonSet":                      1000,
+	"ReplicaSet":                     1000,
+	"Job":                            1000,
+	"Ingress":                        1000,
+	"NetworkPolicy":                  1000,
+	"HorizontalPodAutoscaler":        1000,
+	"VerticalPodAutoscaler":          1000,
+	"ValidatingWebhookConfiguration": 2000,
+	"MutatingWebhookConfiguration":   2000,
 }
 
-// retiredFallbacks are the two fallback rows: an unknown kind weighs the
-// default, and an unknown version of a known kind weighs the kind.
-var retiredFallbacks = map[schema.GroupVersionKind]int{
+// pinnedFallbacks are the fallback rows: an unknown kind weighs the default,
+// an unknown version of a known kind weighs the kind, and a kind no row
+// holds whose name ends in "Class" (case-sensitive) weighs as a class kind.
+var pinnedFallbacks = map[schema.GroupVersionKind]int{
 	{Group: "example.com", Version: "v1", Kind: "Foo"}:                          1000,
-	{Group: "autoscaling", Version: "v2beta2", Kind: "HorizontalPodAutoscaler"}: 200,
+	{Group: "autoscaling", Version: "v2beta2", Kind: "HorizontalPodAutoscaler"}: 1000,
+	{Group: "policy", Version: "v1beta1", Kind: "PodDisruptionBudget"}:          108,
+	{Group: "example.com", Version: "v1", Kind: "WidgetClass"}:                  6,
+	{Group: "example.com", Version: "v1", Kind: "Widgetclass"}:                  1000,
 }
 
 func kindOnlyGVK(kind string) schema.GroupVersionKind {
 	return schema.GroupVersionKind{Group: "fallback.invalid", Version: "v9", Kind: kind}
 }
 
-func TestWeightTableMatchesRetiredCopy(t *testing.T) {
+func TestWeightTableMatchesPinnedCopy(t *testing.T) {
 	t.Run("constants", func(t *testing.T) {
-		for name, c := range retiredWeightConstants {
+		for name, c := range pinnedWeightConstants {
 			assert.Equal(t, c.want, c.lib, "object.%s", name)
 		}
 	})
 	t.Run("gvk entries", func(t *testing.T) {
-		for gvk, want := range retiredGVKWeights {
+		for gvk, want := range pinnedGVKWeights {
+			assert.Equal(t, want, object.Weight(gvk), "object.Weight(%s)", gvk)
+		}
+	})
+	t.Run("cluster definitions in another version", func(t *testing.T) {
+		for gvk, want := range pinnedDefinitionWeights {
 			assert.Equal(t, want, object.Weight(gvk), "object.Weight(%s)", gvk)
 		}
 	})
 	t.Run("kind entries", func(t *testing.T) {
-		for kind, want := range retiredKindWeights {
+		for kind, want := range pinnedKindWeights {
 			gvk := kindOnlyGVK(kind)
 			assert.Equal(t, want, object.Weight(gvk), "object.Weight(%s)", gvk)
 		}
 	})
 	t.Run("fallbacks", func(t *testing.T) {
-		for gvk, want := range retiredFallbacks {
+		for gvk, want := range pinnedFallbacks {
 			assert.Equal(t, want, object.Weight(gvk), "object.Weight(%s)", gvk)
 		}
 	})
 }
 
 // orderSet is one shuffled set covering every weight class, two ConfigMaps
-// and two Deployments in a fixed input order, and one unknown kind.
+// and two Deployments in a fixed input order, and four kinds of the default
+// weight (an unknown kind, a Job, an Ingress and a PersistentVolumeClaim),
+// which keep their input order among themselves.
 func orderSet() []*unstructured.Unstructured {
 	mk := func(apiVersion, kind, name string) *unstructured.Unstructured {
 		u := &unstructured.Unstructured{}
@@ -181,6 +220,11 @@ func orderSet() []*unstructured.Unstructured {
 		mk("v1", "ConfigMap", "cm-a"),
 		mk("v1", "ServiceAccount", "sa"),
 		mk("apiextensions.k8s.io/v1", "CustomResourceDefinition", "crd"),
+		mk("rbac.authorization.k8s.io/v1", "ClusterRoleBinding", "crb"),
+		mk("v1", "ResourceQuota", "quota"),
+		mk("v1", "LimitRange", "limits"),
+		mk("batch/v1", "CronJob", "cronjob"),
+		mk("v1", "PersistentVolumeClaim", "pvc"),
 	}
 }
 
@@ -192,20 +236,23 @@ func objNames(objs []*unstructured.Unstructured) []string {
 	return out
 }
 
-// retiredSortOrder is the name sequence the cli's retired sort produced for
-// orderSet, per direction (recorded while both sorts existed).
-var retiredSortOrder = map[object.Direction][]string{
+// pinnedSortOrder is the name sequence the sort gives for orderSet, per
+// direction: the order the cli applies in (ascending) and the order it
+// deletes and prunes in (descending).
+var pinnedSortOrder = map[object.Direction][]string{
 	object.Ascending: {
-		"crd", "ns", "cr", "sa", "cm-b", "cm-a", "sc", "svc",
-		"deploy-b", "deploy-a", "job", "ingress", "pdb", "webhook", "unknown",
+		"crd", "ns", "cr", "sc", "crb", "quota", "sa", "cm-b", "cm-a", "svc",
+		"limits", "deploy-b", "deploy-a", "cronjob", "pdb",
+		"unknown", "job", "ingress", "pvc", "webhook",
 	},
 	object.Descending: {
-		"unknown", "webhook", "pdb", "ingress", "job", "deploy-b", "deploy-a",
-		"svc", "sc", "cm-b", "cm-a", "sa", "cr", "ns", "crd",
+		"webhook", "unknown", "job", "ingress", "pvc",
+		"pdb", "cronjob", "deploy-b", "deploy-a", "limits",
+		"svc", "cm-b", "cm-a", "sa", "quota", "crb", "sc", "cr", "ns", "crd",
 	},
 }
 
-func TestSortMatchesRetiredCopy(t *testing.T) {
+func TestSortMatchesPinnedOrder(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		dir  object.Direction
@@ -216,7 +263,7 @@ func TestSortMatchesRetiredCopy(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			objs := orderSet()
 			SortObjects(objs, tc.dir)
-			assert.Equal(t, retiredSortOrder[tc.dir], objNames(objs))
+			assert.Equal(t, pinnedSortOrder[tc.dir], objNames(objs))
 		})
 	}
 }
@@ -224,7 +271,7 @@ func TestSortMatchesRetiredCopy(t *testing.T) {
 // TestSortObjectsStableOnLargeInput pins that SortObjects keeps equal-weight
 // objects in their input order, in both directions. The input is large
 // enough (96 objects) that an unstable sort reorders equal elements, which
-// the 15-object orderSet does not reveal. Names count down while the input
+// the small orderSet does not reveal. Names count down while the input
 // order counts up, so a sort that fell back to the name would also fail.
 func TestSortObjectsStableOnLargeInput(t *testing.T) {
 	const pairs = 48

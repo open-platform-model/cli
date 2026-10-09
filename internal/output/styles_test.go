@@ -124,3 +124,14 @@ func TestFormatResourceLine_LeftBehind(t *testing.T) {
 	assert.Contains(t, line, "! left behind")
 	assert.Equal(t, "!", statusIcon(StatusLeftBehind))
 }
+
+// A dry run's statuses that need attention carry the attention icon, so the
+// meaning does not rest on color.
+func TestFormatResourceLine_DryRunStatuses(t *testing.T) {
+	for _, status := range []string{StatusWouldRefuse, StatusWouldSkip, StatusWouldKeep, StatusWouldLetGo, StatusCannotCheck} {
+		assert.Equal(t, "!", statusIcon(status), status)
+		line := FormatResourceLine("ConfigMap", "default", "settings", status)
+		assert.Contains(t, line, "ConfigMap/default/settings")
+		assert.Contains(t, line, "! "+status)
+	}
+}

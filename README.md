@@ -79,11 +79,11 @@ Use `opm instance` when you are starting from an instance file or when you want 
 | `instance init` | Create a standalone instance package (`cue.mod/module.cue`, `instance.cue`, `values.cue`) for a published module, pinned and ready to build |
 | `instance vet` | Validate an instance file without generating manifests |
 | `instance build` | Render an instance file or instance package directory to manifests (a module directory is refused: use `module build`) |
-| `instance apply` | Deploy an instance file to a cluster (`--wait` blocks until every resource is healthy) |
+| `instance apply` | Deploy an instance file to a cluster (`--wait` blocks until every resource is healthy; for a CLI-managed instance the prune keeps PersistentVolumeClaims unless `--delete-data`) |
 | `instance diff` | Compare an instance file with live cluster state |
 | `instance status` | Show resource status for a deployed instance |
 | `instance tree` | Show instance resource hierarchy |
-| `instance delete` | Delete instance resources from a cluster |
+| `instance delete` | Delete instance resources from a cluster (for a CLI-managed instance, PersistentVolumeClaims are kept unless `--delete-data`; `--wait` returns only when the deleted resources are gone) |
 | `instance list` | List deployed instances |
 | `instance events` | Show events for an instance |
 
@@ -147,13 +147,14 @@ Without a host argument, the configured registry mapping is resolved to its host
 
 Use `opm controller` to put the opm-controller (and its CRDs) onto a cluster — a prerequisite for any `opm instance apply`.
 
-`opm controller install` installs the controller from its OPM module, `opmodel.dev/modules/opm_controller`, as the CLI-owned ModuleInstance `opm-controller` in `opm-controller-system`. The controller never reconciles that instance, so re-running the CLI is always the way to repair or upgrade the controller.
+`opm controller install` installs the controller from its OPM module, `opmodel.dev/modules/opm_controller`, as the CLI-owned ModuleInstance `opm-controller` in `opm-system`. The controller never reconciles that instance, so re-running the CLI is always the way to repair or upgrade the controller.
 
 - **Install needs a registry.** The module is pulled from the configured registry (`--registry`, `OPM_REGISTRY` or the config file). An air-gapped cluster installs from a mirror that serves the module and its dependencies.
-- **`--crds-only` needs no registry.** It applies the CRDs of the module version this CLI pins, which the CLI carries, and talks only to the cluster. It takes no `--version`, `-f` or `--reset-values`, and refuses CRDs a newer module version installed (run `--crds-only` from a CLI that pins that version or newer, or install that version in full). It refuses `opmodel.dev` CRDs without OPM's labels, which an earlier installer applied: `--crds-only` neither adopts nor migrates them, so such a cluster starts fresh.
+- **`--crds-only` needs no registry.** It applies the CRDs of the module version this CLI pins, which the CLI carries, and talks only to the cluster. It takes no `--version`, `-f` or `--reset-values`, and refuses CRDs a newer module version installed (run `--crds-only` from a CLI that pins that version or newer, or install that version in full). A CRD that exists without OPM's managed-by label, or that carries another instance's identity, is refused as on a full install: `--crds-only` adopts nothing by itself, and the refusal prints the annotation to set.
 - **`--version` takes a controller module version**: `--version 0.2.0` pins, `--version v0` floats. Without it, install uses the module version this CLI pins. Install prints the controller release the module deploys.
 - **Settings are instance values, not Deployment patches.** `-f/--values` files are layered over the values recorded on the controller's instance, so a reinstall keeps every recorded value it does not change; `--reset-values` starts from the module's defaults. The module's `#config` holds `registry` (the controller's own `--registry` mapping), `image.repository` (for a mirror), `defaultServiceAccount`, `resources`, `replicas` and `extraArgs`.
-- **Uninstall deletes what the instance recorded**, except the CRDs and the Namespace, then the record. A controller with no record is refused: install it with this CLI first.
+- **Install does not take over a controller applied from an earlier release manifest.** An object the module renders that already exists passes when the instance's record lists it, when it carries OPM's managed-by label and no other instance's UUID (a stopped install, a `--crds-only` install), or when it carries the annotation `opmodel.dev/adopt=<instance UUID>`; otherwise install refuses with exit 2, changes nothing, and prints the annotation to set for each object. Delete an earlier controller Deployment first: its selector differs from the module's and cannot change. Install does not delete or report the earlier manifest's role bindings (`opm-operator-manager-rolebinding`, `opm-operator-metrics-auth-rolebinding`, `opm-operator-leader-election-rolebinding`) or other objects the module does not render: delete them by hand.
+- **Uninstall deletes what the instance recorded**, except the CRDs and the Namespace, then the record. A controller with no record, applied with kubectl or by an older CLI, is refused: delete its objects by hand, or annotate them as install's refusal prints and install it with this CLI first.
 
 | Command | Description |
 |---------|-------------|

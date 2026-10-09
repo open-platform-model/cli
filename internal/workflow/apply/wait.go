@@ -6,13 +6,14 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
 )
 
-// waitForHealthy blocks until every resource the apply rendered reads healthy
+// waitForHealthy blocks until every resource the apply applied reads healthy
 // on the cluster, or timeout runs out. The timeout is a fresh --timeout that
 // starts with this wait, not what the apply's CustomResourceDefinition wait
 // left over. It uses the shared poll loop in internal/kubernetes, so a resource that
@@ -20,8 +21,7 @@ import (
 // every resource still pending.
 // The resources are already applied and recorded when it runs; a failure here
 // leaves them in place, and the error says how to inspect them.
-func waitForHealthy(ctx context.Context, req Request, timeout time.Duration, instanceLog *log.Logger) error {
-	resources := req.Result.Resources
+func waitForHealthy(ctx context.Context, req Request, resources []*unstructured.Unstructured, timeout time.Duration, instanceLog *log.Logger) error {
 	if len(resources) == 0 {
 		return nil
 	}

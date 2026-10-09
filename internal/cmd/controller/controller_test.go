@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,12 +12,17 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	"github.com/open-platform-model/library/opm/k8s/ownership"
 
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	"github.com/open-platform-model/cli/internal/config"
 	ctrllib "github.com/open-platform-model/cli/internal/controller"
 	"github.com/open-platform-model/cli/internal/controller/controllertest"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
+	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/modref"
 	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/platform"
@@ -214,8 +220,9 @@ func installWithoutCluster(t *testing.T, registry string, flags installFlags) er
 	}, flags)
 }
 
-// A --version the registry does not serve, or that is not a version
-// selector, is refused before any cluster call.
+// "Unserved version": a selector no module version matches, an opm-controller
+// release tag included, is refused before any cluster call with no message
+// of its own.
 func TestRunControllerInstall_UnservedVersionIsRefusedBeforeTheCluster(t *testing.T) {
 	reg := mirrorRegistry(t)
 	for _, v := range []string{"v1.0.0-beta.5", "1.0.0-beta.5"} {
@@ -223,6 +230,7 @@ func TestRunControllerInstall_UnservedVersionIsRefusedBeforeTheCluster(t *testin
 		var exitErr *opmexit.ExitError
 		require.ErrorAs(t, err, &exitErr, v)
 		assert.Equal(t, opmexit.ExitValidationError, exitErr.Code, v)
+		assert.NotContains(t, err.Error(), "--version now takes", v)
 		assert.NotContains(t, err.Error(), "kubeconfig", v)
 	}
 }
@@ -254,6 +262,7 @@ func TestRunControllerInstall_UnreachableRegistry(t *testing.T) {
 }
 
 func TestInstallErrorMapping(t *testing.T) {
+	unreadable := apierrors.NewForbidden(schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterroles"}, "x", errors.New("no get"))
 	cases := []struct {
 		err  error
 		code int
@@ -261,6 +270,13 @@ func TestInstallErrorMapping(t *testing.T) {
 		{&ctrllib.TargetError{ModuleVersion: "v0.4.0", Rule: "newer"}, opmexit.ExitValidationError},
 		{&ctrllib.VersionError{ModuleVersion: "v0.4.0", Reason: "none"}, opmexit.ExitValidationError},
 		{&ctrllib.GuardError{Err: errors.New("exists")}, opmexit.ExitValidationError},
+		// The guard refuses an object another instance owns or adopts.
+		{&ctrllib.GuardError{Err: &inventory.GuardRefusalError{Refused: []inventory.Refused{{Reason: ownership.RefuseAdoptedElsewhere, Message: "Deployment/x was adopted"}}}}, opmexit.ExitValidationError},
+		// An object install cannot read. The guard's refusal keeps its code
+		// whatever API error it wraps; the same read failing in an earlier
+		// check exits by the API error.
+		{&ctrllib.GuardError{Err: fmt.Errorf("cannot check whether ClusterRole/x already exists: %w", unreadable)}, opmexit.ExitValidationError},
+		{fmt.Errorf("checking ClusterRole/x before apply: %w", unreadable), opmexit.ExitPermissionDenied},
 		{&ctrllib.OwnedRecordError{}, opmexit.ExitValidationError},
 		{&modref.RefusalError{Refusal: publish.Refusal{Headline: "no such version"}}, opmexit.ExitValidationError},
 		{&publish.ConnectivityError{Op: "listing", Err: errors.New("refused")}, opmexit.ExitConnectivityError},

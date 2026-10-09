@@ -1,15 +1,15 @@
 ## REMOVED Requirements
 
 ### Requirement: Operator applier grant is verified before operator-owned tests
-**Reason**: Renamed with the product: the operator is now the controller (`opm controller`, `opm-controller-system`, `spec.owner: controller`). Restated under the new title.
+**Reason**: Renamed with the product: the operator is now the controller (`opm controller`, `opm-system`, `spec.owner: controller`). Restated under the new title.
 **Migration**: None.
 
 ### Requirement: Dev grant is documented as a separate step
-**Reason**: Renamed with the product: the operator is now the controller (`opm controller`, `opm-controller-system`, `spec.owner: controller`). Restated under the new title.
+**Reason**: Renamed with the product: the operator is now the controller (`opm controller`, `opm-system`, `spec.owner: controller`). Restated under the new title.
 **Migration**: None.
 
 ### Requirement: The e2e suite resolves modules through the shipped default registry
-**Reason**: Renamed with the product: the operator is now the controller (`opm controller`, `opm-controller-system`, `spec.owner: controller`). Restated under the new title.
+**Reason**: Renamed with the product: the operator is now the controller (`opm controller`, `opm-system`, `spec.owner: controller`). Restated under the new title.
 **Migration**: None.
 
 ## MODIFIED Requirements
@@ -79,7 +79,7 @@ Every e2e test that relies on the controller applying workload resources for a `
 #### Scenario: Controller installed without the dev grant
 
 - **WHEN** the controller was installed with `opm controller install` alone and a controller-owned e2e test starts
-- **THEN** the test fails immediately, its message names `system:serviceaccount:opm-controller-system:opm-controller-manager`, the denied `patch services`, and `task cluster:controller` as the remedy
+- **THEN** the test fails immediately, its message names `system:serviceaccount:opm-system:opm-controller-manager`, the denied `patch services`, and `task cluster:controller` as the remedy
 - **AND** no `ModuleInstance` or workload has been created by the test
 
 #### Scenario: Check cannot be performed

@@ -41,10 +41,20 @@ func WorkloadReadyPredicate(obj *unstructured.Unstructured) bool {
 func pendingObjects(ctx context.Context, client *kubernetes.Client, objs []*unstructured.Unstructured, predicate kubernetes.ReadyPredicate) []*unstructured.Unstructured {
 	var pending []*unstructured.Unstructured
 	for _, obj := range objs {
-		live, err := client.ResourceClient(kubernetes.GVRFromUnstructured(obj), obj.GetNamespace()).Get(ctx, obj.GetName(), metav1.GetOptions{})
+		live, err := getObject(ctx, client, obj)
 		if err != nil || !predicate(live) {
 			pending = append(pending, obj)
 		}
 	}
 	return pending
+}
+
+// getObject reads the live object of obj, under the resource the cluster
+// serves its kind as.
+func getObject(ctx context.Context, client *kubernetes.Client, obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	resource, err := client.ResourceClientFor(ctx, obj.GroupVersionKind(), obj.GetNamespace())
+	if err != nil {
+		return nil, err
+	}
+	return resource.Get(ctx, obj.GetName(), metav1.GetOptions{})
 }

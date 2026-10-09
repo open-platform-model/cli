@@ -16,9 +16,9 @@ func NewCatalogVersionCmd() *cobra.Command {
 		Short: "Manage the catalog's declared version",
 		Long: `Manage the version an OPM catalog declares in identity/identity.cue.
 
-	The declared version is the single source the publish pipeline reads; these
-	commands edit it deliberately so a commit sits between deciding a version
-	and pushing an artifact.`,
+The declared version is the single source the publish pipeline reads; these
+commands edit it deliberately so a commit sits between deciding a version
+and pushing an artifact.`,
 	}
 
 	c.AddCommand(newCatalogVersionSetCmd())
@@ -32,30 +32,30 @@ func newCatalogVersionSetCmd() *cobra.Command {
 		Short: "Set the catalog's declared version",
 		Long: `Set the version the catalog declares in identity/identity.cue.
 
-	The write is surgical: only the version value changes — comments, field
-	order, alignment, any type assertion on the field, and release-automation
-	marker lines all survive byte-for-byte. A defaulted declaration (the shape
-	release automation owns) stays defaulted with its marker intact. Setting
-	the version the file already declares writes nothing (no mtime change) and
-	reports the no-op.
+The write is surgical: only the version value changes — comments, field
+order, alignment, any type assertion on the field, and release-automation
+marker lines all survive byte-for-byte. A defaulted declaration (the shape
+release automation owns) stays defaulted with its marker intact. Setting
+the version the file already declares writes nothing (no mtime change) and
+reports the no-op.
 
-	The command is offline: no registry access, no schema fetch. It refuses an
-	identity file that does not structurally carry a Version field; run
-	'opm catalog publish --dry-run' for full conformance checking — every
-	publish gate runs, nothing is pushed.
+The command is offline: no registry access, no schema fetch. It refuses an
+identity file that does not structurally carry a Version field; run
+'opm catalog publish --dry-run' for full conformance checking — every
+publish gate runs, nothing is pushed.
 
-	Exit codes: 0 set (or already set), 2 refused.
+Exit codes: 0 set (or already set), 2 refused.
 
-	Arguments:
-	  version    Bare SemVer to declare (no "v" prefix)
-	  path       Path to the catalog directory (default: current directory)
+Arguments:
+  version    Bare SemVer to declare (no "v" prefix)
+  path       Path to the catalog directory (default: current directory)
 
-	Examples:
-	  # Declare the next release version in the current directory
-	  opm catalog version set 1.3.0
+Examples:
+  # Declare the next release version in the current directory
+  opm catalog version set 1.3.0
 
-	  # Same, against an explicit catalog directory
-	  opm catalog version set 1.3.0 ./src`,
+  # Same, against an explicit catalog directory
+  opm catalog version set 1.3.0 ./src`,
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(c *cobra.Command, args []string) error {
 			return cmdutil.RunVersionSet(publish.KindCatalog, args[0], args[1:])

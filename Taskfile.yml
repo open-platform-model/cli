@@ -7,7 +7,7 @@ vars:
   BINARY_NAME: opm
   BUILD_DIR: bin
   CLUSTER_NAME: opm-dev
-  K8S_NODE_IMAGE: "kindest/node:v1.34.3@sha256:08497ee19eace7b4b5348db5c6a1591d7752b164530a36f855cb0f2bdcbadd48"
+  K8S_NODE_IMAGE: "kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
   REGISTRY_CONTAINER: '{{.REGISTRY_CONTAINER | default "opm-registry"}}'
   # Canonical mapping (Registry Policy, root AGENTS.md): both opmodel.dev/* and
   # testing.opmodel.dev/* read from GHCR. The testing domain carries this repo's
@@ -106,10 +106,11 @@ tasks:
       - go run tests/integration/apply-staging/main.go
       - go run tests/integration/inventory-apply/main.go
       - go run tests/integration/inventory-ops/main.go
+      - go run tests/integration/delete-ownership/main.go
+      - go run tests/integration/apply-ownership/main.go
       - go run tests/integration/inst-list/main.go
       - go run tests/integration/inst-tree/main.go
       - go run tests/integration/module-apply/main.go
-      - go run tests/integration/migration/main.go
       - go run tests/integration/gates/main.go
       - go run tests/integration/ssa-ownership/main.go
       - go run tests/integration/platform-build/main.go
@@ -351,7 +352,7 @@ tasks:
             echo "  $type: $status $(field "$type" reason): $(field "$type" message)" >&2
           fi
         done
-        echo "Check: kubectl --context $ctx -n opm-controller-system logs deploy/opm-controller-manager" >&2
+        echo "Check: kubectl --context $ctx -n opm-system logs deploy/opm-controller-manager" >&2
         echo "A 'Failed to resolve OPM core schema' line means the pod cannot reach the registry" >&2
         echo "its --registry flag (or built-in default) points at." >&2
         exit 1
@@ -360,14 +361,14 @@ tasks:
     desc: Report whether a reconciling controller is present in the kind cluster
     cmds:
       - |
-        replicas=$(kubectl --context kind-{{.CLUSTER_NAME}} -n opm-controller-system get deployment opm-controller-manager \
+        replicas=$(kubectl --context kind-{{.CLUSTER_NAME}} -n opm-system get deployment opm-controller-manager \
           -o jsonpath='{.status.availableReplicas}' 2>/dev/null || true)
         if [ -z "$replicas" ] || [ "$replicas" = "0" ]; then
           echo "No reconciling controller. Run: task cluster:controller"
           exit 1
         fi
         echo "controller available replicas: $replicas"
-        kubectl --context kind-{{.CLUSTER_NAME}} -n opm-controller-system get deployment opm-controller-manager \
+        kubectl --context kind-{{.CLUSTER_NAME}} -n opm-system get deployment opm-controller-manager \
           -o jsonpath='{.spec.template.spec.containers[0].args}'; echo
         echo "Platform/cluster controllerVersion: $(kubectl --context kind-{{.CLUSTER_NAME}} get platform cluster -o jsonpath='{.status.controllerVersion}' 2>/dev/null)"
 
@@ -375,9 +376,20 @@ tasks:
   ## Code quality tasks
   #########################
   lint:
-    desc: Run linters
+    desc: Check the linter configuration (offline), then run linters
     cmds:
+      - task: lint:config
       - golangci-lint run ./...
+
+  lint:config:
+    desc: Verify .golangci.yml against the committed schema, and that .golangci-lint-version, the schema and the workflows agree (offline)
+    cmds:
+      - bash .github/scripts/lint-config-check.sh
+
+  lint:config:test:
+    desc: Scenario test of the linter configuration check (offline)
+    cmds:
+      - bash .github/scripts/lint-config-check-test.sh
 
   lint:fix:
     desc: Run linters and fix issues

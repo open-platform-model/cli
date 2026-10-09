@@ -67,7 +67,7 @@ Every e2e test that relies on the controller applying workload resources for a `
 #### Scenario: Controller installed without the dev grant
 
 - **WHEN** the controller was installed with `opm controller install` alone and a controller-owned e2e test starts
-- **THEN** the test fails immediately, its message names `system:serviceaccount:opm-controller-system:opm-controller-manager`, the denied `patch services`, and `task cluster:controller` as the remedy
+- **THEN** the test fails immediately, its message names `system:serviceaccount:opm-system:opm-controller-manager`, the denied `patch services`, and `task cluster:controller` as the remedy
 - **AND** no `ModuleInstance` or workload has been created by the test
 
 #### Scenario: Check cannot be performed

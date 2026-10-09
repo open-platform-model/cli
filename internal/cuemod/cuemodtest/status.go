@@ -112,3 +112,23 @@ func wireCode(r *http.Request, status int) string {
 		return ""
 	}
 }
+
+// TokenRegistry starts a registry that hands out bearer tokens, as GHCR and
+// Docker Hub do: every registry request answers 401 with a Bearer challenge
+// naming its own token endpoint, and the token endpoint answers tokenStatus
+// (with an empty body, so a 200 carries no token). It returns the registry's
+// CUE_REGISTRY mapping.
+func TokenRegistry(t *testing.T, tokenStatus int) string {
+	t.Helper()
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/token" {
+			w.WriteHeader(tokenStatus)
+			return
+		}
+		w.Header().Set("Www-Authenticate", fmt.Sprintf(`Bearer realm=%q,service="registry"`, srv.URL+"/token"))
+		writeStatus(w, r, http.StatusUnauthorized)
+	}))
+	t.Cleanup(srv.Close)
+	return strings.TrimPrefix(srv.URL, "http://") + "+insecure"
+}

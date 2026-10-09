@@ -31,6 +31,16 @@ func NewInstanceStatusCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Short: "Show resource status for an instance",
 		Long: `Show status of resources deployed by an OPM instance.
 
+The exit code carries the verdict, so a pipeline can act on it without
+reading the output:
+
+  0  every tracked resource is healthy
+  1  usage error, or the instance record could not be read
+  2  a resource is not ready, or a tracked resource could not be read
+  3  the cluster could not be reached
+  4  permission denied
+  5  the instance or its resources were not found
+
 Arguments:
   file         Path to an instance.cue file or directory containing one.
                The instance name and namespace are read from the file's metadata.

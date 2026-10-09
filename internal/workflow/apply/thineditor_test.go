@@ -109,3 +109,47 @@ func TestThinEditor_RefusesSkipUnprovided(t *testing.T) {
 		})
 	}
 }
+
+// The controller decides what a controller-managed instance prunes, so
+// --delete-data only draws a warning there, on the real edit and on the
+// dry-run preview, and without the flag nothing mentions it. The local-source
+// refusal ends both runs before any write.
+func TestThinEditor_DeleteDataWarnsOnControllerManaged(t *testing.T) {
+	result := &workflowrender.Result{
+		Instance:    module.InstanceMetadata{Name: "podinfo", Namespace: "demo"},
+		Module:      module.ModuleMetadata{Name: "podinfo"},
+		SourceLocal: true,
+	}
+	rec := &inventory.Record{Owner: inventory.OwnerController, Name: "podinfo", Namespace: "demo"}
+
+	for _, deleteData := range []bool{true, false} {
+		for name, run := range map[string]func(Request) error{
+			"apply":   func(req Request) error { return executeThinEditor(context.Background(), req, rec) },
+			"dry-run": func(req Request) error { return previewThinEditor(req, rec) },
+		} {
+			// The request's logger binds the log writer when it is built.
+			logBuf := captureLog(t)
+			req := controllerOwnedRequest(result)
+			req.Options.DeleteData = deleteData
+			require.Error(t, run(req), name)
+			if deleteData {
+				line := logLine(logBuf.String(), DeleteDataControllerManagedNote)
+				require.NotEmpty(t, line, "%s: %s", name, logBuf.String())
+				assert.Contains(t, line, "WARN", name)
+				continue
+			}
+			assert.NotContains(t, logBuf.String(), "--delete-data", name)
+		}
+	}
+}
+
+// The note must name the setting the controller obeys. "has no effect" alone
+// sent the user nowhere.
+func TestDeleteDataControllerManagedNote_NamesTheDataPolicy(t *testing.T) {
+	assert.Contains(t, DeleteDataControllerManagedNote, "--delete-data does not change what the controller does")
+	assert.Contains(t, DeleteDataControllerManagedNote, "spec.dataPolicy")
+	assert.Contains(t, DeleteDataControllerManagedNote, "PersistentVolumeClaims")
+	// No released controller had the field when this was written: the note
+	// must not promise that every controller keeps claims.
+	assert.Contains(t, DeleteDataControllerManagedNote, "an older controller deletes them")
+}

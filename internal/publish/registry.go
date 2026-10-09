@@ -28,8 +28,9 @@ func NewRegistryClient(registry string) (*modregistry.Client, error) {
 
 // gateAlreadyPublished is 0011:D15's refusal 8: a published tag names fixed bytes
 // permanently, so publishing over one is refused — no flag or mode turns it
-// into a success. An unreachable registry is a *ConnectivityError, not a
-// refusal: the artifact was never judged.
+// into a success. A failed lookup is not a refusal, because the artifact was
+// never judged: an unreachable registry is a *ConnectivityError, and a
+// registry that answered with a failure is a *RegistryError (RegistryFailure).
 func gateAlreadyPublished(ctx context.Context, p *Plan, opts Options) error {
 	if p.DeclaredPath == "" || p.Tag == "" {
 		return nil
@@ -40,10 +41,7 @@ func gateAlreadyPublished(ctx context.Context, p *Plan, opts Options) error {
 	}
 	versions, err := client.ModuleVersions(ctx, p.DeclaredPath)
 	if err != nil {
-		return &ConnectivityError{
-			Op:  fmt.Sprintf("listing published versions of %s", p.DeclaredPath),
-			Err: err,
-		}
+		return RegistryFailure(fmt.Sprintf("listing published versions of %s", p.DeclaredPath), RegistryHost(opts.Registry, p.DeclaredPath), err)
 	}
 	p.RegistryChecked = true
 	p.registryClient = client
@@ -65,7 +63,8 @@ func gateAlreadyPublished(ctx context.Context, p *Plan, opts Options) error {
 // Push publishes the plan: write the --version fill into the working tree
 // when one is pending (0011:D12 — the pushed bytes come from disk), zip the
 // committed directory, and put it through CUE's own module machinery. Callers
-// invoke it only on a GO plan outside --dry-run.
+// invoke it only on a GO plan outside --dry-run. A failed push is named by
+// RegistryFailure.
 func Push(ctx context.Context, opts Options, p *Plan) error {
 	if !p.Go() {
 		return fmt.Errorf("internal error: push invoked on a refused plan")
@@ -105,10 +104,7 @@ func Push(ctx context.Context, opts Options, p *Plan) error {
 		}
 	}
 	if err := client.PutModule(ctx, mv, zipFile, info.Size()); err != nil {
-		return &ConnectivityError{
-			Op:  fmt.Sprintf("pushing %s:%s", p.RegistryRepo, p.Tag),
-			Err: err,
-		}
+		return RegistryFailure(fmt.Sprintf("pushing %s:%s", p.RegistryRepo, p.Tag), RegistryHost(opts.Registry, p.DeclaredPath), err)
 	}
 	return nil
 }

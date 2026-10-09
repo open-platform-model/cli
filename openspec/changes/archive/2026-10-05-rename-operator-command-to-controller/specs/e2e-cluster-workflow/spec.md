@@ -1,11 +1,11 @@
 ## REMOVED Requirements
 
 ### Requirement: The job applies to operator-facing pull requests, cascade pull requests and release pull requests
-**Reason**: Renamed with the product: the operator is now the controller (`opm controller`, `opm-controller-system`, `spec.owner: controller`). Restated under the new title.
+**Reason**: Renamed with the product: the operator is now the controller (`opm controller`, `opm-system`, `spec.owner: controller`). Restated under the new title.
 **Migration**: None.
 
 ### Requirement: The cluster is prepared with the local loop's own tasks and the pinned operator module
-**Reason**: Renamed with the product: the operator is now the controller (`opm controller`, `opm-controller-system`, `spec.owner: controller`). Restated under the new title.
+**Reason**: Renamed with the product: the operator is now the controller (`opm controller`, `opm-system`, `spec.owner: controller`). Restated under the new title.
 **Migration**: None.
 
 ## MODIFIED Requirements
@@ -103,7 +103,7 @@ The job SHALL run a registry container seeded from the tree with `hack/fixtures.
 #### Scenario: The pinned controller module is what runs
 
 - **WHEN** the job has prepared the cluster
-- **THEN** the ModuleInstance `opm-controller` in `opm-controller-system` records the `PinnedModuleVersion` of the pull request's head commit, and the controller Deployment runs the controller release `PinnedControllerVersion` names
+- **THEN** the ModuleInstance `opm-controller` in `opm-system` records the `PinnedModuleVersion` of the pull request's head commit, and the controller Deployment runs the controller release `PinnedControllerVersion` names
 
 #### Scenario: Bumped fixture before it is published
 

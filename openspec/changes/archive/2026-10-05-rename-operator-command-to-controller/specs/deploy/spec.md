@@ -1,11 +1,11 @@
 ## REMOVED Requirements
 
 ### Requirement: Instance delete of an instance that deploys the operator is guarded
-**Reason**: Renamed with the product: the operator is now the controller (`opm controller`, `opm-controller-system`, `spec.owner: controller`). Restated under the new title.
+**Reason**: Renamed with the product: the operator is now the controller (`opm controller`, `opm-system`, `spec.owner: controller`). Restated under the new title.
 **Migration**: None.
 
 ### Requirement: Instance delete keeps the ModuleInstance when a tracked resource could not be read
-**Reason**: Renamed with the product: the operator is now the controller (`opm controller`, `opm-controller-system`, `spec.owner: controller`). Restated under the new title.
+**Reason**: Renamed with the product: the operator is now the controller (`opm controller`, `opm-system`, `spec.owner: controller`). Restated under the new title.
 **Migration**: None.
 
 ## MODIFIED Requirements
@@ -86,7 +86,7 @@ On `--dry-run`, `opm instance apply` and `opm module apply` SHALL NOT send a nam
 
 `opm instance delete` SHALL NOT delete an instance that deploys the controller while that instance is controller-owned, nor while any `ModuleInstance` in the cluster carries the `opmodel.dev/cleanup` finalizer.
 
-An instance deploys the controller when any one of these holds, read from its record without rendering: it is named `opm-controller` in the namespace `opm-controller-system`; its module path, with any `@<major>` suffix removed, is `opmodel.dev/modules/opm_controller`; or its recorded inventory holds a `CustomResourceDefinition` (group `apiextensions.k8s.io`) whose name, after its first `.`, is exactly `opmodel.dev`. These are the same signals by which the controller recognises the instance that deploys it, so the CLI and the controller agree on which instance that is.
+An instance deploys the controller when any one of these holds, read from its record without rendering: it is named `opm-controller` in the namespace `opm-system`; its module path, with any `@<major>` suffix removed, is `opmodel.dev/modules/opm_controller`; or its recorded inventory holds a `CustomResourceDefinition` (group `apiextensions.k8s.io`) whose name, after its first `.`, is exactly `opmodel.dev`. These are the same signals by which the controller recognises the instance that deploys it, so the CLI and the controller agree on which instance that is.
 
 The guard SHALL run after the target instance is resolved and before any object is deleted, on the CLI-owned and the controller-owned branch alike, and on a dry run with the same outcome as the real run.
 
@@ -97,26 +97,26 @@ The guard SHALL run after the target instance is resolved and before any object 
 
 #### Scenario: Refused while an instance waits on the controller's cleanup
 
-- **WHEN** `opm instance delete opm-controller -n opm-controller-system --force` runs for a CLI-owned record while `default/hello` carries the `opmodel.dev/cleanup` finalizer
+- **WHEN** `opm instance delete opm-controller -n opm-system --force` runs for a CLI-owned record while `default/hello` carries the `opmodel.dev/cleanup` finalizer
 - **THEN** the command SHALL exit 2 without deleting any object, and the record and every object its inventory lists SHALL still exist
 - **AND** the error SHALL name `default/hello` and `opm controller uninstall --remove-finalizers` and state that this choice orphans its workloads
 
 #### Scenario: Controller-owned instance of the controller is refused
 
-- **WHEN** the record `opm-controller` in `opm-controller-system` is controller-owned, with `spec.prune: true`, and no `ModuleInstance` carries `opmodel.dev/cleanup`
-- **AND** `opm instance delete opm-controller -n opm-controller-system --force` runs
+- **WHEN** the record `opm-controller` in `opm-system` is controller-owned, with `spec.prune: true`, and no `ModuleInstance` carries `opmodel.dev/cleanup`
+- **AND** `opm instance delete opm-controller -n opm-system --force` runs
 - **THEN** the command SHALL exit 2 and the `ModuleInstance` `opm-controller` SHALL still exist
 - **AND** the error SHALL name the matched signal and say to set `spec.owner` to `cli`, and SHALL NOT report that any resource was pruned
 
 #### Scenario: Dry run reports the same refusal
 
-- **WHEN** `opm instance delete opm-controller -n opm-controller-system --dry-run` runs for a CLI-owned record while an instance carries the `opmodel.dev/cleanup` finalizer
+- **WHEN** `opm instance delete opm-controller -n opm-system --dry-run` runs for a CLI-owned record while an instance carries the `opmodel.dev/cleanup` finalizer
 - **THEN** the command SHALL exit 2 with the same refusal as the real run, and nothing SHALL be deleted
 
 #### Scenario: The target itself carries the finalizer
 
-- **WHEN** `opm instance delete opm-controller -n opm-controller-system --force` runs for a CLI-owned record while the `ModuleInstance` `opm-controller` itself carries `opmodel.dev/cleanup` and no other instance does
-- **THEN** the command SHALL exit 2, naming `opm-controller-system/opm-controller` as the instance being deleted
+- **WHEN** `opm instance delete opm-controller -n opm-system --force` runs for a CLI-owned record while the `ModuleInstance` `opm-controller` itself carries `opmodel.dev/cleanup` and no other instance does
+- **THEN** the command SHALL exit 2, naming `opm-system/opm-controller` as the instance being deleted
 
 #### Scenario: The controller module under another name is guarded
 
@@ -135,12 +135,12 @@ The guard SHALL run after the target instance is resolved and before any object 
 
 #### Scenario: No armed instance, no refusal
 
-- **WHEN** `opm instance delete opm-controller -n opm-controller-system --force` runs for a CLI-owned record and no `ModuleInstance` carries `opmodel.dev/cleanup`
+- **WHEN** `opm instance delete opm-controller -n opm-system --force` runs for a CLI-owned record and no `ModuleInstance` carries `opmodel.dev/cleanup`
 - **THEN** the guard SHALL pass and the delete SHALL proceed as for any CLI-owned instance
 
 #### Scenario: List failure fails closed
 
-- **WHEN** the user may not list `moduleinstances` cluster-wide and runs `opm instance delete opm-controller -n opm-controller-system --force` for a CLI-owned record
+- **WHEN** the user may not list `moduleinstances` cluster-wide and runs `opm instance delete opm-controller -n opm-system --force` for a CLI-owned record
 - **THEN** the command SHALL exit 4 without deleting anything
 
 #### Scenario: Other instances are not guarded

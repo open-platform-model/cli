@@ -1,6 +1,7 @@
 package inventory
 
 import (
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,7 +34,8 @@ func newDynamicClient(objs ...*unstructured.Unstructured) *kubernetes.Client {
 		crdGVR:            "CustomResourceDefinitionList",
 	}
 	return &kubernetes.Client{
-		Dynamic: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, listKinds, runtimeObjs...),
+		Resources: kubetest.Resources(),
+		Dynamic:   dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, listKinds, runtimeObjs...),
 	}
 }
 

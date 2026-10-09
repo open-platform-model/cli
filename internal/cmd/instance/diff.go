@@ -51,7 +51,7 @@ Examples:
 }
 
 // runInstanceDiff executes the instance diff command.
-func runInstanceDiff(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil.InstanceFileFlags, kf *cmdutil.K8sFlags, namespaceFlag string) error { //nolint:gocyclo // orchestration function; complexity is inherent
+func runInstanceDiff(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil.InstanceFileFlags, kf *cmdutil.K8sFlags, namespaceFlag string) error {
 	ctx := context.Background()
 
 	k8sConfig, err := config.ResolveKubernetes(config.ResolveKubernetesOptions{
@@ -98,29 +98,62 @@ func runInstanceDiff(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil
 		return nil
 	}
 
-	comparer := kubernetes.NewComparer()
+	return executeInstanceDiff(ctx, k8sClient, result.Resources, result.Instance.Name, result.Instance.Namespace, result.Instance.UUID, instanceLog)
+}
 
+// executeInstanceDiff compares the rendered resources with the cluster, prints
+// the differences and reports every rendered resource it could not read or
+// compare. Any such failure makes the diff incomplete, so the command then
+// never prints "No differences found" and exits non-zero. An empty instanceID
+// skips orphan detection.
+func executeInstanceDiff(ctx context.Context, k8sClient *kubernetes.Client, resources []*unstructured.Unstructured, name, namespace, instanceID string, instanceLog *log.Logger) error {
 	var diffOpts kubernetes.DiffOptions
-	instanceID := result.Instance.UUID
 	if instanceID != "" {
-		diffOpts.InventoryLive = discoverOrphanCandidates(ctx, k8sClient, result.Instance.Name, result.Instance.Namespace, instanceLog)
+		diffOpts.InventoryLive = discoverOrphanCandidates(ctx, k8sClient, name, namespace, instanceLog)
 	}
 
-	diffResult, err := kubernetes.Diff(ctx, k8sClient, result.Resources, result.Instance.Name, comparer, diffOpts)
+	diffResult, err := kubernetes.Diff(ctx, k8sClient, resources, name, kubernetes.NewComparer(), diffOpts)
 	if err != nil {
 		instanceLog.Error("diff failed", "error", err)
 		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err, Printed: true}
 	}
 
-	for _, w := range diffResult.Warnings {
-		instanceLog.Warn(w)
-	}
-
-	if diffResult.IsEmpty() {
+	switch {
+	case !diffResult.IsEmpty():
+		printDifferences(diffResult)
+	case len(diffResult.Errors) == 0:
 		output.Println("No differences found")
+	}
+	if len(diffResult.Errors) == 0 {
 		return nil
 	}
 
+	failures := make([]error, 0, len(diffResult.Errors))
+	for _, e := range diffResult.Errors {
+		instanceLog.Error("could not diff resource", "kind", e.Kind, "namespace", e.Namespace, "name", e.Name, "error", e.Err)
+		failures = append(failures, e)
+	}
+	incomplete := fmt.Errorf("diff is incomplete: %d resource(s) could not be read or compared", len(failures))
+	instanceLog.Error(incomplete.Error())
+	output.Details("Fix the cause (for example missing RBAC) and run the diff again.")
+	return &opmexit.ExitError{Code: failureExitCode(failures), Err: incomplete, Printed: true}
+}
+
+// failureExitCode is the exit code of an incomplete diff: the code the
+// failures share (4 for a denied call, 3 for a server timeout or an unavailable
+// server, 1 otherwise), or 1 when their codes differ.
+func failureExitCode(failures []error) int {
+	code := cmdutil.ExitCodeFromK8sError(failures[0])
+	for _, f := range failures[1:] {
+		if cmdutil.ExitCodeFromK8sError(f) != code {
+			return opmexit.ExitGeneralError
+		}
+	}
+	return code
+}
+
+// printDifferences prints the summary line and one block per changed resource.
+func printDifferences(diffResult *kubernetes.DiffResult) {
 	output.Println(diffResult.SummaryLine())
 	output.Println("")
 
@@ -149,8 +182,6 @@ func runInstanceDiff(instanceFile string, cfg *config.GlobalConfig, rff *cmdutil
 			// No output for unchanged resources in diff view
 		}
 	}
-
-	return nil
 }
 
 // discoverOrphanCandidates returns the live resources the instance's

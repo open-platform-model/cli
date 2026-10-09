@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+
 	"github.com/open-platform-model/library/opm/k8s/object"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
@@ -51,6 +54,7 @@ func TestDelete_DeletesOnlyTrackedInventoryResources(t *testing.T) {
 
 	scheme := runtime.NewScheme()
 	client := &Client{
+		Resources: kubetest.Resources(),
 		Clientset: fake.NewClientset(tracked.DeepCopy(), untracked.DeepCopy()),
 		Dynamic:   dynamicfake.NewSimpleDynamicClient(scheme, tracked.DeepCopy(), untracked.DeepCopy()),
 	}
@@ -69,10 +73,10 @@ func TestDelete_DeletesOnlyTrackedInventoryResources(t *testing.T) {
 	require.NotNil(t, result)
 	assert.Equal(t, 1, result.Deleted)
 
-	_, err = client.ResourceClient(GVRFromUnstructured(tracked), namespace).Get(ctx, tracked.GetName(), metav1.GetOptions{})
+	_, err = client.ResourceClient(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, namespace).Get(ctx, tracked.GetName(), metav1.GetOptions{})
 	assert.Error(t, err)
 
-	remaining, err := client.ResourceClient(GVRFromUnstructured(untracked), namespace).Get(ctx, untracked.GetName(), metav1.GetOptions{})
+	remaining, err := client.ResourceClient(schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}, namespace).Get(ctx, untracked.GetName(), metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, untracked.GetName(), remaining.GetName())
 }
@@ -90,6 +94,18 @@ func setOwnership(obj *unstructured.Unstructured, managedBy, uuid string) {
 		labels[opmlabels.ModuleInstanceUUID] = uuid
 	}
 	obj.SetLabels(labels)
+}
+
+// adoptedBy sets the adopt annotation of obj to an instance UUID.
+func adoptedBy(obj *unstructured.Unstructured, uuid string) *unstructured.Unstructured {
+	obj.SetAnnotations(map[string]string{opmlabels.AnnotationAdopt: uuid})
+	return obj
+}
+
+// withUID gives obj a UID, as every object the API server stores has one.
+func withUID(obj *unstructured.Unstructured, uid string) *unstructured.Unstructured {
+	obj.SetUID(types.UID(uid))
+	return obj
 }
 
 func owned(apiVersion, kind, name, namespace, managedBy, uuid string) *unstructured.Unstructured {
@@ -121,6 +137,7 @@ func TestDelete_LeavesBehind(t *testing.T) {
 		dryDeleted   int    // a dry run issues no delete call, so a delete-time NotFound cannot happen
 		wantReason   string // non-empty: left behind with this reason
 		wantErr      bool
+		wantReplaced bool // the error is ErrReplaced
 		wantPresent  bool // the live object still exists afterwards
 	}{
 		{
@@ -144,7 +161,7 @@ func TestDelete_LeavesBehind(t *testing.T) {
 			inventory:    opmCM("cm"),
 			live:         owned("v1", "ConfigMap", "cm", "default", "", testInstanceUUID),
 			instanceUUID: testInstanceUUID,
-			wantReason:   reasonNotManaged,
+			wantReason:   "ConfigMap/default/cm is not managed by OPM; left in place",
 			wantPresent:  true,
 		},
 		{
@@ -152,7 +169,37 @@ func TestDelete_LeavesBehind(t *testing.T) {
 			inventory:    opmCM("cm"),
 			live:         owned("v1", "ConfigMap", "cm", "default", opmlabels.ManagedByCLI, "uuid-other"),
 			instanceUUID: testInstanceUUID,
-			wantReason:   reasonOtherInstance,
+			wantReason:   "ConfigMap/default/cm belongs to module instance uuid-other, not this one; left in place",
+			wantPresent:  true,
+		},
+		{
+			name:         "adopted by another instance",
+			inventory:    opmCM("cm"),
+			live:         adoptedBy(opmCM("cm"), "uuid-other"),
+			instanceUUID: testInstanceUUID,
+			wantReason:   "ConfigMap/default/cm is being adopted by module instance uuid-other, not this one; left in place",
+			wantPresent:  true,
+		},
+		{
+			name:         "adopt annotation naming this instance is deleted",
+			inventory:    opmCM("cm"),
+			live:         adoptedBy(opmCM("cm"), testInstanceUUID),
+			instanceUUID: testInstanceUUID,
+			wantDeleted:  1,
+		},
+		{
+			name:         "replaced between the re-read and the delete",
+			inventory:    opmCM("cm"),
+			live:         withUID(opmCM("cm"), "uid-read"),
+			instanceUUID: testInstanceUUID,
+			reactor: func(dyn *dynamicfake.FakeDynamicClient) {
+				dyn.PrependReactor("delete", "configmaps", func(k8stesting.Action) (bool, runtime.Object, error) {
+					return true, nil, apierrors.NewConflict(schema.GroupResource{Resource: "configmaps"}, "cm", errors.New("the UID in the precondition does not match"))
+				})
+			},
+			wantErr:      true,
+			wantReplaced: true,
+			dryDeleted:   1,
 			wantPresent:  true,
 		},
 		{
@@ -213,7 +260,7 @@ func TestDelete_LeavesBehind(t *testing.T) {
 				if tc.reactor != nil {
 					tc.reactor(dyn)
 				}
-				client := &Client{Dynamic: dyn}
+				client := &Client{Resources: kubetest.Resources(), Dynamic: dyn}
 
 				result, err := Delete(ctx, client, DeleteOptions{
 					InstanceName:          "demo",
@@ -230,11 +277,7 @@ func TestDelete_LeavesBehind(t *testing.T) {
 					wantDeleted = tc.dryDeleted
 				}
 				assert.Equal(t, wantDeleted, result.Deleted)
-				if tc.wantErr {
-					assert.Len(t, result.Errors, 1)
-				} else {
-					assert.Empty(t, result.Errors)
-				}
+				assertDeleteErrors(t, result, tc.wantErr && (!dryRun || tc.dryDeleted == 0), tc.wantReplaced)
 				if tc.wantReason != "" {
 					require.Len(t, result.LeftBehind, 1)
 					lb := result.LeftBehind[0]
@@ -249,7 +292,7 @@ func TestDelete_LeavesBehind(t *testing.T) {
 				if tc.live == nil {
 					return
 				}
-				_, getErr := dyn.Tracker().Get(GVRFromUnstructured(tc.live), tc.live.GetNamespace(), tc.live.GetName())
+				_, getErr := dyn.Tracker().Get(kubetest.GVR(tc.live), tc.live.GetNamespace(), tc.live.GetName())
 				if tc.wantPresent || dryRun {
 					assert.NoError(t, getErr, "the object is still on the cluster")
 				} else {
@@ -307,7 +350,7 @@ func TestDelete_Unreadable(t *testing.T) {
 					live = append(live, deploy.DeepCopy())
 				}
 				dyn := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), objs...)
-				client := &Client{Dynamic: dyn}
+				client := &Client{Resources: kubetest.Resources(), Dynamic: dyn}
 
 				result, err := Delete(ctx, client, DeleteOptions{
 					InstanceName:          "demo",
@@ -338,7 +381,7 @@ func TestDelete_Unreadable(t *testing.T) {
 					return
 				}
 				assert.Equal(t, 1, result.Deleted, "the readable Deployment is still processed")
-				_, getErr := dyn.Tracker().Get(GVRFromUnstructured(deploy), "default", "web")
+				_, getErr := dyn.Tracker().Get(kubetest.GVR(deploy), "default", "web")
 				if dryRun {
 					assert.NoError(t, getErr, "a dry run deletes nothing")
 				} else {
@@ -346,6 +389,21 @@ func TestDelete_Unreadable(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// assertDeleteErrors checks the per-resource errors of a Delete: none, or
+// one, which is ErrReplaced when wantReplaced. A dry run sends no delete, so
+// the caller passes wantErr false for a failure only a delete can raise.
+func assertDeleteErrors(t *testing.T, result *DeleteResult, wantErr, wantReplaced bool) {
+	t.Helper()
+	if !wantErr {
+		assert.Empty(t, result.Errors)
+		return
+	}
+	require.Len(t, result.Errors, 1)
+	if wantReplaced {
+		assert.ErrorIs(t, result.Errors[0].Err, ErrReplaced)
 	}
 }
 
@@ -379,7 +437,7 @@ func TestDelete_DeletesInDescendingWeightOrder(t *testing.T) {
 		live[i] = o.DeepCopy()
 	}
 	dyn := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), live...)
-	client := &Client{Clientset: fake.NewClientset(), Dynamic: dyn}
+	client := &Client{Resources: kubetest.Resources(), Clientset: fake.NewClientset(), Dynamic: dyn}
 
 	result, err := Delete(ctx, client, DeleteOptions{
 		InstanceName:          "demo",
@@ -391,4 +449,85 @@ func TestDelete_DeletesInDescendingWeightOrder(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 4, result.Deleted)
 	assert.Equal(t, []string{"deploy", "svc", "cm-1", "cm-2"}, deletedNames(t, dyn))
+}
+
+// A tracked PersistentVolumeClaim is kept unless DeleteData is set, whether
+// discovery read it or not, and is reported in Kept, never as left behind or
+// as an error. A kind of the same name in another API group is not a claim.
+func TestDelete_KeepsClaimsUnlessDeleteData(t *testing.T) {
+	claim := func() *unstructured.Unstructured {
+		return owned("v1", "PersistentVolumeClaim", "data", "default", opmlabels.ManagedByCLI, testInstanceUUID)
+	}
+	lookalike := func() *unstructured.Unstructured {
+		return owned("example.io/v1", "PersistentVolumeClaim", "data", "default", opmlabels.ManagedByCLI, testInstanceUUID)
+	}
+	unreadableClaim := []UnreadableResource{{Kind: "PersistentVolumeClaim", Namespace: "default", Name: "data", Err: errors.New("denied")}}
+
+	tests := []struct {
+		name        string
+		live        *unstructured.Unstructured
+		unreadable  []UnreadableResource
+		deleteData  bool
+		wantKept    int
+		wantDeleted int
+		wantErrors  int
+	}{
+		{name: "kept by default", live: claim(), wantKept: 1},
+		{name: "deleted with DeleteData", live: claim(), deleteData: true, wantDeleted: 1},
+		{name: "another group is deleted", live: lookalike(), wantDeleted: 1},
+		{name: "unreadable claim is kept by default", unreadable: unreadableClaim, wantKept: 1},
+		{name: "unreadable claim is an error with DeleteData", unreadable: unreadableClaim, deleteData: true, wantErrors: 1},
+	}
+	for _, tc := range tests {
+		for _, dryRun := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/dryRun=%v", tc.name, dryRun), func(t *testing.T) {
+				var objs []runtime.Object
+				var inv []*unstructured.Unstructured
+				if tc.live != nil {
+					objs = append(objs, tc.live.DeepCopy())
+					inv = append(inv, tc.live.DeepCopy())
+				}
+				dyn := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme(), objs...)
+				client := &Client{Resources: kubetest.Resources(), Dynamic: dyn}
+
+				result, err := Delete(context.Background(), client, DeleteOptions{
+					InstanceName:          "demo",
+					Namespace:             "default",
+					InstanceUUID:          testInstanceUUID,
+					DryRun:                dryRun,
+					DeleteData:            tc.deleteData,
+					InventoryLive:         inv,
+					InventoryRecordExists: true,
+					Unreadable:            tc.unreadable,
+				})
+				require.NoError(t, err)
+
+				assert.Len(t, result.Kept, tc.wantKept)
+				assert.Equal(t, tc.wantDeleted, result.Deleted)
+				assert.Len(t, result.Errors, tc.wantErrors)
+				assert.Empty(t, result.LeftBehind, "a kept claim is not a left-behind resource")
+				if tc.wantKept == 1 {
+					assert.Equal(t, LeftBehindResource{Kind: "PersistentVolumeClaim", Namespace: "default", Name: "data", Reason: KeptClaimReason}, result.Kept[0])
+				}
+
+				if tc.live == nil {
+					return
+				}
+				_, getErr := dyn.Tracker().Get(kubetest.GVR(tc.live), "default", "data")
+				if tc.wantKept == 1 || dryRun {
+					assert.NoError(t, getErr, "the claim is still on the cluster")
+				} else {
+					assert.True(t, apierrors.IsNotFound(getErr), "the object was deleted")
+				}
+			})
+		}
+	}
+}
+
+func TestIsDataClaim(t *testing.T) {
+	assert.True(t, IsDataClaim("", "PersistentVolumeClaim"))
+	assert.False(t, IsDataClaim("example.io", "PersistentVolumeClaim"))
+	assert.False(t, IsDataClaim("", "PersistentVolume"))
+	assert.False(t, IsDataClaim("", "ConfigMap"))
+	assert.False(t, IsProtectedKind("", "PersistentVolumeClaim"), "a claim has an override, so it is not a protected kind")
 }

@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -58,7 +60,7 @@ func TestExecute_NeverSeedsAPlatform(t *testing.T) {
 		return false, nil, nil // passthrough to the tracker
 	})
 
-	client := &kubernetes.Client{Dynamic: fake}
+	client := &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: fake}
 
 	req := Request{
 		Result: &workflowrender.Result{

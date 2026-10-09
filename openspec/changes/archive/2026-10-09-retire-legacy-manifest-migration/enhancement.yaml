@@ -1,0 +1,7 @@
+# Removes the cli implementation of 0012:D8:R6 and 0012:D8:R7, which the
+# enhancement withdraws. A withdrawal delivers no decision, so none is
+# claimed here. Under-claiming is the safe direction.
+implements:
+  - enhancement: "0012"
+    decisions: []
+    resolves: []

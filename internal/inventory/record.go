@@ -21,7 +21,7 @@ type Inventory struct {
 }
 
 // Record is the CLI's view of an instance's persisted inventory, backed by the
-// ModuleInstance CR. It replaces the Secret-era InstanceInventoryRecord: the
+// ModuleInstance CR: the
 // instance identity lives in metadata, module identity in spec.module, the UUID
 // in status.instanceUUID, and ownership in spec.owner.
 type Record struct {
@@ -50,6 +50,13 @@ type Record struct {
 	// resources on deletion"). The CLI does not write this field; it reads it
 	// so a controller-owned delete can report what will actually happen.
 	Prune bool
+
+	// DataPolicy is the CR's spec.dataPolicy as it is written, empty when the
+	// field is absent. The controller reads it to decide whether a prune or a
+	// deletion removes PersistentVolumeClaims: only "Delete" removes them. The
+	// CLI does not write this field and does not interpret it here; it reads
+	// it so a controller-owned delete can report what will actually happen.
+	DataPolicy string
 
 	// InstanceUUID is the CR's status.instanceUUID.
 	InstanceUUID string

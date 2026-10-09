@@ -26,8 +26,8 @@ func NewCatalogRegistryCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Short: "Work with published catalogs",
 		Long: `Work with catalogs already published to a registry.
 
-	Use this command group when you are starting from a published artifact:
-	verify a build out of band, after the fact, from the consumer's side.`,
+Use this command group when you are starting from a published artifact:
+verify a build out of band, after the fact, from the consumer's side.`,
 	}
 
 	c.AddCommand(NewCatalogRegistryCheckCmd(cfg))
@@ -47,20 +47,20 @@ is concrete, and its modulePath and version agree with the coordinate the
 build was fetched by.
 The report lists the catalog's members per kind and apiVersion.
 
-	With --compat, additionally compare every beta/GA member against the last
-	published build that shipped it, under the additive-only rule — exactly the
-	comparison publish enforces.
+With --compat, additionally compare every beta/GA member against the last
+published build that shipped it, under the additive-only rule — exactly the
+comparison publish enforces.
 
-	` + AidSentence + `
+` + AidSentence + `
 
-	Exit codes: 0 clean, 2 findings, 3 registry unreachable.
+Exit codes: 0 clean, 2 findings, 3 registry unreachable.
 
-	Examples:
-	  # Verify a published build's identity and see what it contains
-	  opm catalog registry check opmodel.dev/catalogs/opm@v4.4.4
+Examples:
+  # Verify a published build's identity and see what it contains
+  opm catalog registry check opmodel.dev/catalogs/opm@v4.4.4
 
-	  # Additionally check it kept its published contracts
-	  opm catalog registry check opmodel.dev/catalogs/opm@v4.4.4 --compat`,
+  # Additionally check it kept its published contracts
+  opm catalog registry check opmodel.dev/catalogs/opm@v4.4.4 --compat`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			report, err := publish.RegistryCheck(c.Context(), publish.CheckOptions{

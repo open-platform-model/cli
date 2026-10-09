@@ -137,7 +137,7 @@ func TestCheckReady_AbsentControllerIsNotReady(t *testing.T) {
 
 func TestNotReadyError_IncludesTheCallerHint(t *testing.T) {
 	err := &NotReadyError{
-		Pending: []string{"Deployment/opm-controller-manager in opm-controller-system"},
+		Pending: []string{"Deployment/opm-controller-manager in opm-system"},
 		Hint:    "deleting now would wedge the instance",
 	}
 

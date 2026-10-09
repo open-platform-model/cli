@@ -118,7 +118,7 @@ const (
 )
 
 // InstanceInfo holds instance metadata for tree display.
-// Populated by the command layer from the inventory Secret.
+// Populated by the command layer from the ModuleInstance record.
 type InstanceInfo struct {
 	Name      string `json:"name" yaml:"name"`
 	Namespace string `json:"namespace" yaml:"namespace"`
@@ -163,10 +163,10 @@ type TreeResult struct {
 // Resource discovery and component mapping are resolved by the command layer,
 // mirroring the StatusOptions pattern.
 type TreeOptions struct {
-	// InstanceInfo is populated from the inventory Secret by the command layer.
+	// InstanceInfo is populated from the ModuleInstance record by the command layer.
 	InstanceInfo InstanceInfo
 
-	// InventoryLive is the list of live resources fetched from the inventory Secret.
+	// InventoryLive is the list of live resources the record's inventory names.
 	InventoryLive []*unstructured.Unstructured
 
 	// ComponentMap maps "Kind/Namespace/Name" to component name.

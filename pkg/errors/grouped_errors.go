@@ -52,6 +52,10 @@ func groupCUEErrors(err error) []GroupedError {
 		}
 
 		// Skip disjunction summary lines — they add noise without actionable info.
+		// CUE gives the summary line no type of its own, so its text is the
+		// only signal. The filter drops a display line and decides no
+		// answer; it is one of the named text matches TestNoErrorTextMatch
+		// allows.
 		if strings.Contains(msg, "errors in empty disjunction") {
 			continue
 		}

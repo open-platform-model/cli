@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 
 	"github.com/charmbracelet/log"
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -31,8 +33,11 @@ func NewInstanceDeleteCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var namespace string
 
 	var (
+		yesFlag     bool
 		forceFlag   bool
 		dryRunFlag  bool
+		deleteData  bool
+		waitFlag    bool
 		timeoutFlag time.Duration
 	)
 
@@ -40,24 +45,59 @@ func NewInstanceDeleteCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Use:   "delete <file|name|uuid>",
 		Short: "Delete instance resources from cluster",
 		Long: `Delete the resources belonging to an OPM instance from a Kubernetes cluster
-(CRDs and Namespaces are left behind).
+(CRDs and Namespaces are left behind, PersistentVolumeClaims are kept).
+
+PersistentVolumeClaims are kept by default, because deleting one deletes the
+data on its volume. Each kept claim is listed with the status "kept", the
+command still exits 0, and the closing output prints the 'kubectl delete pvc'
+command for each one. The ModuleInstance is deleted, so OPM no longer tracks a
+kept claim and no later opm command deletes it; applying the instance again
+takes it back. Pass --delete-data to delete the claims and their data with the
+instance; the confirmation prompt then names each claim. Claims a StatefulSet
+created from volumeClaimTemplates are not tracked by OPM and are never deleted
+here, with or without the flag: Kubernetes keeps them by default.
+
+None of this holds for a controller-managed instance: there the controller
+deletes what the instance tracks when spec.prune is set, and leaves all of it
+running otherwise. A controller that has spec.dataPolicy keeps
+PersistentVolumeClaims unless that field of the instance is Delete; an
+controller without the field deletes them. The confirmation prompt says which
+holds: it reads spec.prune and spec.dataPolicy from the instance, and from the
+ModuleInstance CRD whether the controller has the field. --delete-data does not
+change what the controller does.
 
 CustomResourceDefinitions and Namespaces are never deleted, since deleting one
 takes every custom resource of its kind, or everything inside it, with it.
 Each tracked resource is also read again just before its delete, and a
-resource that is no longer managed by OPM or now belongs to another instance
-is left behind. Every resource left behind is listed with its reason; remove
+resource that is no longer managed by OPM, now belongs to another instance, or
+carries an opmodel.dev/adopt annotation naming another instance is left
+behind. Every resource left behind is listed with its reason; remove
 it with 'kubectl delete' once nothing else needs it.
 
+The command returns when the API server has accepted every delete. A deleted
+resource can still exist then, terminating, until its dependents and its
+finalizers are gone. Pass --wait to return only when every resource this run
+deleted is gone: its read returns NotFound, or a new object holds its name.
+--timeout (default 5m0s) bounds the wait and starts with it. Kept claims,
+resources left behind and resources that were already gone are not waited
+for. When the wait times out, the command lists each resource that is still
+terminating, with its finalizers, keeps the ModuleInstance and exits 1; run
+the same command again to wait again, or without --wait to delete the
+ModuleInstance and stop tracking those resources. --wait does nothing on
+--dry-run, and nothing when a resource failed to delete. For an
+controller-managed instance the command always waits, bounded by --timeout,
+until the ModuleInstance is gone, with or without --wait; it does not check
+the resources the controller prunes.
+
 Deleting an instance that deploys the controller (the instance opm-controller in
-opm-controller-system, any instance of the controller module, or one whose
+opm-system, any instance of the controller module, or one whose
 inventory holds the controller's CRDs) is refused in two cases, dry runs
 included. While it is controller-owned: the controller never reconciles or prunes
 the instance that deploys it, so set spec.owner to cli first. And while any
 instance still carries the controller's opmodel.dev/cleanup finalizer: removing
 the controller would leave them unable to finish deletion. Run
 'opm controller uninstall --remove-finalizers' to remove that finalizer first,
-which orphans those instances' workloads. --force does not bypass either.
+which orphans those instances' workloads. --yes does not bypass either.
 
 Arguments:
   file         Path to an instance.cue file or directory containing one.
@@ -79,25 +119,66 @@ Examples:
   # Preview what would be deleted
   opm instance delete jellyfin -n media --dry-run
 
-  # Skip confirmation prompt
-  opm instance delete jellyfin -n media --force`,
+  # Skip the confirmation prompt
+  opm instance delete jellyfin -n media --yes
+
+  # Also delete the PersistentVolumeClaims and the data on them
+  opm instance delete jellyfin -n media --delete-data
+
+  # Return only when the deleted resources are gone, or after two minutes
+  opm instance delete jellyfin -n media --yes --wait --timeout 2m`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runInstanceDelete(c.Context(), args[0], cfg, &kf, namespace, forceFlag, dryRunFlag, timeoutFlag)
+			return runDelete(c.Context(), args[0], cfg, &kf, namespace, deleteFlags{
+				SkipConfirm: yesFlag || forceFlag,
+				DryRun:      dryRunFlag,
+				DeleteData:  deleteData,
+				Wait:        waitFlag,
+				Timeout:     timeoutFlag,
+			})
 		},
 	}
 
 	kf.AddTo(c)
 	c.Flags().StringVarP(&namespace, "namespace", "n", "", "Target namespace")
-	c.Flags().BoolVar(&forceFlag, "force", false, "Skip confirmation prompt")
+	c.Flags().BoolVarP(&yesFlag, "yes", "y", false, "Skip the confirmation prompt")
+	// --force was the first spelling of --yes. On every other command --force
+	// overrides a refusal, so here it stays only as a deprecated alias.
+	c.Flags().BoolVar(&forceFlag, "force", false, "Skip the confirmation prompt")
+	cmdutil.DeprecateFlag(c, "force", "yes")
 	c.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Preview without deleting")
+	c.Flags().BoolVar(&deleteData, "delete-data", false, deleteDataFlagHelp)
+	c.Flags().BoolVar(&waitFlag, "wait", false,
+		"Wait until every resource this run deleted is gone before returning (skipped on --dry-run; controller-managed instances always wait for the controller)")
 	c.Flags().DurationVar(&timeoutFlag, "timeout", inventory.DefaultReconcileTimeout,
-		"Bound on the controller-cleanup wait (controller-managed instances only)")
+		"Bound on the --wait wait, and on the controller-cleanup wait of a controller-managed instance")
 
 	return c
 }
 
-func runInstanceDelete(ctx context.Context, identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag string, force, dryRun bool, timeout time.Duration) error {
+// runDelete is what the delete command runs. It is a variable so a test can
+// read what the flags resolved to without a cluster.
+var runDelete = runInstanceDelete
+
+// deleteDataFlagHelp is the help of --delete-data on instance delete.
+const deleteDataFlagHelp = "Also delete PersistentVolumeClaims and the data on them (kept by default)"
+
+// deleteFlags carries the delete command's behavior flags.
+type deleteFlags struct {
+	// SkipConfirm is --yes (or its deprecated alias): do not prompt.
+	SkipConfirm bool
+	DryRun      bool
+	// DeleteData is --delete-data: delete tracked PersistentVolumeClaims too.
+	DeleteData bool
+	// Wait is --wait: return only when the deleted resources are gone, or
+	// Timeout passed. A controller-managed delete waits without it.
+	Wait bool
+	// Timeout is --timeout: it bounds the wait of Wait, and the wait for
+	// the controller's cleanup of a controller-managed instance.
+	Timeout time.Duration
+}
+
+func runInstanceDelete(ctx context.Context, identifier string, cfg *config.GlobalConfig, kf *cmdutil.K8sFlags, namespaceFlag string, flags deleteFlags) error {
 	target, err := cmdutil.ResolveInstanceTarget(ctx, identifier, cfg, kf, namespaceFlag)
 	if err != nil {
 		return err
@@ -114,21 +195,70 @@ func runInstanceDelete(ctx context.Context, identifier string, cfg *config.Globa
 		return err
 	}
 
-	if dryRun {
-		instanceLog.Info("dry run - no changes will be made")
-	} else if !force {
-		if !confirmInstanceDelete(rsf.InstanceName, rsf.InstanceID, namespace) {
-			instanceLog.Info("deletion canceled")
-			return nil
-		}
-	}
+	return confirmAndDelete(ctx, k8sClient, rsf, namespace, flags, os.Stdin, instanceLog)
+}
 
+// confirmAndDelete reads the instance record, asks for confirmation on in
+// unless the flags skip it, and deletes. The record is read before the
+// prompt, so that the prompt can name the claims --delete-data deletes and a
+// missing instance is reported without a question. The read changes nothing.
+//
+// The question is asked by deleteResolvedInstance, after every check that can
+// refuse the delete: nobody is asked about their data for a delete that the
+// command then refuses.
+func confirmAndDelete(ctx context.Context, k8sClient *kubernetes.Client, rsf *cmdutil.InstanceSelectorFlags, namespace string, flags deleteFlags, in io.Reader, instanceLog *log.Logger) error {
 	inv, liveResources, _, unreadable, err := query.ResolveInventory(ctx, k8sClient, rsf, namespace, instanceLog)
 	if err != nil {
 		return err
 	}
 
-	return deleteResolvedInstance(ctx, k8sClient, rsf, namespace, inv, liveResources, unreadable, timeout, dryRun, instanceLog)
+	// Said before the question: on a controller-managed instance the flag
+	// does not change what the controller does, and the user must know that
+	// when they answer.
+	controllerManaged := inventory.ResolveOwnership(inv) == inventory.ModeControllerOwned
+	if controllerManaged && flags.DeleteData {
+		instanceLog.Warn(workflowapply.DeleteDataControllerManagedNote)
+	}
+	if flags.DryRun {
+		instanceLog.Info("dry run - no changes will be made")
+	}
+
+	confirm := func(opClaims controllerClaims) bool {
+		if flags.DryRun || flags.SkipConfirm {
+			return true
+		}
+		prompt := deletePrompt(rsf.InstanceName, rsf.InstanceID, namespace, claimsToDelete(inv, liveResources, flags.DeleteData))
+		if controllerManaged {
+			prompt = controllerManagedDeletePrompt(rsf.InstanceName, rsf.InstanceID, namespace, inv.Prune, opClaims)
+		}
+		output.Prompt(prompt)
+		return readConfirmation(in)
+	}
+
+	return deleteResolvedInstance(ctx, k8sClient, rsf, namespace, inv, liveResources, unreadable, confirm, flags, instanceLog)
+}
+
+// confirmFunc asks whether the delete goes ahead. It is called once, after
+// the checks that can refuse the delete, with what the controller does with the
+// instance's PersistentVolumeClaims (the zero value for a CLI-owned instance).
+// A run that skips the question answers yes.
+type confirmFunc func(opClaims controllerClaims) bool
+
+// claimsToDelete lists, as "<namespace>/<name>", the PersistentVolumeClaims a
+// delete with these flags removes: the live tracked claims of a CLI-owned
+// instance when deleteData is set, and none otherwise. A controller-managed
+// instance lists none, since the controller decides what it removes.
+func claimsToDelete(inv *inventory.Record, live []*unstructured.Unstructured, deleteData bool) []string {
+	if !deleteData || inventory.ResolveOwnership(inv) == inventory.ModeControllerOwned {
+		return nil
+	}
+	var claims []string
+	for _, obj := range live {
+		if kubernetes.IsDataClaim(obj.GroupVersionKind().Group, obj.GetKind()) {
+			claims = append(claims, obj.GetNamespace()+"/"+obj.GetName())
+		}
+	}
+	return claims
 }
 
 // deleteResolvedInstance deletes an instance whose record has been read. It
@@ -137,21 +267,30 @@ func runInstanceDelete(ctx context.Context, identifier string, cfg *config.Globa
 // controller-owned instance is deleted by deleting its CR and letting the
 // controller's finalizer prune the workloads.
 //
+// confirm is asked after the guard and, for a controller-owned instance, after
+// the controller-readiness gate: both can refuse, and a refusal comes before the
+// question. A "no" deletes nothing and is not an error.
+//
 // unreadable lists the tracked resources discovery could not read. The
 // CLI-owned branch treats each as a per-resource failure and keeps the
 // ModuleInstance; the controller-owned branch ignores them, since it deletes only
 // the ModuleInstance and the controller prunes with its own credentials.
 func deleteResolvedInstance(ctx context.Context, k8sClient *kubernetes.Client, rsf *cmdutil.InstanceSelectorFlags, namespace string,
-	inv *inventory.Record, liveResources []*unstructured.Unstructured, unreadable []inventory.UnreadableEntry, timeout time.Duration, dryRun bool, instanceLog *log.Logger) error {
+	inv *inventory.Record, liveResources []*unstructured.Unstructured, unreadable []inventory.UnreadableEntry, confirm confirmFunc,
+	flags deleteFlags, instanceLog *log.Logger) error {
 	if err := guardControllerInstanceDelete(ctx, k8sClient, inv); err != nil {
 		return err
 	}
 
 	if inventory.ResolveOwnership(inv) == inventory.ModeControllerOwned {
-		return deleteControllerOwned(ctx, k8sClient, inv, timeout, dryRun, instanceLog)
+		return deleteControllerOwned(ctx, k8sClient, inv, confirm, flags.Timeout, flags.DryRun, instanceLog)
 	}
 
-	return executeInstanceDelete(ctx, k8sClient, rsf, namespace, inv, liveResources, unreadable, dryRun, instanceLog)
+	if !confirm(controllerClaims{}) {
+		instanceLog.Info("deletion canceled")
+		return nil
+	}
+	return executeInstanceDelete(ctx, k8sClient, rsf, namespace, inv, liveResources, unreadable, flags, instanceLog)
 }
 
 // guardControllerInstanceDelete refuses to delete an instance that deploys the
@@ -207,8 +346,13 @@ func guardControllerInstanceDelete(ctx context.Context, k8sClient *kubernetes.Cl
 // with its workloads orphaned and unreachable through the CLI. That is the same
 // footgun `opm controller uninstall` guards from the other side, and it has no
 // --force bypass here: forcing it produces the wedge, it does not avoid it.
-func deleteControllerOwned(ctx context.Context, k8sClient *kubernetes.Client, inv *inventory.Record, timeout time.Duration, dryRun bool, instanceLog *log.Logger) error {
-	if err := controller.CheckReady(ctx, k8sClient); err != nil {
+//
+// The guard runs before confirm is asked, so its refusal comes before the
+// question. The ModuleInstance CRD it reads also says whether the controller has
+// spec.dataPolicy, which the question needs; no second read is made for that.
+func deleteControllerOwned(ctx context.Context, k8sClient *kubernetes.Client, inv *inventory.Record, confirm confirmFunc, timeout time.Duration, dryRun bool, instanceLog *log.Logger) error {
+	crd, err := controller.ReadyModuleInstanceCRD(ctx, k8sClient)
+	if err != nil {
 		var notReady *controller.NotReadyError
 		if errors.As(err, &notReady) {
 			notReady.Hint = fmt.Sprintf(
@@ -218,17 +362,27 @@ func deleteControllerOwned(ctx context.Context, k8sClient *kubernetes.Client, in
 		return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err}
 	}
 
+	claims := controllerClaimsOf(inv, crd)
+	if !confirm(claims) {
+		instanceLog.Info("deletion canceled")
+		return nil
+	}
+
 	// spec.prune decides whether removing the CR removes the workloads. It has
 	// no CRD default, so it is false unless someone set it, and the controller
 	// then orphans the workloads on purpose. The CLI does not write this field,
 	// so a CLI-created instance orphans by default — say so rather than
 	// reporting a cleanup that will not happen.
+	//
+	// spec.dataPolicy decides, under spec.prune, whether the controller's prune
+	// takes the PersistentVolumeClaims too, for a controller that has the
+	// field; claims carries what opm could read about that.
 	entries := len(inv.Inventory.Entries)
 	if dryRun {
 		if inv.Prune {
 			instanceLog.Info(fmt.Sprintf(
-				"dry run complete: ModuleInstance %q would be deleted and the controller would prune its %d tracked resource(s)",
-				inv.Name, entries))
+				"dry run complete: ModuleInstance %q would be deleted and the controller would prune its %d tracked resource(s)%s",
+				inv.Name, entries, claims.outcome()))
 		} else {
 			instanceLog.Info(fmt.Sprintf(
 				"dry run complete: ModuleInstance %q would be deleted; its %d tracked resource(s) would be left running (spec.prune is not set)",
@@ -238,7 +392,7 @@ func deleteControllerOwned(ctx context.Context, k8sClient *kubernetes.Client, in
 	}
 
 	if inv.Prune {
-		instanceLog.Info("deleting the ModuleInstance — the controller prunes its resources", "instance", inv.Name)
+		instanceLog.Info("deleting the ModuleInstance — the controller prunes its resources"+claims.outcome(), "instance", inv.Name)
 	} else {
 		instanceLog.Warn("spec.prune is not set — the controller will remove the ModuleInstance but leave its resources running",
 			"instance", inv.Name, "resources", entries)
@@ -256,8 +410,7 @@ func deleteControllerOwned(ctx context.Context, k8sClient *kubernetes.Client, in
 	// The CR's disappearance proves the finalizer completed; it does not prove
 	// anything was pruned. Report only what was actually established.
 	if inv.Prune {
-		instanceLog.Info("all resources have been deleted")
-		output.Println(output.FormatCheckmark(fmt.Sprintf("Instance deleted — controller pruned %d resources", entries)))
+		reportControllerPrune(inv, claims, instanceLog)
 		return nil
 	}
 
@@ -275,8 +428,14 @@ func deleteControllerOwned(ctx context.Context, k8sClient *kubernetes.Client, in
 // executeInstanceDelete deletes the instance's tracked workloads, then the
 // ModuleInstance CR last (after all workloads are gone; skipped on dry-run).
 // A tracked resource discovery could not read (unreadable) is a per-resource
-// failure, so the ModuleInstance is kept and still tracks it.
-func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rsf *cmdutil.InstanceSelectorFlags, namespace string, inv *inventory.Record, liveResources []*unstructured.Unstructured, unreadable []inventory.UnreadableEntry, dryRun bool, instanceLog *log.Logger) error {
+// failure, so the ModuleInstance is kept and still tracks it. A ModuleInstance
+// delete that fails after the workloads are gone fails the command with the
+// exit code of its cause. A PersistentVolumeClaim is kept unless deleteData;
+// a kept claim does not block the ModuleInstance delete, so it is left
+// untracked, where no later opm command can delete it. With flags.Wait the
+// ModuleInstance is deleted only when every deleted resource is gone; the
+// ones still terminating when flags.Timeout passed fail the command.
+func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rsf *cmdutil.InstanceSelectorFlags, namespace string, inv *inventory.Record, liveResources []*unstructured.Unstructured, unreadable []inventory.UnreadableEntry, flags deleteFlags, instanceLog *log.Logger) error {
 	deleteResult, err := workflowapply.DeleteRecorded(ctx, workflowapply.DeleteRequest{
 		Client:       k8sClient,
 		InstanceName: rsf.InstanceName,
@@ -285,13 +444,23 @@ func executeInstanceDelete(ctx context.Context, k8sClient *kubernetes.Client, rs
 		Record:       inv,
 		Live:         liveResources,
 		Unreadable:   inventory.UnreadableResources(unreadable),
-		DryRun:       dryRun,
+		DryRun:       flags.DryRun,
+		DeleteData:   flags.DeleteData,
+		Wait:         flags.Wait,
+		Timeout:      flags.Timeout,
 		Log:          instanceLog,
 	})
 	if err != nil {
+		var recordErr *workflowapply.RecordDeleteError
+		if errors.As(err, &recordErr) {
+			instanceLog.Error(fmt.Sprintf("the tracked resources of ModuleInstance %s/%s were deleted, but the record remains",
+				recordErr.Namespace, recordErr.Name), "error", recordErr.Err)
+			output.Details("The ModuleInstance still lists resources that are gone.\n" +
+				"Fix the cause (for example missing RBAC) and re-run; re-running is safe.")
+		}
 		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
 	}
-	return reportInstanceDelete(deleteResult, dryRun, instanceLog)
+	return reportInstanceDelete(deleteResult, flags.DryRun, instanceLog)
 }
 
 // reportInstanceDelete prints the closing summary of a CLI-owned delete and
@@ -307,7 +476,12 @@ func reportInstanceDelete(deleteResult *kubernetes.DeleteResult, dryRun bool, in
 			output.Details("The ModuleInstance was kept, so it still tracks these resources.\n" +
 				"Fix the cause (for example missing RBAC) and re-run; re-running is safe.")
 		}
-		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf(format, n), Printed: true}
+		hintUnservedKinds(deleteResult)
+		return &opmexit.ExitError{Code: deleteFailureExitCode(deleteResult), Err: fmt.Errorf(format, n), Printed: true}
+	}
+
+	if len(deleteResult.Terminating) > 0 {
+		return reportTerminating(deleteResult, instanceLog)
 	}
 
 	leftBehind := len(deleteResult.LeftBehind)
@@ -320,21 +494,289 @@ func reportInstanceDelete(deleteResult *kubernetes.DeleteResult, dryRun bool, in
 		output.Println(output.FormatCheckmark(fmt.Sprintf("Instance deleted — %d resource(s) left behind", leftBehind)))
 		output.Details("Remove them with 'kubectl delete' once nothing else needs them.")
 	default:
-		instanceLog.Info("all resources have been deleted")
+		if len(deleteResult.Kept) == 0 {
+			instanceLog.Info("all resources have been deleted")
+		}
 		output.Println(output.FormatCheckmark("Instance deleted"))
 	}
+	reportKeptClaims(deleteResult.Kept, dryRun, instanceLog)
 	return nil
 }
 
-func confirmInstanceDelete(instanceName, instanceID, namespace string) bool {
-	var prompt string
-	if instanceName != "" {
-		prompt = fmt.Sprintf("Delete the resources for instance %q in namespace %q (CRDs and Namespaces are left behind)? [y/N]: ", instanceName, namespace)
-	} else {
-		prompt = fmt.Sprintf("Delete the resources for instance-id %q in namespace %q (CRDs and Namespaces are left behind)? [y/N]: ", instanceID, namespace)
+// reportTerminating closes a delete whose --wait ran out of time: one line
+// per deleted resource that still exists, with the finalizers that hold it or
+// the error of its last read, then what the user can do. It claims no
+// completion, since the ModuleInstance was kept, and exits 1: the cluster
+// answered every read, so this is not the connectivity class of exit 3.
+func reportTerminating(deleteResult *kubernetes.DeleteResult, instanceLog *log.Logger) error {
+	for i := range deleteResult.Terminating {
+		t := &deleteResult.Terminating[i]
+		line := output.FormatResourceLine(t.Entry.Kind, t.Entry.Namespace, t.Entry.Name, output.StatusTerminating)
+		switch {
+		case t.Err != nil:
+			instanceLog.Warn(line, "error", t.Err)
+		case len(t.Finalizers) > 0:
+			instanceLog.Warn(line, "finalizers", strings.Join(t.Finalizers, ","))
+		default:
+			instanceLog.Warn(line)
+		}
 	}
-	output.Prompt(prompt)
-	scanner := bufio.NewScanner(os.Stdin)
+	err := fmt.Errorf("timed out after %s: %d deleted resource(s) are still terminating", deleteResult.WaitElapsed, len(deleteResult.Terminating))
+	instanceLog.Error(err.Error())
+	output.Details("The ModuleInstance was kept, so it still tracks these resources.\n" +
+		"A resource stays until its dependents are gone and every finalizer on it is removed.\n" +
+		"Run the same command again to wait again; re-running is safe.\n" +
+		"Without --wait the command deletes the ModuleInstance and does not wait for them.")
+	return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err, Printed: true}
+}
+
+// reportKeptClaims closes a delete that kept PersistentVolumeClaims: how many,
+// that OPM no longer tracks them, and the command that deletes each one. The
+// claims are kept on purpose, so nothing here is a warning. A dry run says
+// what a real run would keep.
+func reportKeptClaims(kept []kubernetes.LeftBehindResource, dryRun bool, instanceLog *log.Logger) {
+	if len(kept) == 0 {
+		return
+	}
+	if dryRun {
+		instanceLog.Info(fmt.Sprintf("dry run: %d PersistentVolumeClaim(s) would be kept with the data on them; pass --delete-data to delete them",
+			len(kept)))
+		return
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "Kept %d PersistentVolumeClaim(s) and the data on them. OPM no longer tracks them.\n", len(kept))
+	b.WriteString("Applying the instance again takes them back. To delete a claim and its data:\n")
+	for _, k := range kept {
+		fmt.Fprintf(&b, "  kubectl delete pvc %s -n %s\n", k.Name, k.Namespace)
+	}
+	b.WriteString("To delete claims together with an instance, pass --delete-data.")
+	output.Details(b.String())
+}
+
+// deletePrompt is the confirmation question of instance delete. claims are
+// the PersistentVolumeClaims this run deletes ("<namespace>/<name>"); when
+// there are any, the prompt names each one before the question.
+func deletePrompt(instanceName, instanceID, namespace string, claims []string) string {
+	var b strings.Builder
+	if len(claims) > 0 {
+		b.WriteString("--delete-data: these PersistentVolumeClaims and the data on them will be deleted:\n")
+		for _, c := range claims {
+			b.WriteString("  " + c + "\n")
+		}
+	}
+	subject := fmt.Sprintf("instance %q", instanceName)
+	if instanceName == "" {
+		subject = fmt.Sprintf("instance-id %q", instanceID)
+	}
+	left := "CRDs and Namespaces are left behind, PersistentVolumeClaims are kept"
+	if len(claims) > 0 {
+		left = "CRDs and Namespaces are left behind"
+	}
+	fmt.Fprintf(&b, "Delete the resources for %s in namespace %q (%s)? [y/N]: ", subject, namespace, left)
+	return b.String()
+}
+
+// reportControllerPrune closes a controller-owned delete with spec.prune set. The
+// ModuleInstance being gone proves that the controller's finalizer completed,
+// not which resources are left. So when the instance tracked
+// PersistentVolumeClaims that the controller may have kept, the closing output
+// does not say that everything was pruned, and does not say that the claims
+// are still there either: it names them, says which controller keeps them, and
+// prints the commands that show and delete them.
+func reportControllerPrune(inv *inventory.Record, claims controllerClaims, instanceLog *log.Logger) {
+	if fate := claims.fate(); fate == claimsNone || fate == claimsDeleted {
+		instanceLog.Info("all resources have been deleted")
+		output.Println(output.FormatCheckmark(fmt.Sprintf("Instance deleted — controller pruned %d resources", len(inv.Inventory.Entries))))
+		return
+	}
+
+	output.Println(output.FormatCheckmark("Instance deleted: the controller finished its cleanup"))
+	var b strings.Builder
+	fmt.Fprintf(&b, "The instance tracked %d PersistentVolumeClaim(s). A controller that has spec.dataPolicy keeps them\n", len(claims.tracked))
+	fmt.Fprintf(&b, "and the data on them (%s), and OPM no longer tracks them.\n", describeDataPolicy(claims.dataPolicy))
+	if claims.fate() == claimsUndecided {
+		b.WriteString("A controller without spec.dataPolicy, or older than its CRDs, deleted them, and opm could not read\n")
+		b.WriteString("the schema of the ModuleInstance CRD to tell. To see what is left:\n")
+	} else {
+		b.WriteString("A controller older than its CRDs deleted them. To see what is left:\n")
+	}
+	fmt.Fprintf(&b, "  kubectl get pvc -n %s\n", inv.Namespace)
+	b.WriteString("To delete a claim and its data:\n")
+	for _, c := range claims.tracked {
+		fmt.Fprintf(&b, "  kubectl delete pvc %s -n %s\n", c.Name, c.Namespace)
+	}
+	b.WriteString("To have the controller delete claims with an instance, set spec.dataPolicy to Delete before deleting it.")
+	output.Details(b.String())
+}
+
+// dataPolicyDelete is the one value of a ModuleInstance's spec.dataPolicy
+// that lets the controller delete PersistentVolumeClaims; dataPolicyKeep is the
+// other value the controller defines. The CLI reads the field as a string and
+// does not import the controller's types.
+const (
+	dataPolicyField  = "dataPolicy"
+	dataPolicyDelete = "Delete"
+	dataPolicyKeep   = "Keep"
+)
+
+// keptClaimsHedge follows every statement that the controller keeps claims. The
+// CRD shows that the controller's API has spec.dataPolicy; it does not show
+// that the controller is as new as its CRDs.
+const keptClaimsHedge = "The ModuleInstance CRD has spec.dataPolicy, but a controller older than its CRDs deletes the claims whatever the field says."
+
+// undecidedClaimsNote stands in for a statement about claims when the schema
+// of the CRD could not be read. The readiness gate has read the CRD by then,
+// so this is a CRD without a readable version or schema, not a failed read.
+const undecidedClaimsNote = "A controller that has spec.dataPolicy keeps PersistentVolumeClaims and the data on them, an older controller deletes them, " +
+	"and opm could not read the schema of the ModuleInstance CRD to tell which runs here."
+
+// claimFate is what the controller does with the PersistentVolumeClaims of an
+// instance with spec.prune set, as far as opm can read it.
+type claimFate int
+
+const (
+	// claimsNone: the inventory tracks no claim.
+	claimsNone claimFate = iota
+	// claimsDeleted: spec.dataPolicy is Delete, or the controller's CRD has no
+	// such field, which is the controller that deletes claims under spec.prune.
+	claimsDeleted
+	// claimsKept: the CRD has the field and its value is not Delete.
+	claimsKept
+	// claimsUndecided: the value is not Delete and the CRD's schema could not
+	// be read.
+	claimsUndecided
+)
+
+// controllerClaims is what a controller-owned delete knows about the instance's
+// PersistentVolumeClaims: the ones its recorded inventory tracks, the
+// spec.dataPolicy as written, and whether the installed ModuleInstance CRD
+// has that field. The zero value tracks no claim.
+type controllerClaims struct {
+	tracked    []k8sinventory.Entry
+	dataPolicy string
+	field      controller.FieldSupport
+}
+
+// controllerClaimsOf builds the controllerClaims of a controller-managed instance
+// from its record and the live ModuleInstance CRD the readiness gate read.
+// Without spec.prune the controller leaves everything, so the zero value is
+// returned and no message speaks of claims.
+func controllerClaimsOf(inv *inventory.Record, crd *unstructured.Unstructured) controllerClaims {
+	if !inv.Prune {
+		return controllerClaims{}
+	}
+	return controllerClaims{
+		tracked:    trackedClaims(inv),
+		dataPolicy: inv.DataPolicy,
+		field:      controller.SpecFieldSupport(crd, dataPolicyField),
+	}
+}
+
+// fate decides what the controller does with the tracked claims. Only the
+// exact value Delete is a request to delete: Keep, an absent value and any
+// value opm does not know keep them, which is the controller's own rule. An
+// controller whose CRD has no spec.dataPolicy keeps nothing.
+func (c controllerClaims) fate() claimFate {
+	switch {
+	case len(c.tracked) == 0:
+		return claimsNone
+	case c.field == controller.FieldAbsent, c.dataPolicy == dataPolicyDelete:
+		return claimsDeleted
+	case c.field == controller.FieldPresent:
+		return claimsKept
+	default:
+		return claimsUndecided
+	}
+}
+
+// reason says why the claims have their fate: the controller has no
+// spec.dataPolicy, or the value of the field as it is written.
+func (c controllerClaims) reason() string {
+	if c.field == controller.FieldAbsent {
+		return "the controller in this cluster has no spec.dataPolicy"
+	}
+	return describeDataPolicy(c.dataPolicy)
+}
+
+// outcome is the clause a progress or dry-run line of an instance with
+// spec.prune set appends about the claims; empty when it tracks none.
+func (c controllerClaims) outcome() string {
+	switch c.fate() {
+	case claimsDeleted:
+		return fmt.Sprintf(", PersistentVolumeClaims and the data on them included (%s)", c.reason())
+	case claimsKept:
+		return fmt.Sprintf(", PersistentVolumeClaims and the data on them kept (%s) unless the controller is older than its CRDs", c.reason())
+	case claimsUndecided:
+		return "; PersistentVolumeClaims are kept only by a controller that has spec.dataPolicy, and opm could not read the schema of the ModuleInstance CRD to tell"
+	case claimsNone:
+		return ""
+	}
+	return ""
+}
+
+// describeDataPolicy words a spec.dataPolicy value for a message, as it is
+// written on the instance. A value opm does not know is quoted, which also
+// makes any control character in it harmless, and is named as read as Keep.
+func describeDataPolicy(dataPolicy string) string {
+	switch dataPolicy {
+	case "":
+		return "spec.dataPolicy is not set"
+	case dataPolicyKeep, dataPolicyDelete:
+		return "spec.dataPolicy is " + dataPolicy
+	default:
+		return fmt.Sprintf("spec.dataPolicy is %q, not a value opm knows, read as %s", dataPolicy, dataPolicyKeep)
+	}
+}
+
+// trackedClaims lists the PersistentVolumeClaims in the instance's recorded
+// inventory.
+func trackedClaims(inv *inventory.Record) []k8sinventory.Entry {
+	var claims []k8sinventory.Entry
+	for _, e := range inv.Inventory.Entries {
+		if kubernetes.IsDataClaim(e.Group, e.Kind) {
+			claims = append(claims, e)
+		}
+	}
+	return claims
+}
+
+// controllerManagedDeletePrompt is the confirmation question for an
+// controller-managed instance. opm deletes only the ModuleInstance there; the
+// controller removes what the instance tracks when spec.prune is set, and
+// leaves all of it running otherwise. When the instance tracks
+// PersistentVolumeClaims the prompt says what the controller does with them,
+// and it says that they are kept only when the installed CRD has
+// spec.dataPolicy, with what a controller older than its CRDs does.
+func controllerManagedDeletePrompt(instanceName, instanceID, namespace string, prune bool, claims controllerClaims) string {
+	subject := fmt.Sprintf("instance %q", instanceName)
+	if instanceName == "" {
+		subject = fmt.Sprintf("instance-id %q", instanceID)
+	}
+	question := fmt.Sprintf("Delete the ModuleInstance for %s in namespace %q? [y/N]: ", subject, namespace)
+	if !prune {
+		return "This instance is controller-managed: spec.prune is not set, so the controller leaves its tracked resources running.\n" + question
+	}
+
+	const lead = "This instance is controller-managed: spec.prune is set"
+	switch claims.fate() {
+	case claimsDeleted:
+		return fmt.Sprintf("%s and %s, so the controller deletes its tracked resources, PersistentVolumeClaims and the data on them included.\n",
+			lead, claims.reason()) + question
+	case claimsKept:
+		return fmt.Sprintf("%s and %s, so the controller deletes its tracked resources and keeps PersistentVolumeClaims and the data on them.\n",
+			lead, claims.reason()) + keptClaimsHedge + "\n" + question
+	case claimsUndecided:
+		return fmt.Sprintf("%s and %s, so the controller deletes its tracked resources.\n", lead, claims.reason()) +
+			undecidedClaimsNote + "\n" + question
+	case claimsNone:
+	}
+	return lead + ", so the controller deletes its tracked resources.\n" + question
+}
+
+// readConfirmation reads one line and reports whether it says yes. Anything
+// else, a closed input included, is a no.
+func readConfirmation(in io.Reader) bool {
+	scanner := bufio.NewScanner(in)
 	if scanner.Scan() {
 		answer := strings.TrimSpace(strings.ToLower(scanner.Text()))
 		return answer == "y" || answer == "yes"

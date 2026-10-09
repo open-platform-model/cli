@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"golang.org/x/mod/semver"
@@ -12,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
 	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 	"github.com/open-platform-model/library/opm/kernel"
 
@@ -127,11 +127,18 @@ func (e *RecordedValuesError) Error() string {
 
 func (e *RecordedValuesError) Unwrap() error { return e.Err }
 
-// GuardError is the apply guard's refusal: an object the render names
-// already exists and is not OPM's.
+// GuardError is the apply guard's refusal: an object the plan applies
+// exists and is not OPM's, belongs to or is adopted by another instance, is
+// terminating, or could not be read by the guard (the read error is then in
+// the chain). Nothing was written. The install command exits
+// 2 on every GuardError, whatever it wraps. An object that is unreadable
+// before the guard runs is refused earlier, by the terminating wait, with the
+// exit code of the read error.
 type GuardError struct{ Err error }
 
-func (e *GuardError) Error() string { return e.Err.Error() }
+func (e *GuardError) Error() string {
+	return "refusing to install: " + e.Err.Error() + "\nnothing was changed"
+}
 func (e *GuardError) Unwrap() error { return e.Err }
 
 // PlanInstall runs every check that can refuse the install, in order, and
@@ -139,7 +146,10 @@ func (e *GuardError) Unwrap() error { return e.Err }
 // checks the values against the target's #config), the target rules
 // (CheckTarget), the status-subresource permission check, the wait for
 // terminating objects and, last, the apply guard over every object the plan
-// applies when no record exists yet. The terminating wait starts the
+// applies, with or without a record. No object is admitted by a proof of
+// where it came from: an existing object passes when the record lists it,
+// when it is annotated for adoption by this instance, or when it carries
+// OPM's managed-by label and no other instance's UUID. The terminating wait starts the
 // --timeout budget the writes then share.
 func PlanInstall(ctx context.Context, env InstallEnv, res *modref.Resolution, target Target, opts PlanOptions) (*Plan, error) {
 	rec, err := inventory.GetRecord(ctx, env.Client, ControllerInstanceName, ControllerNamespace)
@@ -174,9 +184,21 @@ func PlanInstall(ctx context.Context, env InstallEnv, res *modref.Resolution, ta
 		return nil, &opmexit.ExitError{Code: opmexit.ExitPermissionDenied, Err: err}
 	}
 
-	// The apply guard, the last check: on a cluster with no record every
-	// object the plan applies must be absent or already OPM's.
-	if err := waitThenGuard(ctx, env, plan, rec == nil); err != nil {
+	if err := waitForTerminatingObjects(ctx, env, plan); err != nil {
+		return nil, err
+	}
+
+	// The apply guard, the last check, on every install: an object the plan
+	// applies must be absent, in the record, this instance's, or annotated
+	// for adoption by it. Install needs every object it renders, so an
+	// object another instance is adopting refuses here too, where any other
+	// apply would leave it out and go on. Nothing has been written yet, so no
+	// write of the install reaches an object the guard did not allow.
+	var previous []k8sinventory.Entry
+	if rec != nil {
+		previous = rec.Inventory.Entries
+	}
+	if err := applyGuard(ctx, env, plan, previous, result.Instance.UUID); err != nil {
 		return nil, err
 	}
 	return plan, nil
@@ -196,10 +218,13 @@ func PinnedTarget() Target {
 // version. It works offline: it resolves, fetches and renders nothing, and
 // reads no ModuleInstance, so it cannot know whether the controller's
 // instance is recorded. Its checks are the wait for terminating objects, the
-// check of the existing CRDs (one an earlier installer applied, or one a
-// newer module version installed, is refused), and the apply guard over the
-// CRDs, which always runs (a CRD that exists and is not OPM's refuses the
-// install). The target rules already held when the version was pinned.
+// check of the existing CRDs (one a newer module version installed is
+// refused), and the apply guard over the CRDs, asked as for a first install
+// of the controller's instance: the embedded CRDs carry that instance's
+// UUID, and no record is read. A CRD that exists and is not OPM's, or that
+// carries another instance's identity, refuses the install with the guard's
+// own message, which names the adopt annotation; nothing is adopted without
+// it. The target rules already held when the version was pinned.
 func PlanCRDsOnly(ctx context.Context, env InstallEnv, opts PlanOptions) (*Plan, error) {
 	objs, err := embeddedCRDs()
 	if err != nil {
@@ -212,16 +237,27 @@ func PlanCRDsOnly(ctx context.Context, env InstallEnv, opts PlanOptions) (*Plan,
 		Extra:    opts.Extra,
 		Timeout:  opts.Timeout,
 	}
-	if err := waitThenGuard(ctx, env, plan, false); err != nil {
+	if err := waitForTerminatingObjects(ctx, env, plan); err != nil {
 		return nil, err
 	}
 	if err := checkExistingCRDs(ctx, env.Client, objs); err != nil {
 		return nil, err
 	}
-	if err := applyGuard(ctx, env, plan); err != nil {
+	if err := applyGuard(ctx, env, plan, nil, embeddedInstanceUUID(objs)); err != nil {
 		return nil, err
 	}
 	return plan, nil
+}
+
+// embeddedInstanceUUID is the UUID of the controller's instance as the
+// embedded CRDs carry it: the render that produced them stamped it on each.
+func embeddedInstanceUUID(objs []*unstructured.Unstructured) string {
+	for _, obj := range objs {
+		if uuid := obj.GetLabels()[opmlabels.ModuleInstanceUUID]; uuid != "" {
+			return uuid
+		}
+	}
+	return ""
 }
 
 // moduleVersionLabel is the label the kernel stamps with the module version
@@ -232,27 +268,23 @@ const moduleVersionLabel = "module.opmodel.dev/version"
 // that rendered an object.
 const moduleNameLabel = "module.opmodel.dev/name"
 
-// opmCRDGroupSuffix ends the name of every CRD the controller module renders.
-const opmCRDGroupSuffix = ".opmodel.dev"
-
 // checkExistingCRDs reads the CRDs a CRDs-only install would apply from the
-// API server only, so the form stays offline, and refuses two cases before
-// any write:
+// API server only, so the form stays offline, and refuses, before any write,
+// a CRD the embedded CRD's module (module.opmodel.dev/name) rendered whose
+// module.opmodel.dev/version is newer than this cli's pin: applying the
+// embedded CRDs would replace that version's schemas (a *TargetError, exit
+// 2). Versions of another module are not compared.
 //
-//   - an opmodel.dev CRD that carries no OPM managed-by label. An installer
-//     from before the CLI carried its CRDs applied it; the CLI adopts and
-//     migrates no such CRD (a *GuardError, exit 2, saying to start fresh);
-//   - a CRD the embedded CRD's module (module.opmodel.dev/name) rendered
-//     whose module.opmodel.dev/version is newer than this cli's pin:
-//     applying the embedded CRDs would replace that version's schemas (a
-//     *TargetError, exit 2). Versions of another module are not compared.
-//
-// A CRD that is absent, OPM's without a semver module version, or another
-// module's passes.
+// A CRD that is absent, without a semver module version, or another module's
+// passes here; the apply guard then judges whose it is.
 func checkExistingCRDs(ctx context.Context, client *kubernetes.Client, objs []*unstructured.Unstructured) error {
 	pinned := "v" + PinnedModuleVersion
 	for _, obj := range objs {
-		live, err := client.ResourceClient(kubernetes.GVRFromUnstructured(obj), "").Get(ctx, obj.GetName(), metav1.GetOptions{})
+		resource, err := client.ResourceClientFor(ctx, obj.GroupVersionKind(), "")
+		if err != nil {
+			return fmt.Errorf("reading %s/%s before apply: %w", obj.GetKind(), obj.GetName(), err)
+		}
+		live, err := resource.Get(ctx, obj.GetName(), metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			continue
 		}
@@ -260,13 +292,6 @@ func checkExistingCRDs(ctx context.Context, client *kubernetes.Client, objs []*u
 			return fmt.Errorf("reading %s/%s before apply: %w", obj.GetKind(), obj.GetName(), err)
 		}
 		labels := live.GetLabels()
-		if strings.HasSuffix(obj.GetName(), opmCRDGroupSuffix) && !opmlabels.IsOPMManagedBy(labels[opmlabels.ManagedBy]) {
-			return &GuardError{Err: fmt.Errorf(
-				"CustomResourceDefinition %s already exists without OPM's labels: an earlier installer bootstrapped this cluster, "+
-					"and this CLI neither adopts nor migrates CRDs it did not install; start fresh on a new cluster, "+
-					"then run opm controller install --crds-only again",
-				obj.GetName())}
-		}
 		if labels[moduleNameLabel] != obj.GetLabels()[moduleNameLabel] {
 			continue
 		}
@@ -282,27 +307,26 @@ func checkExistingCRDs(ctx context.Context, client *kubernetes.Client, objs []*u
 	return nil
 }
 
-// waitThenGuard starts the plan's --timeout budget, waits out the objects
-// it applies that are terminating, then, when guard is set, refuses any of
-// its render objects that exists and is not OPM's.
-func waitThenGuard(ctx context.Context, env InstallEnv, plan *Plan, guard bool) error {
+// waitForTerminatingObjects starts the plan's --timeout budget and waits out
+// the objects it applies that are terminating.
+func waitForTerminatingObjects(ctx context.Context, env InstallEnv, plan *Plan) error {
 	plan.BudgetStart = time.Now()
 	waitCtx, cancel := context.WithDeadline(ctx, plan.Deadline())
 	defer cancel()
-	if err := waitForTerminating(waitCtx, env.Client, append(plan.Objects(), plan.Extra...), plan.BudgetStart); err != nil {
-		return err
-	}
-	if !guard {
-		return nil
-	}
-	return applyGuard(ctx, env, plan)
+	return waitForTerminating(waitCtx, env.Client, append(plan.Objects(), plan.Extra...), plan.BudgetStart)
 }
 
-// applyGuard refuses any of the plan's render objects that exists and is not
-// OPM's.
-func applyGuard(ctx context.Context, env InstallEnv, plan *Plan) error {
-	entries := workflowapply.CurrentInventoryEntries(plan.Objects())
-	if err := inventory.PreApplyExistenceCheck(ctx, env.Client, entries); err != nil {
+// applyGuard asks the shared ownership guard (inventory.Guard) about every
+// render object the plan applies, as instanceUUID, with previous as the
+// record's inventory. Install needs every object it applies, so an object
+// adopted by another instance is a refusal too.
+func applyGuard(ctx context.Context, env InstallEnv, plan *Plan, previous []k8sinventory.Entry, instanceUUID string) error {
+	if _, err := inventory.Guard(ctx, env.Client, inventory.GuardInput{
+		Entries:      workflowapply.CurrentInventoryEntries(plan.Objects()),
+		Previous:     previous,
+		InstanceUUID: instanceUUID,
+		RefuseLetGo:  true,
+	}); err != nil {
 		return &GuardError{Err: err}
 	}
 	return nil

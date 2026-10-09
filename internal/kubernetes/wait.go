@@ -139,11 +139,17 @@ func waitUntil(ctx context.Context, client *Client, objs []*unstructured.Unstruc
 // pollObjects fetches the live state of each object and returns those that
 // don't yet satisfy predicate. A NotFound read satisfies absence mode and
 // fails readiness mode with an error naming the object; any other Get error
-// leaves the object pending in both modes.
+// leaves the object pending in both modes. A kind that cannot be resolved
+// (not served, or a failed discovery request) is returned as an error in both
+// modes: it is never read as an object that is gone.
 func pollObjects(ctx context.Context, client *Client, objs []*unstructured.Unstructured, predicate ReadyPredicate, mode waitMode) ([]*unstructured.Unstructured, error) {
 	var pending []*unstructured.Unstructured
 	for _, obj := range objs {
-		live, err := client.ResourceClient(GVRFromUnstructured(obj), obj.GetNamespace()).Get(ctx, obj.GetName(), metav1.GetOptions{})
+		resource, err := client.ResourceClientFor(ctx, obj.GroupVersionKind(), obj.GetNamespace())
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", describeObjects([]*unstructured.Unstructured{obj}), err)
+		}
+		live, err := resource.Get(ctx, obj.GetName(), metav1.GetOptions{})
 		switch {
 		case apierrors.IsNotFound(err):
 			if mode == modeReady {

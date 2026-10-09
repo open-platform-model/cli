@@ -118,7 +118,9 @@ The `opm mod vet` command SHALL support `--values` / `-f` flags for providing ex
 
 ### Requirement: mod vet command flags and syntax
 
-The `opm mod vet` command SHALL accept an optional module path argument that defaults to the current directory, and SHALL expose the shared render flags registered by `cmdutil.RenderFlags` (`-f`/`--values`, repeatable; `-n`/`--namespace`; `--instance-name`; `--platform`). All four affect the verdict: `-f` selects the values, `-n` and `--instance-name` set the synthesized instance's namespace and name for the render, and `--platform` renders against that platform module instead of the module-deps platform.
+The `opm mod vet` command SHALL accept an optional module path argument that defaults to the current directory, and SHALL expose `-f`/`--values` (repeatable), `-n`/`--namespace`, `--name` and `--platform`. All four affect the verdict: `-f` selects the values, `-n` and `--name` set the synthesized instance's namespace and name for the render, and `--platform` renders against that platform module instead of the module-deps platform.
+
+`--instance-name` SHALL stay accepted as a deprecated alias of `--name` with the same effect. It SHALL NOT appear in the command's help, and its use SHALL print one line on standard error that names `--name`. Passing both `--name` and `--instance-name` SHALL be a usage error, and nothing SHALL be validated or rendered.
 
 ```text
 opm mod vet [path] [flags]
@@ -129,7 +131,7 @@ Arguments:
 Flags:
   -f, --values strings        Additional values files (can be repeated)
   -n, --namespace string      Namespace of the synthesized instance
-      --instance-name string  Name of the synthesized instance (default: module name)
+      --name string           Name of the synthesized instance (default: <module name>-debug)
       --platform string       Render against this platform module instead of the module's deps
   -h, --help                  Help for vet
 ```
@@ -140,16 +142,34 @@ Flags:
 - **THEN** path SHALL default to `"."`
 - **AND** the render SHALL use the module-deps platform
 
+#### Scenario: Name flag sets the synthesized instance name
+
+- **WHEN** `opm module vet ./my-module --name web` is run
+- **THEN** the synthesized instance SHALL be named `web`
+- **AND** nothing about a deprecated flag SHALL be printed
+
+#### Scenario: Deprecated alias keeps working
+
+- **WHEN** `opm module vet ./my-module --instance-name web` is run
+- **THEN** the synthesized instance SHALL be named `web`
+- **AND** standard error SHALL carry one line saying that `--instance-name` is deprecated and naming `--name`
+
+#### Scenario: Both spellings together are refused
+
+- **WHEN** `opm module vet ./my-module --name a --instance-name b` is run
+- **THEN** the command SHALL fail with a usage error before the module is loaded
+
 ### Requirement: mod vet exit codes
 
-The `opm mod vet` command SHALL signal its verdict through the process exit code: 0 when validation and the render pass, 1 on a usage error or when the platform cannot be generated or acquired, 2 on any validation failure or render refusal, and 3 when the registry cannot be reached for the core schema, as the table below details.
+The `opm mod vet` command SHALL signal its verdict through the process exit code: 0 when validation and the render pass, 1 on a usage error or when the platform cannot be generated or acquired, 2 on any validation failure or render refusal and when the core schema cannot be loaded because no registry is configured, 3 when the core-schema fetch fails against a configured registry, and 4 when that registry refuses the credentials, as the table below details. The mapping of a failed core-schema fetch SHALL be the one `opm module publish` uses, and a refusal SHALL print the `opm registry login <host>` hint.
 
 | Code | Meaning |
 |------|---------|
 | 0 | Validation and render passed |
 | 1 | Usage error (invalid flags, missing arguments), or the platform could not be generated or acquired (an unpublished pin, a bad `--platform` directory) |
-| 2 | Validation error (CUE errors, invalid values, missing `debugValues`, identity/coordinate check failures) or render refusal (unmatched components, unresolved demands, a failed transformer) |
-| 3 | Registry unreachable (core-schema fetch) |
+| 2 | Validation error (CUE errors, invalid values, missing `debugValues`, identity/coordinate check failures), render refusal (unmatched components, unresolved demands, a failed transformer), or no registry configured (core-schema fetch) |
+| 3 | The core-schema fetch failed against a configured registry (unreachable, or a failure answer other than a refused credential) |
+| 4 | The registry refused the credentials on the core-schema fetch (a 401, or a 403 that reaches the cli as a refusal) |
 
 #### Scenario: Exit code 0 on success
 
@@ -167,6 +187,28 @@ The `opm mod vet` command SHALL signal its verdict through the process exit code
 - **THEN** the command SHALL print the kernel's refusal with its diagnostics
 - **AND** the exit code SHALL be 2
 
+#### Scenario: Exit code 2 when no registry is configured
+
+- **WHEN** `opm mod vet .` runs with no `--registry`, no `OPM_REGISTRY`, no `registry` in the config file and no `CUE_REGISTRY`, and the core schema cannot be loaded
+- **THEN** the message SHALL say no registry is configured, keep the cause, and point to `opm config init`
+- **AND** the exit code SHALL be 2
+
+#### Scenario: Exit code 4 when the registry refuses the credentials
+
+- **WHEN** `opm mod vet .` runs against a configured registry that answers the core-schema fetch with 401
+- **THEN** the message SHALL say the registry refused the credentials, keep the cause, and end with `opm registry login <host>`
+- **AND** the exit code SHALL be 4
+
+#### Scenario: Exit code 3 when the registry is unreachable or fails
+
+- **WHEN** the configured registry refuses the connection, or answers the core-schema fetch with 503
+- **THEN** the exit code SHALL be 3 and the message SHALL NOT name the login
+
+#### Scenario: A 403 on the tag lookup reads as a failed registry operation
+
+- **WHEN** the configured registry answers the core-schema fetch with 403, which CUE's registry client reports as "not found"
+- **THEN** the exit code SHALL be 3, as it is for `opm module publish`
+
 ### Requirement: Identity and coordinate checks before values validation
 
 `opm module vet` SHALL, after loading the module and before values resolution, verify: the identity package conforms to core's `#IdentityPackage` (by unification, surfacing CUE's diagnostic); `metadata.modulePath` and `metadata.version` derive from the identity package's values; and `cue.mod`'s `module:` line agrees with the declared module path. Failures SHALL report through the standard validation-error rendering with exit code 2, in the same aligned two-value form the publish refusals use, and SHALL be reported even for a module that declares no `debugValues`.
@@ -183,9 +225,14 @@ The `opm mod vet` command SHALL signal its verdict through the process exit code
 
 ### Requirement: Registry-aware loading
 
-Vet's module load SHALL resolve dependencies using the resolved registry (flag > env > config precedence), not the ambient process environment alone. Failing to reach the registry for the core-schema fetch SHALL exit 3 (connectivity), distinct from check failures (2).
+Vet's module load SHALL resolve dependencies using the resolved registry (flag > env > config precedence), not the ambient process environment alone. Failing to reach a configured registry for the core-schema fetch SHALL exit 3 (connectivity), distinct from check failures (2). A core-schema fetch that fails while no registry is configured (no flag, no `OPM_REGISTRY`, no config value, no `CUE_REGISTRY`) SHALL be reported as a missing registry configuration, not as a connectivity failure.
 
 #### Scenario: Registry flag respected
 
 - **WHEN** vet runs with `--registry` pointing at a reachable mapping
 - **THEN** the module's dependencies resolve through that mapping
+
+#### Scenario: A run with only CUE_REGISTRY set is not a missing configuration
+
+- **WHEN** vet runs with no `--registry`, no `OPM_REGISTRY` and no config value, with `CUE_REGISTRY` set, and the core-schema fetch fails
+- **THEN** the failure SHALL exit 3 and SHALL NOT be reported as a missing registry configuration

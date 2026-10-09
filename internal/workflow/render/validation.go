@@ -59,6 +59,10 @@ func printValidationError(err error) {
 	}
 	var dupErr *object.DuplicateIdentitiesError
 	if errors.As(err, &dupErr) {
+		// The type decides. The library's error exposes its header and its
+		// identity rows only as one message, with no accessor for either, so
+		// the message is cut at its first newline to lay it out. This is one
+		// of the named text matches TestNoErrorTextMatch allows.
 		header, rows, _ := strings.Cut(dupErr.Error(), "\n")
 		output.Error(fmt.Sprintf("%s: %s", renderFailedMsg, header))
 		if rows != "" {

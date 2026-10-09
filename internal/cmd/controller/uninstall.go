@@ -23,10 +23,11 @@ func NewControllerUninstallCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Use:   "uninstall",
 		Short: "Remove the opm-controller from a cluster",
 		Long: `Delete every object the controller's instance record (ModuleInstance
-opm-controller in opm-controller-system) lists, then the record, except the CRDs
+opm-controller in opm-system) lists, then the record, except the CRDs
 and the controller's Namespace — those remain for a deliberate, separate
 'kubectl delete crd' once you're sure no ModuleInstance data is still needed.
-An object that no longer carries the instance's identity is left behind.
+An object that no longer carries the instance's identity, or whose
+opmodel.dev/adopt annotation names another instance, is left behind.
 
 With no record, uninstall deletes nothing: run 'opm controller install' first,
 so the running controller is recorded.

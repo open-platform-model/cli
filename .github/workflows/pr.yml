@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.26.0'
+          go-version: '1.26.8'
       - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
         with:
           version: 3.x
@@ -85,12 +85,28 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
-          version: v2.11.3
+          # The one place that names the linter version; the committed schema
+          # and the check in the next step follow it.
+          version-file: .golangci-lint-version
+          # The action's own configuration check downloads the JSON schema
+          # from golangci-lint.run on every run; the next step runs the same
+          # check from the schema committed in this repository.
+          verify: false
           args: --timeout=5m
           # A run restored whole from the action's cache has reported
           # //nolint:staticcheck directives as unused (nolintlint) that a full
           # analysis of the same commit uses, so lint runs uncached.
           skip-cache: true
+      - name: Verify the linter configuration (offline)
+        # golangci-lint config verify against .github/golangci-lint/, with no
+        # network; it also keeps the version file, the schema and this
+        # workflow's use of the action in step. After the action, which puts
+        # golangci-lint on PATH. Local: task lint:config.
+        run: bash .github/scripts/lint-config-check.sh
+      - name: Linter configuration check scenarios (offline)
+        # Every refusal of the step above, against copies of this tree.
+        # Local: task lint:config:test.
+        run: bash .github/scripts/lint-config-check-test.sh
 
   unit:
     name: Unit Tests
@@ -101,7 +117,7 @@ jobs:
     # on merge. Core and the catalogs still come from GHCR.
     services:
       registry:
-        image: registry:2
+        image: registry:3.1.2@sha256:ddf754342cfc8acc51a56d5d0ab6af06826461864460636d8bd5c546dab2a7b8
         ports:
           - 5000:5000
     env:
@@ -113,7 +129,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.26.0'
+          go-version: '1.26.8'
       - name: Build opm
         run: go build -o bin/opm ./cmd/opm
       - name: Install cue
@@ -132,7 +148,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
       - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
@@ -159,7 +175,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.26.0'
+          go-version: '1.26.8'
       - name: Build opm
         run: go build -o bin/opm ./cmd/opm
       - name: Install cue (the version go.mod requires)
@@ -184,7 +200,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       registry:
-        image: registry:2
+        image: registry:3.1.2@sha256:ddf754342cfc8acc51a56d5d0ab6af06826461864460636d8bd5c546dab2a7b8
         ports:
           - 5000:5000
     env:
@@ -200,7 +216,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.26.0'
+          go-version: '1.26.8'
       - name: Build opm
         run: go build -o bin/opm ./cmd/opm
       - name: Install cue
@@ -233,16 +249,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.26.0'
+          go-version: '1.26.8'
       - name: Install kind
         run: |
-          KIND_VERSION="v0.31.0"
+          KIND_VERSION="v0.33.0"
           curl -Lo ./kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64"
-          echo "eb244cbafcc157dff60cf68693c14c9a75c4e6e6fedaf9cd71c58117cb93e3fa  ./kind" | sha256sum -c -
+          echo "aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d  ./kind" | sha256sum -c -
           chmod +x ./kind
           sudo mv ./kind /usr/local/bin/kind
       - name: Create kind cluster
-        run: kind create cluster --name opm-dev --config hack/kind-config.yaml --image kindest/node:v1.34.3@sha256:08497ee19eace7b4b5348db5c6a1591d7752b164530a36f855cb0f2bdcbadd48
+        run: kind create cluster --name opm-dev --config hack/kind-config.yaml --image kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
       - name: Install ModuleInstance CRDs
         # The CLI records inventory in the ModuleInstance CR, so the CRD is a
         # hard prerequisite for every apply-path integration program.
@@ -252,8 +268,9 @@ jobs:
           go run tests/integration/deploy/main.go
           go run tests/integration/inventory-apply/main.go
           go run tests/integration/inventory-ops/main.go
+          go run tests/integration/delete-ownership/main.go
+          go run tests/integration/apply-ownership/main.go
           go run tests/integration/inst-list/main.go
-          go run tests/integration/migration/main.go
           go run tests/integration/gates/main.go
       - name: Delete kind cluster
         if: always()
@@ -269,7 +286,7 @@ jobs:
     # from GHCR.
     services:
       registry:
-        image: registry:2
+        image: registry:3.1.2@sha256:ddf754342cfc8acc51a56d5d0ab6af06826461864460636d8bd5c546dab2a7b8
         ports:
           - 5000:5000
     env:
@@ -281,7 +298,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.26.0'
+          go-version: '1.26.8'
       - name: Build opm
         run: go build -o bin/opm ./cmd/opm
       - name: Install cue

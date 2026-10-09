@@ -100,7 +100,7 @@ func TestE2E_ModuleVet_RendersAgainstModuleDeps(t *testing.T) {
 
 	customHome := seedRenderHome(t)
 
-	stdout, stderr, err := runOPMWithEnv(t, t.TempDir(), customHome, 180*time.Second, "module", "vet", modPath, "--instance-name", "e2e-podinfo")
+	stdout, stderr, err := runOPMWithEnv(t, t.TempDir(), customHome, 180*time.Second, "module", "vet", modPath, "--name", "e2e-podinfo")
 	require.NoError(t, err, "stderr: %s", stderr)
 	assert.Contains(t, stderr, "Module config valid")
 	assert.Contains(t, stderr, "platform: module deps ("+podinfoCatalogPin(t, modPath)+"; generated module "+filepath.Join(customHome, ".opm", "cache", "platforms"))
