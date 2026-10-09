@@ -18,3 +18,9 @@
 
 - [x] 3.1 Rewrite the registry failure sentence of `docs/site/authoring/publish-a-module.md`: a refusing token endpoint is a refused credential on the push; a 403 on a fetch still reads as not found
 - [x] 3.2 `task docs:bundle:check` and `task openspec:check` green, then commit `docs(publish): name a token endpoint refusal as a refused credential`
+
+## 4. Review fixes
+
+- [x] 4.1 Add token endpoint 429 and 503 rows to `TestInitWrite_Pinned` and `TestIsConnectivityError_Pinned`, assert the registry's answer in the init message, and state the transient case in proposal.md and design.md
+- [x] 4.2 Add `TestFromInstanceFile_UnsetRequiredValuesAreNamed`: the instance package of a module served by a local registry, with no value set; restore standard error in a cleanup and read the pipe while the render runs
+- [x] 4.3 `task fmt`, `task vet`, `task lint`, `task openspec:check`, `task docs:bundle:check`, `task test:unit` and `task cascade:wiring:check` green, then commit `test: pin transient token endpoint answers and the instance report for unset values`

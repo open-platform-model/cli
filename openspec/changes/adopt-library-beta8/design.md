@@ -26,7 +26,7 @@ No command, flag or output format changes. Exit codes move only for runs that al
 | --- | --- | --- | --- |
 | `opm module publish <path>`, `opm catalog publish <path>` | the token endpoint answers 403 to the push | 3 | 4 |
 | `opm platform check [dir]` | the token endpoint answers 401 while the platform's imports resolve | 2 | 4 |
-| `opm instance init <module>` | the token endpoint answers 401 while the staged package's dependencies resolve | 3 | 1 |
+| `opm instance init <module>` | the token endpoint answers 401, 429 or 5xx while the staged package's dependencies resolve | 3 | 1 |
 
 Example, the push. The first line is the error of `TestPush_TokenEndpointRefusal`; the second is the hint `publishError` appends for that error type (`TestPublishError_LoginHint`):
 
@@ -83,7 +83,7 @@ Every other package passes. `go build ./...` and `go vet ./...` pass on the bump
 
 ### Which token endpoint cases change
 
-**Explored**: `cuemodtest.TokenRegistry` with 401 and 403, driven through each cli path on beta.7 (`go test -modfile` with the old `go.mod`) and beta.8.
+**Explored**: `cuemodtest.TokenRegistry` with 401, 403, 429 and 503, driven through each cli path on beta.7 (`go test -modfile` with the old `go.mod`) and beta.8.
 
 | Path | Token answer | beta.7 | beta.8 |
 | --- | --- | --- | --- |
@@ -92,8 +92,12 @@ Every other package passes. `go build ./...` and `go vet ./...` pass on the bump
 | tidy (`opm instance init` write) | 401 | unreachable | unauthorized |
 | direct fetch (schema fetch of vet and publish, module acquire) | 401 | unauthorized | unauthorized |
 | any fetch | 403 | not found | not found |
+| tidy (`opm instance init` write) | 429, 503 | unreachable | another answer (not unreachable) |
+| directory load with a dependency (platform build) | 429, 503 | exit 2, pin hint | exit 2, pin hint |
 
-**Decision**: pin all five rows. Where the cli has a login hint (publish, vet, platform build) the new answer is the hint and exit 4. `opm instance init` has no branch for a refused credential: a registry that answered exits 1 by its own spec ("Only a registry that gave no response counts as unreachable"), so the token 401 joins that rule. A hint there is a new behaviour and not part of a pin bump.
+The 429 and 5xx rows follow from library ADR-014: a token endpoint answer is read by its status and is no longer transient "no response". The platform build gives the pin hint for every fetch failure that is not a refusal, so it does not move.
+
+**Decision**: pin the rows. Where the cli has a login hint (publish, vet, platform build) the new answer is the hint and exit 4. `opm instance init` has no branch for a refused credential: a registry that answered exits 1 by its own spec ("Only a registry that gave no response counts as unreachable"), so the token 401, 429 and 5xx join that rule: a direct 429 or 503 answer in the same step already exits 1. A hint there is a new behaviour and not part of a pin bump.
 
 ### The 403 that stays
 
@@ -111,9 +115,9 @@ Every other package passes. `go build ./...` and `go vet ./...` pass on the bump
 
 **Explored**: the cli's tests and docs for a quoted refusal: `tests/e2e/vet_output_test.go` (substrings `incomplete value int`, `values.replicas`, `incomplete value`), `internal/publish/identity_test.go` (`incomplete value`). No doc page quotes the refusal.
 **Finding**: all hold. `opm module vet` and a render with `-f` files check the values against `#config` first (`ValidateConfigDetailed`), which always named the field; that path does not change. The kernel refusal is what a render prints when the values come from `debugValues` or from an instance package (`opm instance build`, `vet`, `apply`, `diff`).
-**Decision**: add one test that pins the printed findings on the module path. The instance commands call the same kernel check through `AcquireInstanceFromDir` and print through the same function (`printValidationError`); the repo has no published fixture module with a required value to drive them offline.
+**Decision**: add two tests that pin the printed findings: one on the module path (`FromModule`) and one on the instance path (`FromInstanceFile`), which renders the package `opm instance init` writes for the same module, served by a local registry. Both print the same findings.
 
 ## Risks / Trade-offs
 
-- A script that reads exit 3 from `opm instance init` for a refused token now gets 1. → The old code was wrong by the command's own spec; the registry's answer is in the message.
+- A script that retries `opm instance init` on exit 3 no longer retries when the token endpoint is rate limited or failing (429, 5xx), and one that reads exit 3 for a refused token now gets 1. → The old code was wrong by the command's own spec; the registry's answer is in the message.
 - The 403 limit stays visible to users as "not found" or the pin hint. → Stated in the specs and the publish page; the fix is the registry client's.

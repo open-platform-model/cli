@@ -82,6 +82,14 @@ func TestIsConnectivityError_Pinned(t *testing.T) {
 		{"tidy: token endpoint answers 403", func(t *testing.T) error {
 			return tidyErr(t, cuemodtest.TokenRegistry(t, http.StatusForbidden), false)
 		}, false},
+		// The same holds for a token endpoint that is rate limited or
+		// failing: it answered. These two rows were true as well.
+		{"tidy: token endpoint answers 429", func(t *testing.T) error {
+			return tidyErr(t, cuemodtest.TokenRegistry(t, http.StatusTooManyRequests), false)
+		}, false},
+		{"tidy: token endpoint answers 503", func(t *testing.T) error {
+			return tidyErr(t, cuemodtest.TokenRegistry(t, http.StatusServiceUnavailable), false)
+		}, false},
 		{"acquire: token endpoint answers 401", func(t *testing.T) error {
 			return acquireErr(t, cuemodtest.TokenRegistry(t, http.StatusUnauthorized), cuemodtest.DepModule, cuemodtest.DepNewest)
 		}, false},
