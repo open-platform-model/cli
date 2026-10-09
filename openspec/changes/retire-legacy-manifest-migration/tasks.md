@@ -23,6 +23,6 @@ Ships as one PR, merged before the library removes `Admit` and before the contro
 
 ## 2. Docs
 
-- [ ] 2.1 `README.md` (the "Install migrates" bullet and "which migrates it"), `AGENTS.md` (the `hack/operator-legacy/` entry), `docs/site/diagnostics/adopt-an-existing-object.md` (the `operator migration refused` paragraph: say that install refuses such an object as any other, that the annotation applies, and that an earlier controller Deployment must be deleted first because its selector cannot change).
-- [ ] 2.2 `git grep -n -i "migration refused\|operator-legacy\|legacy-manifests\|release manifest"` outside `openspec/changes/archive` and `CHANGELOG.md` finds only the name-based scenario this change leaves in `openspec/specs/inventory-ownership`, and specs the archive rewrites.
-- [ ] 2.3 The local gate plus `task docs:bundle:check` and `task cascade:wiring:check` are green, then commit `docs(operator): drop the legacy-manifest migration from the install docs`.
+- [x] 2.1 `README.md` (the "Install migrates" bullet and "which migrates it"), `AGENTS.md` (the `hack/operator-legacy/` entry), `docs/site/diagnostics/adopt-an-existing-object.md` (the `operator migration refused` paragraph: say that install refuses such an object as any other, that the annotation applies, and that an earlier controller Deployment must be deleted first because its selector cannot change).
+- [x] 2.2 `git grep -n -i "migration refused\|operator-legacy\|legacy-manifests\|release manifest"` outside `openspec/changes/archive` and `CHANGELOG.md` finds only the name-based scenario this change leaves in `openspec/specs/inventory-ownership`, and specs the archive rewrites.
+- [x] 2.3 The local gate plus `task docs:bundle:check` and `task cascade:wiring:check` are green, then commit `docs(operator): drop the legacy-manifest migration from the install docs`.
