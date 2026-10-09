@@ -129,6 +129,16 @@ func moduleObjects(o renderOpts) []*unstructured.Unstructured {
 	return objs
 }
 
+// findObj returns the object of a kind and name in objs, or nil.
+func findObj(objs []*unstructured.Unstructured, kind, name string) *unstructured.Unstructured {
+	for _, o := range objs {
+		if o.GetKind() == kind && o.GetName() == name {
+			return o
+		}
+	}
+	return nil
+}
+
 // renderResult wraps fixture objects as the render workflow returns them.
 func renderResult(objs []*unstructured.Unstructured, values map[string]any, moduleVersion string) *workflowrender.Result {
 	return &workflowrender.Result{

@@ -23,9 +23,6 @@ type GuardInput struct {
 	Previous []k8sinventory.Entry
 	// InstanceUUID is the identity of the render.
 	InstanceUUID string
-	// Admit are objects the caller proved came from an earlier operator
-	// release manifest. Only `opm operator install` passes a non-empty set.
-	Admit AdmitSet
 	// RefuseLetGo makes an object adopted by another instance a refusal.
 	// Only `opm operator install` sets it: it needs every object it renders.
 	RefuseLetGo bool
@@ -124,7 +121,6 @@ func Guard(ctx context.Context, client *kubernetes.Client, in GuardInput) (Guard
 			Live:         live,
 			InInventory:  inInventory,
 			InstanceUUID: in.InstanceUUID,
-			Admit:        in.Admit.Has(obj),
 		})
 		switch {
 		case verdict.Allowed():

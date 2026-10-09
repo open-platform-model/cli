@@ -43,12 +43,13 @@ func TestResolveTarget(t *testing.T) {
 	require.ErrorAs(t, err, &verr)
 	assert.Contains(t, err.Error(), "opm_operator 0.3.0")
 
-	// "Old-style operator tag", with and without its "v".
+	// "Unserved version": an opm-operator release tag, with and without its
+	// "v", is refused as any other selector and gets no message of its own.
 	for _, old := range []string{"v1.0.0-beta.5", "1.0.0-beta.5"} {
 		_, _, err = ResolveTarget(ctx, src, reg, old)
 		var refusal *modref.RefusalError
 		require.ErrorAs(t, err, &refusal, old)
-		assert.Contains(t, err.Error(), "--version now takes an operator module version", old)
+		assert.NotContains(t, err.Error(), "--version now takes", old)
 		assert.Contains(t, err.Error(), old)
 	}
 
@@ -63,15 +64,6 @@ func TestResolveTarget(t *testing.T) {
 	_, _, err = ResolveTarget(ctx, operatortest.Source(t, unreachable), unreachable, "")
 	var connErr *publish.ConnectivityError
 	require.ErrorAs(t, err, &connErr)
-}
-
-func TestLooksLikeOperatorTag(t *testing.T) {
-	for _, v := range []string{"v1.0.0-beta.5", "v1.0.0", "1.0.0-beta.5", "v0.1.0"} {
-		assert.True(t, looksLikeOperatorTag(v), v)
-	}
-	for _, v := range []string{"0.1.0", "v0", "latest", "0.2.0-rc.1"} {
-		assert.False(t, looksLikeOperatorTag(v), v)
-	}
 }
 
 // operatorRecord is the operator instance's record as a fixture.
@@ -209,13 +201,13 @@ func TestPlanInstall_RefusalsWriteNothing(t *testing.T) {
 			},
 		},
 		{
-			name:    "an object of an earlier manifest fails the proof",
+			name:    "an object of an earlier manifest is refused as any other",
 			cluster: []*unstructured.Unstructured{foreignNS},
 			render:  &fakeRender{objs: moduleObjects(renderOpts{})},
-			want:    []string{"operator migration refused", "Namespace/opm-operator-system: label app.kubernetes.io/managed-by is missing"},
+			want:    []string{"refusing to install", "Namespace/opm-operator-system exists and is not managed by OPM", "opmodel.dev/adopt="},
 			check: func(t *testing.T, err error) {
-				var mr *MigrationRefusalError
-				require.ErrorAs(t, err, &mr)
+				var ge *GuardError
+				require.ErrorAs(t, err, &ge)
 			},
 		},
 		{

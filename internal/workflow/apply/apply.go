@@ -77,7 +77,7 @@ type Options struct {
 	// AfterCallerWrites says that the caller wrote to the cluster in the same
 	// command before this workflow runs, so a refusal here cannot say that
 	// nothing was changed. Only `opm operator install` sets it: it applies
-	// the render's CRDs and its migration first.
+	// the render's CRDs first.
 	AfterCallerWrites bool
 
 	// RefuseLetGo makes the ownership guard refuse the apply for a rendered
@@ -92,10 +92,6 @@ type Request struct {
 	K8sClient *kubernetes.Client
 	Log       *log.Logger
 	Options   Options
-	// Admit are existing objects the ownership guard lets pass its
-	// foreign-object test. Only `opm operator install` sets it, to the
-	// objects its migration proved; nil for every other apply.
-	Admit inventory.AdmitSet
 }
 
 func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orchestration for apply flow spans gates, apply, prune, and CR spec+status writes
@@ -205,7 +201,6 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		Entries:      checkEntries,
 		Previous:     prevEntries,
 		InstanceUUID: instanceID,
-		Admit:        req.Admit,
 		RefuseLetGo:  req.Options.RefuseLetGo,
 	}
 	var guard inventory.GuardResult

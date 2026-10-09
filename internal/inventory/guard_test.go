@@ -61,12 +61,10 @@ func terminating(obj *unstructured.Unstructured) *unstructured.Unstructured {
 // One row per answer of the library's apply verdict, for an object outside
 // the inventory and for one inside it. The guard adds no rule of its own.
 func TestGuard_Verdicts(t *testing.T) {
-	admit := AdmitSet{{Kind: "ConfigMap", Namespace: "default", Name: "cm"}: {}}
 	tests := []struct {
 		name        string
 		live        *unstructured.Unstructured
 		recorded    bool
-		admit       AdmitSet
 		refuseLetGo bool
 		wantRefuse  ownership.ApplyRefusal
 		wantLetGo   bool
@@ -135,20 +133,8 @@ func TestGuard_Verdicts(t *testing.T) {
 			recorded: true, refuseLetGo: true, wantRefuse: ownership.RefuseAdoptedElsewhere, wantText: []string{guardOther},
 		},
 		{
-			name: "admitted foreign object passes and is not reported as managed", live: guardCM("cm", map[string]string{"app.kubernetes.io/managed-by": "kustomize"}, ""),
-			admit: admit,
-		},
-		{
-			name: "admitted terminating object is refused", live: terminating(guardCM("cm", nil, "")),
-			admit: admit, wantRefuse: ownership.RefuseTerminating,
-		},
-		{
-			name: "admission does not lift another instance's identity", live: guardCM("cm", managedBy(opmlabels.ManagedByCLI, guardOther), ""),
-			admit: admit, wantRefuse: ownership.RefuseOtherInstance,
-		},
-		{
-			name: "admission does not lift an adoption by another instance", live: guardCM("cm", managedBy(opmlabels.ManagedByCLI, guardSelf), guardOther),
-			recorded: true, admit: admit, wantLetGo: true,
+			name: "this instance's UUID without an OPM managed-by label is still foreign", live: guardCM("cm", map[string]string{"app.kubernetes.io/managed-by": "kustomize", opmlabels.ModuleInstanceUUID: guardSelf}, ""),
+			wantRefuse: ownership.RefuseForeignObject, wantText: []string{opmlabels.AnnotationAdopt + "=" + guardSelf},
 		},
 	}
 	for _, tc := range tests {
@@ -162,7 +148,6 @@ func TestGuard_Verdicts(t *testing.T) {
 			in := GuardInput{
 				Entries:      []k8sinventory.Entry{guardEntry("cm")},
 				InstanceUUID: guardSelf,
-				Admit:        tc.admit,
 				RefuseLetGo:  tc.refuseLetGo,
 			}
 			if tc.recorded {
@@ -221,7 +206,7 @@ func TestGuard_ReportsEveryRefusal(t *testing.T) {
 	assert.Equal(t, []k8sinventory.Entry{guardEntry("mine")}, result.Managed)
 }
 
-// The guard refuses an object it cannot read, recorded or admitted or not;
+// The guard refuses an object it cannot read, recorded or not;
 // only a NotFound answer proves the name is free.
 func TestGuard_UnreadableObjectRefuses(t *testing.T) {
 	ctx := context.Background()
@@ -244,9 +229,8 @@ func TestGuard_UnreadableObjectRefuses(t *testing.T) {
 
 	_, err = Guard(ctx, client, GuardInput{
 		Entries: []k8sinventory.Entry{entry}, Previous: []k8sinventory.Entry{entry}, InstanceUUID: guardSelf,
-		Admit: AdmitSet{{Kind: "ConfigMap", Namespace: "default", Name: "taken"}: {}},
 	})
-	require.Error(t, err, "neither the record nor admission passes an unreadable object")
+	require.Error(t, err, "the record does not pass an unreadable object")
 
 	absent := &kubernetes.Client{Resources: kubetest.Resources(), Dynamic: dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())}
 	_, err = Guard(ctx, absent, GuardInput{Entries: []k8sinventory.Entry{entry}, InstanceUUID: guardSelf})

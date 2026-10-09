@@ -12,11 +12,9 @@ import (
 )
 
 // The operator's fixed names. The running-operator check (CheckReady) locates
-// the operator by these names alone, so it finds an operator applied from a
-// release manifest, by kubectl or by 'opm operator install', and an operator
-// installed as the operator module, whose instance keeps every one of them.
-// They are the contract that check relies on once the CLI no longer embeds
-// the operator manifest. A module version that renames one updates it here.
+// the operator by these names alone: every install of the operator module
+// keeps every one of them. They are the contract that check relies on. A
+// module version that renames one updates it here.
 const (
 	// OperatorInstanceName and OperatorNamespace are the coordinates of the
 	// ModuleInstance that deploys the operator when it is installed as a module.
