@@ -56,7 +56,7 @@ after the rename's own archive. Implements 0021:D11:R1/R7 (revised 2026-10-06); 
 - [x] 3.9 After main's shared ownership guard (cli#357) was merged in: the start-fresh refusal of 3.7 and 3.8 is
   removed; `PlanCRDsOnly` asks `inventory.Guard` with the UUID the embedded CRDs carry, so an unlabelled CRD and a CRD
   of another instance are refused with the guard's message, which names the adopt annotation, and an annotated CRD is
-  applied; tests for the three cases. Tasks 3.1, 3.3, 3.7 and 3.8 describe the earlier form
+  applied; tests for the three cases. Tasks 3.1, 3.3, 3.7 and 3.8 describe the earlier form, and QUICKSTART (3.4) no longer names `--crds-only`: the merge took main's file
 - [x] 3.10 `PlanCRDsOnly` reads the record of the controller's instance when one exists and passes its inventory to
   the guard (a recorded CRD is applied whatever identity it carries); it writes no ModuleInstance; an unreadable record
   stops the install before any write; tests for a recorded CRD, an unlisted CRD and an unreadable record; commit

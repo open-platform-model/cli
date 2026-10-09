@@ -11,6 +11,7 @@ import (
 
 	"github.com/open-platform-model/cli/internal/controller/crds"
 	"github.com/open-platform-model/cli/internal/inventory"
+	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
 )
 
 // The embedded manifests are the CRDs the pinned module version renders for
@@ -31,6 +32,10 @@ func TestEmbeddedCRDs_MatchThePin(t *testing.T) {
 		assert.Equal(t, "opm_controller", labels["module.opmodel.dev/name"], obj.GetName())
 		assert.Equal(t, ControllerInstanceName, labels["module-instance.opmodel.dev/name"], obj.GetName())
 		assert.Equal(t, "opm-cli", labels["app.kubernetes.io/managed-by"], obj.GetName())
+		// The CRDs-only plan asks the guard as this identity, and the refusal
+		// prints it in the adopt annotation.
+		assert.NotEmpty(t, labels[opmlabels.ModuleInstanceUUID], "%s: carries the instance UUID", obj.GetName())
+		assert.Equal(t, embeddedInstanceUUID(objs), labels[opmlabels.ModuleInstanceUUID], "%s: one UUID on every CRD", obj.GetName())
 	}
 	want := CRDNames()
 	sort.Strings(want)
