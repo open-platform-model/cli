@@ -8,11 +8,11 @@
 **Reason**: Renamed with the product: the operator is now the controller (`opm controller`, `opm-system`, `spec.owner: controller`). Restated under the new title.
 **Migration**: None.
 
-### Requirement: Operator-owned delete delegates to the operator's finalizer
+### Requirement: Ownership is exclusive across tools
 **Reason**: Renamed with the product: the operator is now the controller (`opm controller`, `opm-system`, `spec.owner: controller`). Restated under the new title.
 **Migration**: None.
 
-### Requirement: Ownership is exclusive across tools
+### Requirement: Operator-owned delete hands cleanup to the operator's finalizer
 **Reason**: Renamed with the product: the operator is now the controller (`opm controller`, `opm-system`, `spec.owner: controller`). Restated under the new title.
 **Migration**: None.
 
@@ -38,20 +38,6 @@ The mapping from `spec.owner` to a CLI execution mode SHALL be implemented in ex
 - **THEN** none exists; `spec.owner` is set at creation and changed only outside the CLI
 
 ## ADDED Requirements
-
-### Requirement: spec.owner names the instance owner
-
-Instance ownership SHALL be determined from the `ModuleInstance` CR's `spec.owner` field. A CR the CLI writes SHALL always carry `spec.owner: cli` explicitly. For reads: an absent CR or `spec.owner: cli` SHALL resolve to CLI-executor mode; `spec.owner: controller` SHALL resolve to controller-owned. (An absent or empty `spec.owner` on an existing CR means controller-managed by the controller's own defaulting contract; the CLI SHALL treat any value other than `cli` as controller-owned.) Source: 0032:D1:R1, 0032:D1:R6.
-
-#### Scenario: CLI-owned instance
-
-- **WHEN** the CLI reads a `ModuleInstance` with `spec.owner: cli`
-- **THEN** the instance SHALL resolve to CLI-executor mode
-
-#### Scenario: Controller-owned instance
-
-- **WHEN** the CLI reads a `ModuleInstance` with `spec.owner: controller` or without `spec.owner`
-- **THEN** the instance SHALL resolve to controller-owned
 
 ### Requirement: Thin-editor apply on controller-owned instances
 
@@ -82,7 +68,7 @@ The applied document SHALL carry the instance's current `spec.owner` value, read
 - **WHEN** a thin-editor apply completes
 - **THEN** the CLI SHALL NOT have written any `status` field on the CR
 
-### Requirement: Controller-owned delete delegates to the controller's finalizer
+### Requirement: Controller-owned delete hands cleanup to the controller's finalizer
 
 `opm instance delete` against a controller-owned instance SHALL delete the `ModuleInstance` CR and delegate workload cleanup to the controller's `opmodel.dev/cleanup` finalizer, waiting bounded and reporting completion. Before deleting, the CLI SHALL verify the controller is ready and refuse when it is not — deleting a finalizer-armed CR with no running controller wedges the CR in terminating state. The readiness check SHALL locate the controller by its fixed names, as the `controller-lifecycle` capability's running-controller check defines.
 
@@ -104,6 +90,20 @@ Whether the controller removes the workloads is governed by `spec.prune`, which 
 - **WHEN** the controller Deployment is not available
 - **AND** `opm instance delete` targets a controller-owned instance
 - **THEN** the CLI SHALL refuse, explaining the finalizer would wedge without a running controller
+
+### Requirement: spec.owner names the instance owner
+
+Instance ownership SHALL be determined from the `ModuleInstance` CR's `spec.owner` field. A CR the CLI writes SHALL always carry `spec.owner: cli` explicitly. For reads: an absent CR or `spec.owner: cli` SHALL resolve to CLI-executor mode; `spec.owner: controller` SHALL resolve to controller-owned. (An absent or empty `spec.owner` on an existing CR means controller-managed by the controller's own defaulting contract; the CLI SHALL treat any value other than `cli` as controller-owned.) Source: 0032:D1:R1, 0032:D1:R6.
+
+#### Scenario: CLI-owned instance
+
+- **WHEN** the CLI reads a `ModuleInstance` with `spec.owner: cli`
+- **THEN** the instance SHALL resolve to CLI-executor mode
+
+#### Scenario: Controller-owned instance
+
+- **WHEN** the CLI reads a `ModuleInstance` with `spec.owner: controller` or without `spec.owner`
+- **THEN** the instance SHALL resolve to controller-owned
 
 ### Requirement: One tool owns an instance at a time
 

@@ -261,7 +261,7 @@ After the controller's rollout, and unless `--skip-platform` or `--crds-only` is
 
 ### Requirement: Uninstall deletes the controller instance's recorded inventory
 
-`opm controller uninstall` SHALL read the controller's instance record `opm-controller` in `opm-system`. When none exists, it SHALL delete nothing and exit 2 naming `opm controller install` as the step that records the running controller. Otherwise, after the finalizer guard, it SHALL delete every object the record's inventory lists except CRDs and the Namespace, in descending resource-weight order, leaving behind any object that no longer carries this instance's identity, then, when no object failed, delete the record. It SHALL delete no object the inventory does not list, SHALL NOT wait for deletion to complete, and SHALL treat an already absent object as deleted. Source: 0006:D34, 0021:D11:R11.
+`opm controller uninstall` SHALL read the controller's instance record `opm-controller` in `opm-system`. When none exists, it SHALL delete nothing and exit 2 naming `opm controller install` as the step that records the running controller. Otherwise, after the finalizer guard, it SHALL delete every object the record's inventory lists except CRDs and the Namespace, in descending resource-weight order, leaving behind any object that the delete verdict of `opm instance delete` leaves behind (capability `deploy`, "Instance delete re-checks live ownership before each delete"): one that OPM no longer manages, one that carries another instance's identity, or one whose `opmodel.dev/adopt` annotation names another instance, then, when no object failed, delete the record. It SHALL delete no object the inventory does not list, SHALL NOT wait for deletion to complete, and SHALL treat an already absent object as deleted. Source: 0006:D34, 0021:D11:R11.
 
 #### Scenario: Uninstall after a module install
 
@@ -283,6 +283,12 @@ After the controller's rollout, and unless `--skip-platform` or `--crds-only` is
 - **WHEN** uninstall runs again after an earlier run deleted the objects but failed to delete the record
 - **THEN** it treats the absent objects as deleted, deletes the record and exits zero
 
+#### Scenario: Recorded object adopted by another instance is left behind
+
+- **WHEN** a recorded ClusterRole carries `opmodel.dev/adopt` with the UUID of another instance
+- **THEN** uninstall SHALL NOT delete it, SHALL list it as `left behind`, and SHALL count it in the closing line
+- **AND** the record SHALL still be deleted when no object failed
+
 ### Requirement: Uninstall keeps the record when a recorded object could not be read
 
 When `opm controller uninstall` reads the objects its instance record lists and the read of one fails with an error other than NotFound, that object SHALL count as a failure for that object: it SHALL be listed with its read error and not deleted, the other recorded objects SHALL still be deleted, the instance record SHALL NOT be deleted, and the command SHALL exit 1 and SHALL NOT report the controller uninstalled. A recorded `Namespace` or `CustomResourceDefinition` that could not be read SHALL instead be left behind, as it would be if read, and SHALL NOT count as a failure. Re-running uninstall after the cause is fixed SHALL delete the remaining objects and the record.
@@ -295,9 +301,42 @@ When `opm controller uninstall` reads the objects its instance record lists and 
 - **AND** the instance record SHALL NOT be deleted
 - **AND** the command SHALL exit 1 without reporting the controller uninstalled
 
+### Requirement: Uninstall fails when the instance record cannot be deleted
+
+When `opm controller uninstall` deleted every recorded object and the delete of the controller's instance record then fails with an error other than NotFound, the command SHALL NOT report the controller uninstalled and SHALL exit non-zero. The error SHALL name the record and the cause, and SHALL say that the recorded objects were deleted, that the record remains and that re-running is safe. The exit code SHALL be 4 when the API server denied the delete (Forbidden or Unauthorized), 3 when it answered with a server timeout or service unavailable, and 1 for any other failure.
+
+#### Scenario: Forbidden record delete
+
+- **WHEN** `opm controller uninstall` runs and the delete of the instance record fails with Forbidden
+- **THEN** the recorded ClusterRole, ServiceAccount and Deployment SHALL be deleted
+- **AND** the instance record SHALL still exist
+- **AND** the command SHALL exit 4 without reporting the controller uninstalled
+
+### Requirement: Uninstall follows the shared deletion plan
+
+`opm controller uninstall` SHALL take every action on a recorded object from the deletion plan `opm instance delete` uses (capability `deploy`, "Instance delete follows the shared deletion plan"), built from the objects of the controller's instance record that the command found or could not read, and from the identity stored in the record. It SHALL read a recorded object, delete it or leave it in place only when the plan names that action as the next one, and SHALL delete the instance record only when the plan's release verdict allows it. The finalizer guard and the no-record refusal SHALL run before the plan is built. The output lines and the exit codes of the command SHALL stay as the other requirements of this capability state them. Source: 0012:D4:R1.
+
+#### Scenario: Recorded objects are deleted in the plan's order
+
+- **WHEN** `opm controller uninstall` runs on a cluster with no armed ModuleInstance
+- **THEN** the delete request for the controller Deployment SHALL be sent before the ones for its ServiceAccount and ClusterRole
+- **AND** each delete request SHALL carry Foreground propagation and a precondition on the UID of the object that was read
+
+#### Scenario: Failed object holds the record
+
+- **WHEN** the delete of the recorded ClusterRole fails with Forbidden
+- **THEN** the other recorded objects SHALL still be deleted
+- **AND** the instance record SHALL NOT be deleted
+- **AND** the command SHALL exit 1 without reporting the controller uninstalled
+
+#### Scenario: Guard refuses before any plan
+
+- **WHEN** a ModuleInstance still carries the controller's cleanup finalizer and `--remove-finalizers` is not set
+- **THEN** no recorded object SHALL be read for a delete verdict and none SHALL be deleted
+
 ### Requirement: Install runs every refusing check before its first write
 
-Install SHALL run, before it writes any object, every check that can refuse it: resolving the module and reading the controller version it deploys, rendering it, the check of the values against the target version's `#config`, the target rules of install (the controller version against the CLI's, the rendered image against the module's stated controller version, and the rendered ModuleInstance CRD against the CLI's floor), the status-subresource permission check, and, on a cluster with no record of the controller's instance, the apply guard over every object the render names. The apply guard SHALL admit no object it would refuse for any other instance. With a record, install runs no apply guard: the instance apply takes over any object the render names, including one new to the inventory that already exists and OPM does not manage. Objects of the render that exist with a deletion timestamp SHALL be waited out within `--timeout` before the apply guard runs, so install right after uninstall waits instead of refusing; a terminating object that outlives the budget SHALL fail the command with nothing applied. Only after every check passed SHALL install write, in this order: the CRD step, then the instance apply, then the Platform seed. An install that refuses SHALL change no object in the cluster.
+Install SHALL run, before it writes any object, every check that can refuse it: resolving the module and reading the controller version it deploys, rendering it, the check of the values against the target version's `#config`, the target rules of install (the controller version against the CLI's, the rendered image against the module's stated controller version, and the rendered ModuleInstance CRD against the CLI's floor), the status-subresource permission check, and the apply guard over every object the render names (capability `apply-pruning`, "Ownership guard judges every apply and dry run"). Install SHALL pass the guard no admission set and SHALL run no proof of where an existing object came from: an object that an earlier opm-controller release manifest created is judged as any other existing object. The guard SHALL run on every install, with or without a record of the controller's instance. An object the record lists is judged as recorded and SHALL pass whatever its UUID label says. An existing object the record does not list SHALL pass when its `opmodel.dev/adopt` annotation holds the UUID of the controller's instance, or when it carries an OPM managed-by label and no UUID label of another instance; it SHALL refuse the install when OPM does not manage it or when it carries another instance's identity. Install needs every object its render names, so, unlike any other apply, it SHALL also refuse when the `opmodel.dev/adopt` annotation of an object names another instance, whether or not the record lists the object: it SHALL NOT leave the object unapplied and go on (owner decision of 2026-10-08 on `opm controller install`). Every refusal of the guard in this phase SHALL exit 2, SHALL name the object and the instance that owns or adopts it, SHALL name the `opmodel.dev/adopt` annotation and the UUID to set where the annotation lifts the refusal, and SHALL leave the cluster unchanged; that includes a failed read by the guard, with or without a record. No refusal of install SHALL tell the user to delete or rename an object. Source: 0012:D8:R1, 0012:D8:R2, 0012:D8:R3, 0012:D8:R8. Objects of the render that exist with a deletion timestamp SHALL be waited out within `--timeout` before the apply guard runs, so install right after uninstall waits instead of refusing; a terminating object that outlives the budget SHALL fail the command with nothing applied. Only after every check passed SHALL install write, in this order: the CRD step, then the instance apply, then the Platform seed. Outside the instance apply and its prune, install SHALL send no delete and no patch of managed fields. An install that refuses SHALL change no object in the cluster. Two of these checks read every object install applies, in this order: the wait for terminating objects and the apply guard. A read that fails with an error other than NotFound SHALL refuse the install in the check that made it. When the wait for terminating objects fails a read, the command SHALL exit with the code of the read error: 4 when the API server denied the read (Forbidden or Unauthorized), 3 when it answered with a server timeout or service unavailable, and 1 for any other failure. When the apply guard fails a read, the command SHALL exit 2, the code of the guard's other refusals. An object that install cannot read from the start is therefore refused by the wait for terminating objects, with exit code 4 when the read is denied.
 
 #### Scenario: A refused install leaves the CRDs untouched
 
@@ -314,14 +353,90 @@ Install SHALL run, before it writes any object, every check that can refuse it: 
 - **WHEN** an object of the render stays terminating for longer than `--timeout`
 - **THEN** the command exits non-zero naming that object and the elapsed timeout, and nothing has been applied
 
-#### Scenario: An existing Namespace OPM does not manage is refused
+#### Scenario: An object unreadable from the start exits by the read error
 
-- **WHEN** install runs on a cluster with no record of the controller's instance, and `Namespace opm-system` exists without OPM's managed-by label
-- **THEN** the apply guard refuses naming that Namespace, and nothing has been applied
+- **WHEN** install runs on a cluster with no record of the controller's instance and every read of a ClusterRole the render names fails with Forbidden
+- **THEN** the command SHALL exit 4 naming that ClusterRole and the read error, and no object in the cluster has changed
+
+#### Scenario: A read the apply guard fails exits with the guard code
+
+- **WHEN** the earlier read of a rendered object was answered and the apply guard's read of it fails with Forbidden
+- **THEN** the command SHALL exit 2 naming that object and the read error, and no object in the cluster has changed
+
+#### Scenario: Reinstall refuses a foreign object new to the inventory
+
+- **WHEN** install runs on a cluster with a record of the controller's instance
+- **AND** the render names a ClusterRole the record does not list, which exists without an OPM managed-by label
+- **THEN** the command SHALL exit 2 naming that ClusterRole and the adopt annotation, and no object in the cluster has changed
+
+#### Scenario: First install refuses an object of another instance
+
+- **WHEN** install runs on a cluster with no record of the controller's instance
+- **AND** a CustomResourceDefinition the render names exists with an OPM managed-by label and the UUID of another instance
+- **THEN** the command SHALL exit 2 naming that CustomResourceDefinition and the other instance, and no object in the cluster has changed
+
+#### Scenario: Install refuses an object adopted by another instance
+
+- **WHEN** the controller Deployment, a rendered CustomResourceDefinition or the controller Namespace carries `opmodel.dev/adopt` with the UUID of another instance
+- **THEN** the command SHALL exit 2 naming that object and that instance
+- **AND** no object in the cluster has changed, the managed fields of that object included
+
+#### Scenario: Reinstall with a failed guard read exits with the guard code
+
+- **WHEN** install runs on a cluster with a record of the controller's instance, the earlier read of a rendered object was answered and the apply guard's read of it fails with Forbidden
+- **THEN** the command SHALL exit 2 naming that object and the read error, and no object in the cluster has changed
+
+#### Scenario: Reinstall over its own recorded objects passes the guard
+
+- **WHEN** install runs on a cluster with a record of the controller's instance and every existing object the render names is in that record
+- **THEN** the apply guard refuses none of them
+
+#### Scenario: Recorded objects that carry another identity are applied
+
+- **WHEN** install runs on a cluster with a record of the controller's instance that lists every object the render names
+- **AND** every one of those objects, the four CRDs and the Namespace included, carries an OPM managed-by label and the UUID of another instance
+- **THEN** the apply guard refuses none of them and install applies them
+
+#### Scenario: Annotated objects that carry another identity are applied
+
+- **WHEN** install runs on a cluster with no record of the controller's instance
+- **AND** every object the render names exists with the UUID of another instance and `opmodel.dev/adopt` holding the UUID of the controller's instance
+- **THEN** the apply guard refuses none of them, and install applies and records them
+
+#### Scenario: Objects that carry another identity, with no record and no annotation, are refused
+
+- **WHEN** install runs on a cluster with no record of the controller's instance
+- **AND** every object the render names exists with an OPM managed-by label and the UUID of another instance, and none carries an adopt annotation
+- **THEN** the command SHALL exit 2 naming each object, the other instance and `opmodel.dev/adopt` with the UUID to set
+- **AND** the output SHALL NOT contain `controller migration refused` or `remove or rename`
+- **AND** no object in the cluster has changed
+
+#### Scenario: Unlabelled CRDs of an earlier manifest install are refused
+
+- **WHEN** install runs on a cluster whose four `opmodel.dev` CRDs, Namespace and Deployment were applied from an earlier release manifest and carry no OPM managed-by label and no adopt annotation
+- **THEN** the command SHALL exit 2 with `refusing to install:` and one line for each such object that says it exists and is not managed by OPM, and names `opmodel.dev/adopt` with the UUID to set
+- **AND** install SHALL adopt none of them by itself, and no object in the cluster has changed
+
+#### Scenario: CRDs-only refuses unlabelled CRDs
+
+- **WHEN** `opm controller install --crds-only` runs and a CRD the render names exists without an OPM managed-by label and without an adopt annotation
+- **THEN** the command SHALL exit 2 naming that CRD, and no CRD has changed
+
+#### Scenario: The instance's own objects without a record pass the guard
+
+- **WHEN** install runs on a cluster with no record of the controller's instance
+- **AND** every existing object the render names carries an OPM managed-by label and the UUID of the controller's instance (a run that stopped before it wrote the record, a CRDs-only install, or a `kubectl apply` of the module's render)
+- **THEN** the apply guard refuses none of them
+
+#### Scenario: An unrecorded object with the instance's UUID and no OPM managed-by label is refused
+
+- **WHEN** install runs on a cluster with no record of the controller's instance
+- **AND** an object the render names carries the UUID of the controller's instance, and its managed-by label is absent or names another tool
+- **THEN** the command SHALL exit 2 naming that object as not managed by OPM, and `opmodel.dev/adopt` with the UUID to set
 
 ### Requirement: Install resolves another module version as the registry serves it
 
-`opm controller install --version <selector>` SHALL resolve the controller module version through the CLI's configured registry, a release version pinning it and a major (`v0`) floating to that major's newest release, and SHALL install it through the same render, checks and steps as the default. Install SHALL report the module version and the controller version it deploys. A selector the registry cannot satisfy, or that is not a version selector, SHALL refuse before any cluster call. With the CLI's registry mapping pointed at a mirror holding the module and its dependencies, install SHALL need no other registry. Source: 0021:D11:R1, 0021:D11:R2.
+`opm controller install --version <selector>` SHALL resolve the controller module version through the CLI's configured registry, a release version pinning it and a major (`v0`) floating to that major's newest release, and SHALL install it through the same render, checks and steps as the default. Install SHALL report the module version and the controller version it deploys. A selector the registry cannot satisfy, or that is not a version selector, SHALL refuse before any cluster call; a selector that has the shape of an opm-controller release tag SHALL get no message of its own. With the CLI's registry mapping pointed at a mirror holding the module and its dependencies, install SHALL need no other registry. Source: 0021:D11:R1, 0021:D11:R2.
 
 #### Scenario: Selecting another version
 
@@ -346,13 +461,13 @@ The controller's objects SHALL be its fixed names, which every install of the co
 
 The controller SHALL count as running only when every one of these `CustomResourceDefinition`s reports `Established=True` and the `Deployment` has completed its rollout. Otherwise the check SHALL report the controller as not ready, name each object that failed, and point at `opm controller install`. A read of any of these objects that fails SHALL count that object as not ready, so the command proceeds only on a positive finding.
 
-#### Scenario: Module-installed controller is found by its fixed names
+#### Scenario: Module-installed controller is found by the same names
 
 - **WHEN** the cluster holds the `ModuleInstance` `opm-controller` in `opm-system` whose render created the four CRDs and the `Deployment` `opm-controller-manager` in `opm-system`
 - **AND** every CRD is `Established` and the `Deployment` has rolled out
 - **THEN** the running-controller check SHALL report the controller as running
 
-#### Scenario: Controller without the fourth CRD is not ready
+#### Scenario: Controller older than the fourth CRD is not ready
 
 - **WHEN** the cluster serves `moduleinstances`, `modulepackages` and `platforms` in `opmodel.dev` but not `transformerregistrations.opmodel.dev`, and `opm-controller-manager` has rolled out
 - **THEN** the running-controller check SHALL report the controller as not ready and name `transformerregistrations.opmodel.dev`

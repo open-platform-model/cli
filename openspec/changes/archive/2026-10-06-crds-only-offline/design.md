@@ -56,23 +56,27 @@ returns the objects in file-name order. Deterministic bytes make the cutover re-
 module when `--version` is given would put a registry back on a path the offline installer depends on, and give one
 flag two behaviours. `-f/--values` and `--reset-values` stay refused as before.
 
-### C4: The offline plan guards the CRDs without reading the record
+### C4: The offline plan guards the CRDs with the shared guard and the record's inventory
 
-The CRDs-only plan reads no ModuleInstance, so it cannot know whether a record exists. It waits out terminating CRDs
-within `--timeout`, then runs the apply guard over the embedded CRDs every time: a CRD that exists and is not labelled
-as OPM-managed refuses the install (exit 2, nothing applied). CRDs a previous install applied carry OPM's managed-by
-label and pass. It runs no target rules: the controller-version, image and CRD-floor rules judge a module version that
-the pin already judged. A unit test holds the embedded ModuleInstance CRD to the CLI's field floor and its labels to the
-pinned version.
+The CRDs-only plan waits out terminating CRDs within `--timeout`, then runs the shared apply guard over the embedded
+CRDs every time, with the instance UUID the embedded CRDs carry. It reads the record of the controller's instance when
+one exists and passes the record's inventory to the guard, so a CRD the record lists is applied whatever identity label
+it carries, as on a full install. "Offline" means no registry request, not no cluster read: the record is one more read
+from the API server, and it is never written. A cluster that does not serve ModuleInstance has no record. With no
+record, a CRD that exists without OPM's managed-by label, or with another instance's identity, refuses the install
+(exit 2, nothing applied) with the guard's own message, which names the `opmodel.dev/adopt` annotation and the UUID to
+set. CRDs a previous install applied carry OPM's managed-by label and this instance's UUID and pass. It runs no target
+rules: the controller-version, image and CRD-floor rules judge a module version that the pin already judged. A unit
+test holds the embedded ModuleInstance CRD to the CLI's field floor and its labels to the pinned version.
 
-Before the apply guard, the plan reads the existing CRDs from the API server and refuses two cases (exit 2, nothing
+An earlier form of this change read no record and refused an unlabelled CRD with its own text ("start fresh on a new
+cluster"), with no way through. Both were replaced when the branch took the one ownership rule of the cli (cli#357):
+the refusal is the guard's, and the adopt annotation is the way through. The plan adopts, relabels and migrates nothing
+by itself.
+
+Before the apply guard, the plan reads the existing CRDs from the API server and refuses one more case (exit 2, nothing
 applied):
 
-- **An `opmodel.dev` CRD without OPM's managed-by label.** An installer from before the CLI carried its CRDs applied it.
-  The CLI adopts and migrates no such CRD: clusters bootstrapped that way start fresh. The refusal says so plainly,
-  instead of the apply guard's generic "not managed by OPM" text, and names no adoption flag because none exists.
-  Adopting them (relabelling and taking over field ownership) was rejected: it would be migration code kept alive for
-  clusters that predate the cutover.
 - **A CRD whose `module.opmodel.dev/version` label is newer than the pinned module version.** Either a full install of
   that version (`--version`) or `--crds-only` from a newer CLI that pins it installed those CRDs, and applying the pin's
   older schemas would be a silent downgrade. The refusal names both remedies: `--crds-only` from a CLI that pins that

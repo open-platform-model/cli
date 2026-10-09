@@ -13,11 +13,13 @@ controller module, while every other install path stays module-based. Enhancemen
 - `task controller:pin VERSION=<v>` also renders the module version as install renders the controller's instance and
   writes that render's CRDs as manifests under `internal/controller/crds/`, which the CLI embeds.
 - `opm controller install --crds-only` applies the embedded CRDs with server-side apply as `opm-cli` and waits for
-  `Established`. It makes no registry request, renders nothing and reads no ModuleInstance. Its only network peer is
-  the Kubernetes API server.
-- `--crds-only` refuses with exit 2, before any write, `opmodel.dev` CRDs without OPM's labels, which an earlier
-  installer applied: such a cluster starts fresh on a new cluster, with no adoption or migration. It also refuses CRDs
-  a newer version of the controller module installed, naming both remedies: `--crds-only` from a CLI that pins that
+  `Established`. It makes no registry request and renders nothing. It reads the record of the controller's instance
+  when one exists, for its inventory only, and writes no ModuleInstance. Its only network peer is the Kubernetes API
+  server.
+- `--crds-only` judges every existing CRD with the shared apply guard, as a full install does: a CRD the record lists
+  is applied; a CRD without OPM's managed-by label, or with another instance's identity, is refused with exit 2 before
+  any write, and the refusal prints the `opmodel.dev/adopt` annotation to set. It adopts nothing by itself. It also
+  refuses CRDs a newer version of the controller module installed, naming both remedies: `--crds-only` from a CLI that pins that
   version or newer, or a full install of that version.
 - **BREAKING**: `--crds-only` refuses `--version` as a flag-validation error. It installs only the CRDs of the module
   version this CLI pins.

@@ -23,10 +23,9 @@ Release class: MAJOR after GA (a renamed command, a changed `spec.owner` value);
 ### Modified Capabilities
 
 - `operator-lifecycle`: retired (every requirement REMOVED, `retire_capabilities: true`), restated as `controller-lifecycle`.
-- Body or title wording only, the product word and names: `apply-preflight-gates`, `apply-pruning`, `artifact-publishing`, `cmd-structure`, `config-types`, `deploy`, `deps-cascade`, `docs-bundle`, `e2e-cluster-preconditions`, `e2e-cluster-workflow`, `health-evaluation`, `instance-inventory`, `inventory-ownership`, `kernel-render`, `kind-cluster-tasks`, `mod-apply`, `platform-check`, `platform-pull`, `platform-resolution`, `pr-workflow`, `release-cascade-wiring`, `release-gates`, `release-workflow`, `resource-conversion`, `test-fixture-lineage`. A requirement whose title or scenario names change is REMOVED and ADDED under a new title; Purpose lines are edited in the main specs at archive.
+- Body or title wording only, the product word and names: `apply-preflight-gates`, `apply-pruning`, `artifact-publishing`, `cmd-structure`, `config-types`, `deploy`, `deps-cascade`, `docs-bundle`, `e2e-cluster-preconditions`, `e2e-cluster-workflow`, `flag-conventions`, `health-evaluation`, `instance-inventory`, `inventory-ownership`, `kernel-render`, `kind-cluster-tasks`, `mod-apply`, `platform-check`, `platform-pull`, `platform-resolution`, `pr-workflow`, `release-cascade-wiring`, `release-gates`, `release-workflow`, `resource-conversion`, `test-fixture-lineage`. A requirement whose title or scenario names change is REMOVED and ADDED under a new title; Purpose lines are edited in the main specs at archive.
 
 ## Impact
 
 - Needs, before merge: the controller's first release under the new name (`v1.0.0-beta.9`, image `ghcr.io/open-platform-model/opm-controller`) and the module `opm_controller` `0.1.0`, so `task controller:pin VERSION=0.1.0` can write the pin; the renamed fixtures published.
-- `inventory-ownership` loses the scenario for an operator applied with kubectl from a release manifest, which nobody runs.
 - Delivers the cli side of 0032:D1 ("The operator becomes the controller"), declared in `enhancement.yaml`.

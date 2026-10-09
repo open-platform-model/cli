@@ -60,6 +60,14 @@
 **Reason**: The capability is renamed with the product: `operator-lifecycle` becomes `controller-lifecycle`, and `opm operator` becomes `opm controller`.
 **Migration**: Restated in `controller-lifecycle` under the controller wording.
 
+### Requirement: Uninstall fails when the instance record cannot be deleted
+**Reason**: The capability is renamed with the product: `operator-lifecycle` becomes `controller-lifecycle`, and `opm operator` becomes `opm controller`.
+**Migration**: Restated in `controller-lifecycle` under the controller wording.
+
+### Requirement: Uninstall follows the shared deletion plan
+**Reason**: The capability is renamed with the product: `operator-lifecycle` becomes `controller-lifecycle`, and `opm operator` becomes `opm controller`.
+**Migration**: Restated in `controller-lifecycle` under the controller wording.
+
 ### Requirement: Install runs every refusing check before its first write
 **Reason**: The capability is renamed with the product: `operator-lifecycle` becomes `controller-lifecycle`, and `opm operator` becomes `opm controller`.
 **Migration**: Restated in `controller-lifecycle` under the controller wording.
