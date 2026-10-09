@@ -75,7 +75,7 @@ Messages that no longer exist: `no operator module version matches "<v>": --vers
 | 10 | Every refusing check runs before the first write | `plan_install.go:188` | Unchanged, one check fewer | existing `TestPlanInstall_RefusalsWriteNothing`, minus its proof row |
 | 11 | A read the proof fails exits 4, 3 or 1 | `migration_plan.go:345`, `cmd/operator/install.go:365` | The proof's read is gone. The terminating wait keeps 4, 3 or 1; the guard keeps 2 | `TestPlanInstall_UnreadableObjectRefuses` (two rows instead of three), `TestPlanInstall_GuardReadFailureWithARecord` (read count 2, was 3) |
 | 12 | A migration refusal exits 2; a stopped migration exits 1 with no re-run hint | `cmd/operator/install.go:353-363`, `:268` | Both error types are gone. Guard refusals exit 2 (`GuardError`); a failure after the CRD step gets the re-run hint | `TestInstallErrorMapping` minus three rows; `TestWithRerunHint` minus one case |
-| 14 | A proof-list object with an OPM managed-by label or an instance name label, and no UUID label, is refused (never proven, not the instance's own) | `migration_proof.go:56-69` | The guard passes it, by the rule of every `opm instance apply`: OPM-managed, no other instance's UUID, no annotation for another instance. Install applies, stamps and records it. Awaits the gate's ruling | `TestPlanInstall_OwnUnrecordedObjects`, row "OPM's managed-by label and no UUID label" |
+| 14 | A proof-list object with an OPM managed-by label or an instance name label, and no UUID label, is refused (never proven, not the instance's own) | `migration_proof.go:56-69` | The guard passes it, by the rule of every `opm instance apply`: OPM-managed, no other instance's UUID, no annotation for another instance. Install applies, stamps and records it. Accepted by the gate on 2026-10-09 | `TestPlanInstall_OwnUnrecordedObjects`, row "OPM's managed-by label and no UUID label" |
 | 13 | The instance's own unrecorded objects pass (`Ours` is admitted) | `migration_plan.go:86` | The guard passes them when they carry an OPM managed-by label. Without that label they are refused (see the proposal's verdict table) | new `TestPlanInstall_OwnUnrecordedObjects` (two rows) |
 
 For an install over objects that carry another identity, the case of the T9.31 report, the cli does exactly this after the change. `PlanInstall` reads the record `opm-operator` in `opm-operator-system`. For each rendered object that exists: listed in the record, it applies whatever its UUID label says; else with `opmodel.dev/adopt` equal to the operator instance's UUID, it applies and is recorded; else it is refused. Any refusal ends the command before its first write with exit 2 and:
@@ -96,6 +96,19 @@ nothing was changed
 ```
 
 The cli adopts no unlabelled CRD by itself and offers no flag for it. The annotation stays the one override, as 0012:D8:R2 and 0012:D8:R3 say for every apply.
+
+## The two verdicts that change for an object that is not a manifest object
+
+Both are for an existing object that the record of the operator's instance does not list.
+
+| | Object | Before | After | What the user sees |
+| --- | --- | --- | --- | --- |
+| Stricter | It carries the operator instance's UUID label, and its managed-by label is absent or names another tool | passes (the migration admitted it) | refused | exit 2, `<object> exists and is not managed by OPM; to let this instance take it over, annotate it opmodel.dev/adopt=<instance UUID>`, nothing changed. Way out: set that annotation |
+| More permissive | It carries OPM's managed-by label and no UUID label, and no adopt annotation for another instance | refused when the object was on the proof list (`operator migration refused`) | passes | install applies it, stamps the instance's labels on it and records it, as `opm instance apply` does for such an object |
+
+Unlabelled CRDs of a manifest install are still refused (the earlier rename plan's D23, "no adoption of unlabelled CRDs"): an object with no OPM managed-by label and no annotation is a foreign object for the guard. `TestPlanInstall_ManifestInstallIsRefused` pins it for the full install and for `--crds-only`, with CRDs that carry no label at all.
+
+Named gap, not built here: `opm operator uninstall` with no record says to run `opm operator install` first. Over a manifest install, that install now refuses until each object is annotated. The later docs unit (T10.28) describes that path.
 
 ## Research & Decisions
 

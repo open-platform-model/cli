@@ -21,8 +21,9 @@ Ships as one PR, merged before the library removes `Admit` and before the contro
 - [x] 1.13 `git grep -n "Admit"` over `*.go` finds nothing outside `openspec/`; `TestNoErrorTextMatch` passes with its list unchanged.
 - [x] 1.14 The local gate is green, then commit `refactor(operator)!: retire the legacy-manifest migration`.
 
-## 2. Docs
+## 2. Docs and the rulings after the review
 
 - [x] 2.1 `README.md` (the "Install migrates" bullet and "which migrates it"), `AGENTS.md` (the `hack/operator-legacy/` entry), `docs/site/diagnostics/adopt-an-existing-object.md` (the `operator migration refused` paragraph: say that install refuses such an object as any other, that the annotation applies, and that an earlier controller Deployment must be deleted first because its selector cannot change).
 - [x] 2.2 `git grep -n -i "migration refused\|operator-legacy\|legacy-manifests"` outside `openspec/` and `CHANGELOG.md` finds nothing, apart from the assertion in `internal/operator/identity_test.go` that the text is absent. `release manifest` stays only where this change says that install does not take such an operator over (`README.md`, the adopt page, `identity_test.go`) and in the name-based scenario of `openspec/specs/inventory-ownership`.
 - [x] 2.3 The local gate plus `task docs:bundle:check` and `task cascade:wiring:check` are green, then commit `docs(operator): drop the legacy-manifest migration from the install docs`.
+- [x] 2.4 After the review and the gate's second ruling: the delta `inventory-ownership` drops the manifest-install scenario; proposal and design name the verdict that becomes more permissive beside the one that becomes stricter; the local gate is green, then commit `docs(openspec): record the second ruling and drop the kubectl-manifest scenario`.
