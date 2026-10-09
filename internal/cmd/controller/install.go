@@ -83,7 +83,9 @@ version renders, carried in this CLI, so --crds-only needs no registry and
 talks only to the cluster: it resolves and renders no module, writes no
 ModuleInstance, and takes no --version, -f or --reset-values. A CRD that
 exists is judged as on a full install: one the controller's instance record
-lists is applied; one without OPM's managed-by label, or with another
+lists is applied (when the record cannot be read because access is denied,
+the CRDs are judged without it and a warning says so); one without OPM's
+managed-by label, or with another
 instance's identity, is refused, and the refusal prints the annotation to
 set on the CRD so that this instance takes it over; --crds-only adopts nothing
 by itself. It also refuses CRDs a newer module version installed: run

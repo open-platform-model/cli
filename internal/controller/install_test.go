@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -393,16 +394,107 @@ func TestPlanCRDsOnly_RecordDoesNotCoverAnUnlistedCRD(t *testing.T) {
 	assert.Empty(t, fc.Writes())
 }
 
-// A record that cannot be read refuses the CRDs-only install before any
-// write: without it the guard would judge a recorded CRD as a stranger's.
-func TestPlanCRDsOnly_UnreadableRecordRefuses(t *testing.T) {
-	fc := newFakeCluster(t)
+// failRecordRead makes every read of a ModuleInstance fail with err.
+func failRecordRead(fc *fakeCluster, err error) {
 	fc.fake.PrependReactor("get", "moduleinstances", func(k8stesting.Action) (bool, runtime.Object, error) {
-		return true, nil, apierrors.NewForbidden(
-			schema.GroupResource{Group: "opmodel.dev", Resource: "moduleinstances"}, ControllerInstanceName, errors.New("denied"))
+		return true, nil, err
 	})
+}
+
+// recordReadDenied is the API server's answer to a caller with no get on
+// ModuleInstances in the controller's namespace.
+func recordReadDenied() error {
+	return apierrors.NewForbidden(
+		schema.GroupResource{Group: "opmodel.dev", Resource: "moduleinstances"}, ControllerInstanceName, errors.New("denied"))
+}
+
+// "A denied record read is no record": a caller that may manage CRDs but not
+// read ModuleInstances in the controller's namespace (the installer's Job)
+// installs the CRDs on a bare cluster, and is told once that the record could
+// not be read and that the CRDs are judged without it.
+func TestInstall_CRDsOnlyGoesOnWhenTheRecordReadIsDenied(t *testing.T) {
+	fastPolling(t)
+	var logBuf bytes.Buffer
+	output.SetLogWriter(&logBuf)
+	t.Cleanup(func() { output.SetLogWriter(os.Stderr) })
+	fc := newFakeCluster(t)
+	failRecordRead(fc, recordReadDenied())
+
+	result, err := installCRDsOnly(t, fc, &fakeRender{err: errors.New("the CRDs-only install must not render")}, PlanOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, 4, result.CRDs)
+	for _, w := range fc.Writes() {
+		assert.Equal(t, "patch customresourcedefinitions", w)
+	}
+	log := logBuf.String()
+	assert.Equal(t, 1, strings.Count(log, "could not read the controller's instance record"), "one line")
+	assert.Contains(t, log, ControllerNamespace+"/"+ControllerInstanceName)
+	assert.Contains(t, log, "judged without it")
+}
+
+// Without the record the guard judges by labels and the adopt annotation
+// alone, so a denied read opens nothing: a CRD OPM does not manage is still
+// refused with the annotation remedy, and nothing is applied.
+func TestPlanCRDsOnly_DeniedRecordReadStillRefusesAnUnlabelledCRD(t *testing.T) {
+	embeddedForTestInstance(t)
+	fc := newFakeCluster(t, renderedCRDObject(inventory.CRDNameModuleInstances, true))
+	failRecordRead(fc, recordReadDenied())
 
 	_, err := installCRDsOnly(t, fc, &fakeRender{}, PlanOptions{})
+	var guardErr *GuardError
+	require.ErrorAs(t, err, &guardErr)
+	assert.Contains(t, err.Error(), "CustomResourceDefinition/"+inventory.CRDNameModuleInstances+" exists and is not managed by OPM")
+	assert.Contains(t, err.Error(), opmlabels.AnnotationAdopt+"="+testInstanceUUID)
+	assert.Empty(t, fc.Writes())
+}
+
+// A CRD that carries the labels of the controller's instance passes the guard
+// by its labels, with the record read denied.
+func TestInstall_CRDsOnlyDeniedRecordReadAppliesOverItsOwnCRD(t *testing.T) {
+	fastPolling(t)
+	embeddedForTestInstance(t)
+	own := ownedBy(labeled(renderedCRDObject(inventory.CRDNameModuleInstances, true), "crds", "0.1.0"), testInstanceUUID)
+	fc := newFakeCluster(t, own)
+	failRecordRead(fc, recordReadDenied())
+
+	result, err := installCRDsOnly(t, fc, &fakeRender{}, PlanOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, 4, result.CRDs)
+}
+
+// Only a denied read is "no record". A read that fails for another reason
+// stops the CRDs-only install before any write, with the error in the chain:
+// the record may exist, and the answer is not known.
+func TestPlanCRDsOnly_FailedRecordReadStops(t *testing.T) {
+	for name, tc := range map[string]struct {
+		err  error
+		same func(error) bool
+	}{
+		"server error": {apierrors.NewInternalError(errors.New("etcd is down")), apierrors.IsInternalError},
+		"unauthorized": {apierrors.NewUnauthorized("token expired"), apierrors.IsUnauthorized},
+		"timeout":      {apierrors.NewServerTimeout(schema.GroupResource{Group: "opmodel.dev", Resource: "moduleinstances"}, "get", 1), apierrors.IsServerTimeout},
+	} {
+		t.Run(name, func(t *testing.T) {
+			fc := newFakeCluster(t)
+			failRecordRead(fc, tc.err)
+
+			_, err := installCRDsOnly(t, fc, &fakeRender{}, PlanOptions{})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "reading the controller's instance record "+ControllerNamespace+"/"+ControllerInstanceName)
+			assert.True(t, tc.same(err), "the read error stays in the chain")
+			assert.Empty(t, fc.Writes())
+		})
+	}
+}
+
+// The full install needs the record (its owner, its values, its inventory):
+// a denied read of it stops the install before any write.
+func TestPlanInstall_DeniedRecordReadStops(t *testing.T) {
+	fc := newFakeCluster(t)
+	failRecordRead(fc, recordReadDenied())
+
+	_, err := PlanInstall(context.Background(), newEnv(fc, &fakeRender{objs: moduleObjects(renderOpts{})}),
+		testResolution("v0.1.0"), defaultTarget, PlanOptions{Timeout: time.Second})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "reading the controller's instance record "+ControllerNamespace+"/"+ControllerInstanceName)
 	assert.True(t, apierrors.IsForbidden(err), "the read error stays in the chain")

@@ -62,7 +62,10 @@ The CRDs-only plan waits out terminating CRDs within `--timeout`, then runs the 
 CRDs every time, with the instance UUID the embedded CRDs carry. It reads the record of the controller's instance when
 one exists and passes the record's inventory to the guard, so a CRD the record lists is applied whatever identity label
 it carries, as on a full install. "Offline" means no registry request, not no cluster read: the record is one more read
-from the API server, and it is never written. A cluster that does not serve ModuleInstance has no record. With no
+from the API server, and it is never written. A cluster that does not serve ModuleInstance has no record. A denied read of the record (Forbidden) is treated as no
+record too, with one warning: the record only widens what the guard allows, so judging without it can only refuse more,
+and an installer whose Job has no rule in the controller's namespace can still install the CRDs. Every other read error
+stops the plan. With no
 record, a CRD that exists without OPM's managed-by label, or with another instance's identity, refuses the install
 (exit 2, nothing applied) with the guard's own message, which names the `opmodel.dev/adopt` annotation and the UUID to
 set. CRDs a previous install applied carry OPM's managed-by label and this instance's UUID and pass. It runs no target

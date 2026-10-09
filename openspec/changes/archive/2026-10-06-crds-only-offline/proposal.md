@@ -14,7 +14,8 @@ controller module, while every other install path stays module-based. Enhancemen
   writes that render's CRDs as manifests under `internal/controller/crds/`, which the CLI embeds.
 - `opm controller install --crds-only` applies the embedded CRDs with server-side apply as `opm-cli` and waits for
   `Established`. It makes no registry request and renders nothing. It reads the record of the controller's instance
-  when one exists, for its inventory only, and writes no ModuleInstance. Its only network peer is the Kubernetes API
+  when one exists, for its inventory only, and writes no ModuleInstance. A denied read of the record is a warning, not
+  a refusal: the CRDs are then judged without it. Its only network peer is the Kubernetes API
   server.
 - `--crds-only` judges every existing CRD with the shared apply guard, as a full install does: a CRD the record lists
   is applied; a CRD without OPM's managed-by label, or with another instance's identity, is refused with exit 2 before

@@ -61,6 +61,10 @@ after the rename's own archive. Implements 0021:D11:R1/R7 (revised 2026-10-06); 
   the guard (a recorded CRD is applied whatever identity it carries); it writes no ModuleInstance; an unreadable record
   stops the install before any write; tests for a recorded CRD, an unlisted CRD and an unreadable record; commit
   `fix(controller): judge CRDs-only installs with the instance record`
+- [x] 3.11 A denied read of the record (`apierrors.IsForbidden`) is "no record" for `PlanCRDsOnly`, with one warning;
+  every other read error still stops it, and the full install still stops on a denied read; tests for a bare cluster, an
+  unlabelled CRD, the instance's own CRD, a server error, Unauthorized, a timeout and the full install; commit
+  `fix(controller): install the CRDs when the record read is denied`
 
 ## 4. Specs and checks
 

@@ -2,7 +2,7 @@
 
 ### Requirement: CRDs-only install applies the CRDs pinned with the CLI, without a registry
 
-`opm controller install --crds-only` SHALL apply the `CustomResourceDefinition` manifests the CLI embeds, which are the CRDs the pinned module version renders for the instance `opm-controller` in `opm-system`, with server-side apply as `opm-cli`, and wait for each to be `Established`. It SHALL make no registry request: it SHALL NOT resolve, fetch or render the controller module and SHALL perform no catalog lookup. It SHALL read one `ModuleInstance` at most, the controller's instance record, and SHALL use only that record's inventory: the record's owner and values SHALL play no part. It SHALL write no instance record, no workload and no Platform, so its only network peer is the Kubernetes API server. With `--rbac` it SHALL also apply the `opm-cli-user` role as a full install does. A later full install of the pinned module version SHALL record those CRDs without recreating them. It SHALL NOT adopt, relabel or migrate a CRD by itself: every existing CRD it would apply is judged by the apply guard (capability `apply-pruning`, "Ownership guard judges every apply and dry run") as on a full install: with the instance UUID the embedded CRDs carry, and with the inventory of the controller's instance record when that record exists. A CRD that the record's inventory lists SHALL therefore be applied whatever identity label it carries, as a full install applies it. With no record, or for a CRD the record does not list, the CRD is judged as on a first install: when it carries no OPM managed-by label, or carries the identity of another instance, the command SHALL refuse with exit 2 before any write, with the guard's message: it names that CRD and the `opmodel.dev/adopt` annotation with the UUID to set, which is what the user does to let the instance take the CRD over. A cluster that does not serve `ModuleInstance` has no record. When the record cannot be read for any other reason, the command SHALL fail before any write with the read error. When an existing CRD it would apply carries the embedded CRD's `module.opmodel.dev/name` and a `module.opmodel.dev/version` label newer than the pinned module version, it SHALL refuse with exit 2 before any write, naming that CRD, that version and both remedies, `--crds-only` from a CLI that pins that module version or newer and a full install of that version, since that version's CRDs came from either one and applying older CRDs would silently downgrade the schemas that version installed. It reads those CRDs from the API server only. `--version`, `-f/--values` and `--reset-values` SHALL be rejected with `--crds-only` as flag-validation errors before any cluster call, because the form installs only the pinned version and records no values. Source: 0021:D11:R7.
+`opm controller install --crds-only` SHALL apply the `CustomResourceDefinition` manifests the CLI embeds, which are the CRDs the pinned module version renders for the instance `opm-controller` in `opm-system`, with server-side apply as `opm-cli`, and wait for each to be `Established`. It SHALL make no registry request: it SHALL NOT resolve, fetch or render the controller module and SHALL perform no catalog lookup. It SHALL read one `ModuleInstance` at most, the controller's instance record, and SHALL use only that record's inventory: the record's owner and values SHALL play no part. It SHALL write no instance record, no workload and no Platform, so its only network peer is the Kubernetes API server. With `--rbac` it SHALL also apply the `opm-cli-user` role as a full install does. A later full install of the pinned module version SHALL record those CRDs without recreating them. It SHALL NOT adopt, relabel or migrate a CRD by itself: every existing CRD it would apply is judged by the apply guard (capability `apply-pruning`, "Ownership guard judges every apply and dry run") as on a full install: with the instance UUID the embedded CRDs carry, and with the inventory of the controller's instance record when that record exists. A CRD that the record's inventory lists SHALL therefore be applied whatever identity label it carries, as a full install applies it. With no record, or for a CRD the record does not list, the CRD is judged as on a first install: when it carries no OPM managed-by label, or carries the identity of another instance, the command SHALL refuse with exit 2 before any write, with the guard's message: it names that CRD and the `opmodel.dev/adopt` annotation with the UUID to set, which is what the user does to let the instance take the CRD over. A cluster that does not serve `ModuleInstance` has no record. When the read of the record is denied (the API server answers Forbidden, judged by the typed error and never by message text), the command SHALL treat it as no record, SHALL print one line that says the record could not be read and that the CRDs are judged without it, and SHALL go on: the record only widens what the guard allows, so a caller with no permission in the controller's namespace can still install the CRDs. When the record cannot be read for any other reason (Unauthorized, a server error, a timeout), the command SHALL fail before any write with the read error. A full install is not changed by this: it needs the record and SHALL fail when it cannot read it. When an existing CRD it would apply carries the embedded CRD's `module.opmodel.dev/name` and a `module.opmodel.dev/version` label newer than the pinned module version, it SHALL refuse with exit 2 before any write, naming that CRD, that version and both remedies, `--crds-only` from a CLI that pins that module version or newer and a full install of that version, since that version's CRDs came from either one and applying older CRDs would silently downgrade the schemas that version installed. It reads those CRDs from the API server only. `--version`, `-f/--values` and `--reset-values` SHALL be rejected with `--crds-only` as flag-validation errors before any cluster call, because the form installs only the pinned version and records no values. Source: 0021:D11:R7.
 
 #### Scenario: Solo-cluster CRD install with no registry
 
@@ -35,9 +35,30 @@
 - **WHEN** `opm controller install --crds-only` runs and `moduleinstances.opmodel.dev` exists without OPM's managed-by label, annotated `opmodel.dev/adopt` with the UUID of the controller's instance
 - **THEN** the CRD is applied and carries that UUID
 
-#### Scenario: An unreadable record refuses
+#### Scenario: A denied record read is no record
 
-- **WHEN** `opm controller install --crds-only` runs and the read of the record `opm-controller` in `opm-system` is denied
+- **WHEN** `opm controller install --crds-only` runs on a cluster with no `opmodel.dev` CRD, by a caller the API server denies the read of the record `opm-controller` in `opm-system`
+- **THEN** the four CRDs are applied and the command exits 0
+- **AND** one line says that the record could not be read and that the CRDs are judged without it
+
+#### Scenario: A denied record read opens nothing
+
+- **WHEN** `opm controller install --crds-only` runs, the read of the record is denied, and `moduleinstances.opmodel.dev` exists without OPM's managed-by label and without an adopt annotation
+- **THEN** the command exits 2 naming that CRD and the `opmodel.dev/adopt` annotation with the UUID to set, and nothing has been applied
+
+#### Scenario: A CRD of the controller's instance passes with the record read denied
+
+- **WHEN** `opm controller install --crds-only` runs, the read of the record is denied, and `moduleinstances.opmodel.dev` carries OPM's managed-by label and the UUID of the controller's instance
+- **THEN** the CRDs are applied
+
+#### Scenario: A failed record read stops the CRDs-only install
+
+- **WHEN** `opm controller install --crds-only` runs and the read of the record `opm-controller` in `opm-system` fails with a server error, Unauthorized or a timeout
+- **THEN** the command fails naming the record, and nothing has been applied
+
+#### Scenario: A full install stops on a denied record read
+
+- **WHEN** a full `opm controller install` runs and the read of the record `opm-controller` in `opm-system` is denied
 - **THEN** the command fails naming the record, and nothing has been applied
 
 #### Scenario: Full install after CRDs-only

@@ -20,6 +20,7 @@ import (
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/modref"
+	"github.com/open-platform-model/cli/internal/output"
 	workflowapply "github.com/open-platform-model/cli/internal/workflow/apply"
 	workflowrender "github.com/open-platform-model/cli/internal/workflow/render"
 )
@@ -226,6 +227,7 @@ func PinnedTarget() Target {
 // that instance's UUID, and the record's inventory, when there is a record, is
 // the guard's previous inventory. So a CRD the record lists is applied
 // whatever identity label it carries, as on a full install. With no record
+// (none exists, or the read of it is denied, which is said in one warning),
 // every CRD is judged as on a first install: one that exists and is not
 // OPM's, or that carries another instance's identity, refuses the install
 // with the guard's own message, which names the adopt annotation; nothing is
@@ -250,10 +252,20 @@ func PlanCRDsOnly(ctx context.Context, env InstallEnv, opts PlanOptions) (*Plan,
 		return nil, err
 	}
 	// A cluster that does not serve ModuleInstance yet answers not-found, which
-	// is "no record". Any other read failure refuses: without the record the
-	// guard would judge a recorded CRD as a stranger's.
+	// is "no record". A denied read (Forbidden) is "no record" too, and said
+	// once: the record only widens what the guard allows, so without it the
+	// guard judges by labels and the adopt annotation alone and can only
+	// refuse more. A caller that may manage CRDs and nothing in the
+	// controller's namespace (an installer's Job) thus still installs them.
+	// Any other read failure stops the install: the answer is not known.
 	rec, err := inventory.GetRecord(ctx, env.Client, ControllerInstanceName, ControllerNamespace)
-	if err != nil {
+	switch {
+	case apierrors.IsForbidden(err):
+		output.Warn(fmt.Sprintf("could not read the controller's instance record %s/%s (access denied); "+
+			"the CustomResourceDefinitions are judged without it, by their labels and the adopt annotation alone",
+			ControllerNamespace, ControllerInstanceName))
+		rec = nil
+	case err != nil:
 		return nil, fmt.Errorf("reading the controller's instance record %s/%s: %w", ControllerNamespace, ControllerInstanceName, err)
 	}
 	var previous []k8sinventory.Entry
