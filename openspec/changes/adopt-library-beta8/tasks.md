@@ -10,9 +10,9 @@
 
 ## 2. Pin the report for unset required values
 
-- [ ] 2.1 Add `TestFromModule_UnsetRequiredValuesAreNamed` in `internal/workflow/render`: a module whose `debugValues` leave two required values unset, one read by a component; verify it passes on beta.8 and fails with the old `go.mod`
-- [ ] 2.2 Search `tests/e2e`, `tests/integration` and `docs/` for a quoted kernel refusal that the new text makes stale; correct each one
-- [ ] 2.3 `task lint` and `task test:unit` green, then commit `test(render): pin the report for unset required values`
+- [x] 2.1 Add `TestFromModule_UnsetRequiredValuesAreNamed` in `internal/workflow/render`: a module whose `debugValues` leave two required values unset, one read by a component; verify it passes on beta.8 and fails with the old `go.mod`
+- [x] 2.2 Search `tests/e2e`, `tests/integration` and `docs/` for a quoted kernel refusal that the new text makes stale; correct each one
+- [x] 2.3 `task lint` and `task test:unit` green, then commit `test(render): pin the report for unset required values`
 
 ## 3. Correct the known-limit notes
 
