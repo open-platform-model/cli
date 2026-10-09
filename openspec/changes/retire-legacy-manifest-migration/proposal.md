@@ -20,7 +20,7 @@ Release class: MAJOR after GA (a removed behaviour of `opm operator install`); d
 
 Not in this change: any rename; the library (it removes `Admit` and `installDeletable` in its own breaking beta, after this merges); `opm operator uninstall`; the earlier-identity hint line and docs page for install (the reduced T9.31, a later unit).
 
-## One verdict changes for an object that is not a legacy-manifest object
+## Two verdicts change for an object that is not a legacy-manifest object
 
 The migration's admission set holds more than proven manifest objects. `MigrationPlan.Admit()` (`internal/operator/migration_plan.go:86`) also adds `Ours`: every existing rendered object whose `module-instance.opmodel.dev/uuid` label equals the operator instance's UUID. The library lifts the foreign-object refusal for an admitted object (`opm/k8s/ownership/apply.go:109`, `:151`). So today an object passes the guard when all of these hold: the record does not list it, it carries the operator instance's UUID label, and its `app.kubernetes.io/managed-by` label is absent or names another tool. After this change that object is refused as "not managed by OPM", exit 2, naming the adopt annotation.
 
@@ -33,6 +33,9 @@ Measured on the fake cluster with a throwaway test (the eight rendered fixture o
 | own UUID, managed-by label removed | none | pass | **refused, exit 2** |
 | own UUID, managed-by `Helm` | none | pass | **refused, exit 2** |
 | own UUID, managed-by label removed | lists them | pass | pass |
+| OPM managed-by, no UUID label (proof-list objects: the CRDs, the Namespace, the Deployment and the like) | none | refused by the proof, exit 2 | **pass** |
+
+The last row is the second changed verdict, in the permissive direction, found by the review of the build. The proof refused a proof-list object that carried an OPM managed-by label, or an instance name or namespace label, without a UUID label (`internal/operator/migration_proof.go:56-69`): it was neither the instance's own nor proven. The guard passes it (library `opm/k8s/ownership/apply.go:109-126`: OPM-managed, no UUID label, no annotation naming another instance), as it does for every `opm instance apply`; install then applies it, stamps it and records it. An object without a UUID label predates UUID stamping or lost the label; no OPM runtime writes one today. This row was not in the proposal the gate saw on 2026-10-09 and awaits the gate's ruling; the test `TestPlanInstall_OwnUnrecordedObjects` pins the behaviour as built.
 
 No `opm instance apply`, `opm module apply`, prune or delete passes an admission set (only `internal/operator` sets `Admit`), so none of their verdicts change. An install over its own recorded objects does not change. An install over its own unrecorded objects does not change as long as they carry the labels OPM stamps (a stopped run, a CRDs-only install, a `kubectl apply` of the module's render). The changed case needs a third party to have removed or rewritten the managed-by label on an unrecorded object while it kept the UUID label. It fails closed, with a remedy the user can apply. The proposal gate of 2026-10-09 accepted it (ruling 1): keeping it would mean keeping an admission path in the cli and `Admit` in the library. The way out is the annotation the refusal prints.
 
