@@ -80,11 +80,12 @@ existing Platform is reported and left untouched, never rewritten.
 --crds-only applies just the CRDs, for clusters where the CLI drives module
 lifecycle without a running controller. They are the CRDs the pinned module
 version renders, carried in this CLI, so --crds-only needs no registry and
-talks only to the cluster: it resolves and renders no module, reads no
+talks only to the cluster: it resolves and renders no module, writes no
 ModuleInstance, and takes no --version, -f or --reset-values. A CRD that
-exists is judged as on a full install: one without OPM's managed-by label,
-or with another instance's identity, is refused, and the refusal prints the
-annotation that lets this instance take it over; --crds-only adopts nothing
+exists is judged as on a full install: one the controller's instance record
+lists is applied; one without OPM's managed-by label, or with another
+instance's identity, is refused, and the refusal prints the annotation to
+set on the CRD so that this instance takes it over; --crds-only adopts nothing
 by itself. It also refuses CRDs a newer module version installed: run
 --crds-only from a CLI that pins that version or newer, or install that
 version in full.

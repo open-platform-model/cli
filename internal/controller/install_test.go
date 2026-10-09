@@ -10,9 +10,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	k8stesting "k8s.io/client-go/testing"
 
 	"github.com/open-platform-model/cli/internal/controller/crds"
 	"github.com/open-platform-model/cli/internal/inventory"
@@ -281,9 +284,9 @@ func installCRDsOnly(t *testing.T, fc *fakeCluster, r *fakeRender, opts PlanOpti
 }
 
 // "Solo-cluster CRD install with no registry" and "The controller's instance
-// record is not read": the embedded CRDs are applied as opm-cli and served,
-// nothing renders, and no ModuleInstance is read or written, even over a
-// record a full install would refuse.
+// record is read for its inventory only": the embedded CRDs are applied as
+// opm-cli and served, nothing renders, and no ModuleInstance is written, even
+// over a record a full install would refuse for its owner.
 func TestInstall_CRDsOnlyAppliesTheEmbeddedCRDsOffline(t *testing.T) {
 	fastPolling(t)
 	fc := newFakeCluster(t, controllerRecord("controller", nil))
@@ -303,9 +306,6 @@ func TestInstall_CRDsOnlyAppliesTheEmbeddedCRDsOffline(t *testing.T) {
 		assert.Equal(t, want.GetLabels(), live.GetLabels(), "%s carries the pinned render's labels", want.GetName())
 		assert.Equal(t, want.Object["spec"], live.Object["spec"], "%s is the embedded CRD", want.GetName())
 		assert.Equal(t, "opm-cli", fc.Manager("customresourcedefinitions", want.GetName()))
-	}
-	for _, read := range fc.Reads() {
-		assert.NotContains(t, read, "moduleinstances", "no ModuleInstance is read")
 	}
 	for _, w := range fc.Writes() {
 		assert.Equal(t, "patch customresourcedefinitions", w)
@@ -334,10 +334,10 @@ func TestPlanCRDsOnly_RefusesCRDsOPMDoesNotManage(t *testing.T) {
 	assert.Empty(t, fc.Writes())
 }
 
-// The CRDs-only form reads no record, so it judges every CRD as on a first
-// install of the controller's instance: a CRD that carries OPM's managed-by
-// label and the UUID of another instance is refused, and the refusal names
-// that instance and the adopt annotation.
+// With no record of the controller's instance, the CRDs-only form judges
+// every CRD as on a first install: a CRD that carries OPM's managed-by label
+// and the UUID of another instance is refused, and the refusal names that
+// instance and the adopt annotation.
 func TestPlanCRDsOnly_RefusesCRDsOfAnotherInstance(t *testing.T) {
 	embeddedForTestInstance(t)
 	theirs := ownedBy(labeled(renderedCRDObject(inventory.CRDNameModuleInstances, true), "crds", "0.1.0"), otherInstanceUUID)
@@ -348,6 +348,64 @@ func TestPlanCRDsOnly_RefusesCRDsOfAnotherInstance(t *testing.T) {
 	require.ErrorAs(t, err, &guardErr)
 	assert.Contains(t, err.Error(), "CustomResourceDefinition/"+inventory.CRDNameModuleInstances+" belongs to module instance "+otherInstanceUUID)
 	assert.Contains(t, err.Error(), opmlabels.AnnotationAdopt+"="+testInstanceUUID)
+	assert.Empty(t, fc.Writes())
+}
+
+// "A CRD the record lists is applied whatever identity it carries": the
+// record of the controller's instance lists the CRD, so the guard judges it as
+// inventoried and the CRDs-only form applies over it, as a full install does.
+// The same CRD without the record is refused (the test above). The record is
+// read and not written.
+func TestInstall_CRDsOnlyAppliesOverARecordedCRDOfAnotherIdentity(t *testing.T) {
+	fastPolling(t)
+	embeddedForTestInstance(t)
+	theirs := ownedBy(labeled(renderedCRDObject(inventory.CRDNameModuleInstances, true), "crds", "0.1.0"), otherInstanceUUID)
+	fc := newFakeCluster(t, theirs, recordListing(theirs))
+
+	result, err := installCRDsOnly(t, fc, &fakeRender{err: errors.New("the CRDs-only install must not render")}, PlanOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, 4, result.CRDs)
+	assert.False(t, result.Recorded)
+	assert.Equal(t, testInstanceUUID,
+		fc.mustGet(crdGVR, "", inventory.CRDNameModuleInstances).GetLabels()[opmlabels.ModuleInstanceUUID],
+		"the recorded CRD now carries the identity of the controller's instance")
+	for _, w := range fc.Writes() {
+		assert.Equal(t, "patch customresourcedefinitions", w, "the record is read, never written")
+	}
+}
+
+const platformsCRDName = "platforms.opmodel.dev"
+
+// The record lists one CRD only: a CRD it does not list is still judged as on
+// a first install, so the record does not open the door for the others.
+func TestPlanCRDsOnly_RecordDoesNotCoverAnUnlistedCRD(t *testing.T) {
+	embeddedForTestInstance(t)
+	listed := ownedBy(labeled(renderedCRDObject(inventory.CRDNameModuleInstances, true), "crds", "0.1.0"), otherInstanceUUID)
+	unlisted := ownedBy(labeled(renderedCRDObject(platformsCRDName, true), "crds", "0.1.0"), otherInstanceUUID)
+	fc := newFakeCluster(t, listed, unlisted, recordListing(listed))
+
+	_, err := installCRDsOnly(t, fc, &fakeRender{}, PlanOptions{})
+	var guardErr *GuardError
+	require.ErrorAs(t, err, &guardErr)
+	assert.Contains(t, err.Error(), "refusing to install: 1 object(s) cannot be applied by this instance:")
+	assert.Contains(t, err.Error(), "CustomResourceDefinition/"+platformsCRDName+" belongs to module instance "+otherInstanceUUID)
+	assert.NotContains(t, err.Error(), "CustomResourceDefinition/"+inventory.CRDNameModuleInstances+" ")
+	assert.Empty(t, fc.Writes())
+}
+
+// A record that cannot be read refuses the CRDs-only install before any
+// write: without it the guard would judge a recorded CRD as a stranger's.
+func TestPlanCRDsOnly_UnreadableRecordRefuses(t *testing.T) {
+	fc := newFakeCluster(t)
+	fc.fake.PrependReactor("get", "moduleinstances", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewForbidden(
+			schema.GroupResource{Group: "opmodel.dev", Resource: "moduleinstances"}, ControllerInstanceName, errors.New("denied"))
+	})
+
+	_, err := installCRDsOnly(t, fc, &fakeRender{}, PlanOptions{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "reading the controller's instance record "+ControllerNamespace+"/"+ControllerInstanceName)
+	assert.True(t, apierrors.IsForbidden(err), "the read error stays in the chain")
 	assert.Empty(t, fc.Writes())
 }
 

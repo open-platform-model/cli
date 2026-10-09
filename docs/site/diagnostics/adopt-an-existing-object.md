@@ -47,6 +47,8 @@ An object that the inventory of the instance already lists is always applied, al
 - An object that is being deleted is not refused at once. Install waits for it to go, up to `--timeout`, and fails when it is still there.
 - An object that install cannot read exits by the read error, as in the table: 4, 3 or 1.
 
+`opm controller install --crds-only` runs the check on the CustomResourceDefinitions only. It uses the inventory of the controller's instance when the cluster has that instance, so it applies a CustomResourceDefinition that the inventory lists. Without that instance it judges each CustomResourceDefinition as a first install does. It refuses with exit 2 and prints the annotation to set, as a full install does.
+
 Install does not take over a controller that was applied from an earlier release manifest. It refuses each object of that controller as an object that OPM does not manage, the CustomResourceDefinitions and the Namespace included, also with `--crds-only`. To keep those objects, annotate each one as the refusal prints, then run install again. Delete the earlier controller Deployment first: its selector differs from the selector of the module, Kubernetes does not let a selector change, and install fails on it after it applied the CustomResourceDefinitions. Install prints only objects that the module renders. It does not delete or report the other objects of the release manifest, such as its role bindings: delete them yourself.
 
 ## Causes and fixes

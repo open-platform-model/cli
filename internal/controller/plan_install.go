@@ -215,16 +215,22 @@ func PinnedTarget() Target {
 
 // PlanCRDsOnly plans `opm controller install --crds-only` from the CRDs this
 // cli embeds, which task controller:pin rendered from the pinned module
-// version. It works offline: it resolves, fetches and renders nothing, and
-// reads no ModuleInstance, so it cannot know whether the controller's
-// instance is recorded. Its checks are the wait for terminating objects, the
-// check of the existing CRDs (one a newer module version installed is
-// refused), and the apply guard over the CRDs, asked as for a first install
-// of the controller's instance: the embedded CRDs carry that instance's
-// UUID, and no record is read. A CRD that exists and is not OPM's, or that
-// carries another instance's identity, refuses the install with the guard's
-// own message, which names the adopt annotation; nothing is adopted without
-// it. The target rules already held when the version was pinned.
+// version. It works without a registry: it resolves, fetches and renders
+// nothing. It reads the cluster only: the CRDs, and the record of the
+// controller's instance when one exists, for its inventory alone (the record's
+// owner and values play no part, and the record is never written).
+//
+// Its checks are the wait for terminating objects, the check of the existing
+// CRDs (one a newer module version installed is refused), and the apply guard
+// over the CRDs, asked as the controller's instance: the embedded CRDs carry
+// that instance's UUID, and the record's inventory, when there is a record, is
+// the guard's previous inventory. So a CRD the record lists is applied
+// whatever identity label it carries, as on a full install. With no record
+// every CRD is judged as on a first install: one that exists and is not
+// OPM's, or that carries another instance's identity, refuses the install
+// with the guard's own message, which names the adopt annotation; nothing is
+// adopted without it. The target rules already held when the version was
+// pinned.
 func PlanCRDsOnly(ctx context.Context, env InstallEnv, opts PlanOptions) (*Plan, error) {
 	objs, err := embeddedCRDs()
 	if err != nil {
@@ -243,7 +249,18 @@ func PlanCRDsOnly(ctx context.Context, env InstallEnv, opts PlanOptions) (*Plan,
 	if err := checkExistingCRDs(ctx, env.Client, objs); err != nil {
 		return nil, err
 	}
-	if err := applyGuard(ctx, env, plan, nil, embeddedInstanceUUID(objs)); err != nil {
+	// A cluster that does not serve ModuleInstance yet answers not-found, which
+	// is "no record". Any other read failure refuses: without the record the
+	// guard would judge a recorded CRD as a stranger's.
+	rec, err := inventory.GetRecord(ctx, env.Client, ControllerInstanceName, ControllerNamespace)
+	if err != nil {
+		return nil, fmt.Errorf("reading the controller's instance record %s/%s: %w", ControllerNamespace, ControllerInstanceName, err)
+	}
+	var previous []k8sinventory.Entry
+	if rec != nil {
+		previous = rec.Inventory.Entries
+	}
+	if err := applyGuard(ctx, env, plan, previous, embeddedInstanceUUID(objs)); err != nil {
 		return nil, err
 	}
 	return plan, nil
