@@ -277,13 +277,8 @@ func (e *RegistryError) Unwrap() error { return e.Err }
 // library's typed classification: no response at all is a
 // *ConnectivityError, and everything else is a *RegistryError, marked
 // Unauthorized for a 401 or 403 answer and carrying host. The cause stays
-// wrapped and in the message.
-//
-// Known gap, held by TestPush_TokenEndpointRefusal_Pinned: a registry that
-// hands out bearer tokens and whose token endpoint answers 403 reaches the
-// library as "cannot do HTTP request: ...: 403 Forbidden", which it reads as
-// no response, so that refusal is still a *ConnectivityError. The reading of
-// registry error text is the library's alone, so the fix belongs there.
+// wrapped and in the message. A refusal by the token endpoint of a registry
+// that hands out bearer tokens is a refusal like any other.
 func RegistryFailure(op, host string, err error) error {
 	if cuemod.IsConnectivityError(err) {
 		return &ConnectivityError{Op: op, Err: err}

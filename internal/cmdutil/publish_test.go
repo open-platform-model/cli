@@ -148,8 +148,14 @@ func TestRunPublish_SchemaFetchFailureIsNamed(t *testing.T) {
 		{"refused connection", func(*testing.T) string { return cuemodtest.UnreachableRegistry }, "registry unreachable: loading core schema: ", opmexit.ExitConnectivityError, false},
 		{"401", func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusUnauthorized) }, "registry refused the credentials (authentication or permission): loading core schema: ", opmexit.ExitPermissionDenied, true},
 		{"503", func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusServiceUnavailable) }, "registry operation failed: loading core schema: ", opmexit.ExitConnectivityError, false},
+		{"token endpoint answers 401", func(t *testing.T) string { return cuemodtest.TokenRegistry(t, http.StatusUnauthorized) }, "registry refused the credentials (authentication or permission): loading core schema: ", opmexit.ExitPermissionDenied, true},
+		// Not the wanted answer: the registry client reports a 403 from the
+		// token endpoint of a fetch as "not found", as it does a 403 answer
+		// to the tag lookup, so no refusal reaches the classification.
+		{"token endpoint answers 403", func(t *testing.T) string { return cuemodtest.TokenRegistry(t, http.StatusForbidden) }, "registry operation failed: loading core schema: ", opmexit.ExitConnectivityError, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("DOCKER_CONFIG", t.TempDir())
 			cuemodtest.ColdCache(t)
 			registry := tc.registry(t)
 			err := runPublish(t, &config.GlobalConfig{Registry: registry})

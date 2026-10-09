@@ -206,6 +206,13 @@ func TestPlatformBuildHint_RefusedCredential(t *testing.T) {
 			contains: "401 Unauthorized",
 			want:     sole,
 		},
+		{
+			name:     "token endpoint answers 401",
+			registry: func(t *testing.T) string { return cuemodtest.TokenRegistry(t, http.StatusUnauthorized) },
+			deps:     depPinned,
+			contains: "401 Unauthorized",
+			want:     sole,
+		},
 		{"archive blob answers 401", blobAnswers(http.StatusUnauthorized), depPinned, "401 Unauthorized", sole},
 		{"archive blob answers 403", blobAnswers(http.StatusForbidden), depPinned, "403 Forbidden", sole},
 		{
@@ -244,13 +251,14 @@ func TestPlatformBuildHint_RefusedCredential(t *testing.T) {
 // does not state the wanted answer. Each registry here refuses the caller,
 // yet the refusal reaches the cli typed as something else, so the build keeps
 // the pin hint and the validation cause: CUE's registry client reports a 403
-// answer to the tag lookup as "module not found", a token endpoint that
-// answers 403 ends the same way, and a token endpoint that answers 401 fails
-// with "cannot do HTTP request: ...: 401 Unauthorized", which the library
-// reads as no response. The wanted answer for all three is the login hint
-// and the permission cause. The reading of registry error text is the
-// library's alone; when it types one of these as a refusal, its row fails:
-// move it to TestPlatformBuildHint_RefusedCredential.
+// answer to the tag lookup as "module not found", and a token endpoint that
+// answers 403 ends the same way. The wanted answer for both is the login
+// hint and the permission cause. The reading of registry error text is the
+// library's alone, and it keeps both as not found on purpose (a 403 and a
+// missing module are one answer from the client); when it types one of
+// these as a refusal, its row fails: move it to
+// TestPlatformBuildHint_RefusedCredential. A token endpoint that answers 401
+// is typed as a refusal and has its row there.
 func TestPlatformBuildHint_RefusalNotTypedAsOne_Pinned(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
@@ -259,7 +267,6 @@ func TestPlatformBuildHint_RefusalNotTypedAsOne_Pinned(t *testing.T) {
 	}{
 		{"tag lookup answers 403", func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusForbidden) }, "module not found"},
 		{"token endpoint answers 403", func(t *testing.T) string { return cuemodtest.TokenRegistry(t, http.StatusForbidden) }, "module not found"},
-		{"token endpoint answers 401", func(t *testing.T) string { return cuemodtest.TokenRegistry(t, http.StatusUnauthorized) }, "401 Unauthorized"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("DOCKER_CONFIG", t.TempDir())

@@ -107,7 +107,7 @@ A failed registry operation SHALL be named by its cause, and the message SHALL k
 - a 401 or 403 answer that reaches the cli as such SHALL exit 4, SHALL read as refused credentials (authentication or permission), SHALL NOT read "unreachable", and SHALL point to `opm registry login`, naming the registry host the operation was routed to when it is known;
 - any other failure answer SHALL read "registry operation failed" and SHALL NOT read "unreachable".
 
-A 403 answer to the already-published lookup is not such a failure: the registry client reads it as "this module is not published", so the lookup passes and the push is where a refusal shows. One refusal is not yet named: a registry that hands out bearer tokens and whose token endpoint answers 403 is reported as "registry unreachable" on the push, exit 3, with the 403 in the text, until the registry error classification the cli builds on reads that form as an answer.
+A 403 answer to the already-published lookup is not such a failure: the registry client reads it as "this module is not published", so the lookup passes and the push is where a refusal shows. A registry that hands out bearer tokens and whose token endpoint refuses the caller is a refused credential like any other: a 401 from the token endpoint on the lookup or the core-schema fetch, and a 401 or 403 from it on the push. A 403 from the token endpoint on the lookup or the core-schema fetch reaches the cli as "not found", as a 403 answer to the tag lookup does: the lookup passes, and the core-schema fetch reads "registry operation failed", exit 3.
 
 When the core-schema fetch fails and no registry is configured (no `--registry` flag, no `OPM_REGISTRY`, no `registry` in the config file, and no `CUE_REGISTRY` in the environment), publish SHALL exit 2 with a message that says no registry is configured, keeps the cause, and points to `opm config init`.
 
@@ -121,6 +121,13 @@ When the core-schema fetch fails and no registry is configured (no `--registry` 
 - **WHEN** the registry answers the already-published lookup with 401, or the push with 401 or 403
 - **THEN** the command exits 4
 - **AND** the message says the registry refused the credentials, names the registry operation, carries the registry's own error text and points to `opm registry login <host>`
+- **AND** the message does not contain "unreachable"
+
+#### Scenario: A refusing token endpoint is not called unreachable
+
+- **WHEN** the registry hands out bearer tokens and its token endpoint answers 403 to the push
+- **THEN** the command exits 4
+- **AND** the message says the registry refused the credentials, carries "403 Forbidden" and points to `opm registry login <host>`
 - **AND** the message does not contain "unreachable"
 
 #### Scenario: A forbidden lookup reads as not published

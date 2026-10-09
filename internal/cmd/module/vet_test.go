@@ -346,8 +346,12 @@ func TestModVet_SchemaFetchFailureIsNamed(t *testing.T) {
 		// registry operation. The same holds for publish.
 		{"403", func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusForbidden) }, "registry operation failed: loading core schema: ", opmexit.ExitConnectivityError, false},
 		{"503", func(t *testing.T) string { return cuemodtest.StatusRegistry(t, http.StatusServiceUnavailable) }, "registry operation failed: loading core schema: ", opmexit.ExitConnectivityError, false},
+		{"token endpoint answers 401", func(t *testing.T) string { return cuemodtest.TokenRegistry(t, http.StatusUnauthorized) }, "registry refused the credentials (authentication or permission): loading core schema: ", opmexit.ExitPermissionDenied, true},
+		// The same known gap as the 403 row above, through the token endpoint.
+		{"token endpoint answers 403", func(t *testing.T) string { return cuemodtest.TokenRegistry(t, http.StatusForbidden) }, "registry operation failed: loading core schema: ", opmexit.ExitConnectivityError, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("DOCKER_CONFIG", t.TempDir())
 			cuemodtest.ColdCache(t)
 			registry := tc.registry(t)
 

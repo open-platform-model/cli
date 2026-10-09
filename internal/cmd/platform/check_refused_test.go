@@ -53,6 +53,15 @@ func TestPlatformCheck_BuildFailureExitCodes(t *testing.T) {
 			notShown: pin,
 		},
 		{
+			name:     "token endpoint refuses the credentials",
+			registry: func(t *testing.T) string { return cuemodtest.TokenRegistry(t, http.StatusUnauthorized) },
+			version:  cuemodtest.DepNewest,
+			code:     opmexit.ExitPermissionDenied,
+			message:  "401 Unauthorized",
+			shows:    func(registry string) string { return login + registry },
+			notShown: pin,
+		},
+		{
 			name:     "registry does not hold the pin",
 			registry: cuemodtest.Registry,
 			version:  "v0.9.0",
