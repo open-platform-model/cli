@@ -69,8 +69,8 @@ function as a string.
 When a platform module fails to build, the cli SHALL add one hint chosen from the cause:
 
 - the package is not a single `#Platform` package: the hint names the expected shape;
-- the registry refused the credentials (a 401 answer, or a 403 answer that reaches the cli as
-  a refusal): the hint says to log in to the registry and names the command
+- the registry refused the credentials (a 401 answer from the registry or from its token
+  endpoint, or a 403 answer that reaches the cli as a refusal): the hint says to log in to the registry and names the command
   `opm registry login`, followed by the registry host when every dependency the platform's
   `cue.mod/module.cue` declares routes to one host through the configured registry mapping;
 - any other registry fetch failed, or a dependency did not resolve (an import no module
@@ -119,8 +119,15 @@ exit code 2, and its hint SHALL NOT change the exit code.
 #### Scenario: A refusal the cli receives as not found
 
 - **WHEN** the registry answers 403 to the tag lookup, or its token endpoint answers 403
-- **THEN** the build fails with exit code 2 and the hint says to pin a published build, until
-  the library reads that answer as a refusal
+- **THEN** the build fails with exit code 2 and the hint says to pin a published build, because
+  the registry client reports both as a module that is not found
+
+#### Scenario: A token endpoint that refuses the credentials
+
+- **WHEN** the registry hands out bearer tokens and its token endpoint answers 401 while the
+  platform module's imports resolve
+- **THEN** the build fails with exit code 4 and the hint is the login hint with the registry
+  host, as for a 401 answer from the registry itself
 
 #### Scenario: A directly imported dependency whose module file does not parse
 
