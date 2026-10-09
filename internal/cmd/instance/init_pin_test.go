@@ -26,6 +26,9 @@ func TestAcquireModule_Pinned(t *testing.T) {
 	status := func(code int) func(t *testing.T) string {
 		return func(t *testing.T) string { return cuemodtest.StatusRegistry(t, code) }
 	}
+	token := func(code int) func(t *testing.T) string {
+		return func(t *testing.T) string { return cuemodtest.TokenRegistry(t, code) }
+	}
 	for _, tc := range []struct {
 		name     string
 		registry func(t *testing.T) string
@@ -38,8 +41,11 @@ func TestAcquireModule_Pinned(t *testing.T) {
 		{"401", status(http.StatusUnauthorized), cuemodtest.DepModule, opmexit.ExitGeneralError},
 		{"429", status(http.StatusTooManyRequests), cuemodtest.DepModule, opmexit.ExitGeneralError},
 		{"503", status(http.StatusServiceUnavailable), cuemodtest.DepModule, opmexit.ExitGeneralError},
+		{"token endpoint answers 401", token(http.StatusUnauthorized), cuemodtest.DepModule, opmexit.ExitGeneralError},
+		{"token endpoint answers 403", token(http.StatusForbidden), cuemodtest.DepModule, opmexit.ExitGeneralError},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("DOCKER_CONFIG", t.TempDir())
 			cuemodtest.ColdCache(t)
 			registry := tc.registry(t)
 			mv, err := module.NewVersion(tc.module, cuemodtest.DepNewest)
@@ -54,7 +60,10 @@ func TestAcquireModule_Pinned(t *testing.T) {
 
 // TestInitWrite_Pinned pins init's exit code when the staged package's
 // dependency closure does not resolve: no response exits 3, a dependency the
-// registry does not hold exits 1, and nothing is left behind either way.
+// registry does not hold exits 1, and nothing is left behind either way. A
+// token endpoint that refuses the caller is a registry that answered, so it
+// exits 1 like every other answer; while the library read that refusal as no
+// response it exited 3 and was printed as "registry unreachable".
 func TestInitWrite_Pinned(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
@@ -64,8 +73,11 @@ func TestInitWrite_Pinned(t *testing.T) {
 	}{
 		{"refused connection", func(*testing.T) string { return cuemodtest.UnreachableRegistry }, cuemodtest.DepModule, opmexit.ExitConnectivityError},
 		{"dependency not held", cuemodtest.Registry, "example.com/missing@v0", opmexit.ExitGeneralError},
+		{"token endpoint answers 401", func(t *testing.T) string { return cuemodtest.TokenRegistry(t, http.StatusUnauthorized) }, cuemodtest.DepModule, opmexit.ExitGeneralError},
+		{"token endpoint answers 403", func(t *testing.T) string { return cuemodtest.TokenRegistry(t, http.StatusForbidden) }, cuemodtest.DepModule, opmexit.ExitGeneralError},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("DOCKER_CONFIG", t.TempDir())
 			cuemodtest.ColdCache(t)
 			files := instinit.Files{
 				instinit.ModuleFile:   []byte("module: \"instance.local/web@v0\"\nlanguage: version: \"v0.9.0\"\n"),

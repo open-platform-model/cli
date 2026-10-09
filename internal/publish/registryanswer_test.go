@@ -150,21 +150,25 @@ func TestGate_AlreadyPublished_TokenEndpointRefusal(t *testing.T) {
 	assert.True(t, regErr.Unauthorized, "%v", err)
 }
 
-// TestPush_TokenEndpointRefusal_Pinned records a known gap, it does not
-// state the wanted answer. A token endpoint that answers 403 lets the lookup
-// pass (a 403 reads as "no such module"), and the push then fails with
-// "cannot do HTTP request: ...: 403 Forbidden", which the library's text
-// classification reads as no response. The registry did answer, so the
-// wanted answer is a *RegistryError marked Unauthorized. When the library
-// reads that form as an answer, this test fails: change it to assert that.
-func TestPush_TokenEndpointRefusal_Pinned(t *testing.T) {
+// A token endpoint that answers 403 lets the lookup pass (the registry
+// client reads a 403 there as "no such module"), so the push is where the
+// refusal shows: a refused credential that names the host, never
+// "registry unreachable".
+func TestPush_TokenEndpointRefusal(t *testing.T) {
 	t.Setenv("DOCKER_CONFIG", t.TempDir())
-	p, opts, err := runAgainst(t, cuemodtest.TokenRegistry(t, http.StatusForbidden))
+	registry := cuemodtest.TokenRegistry(t, http.StatusForbidden)
+	p, opts, err := runAgainst(t, registry)
 	require.NoError(t, err)
 	require.True(t, p.Go(), refusalHeadlines(p))
 
 	err = Push(context.Background(), opts, p)
+	var regErr *RegistryError
+	require.ErrorAs(t, err, &regErr)
+	assert.True(t, regErr.Unauthorized, "%v", err)
+	assert.Equal(t, registry, regErr.Host, "host with its +insecure suffix")
 	var connErr *ConnectivityError
-	require.ErrorAs(t, err, &connErr, "the gap closed: assert *RegistryError with Unauthorized instead")
-	assert.Contains(t, err.Error(), "403 Forbidden", "the registry's answer is at least visible")
+	assert.NotErrorAs(t, err, &connErr)
+	assert.Contains(t, err.Error(), "registry refused the credentials (authentication or permission): pushing ")
+	assert.Contains(t, err.Error(), "403 Forbidden", "the registry's own answer stays in the message")
+	assert.NotContains(t, err.Error(), "unreachable")
 }

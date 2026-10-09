@@ -73,6 +73,21 @@ func TestIsConnectivityError_Pinned(t *testing.T) {
 		{"tidy: 503", func(t *testing.T) error {
 			return tidyErr(t, cuemodtest.StatusRegistry(t, http.StatusServiceUnavailable), false)
 		}, false},
+		// A token endpoint that refuses the caller is an answer. Until the
+		// library read "cannot do HTTP request: ...: 401 Unauthorized" as
+		// one, the tidy row was true.
+		{"tidy: token endpoint answers 401", func(t *testing.T) error {
+			return tidyErr(t, cuemodtest.TokenRegistry(t, http.StatusUnauthorized), false)
+		}, false},
+		{"tidy: token endpoint answers 403", func(t *testing.T) error {
+			return tidyErr(t, cuemodtest.TokenRegistry(t, http.StatusForbidden), false)
+		}, false},
+		{"acquire: token endpoint answers 401", func(t *testing.T) error {
+			return acquireErr(t, cuemodtest.TokenRegistry(t, http.StatusUnauthorized), cuemodtest.DepModule, cuemodtest.DepNewest)
+		}, false},
+		{"acquire: token endpoint answers 403", func(t *testing.T) error {
+			return acquireErr(t, cuemodtest.TokenRegistry(t, http.StatusForbidden), cuemodtest.DepModule, cuemodtest.DepNewest)
+		}, false},
 		{"acquire: refused connection", func(t *testing.T) error {
 			return acquireErr(t, cuemodtest.UnreachableRegistry, cuemodtest.DepModule, cuemodtest.DepNewest)
 		}, true},
@@ -115,6 +130,7 @@ func TestIsConnectivityError_Pinned(t *testing.T) {
 		}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("DOCKER_CONFIG", t.TempDir())
 			err := tc.err(t)
 			assert.Equal(t, tc.want, IsConnectivityError(err), "%v", err)
 		})

@@ -33,6 +33,8 @@ func TestRegistryCheck_ExitCodes_Pinned(t *testing.T) {
 		{"version not held", cuemodtest.Registry, "example.com/dep@v0.9.0", opmexit.ExitNotFound},
 		{"403 on every request", status(http.StatusForbidden), held, opmexit.ExitNotFound},
 		{"401", status(http.StatusUnauthorized), held, opmexit.ExitConnectivityError},
+		{"token endpoint answers 401", func(t *testing.T) string { return cuemodtest.TokenRegistry(t, http.StatusUnauthorized) }, held, opmexit.ExitConnectivityError},
+		{"token endpoint answers 403", func(t *testing.T) string { return cuemodtest.TokenRegistry(t, http.StatusForbidden) }, held, opmexit.ExitNotFound},
 		{"429", status(http.StatusTooManyRequests), held, opmexit.ExitConnectivityError},
 		{"503", status(http.StatusServiceUnavailable), held, opmexit.ExitConnectivityError},
 		{"refused connection", func(*testing.T) string { return cuemodtest.UnreachableRegistry }, held, opmexit.ExitConnectivityError},
@@ -42,6 +44,7 @@ func TestRegistryCheck_ExitCodes_Pinned(t *testing.T) {
 		{"registry mapping does not parse", func(*testing.T) string { return "::nonsense::" }, held, opmexit.ExitGeneralError},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("DOCKER_CONFIG", t.TempDir())
 			cuemodtest.ColdCache(t)
 			_, err := publish.RegistryCheck(context.Background(), publish.CheckOptions{
 				Coordinate: tc.coordinate,

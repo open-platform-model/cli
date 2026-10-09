@@ -88,3 +88,36 @@ func TestIsUnauthorized(t *testing.T) {
 	// A push reports the registry's answer as flattened text.
 	assert.True(t, IsUnauthorized(errors.New("cannot make scratch config: 403 Forbidden: denied: Forbidden")))
 }
+
+// TestIsUnauthorized_TokenEndpoint holds that a refusal by the token
+// endpoint of a registry that hands out bearer tokens is a refused
+// credential on the paths that flatten the error into text (a tidy), as it
+// is on a direct fetch. A 403 there is not: the registry client reports it
+// as a module that is not found.
+func TestIsUnauthorized_TokenEndpoint(t *testing.T) {
+	t.Setenv("DOCKER_CONFIG", t.TempDir())
+	for _, tc := range []struct {
+		name string
+		err  func(t *testing.T) error
+		want bool
+	}{
+		{"tidy: 401", func(t *testing.T) error {
+			return tidyErr(t, cuemodtest.TokenRegistry(t, http.StatusUnauthorized), false)
+		}, true},
+		{"acquire: 401", func(t *testing.T) error {
+			return acquireErr(t, cuemodtest.TokenRegistry(t, http.StatusUnauthorized), cuemodtest.DepModule, cuemodtest.DepNewest)
+		}, true},
+		{"tidy: 403", func(t *testing.T) error {
+			return tidyErr(t, cuemodtest.TokenRegistry(t, http.StatusForbidden), false)
+		}, false},
+		{"acquire: 403", func(t *testing.T) error {
+			return acquireErr(t, cuemodtest.TokenRegistry(t, http.StatusForbidden), cuemodtest.DepModule, cuemodtest.DepNewest)
+		}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.err(t)
+			assert.Equal(t, tc.want, IsUnauthorized(err), "%v", err)
+			assert.False(t, IsConnectivityError(err), "a registry that answered was reached: %v", err)
+		})
+	}
+}
