@@ -69,7 +69,7 @@ orphan inventory:
 Pruning keeps PersistentVolumeClaims: a claim the module no longer renders
 stays in the cluster and in the inventory, is listed with the status "kept",
 and does not fail the apply. Pass --delete-data to prune such claims and the
-data on them; a claim kept by an earlier apply is pruned then too. On an
+data on them; a claim kept by an earlier apply is pruned then too. On a
 controller-managed instance the controller decides what is pruned: a controller
 that has spec.dataPolicy keeps PersistentVolumeClaims unless that field of the
 instance is Delete, an older controller prunes them, and --delete-data does not

@@ -60,7 +60,7 @@ here, with or without the flag: Kubernetes keeps them by default.
 None of this holds for a controller-managed instance: there the controller
 deletes what the instance tracks when spec.prune is set, and leaves all of it
 running otherwise. A controller that has spec.dataPolicy keeps
-PersistentVolumeClaims unless that field of the instance is Delete; an
+PersistentVolumeClaims unless that field of the instance is Delete; a
 controller without the field deletes them. The confirmation prompt says which
 holds: it reads spec.prune and spec.dataPolicy from the instance, and from the
 ModuleInstance CRD whether the controller has the field. --delete-data does not
@@ -84,7 +84,7 @@ for. When the wait times out, the command lists each resource that is still
 terminating, with its finalizers, keeps the ModuleInstance and exits 1; run
 the same command again to wait again, or without --wait to delete the
 ModuleInstance and stop tracking those resources. --wait does nothing on
---dry-run, and nothing when a resource failed to delete. For an
+--dry-run, and nothing when a resource failed to delete. For a
 controller-managed instance the command always waits, bounded by --timeout,
 until the ModuleInstance is gone, with or without --wait; it does not check
 the resources the controller prunes.
@@ -674,7 +674,7 @@ func controllerClaimsOf(inv *inventory.Record, crd *unstructured.Unstructured) c
 
 // fate decides what the controller does with the tracked claims. Only the
 // exact value Delete is a request to delete: Keep, an absent value and any
-// value opm does not know keep them, which is the controller's own rule. An
+// value opm does not know keep them, which is the controller's own rule. A
 // controller whose CRD has no spec.dataPolicy keeps nothing.
 func (c controllerClaims) fate() claimFate {
 	switch {
@@ -740,7 +740,7 @@ func trackedClaims(inv *inventory.Record) []k8sinventory.Entry {
 	return claims
 }
 
-// controllerManagedDeletePrompt is the confirmation question for an
+// controllerManagedDeletePrompt is the confirmation question for a
 // controller-managed instance. opm deletes only the ModuleInstance there; the
 // controller removes what the instance tracks when spec.prune is set, and
 // leaves all of it running otherwise. When the instance tracks

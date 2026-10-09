@@ -385,7 +385,7 @@ func versionLiteral(expr ast.Expr) (lit *ast.BasicLit, defaulted bool) {
 }
 
 // binaryVersionLiteral resolves versionLiteral over a binary expression: only
-// "|" and "&" chains can hold the version literal — any other controller
+// "|" and "&" chains can hold the version literal — any other operator
 // (comparison, arithmetic, pattern match) does not.
 func binaryVersionLiteral(e *ast.BinaryExpr) (lit *ast.BasicLit, defaulted bool) {
 	if e.Op != token.OR && e.Op != token.AND {

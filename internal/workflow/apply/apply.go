@@ -42,7 +42,7 @@ type Options struct {
 
 	// Wait, in CLI-executor mode, blocks after a successful apply and
 	// inventory write until every applied resource is healthy (see
-	// kubernetes.HealthyPredicate) or Timeout runs out. Ignored on dry-run. An
+	// kubernetes.HealthyPredicate) or Timeout runs out. Ignored on dry-run. A
 	// controller-managed instance always waits for the controller, so the flag
 	// changes nothing there.
 	Wait bool
