@@ -13,11 +13,12 @@ The migration proof is also the reason an install over objects that carry anothe
 - Install over objects that carry another identity (the instance's module path, name or namespace changed): the guard decides. Recorded objects apply; objects annotated with `opmodel.dev/adopt=<instance UUID>` apply; objects with neither refuse with exit 2 and a message that names the annotation and the UUID to set. The text "operator migration refused" and the remedy "remove or rename these objects" no longer exist.
 - Install sends no delete and no managed-fields patch outside its instance apply. `opm operator install` keeps its exit code 2 for every guard refusal.
 - Delete the migration: 11 files in `internal/operator`, the 6986-line proof-list data, the tool `hack/operator-legacy`, the e2e migration test and its 1761-line manifest fixture. Full list with `path:line` in `design.md`.
+- Delete the old-style `--version` tag message (`operatorTagShape`, `looksLikeOperatorTag`, `operatorTagRefusal`): a `--version` shaped like an opm-operator release tag is refused as any other selector the registry cannot satisfy, exit 2, before any cluster call. The running-operator requirement no longer names a manifest-installed operator; the check itself does not change (proposal gate of 2026-10-09, ruling 2).
 - Docs: the install help, `README.md`, `AGENTS.md` and `docs/site/diagnostics/adopt-an-existing-object.md` lose their migration text.
 
 Release class: MAJOR after GA (a removed behaviour of `opm operator install`); during beta it ships as the next `-beta.N`. PR title `refactor(operator)!: retire the legacy-manifest migration`.
 
-Not in this change: any rename; the library (it removes `Admit` and `installDeletable` in its own breaking beta, after this merges); `opm operator uninstall`; the earlier-identity hint line and docs page for install (the reduced T9.31, a later unit). The earlier branch also deleted the old-style `--version` tag message (`operatorTagShape`, `looksLikeOperatorTag`, `operatorTagRefusal`) and reworded the running-operator check; neither is migration code and both statements are still true on main, so they are left out here.
+Not in this change: any rename; the library (it removes `Admit` and `installDeletable` in its own breaking beta, after this merges); `opm operator uninstall`; the earlier-identity hint line and docs page for install (the reduced T9.31, a later unit).
 
 ## One verdict changes for an object that is not a legacy-manifest object
 
@@ -33,7 +34,7 @@ Measured on the fake cluster with a throwaway test (the eight rendered fixture o
 | own UUID, managed-by `Helm` | none | pass | **refused, exit 2** |
 | own UUID, managed-by label removed | lists them | pass | pass |
 
-No `opm instance apply`, `opm module apply`, prune or delete passes an admission set (only `internal/operator` sets `Admit`), so none of their verdicts change. An install over its own recorded objects does not change. An install over its own unrecorded objects does not change as long as they carry the labels OPM stamps (a stopped run, a CRDs-only install, a `kubectl apply` of the module's render). The changed case needs a third party to have removed or rewritten the managed-by label on an unrecorded object while it kept the UUID label. It fails closed, with a remedy the user can apply. It is put to the proposal gate as a decision, with the recommendation to accept it: keeping it would mean keeping an admission path in the cli and `Admit` in the library.
+No `opm instance apply`, `opm module apply`, prune or delete passes an admission set (only `internal/operator` sets `Admit`), so none of their verdicts change. An install over its own recorded objects does not change. An install over its own unrecorded objects does not change as long as they carry the labels OPM stamps (a stopped run, a CRDs-only install, a `kubectl apply` of the module's render). The changed case needs a third party to have removed or rewritten the managed-by label on an unrecorded object while it kept the UUID label. It fails closed, with a remedy the user can apply. The proposal gate of 2026-10-09 accepted it (ruling 1): keeping it would mean keeping an admission path in the cli and `Admit` in the library. The way out is the annotation the refusal prints.
 
 ## Capabilities
 
@@ -45,7 +46,7 @@ None.
 
 - `operator-migration`: retired (all 13 requirements REMOVED, `retire_capabilities: true`).
 - `apply-pruning`: "Ownership guard on every apply and dry run" loses its admission set (REMOVED and ADDED as "Ownership guard judges every apply and dry run", since three scenarios go).
-- `operator-lifecycle`: "Every check that can refuse install runs before its first write" drops the migration proof, the admission and the migration's writes, and gains the identity cases (REMOVED and ADDED as "Install runs every refusing check before its first write", since two scenarios go).
+- `operator-lifecycle`: "Every check that can refuse install runs before its first write" drops the migration proof, the admission and the migration's writes, and gains the identity cases (REMOVED and ADDED as "Install runs every refusing check before its first write", since two scenarios go). "Another module version is installed from the registry as served" loses the old-tag message (restated as "Install resolves another module version as the registry serves it"), and "The running-operator check locates the operator by its fixed names" loses the manifest-install case (restated as "The running-operator check finds the operator by its fixed names alone").
 
 ## Impact
 

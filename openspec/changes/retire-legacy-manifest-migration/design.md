@@ -10,7 +10,7 @@ The guard asks the library's `ownership.CanApply` for every rendered object (`in
 
 **Goals:** delete the migration and every type, field, message, test, fixture and doc that exists only for it; make the ownership guard the one judge of an existing object on install; keep every other install check and every `opm instance` and `opm module` verdict unchanged.
 
-**Non-Goals:** the operator to controller rename; the library's removal of `Admit`; a hint line or docs page for the install over an earlier identity; `opm operator uninstall`; the old-style `--version` tag message.
+**Non-Goals:** the operator to controller rename; the library's removal of `Admit`; a hint line or docs page for the install over an earlier identity; `opm operator uninstall`.
 
 ## What is removed
 
@@ -44,6 +44,8 @@ Edits:
 | `internal/operator/plan_install.go:253` | `Admit:` in the guard call; the comments at `:166-172`, `:180-187`, `:239-244` are reworded |
 | `internal/operator/install.go:68-82` | the migration's writes and report lines |
 | `internal/operator/install.go:91` | `Admit:` in the instance apply; the comment at `:43-49` is reworded |
+| `internal/operator/plan_install.go:82-107`, `:121-123`, `:130-132` | `operatorTagShape`, `looksLikeOperatorTag`, `operatorTagRefusal` and their two uses in `ResolveTarget`; the test `TestLooksLikeOperatorTag`; `TestRunOperatorInstall_OldOperatorTagIsRefusedBeforeTheCluster` becomes an unserved-version test |
+| `internal/operator/names.go:14-19`, `internal/operator/ready.go:40-42` | the comment text that names a manifest install |
 | `internal/cmd/operator/install.go:69-75` | the help paragraph "An operator installed from an earlier release manifest ... is migrated" |
 | `internal/cmd/operator/install.go:265-273` | the `MigrationStoppedError` exception in `withRerunHint` |
 | `internal/cmd/operator/install.go:353`, `:355`, `:360`, `:362` | `MigrationRefusalError` (exit 2) and `MigrationStoppedError` (exit 1) in `installError` |
@@ -53,7 +55,7 @@ Edits:
 | `AGENTS.md:131` | the `hack/operator-legacy/` entry |
 | `docs/site/diagnostics/adopt-an-existing-object.md:50` | the paragraph on `operator migration refused` |
 
-Messages that no longer exist: `operator migration refused: N object(s) of an earlier operator manifest cannot be proven:` with its per-object reasons (`carries the identity of instance ...`, `label ... is missing, earlier manifests set ...`, `is applied by Flux ...`, `the module renders no Deployment of this name ...`) and its last line `nothing was changed; remove or rename these objects, or stop the tool that applies them, then re-run 'opm operator install'`; `operator migration refused: cannot read ...`; the stopped-migration error; the install report lines of `MigrationReport`. No flag is removed: the migration had none.
+Messages that no longer exist: `no operator module version matches "<v>": --version now takes an operator module version ...` (the old-tag refusal); `operator migration refused: N object(s) of an earlier operator manifest cannot be proven:` with its per-object reasons (`carries the identity of instance ...`, `label ... is missing, earlier manifests set ...`, `is applied by Flux ...`, `the module renders no Deployment of this name ...`) and its last line `nothing was changed; remove or rename these objects, or stop the tool that applies them, then re-run 'opm operator install'`; `operator migration refused: cannot read ...`; the stopped-migration error; the install report lines of `MigrationReport`. No flag is removed: the migration had none.
 
 `TestNoErrorTextMatch`: the migration matched no error text, so the list of named exceptions does not change.
 
@@ -112,7 +114,7 @@ The cli adopts no unlabelled CRD by itself and offers no flag for it. The annota
 **Options considered**:
 1. Accept the refusal. The object fails closed with the annotation as remedy.
 2. Keep a small admission for "own UUID" in the cli. It keeps `Admit` alive in the library, against the owner's decision.
-**Decision**: 1, pending the proposal gate.
+**Decision**: 1, accepted by the proposal gate of 2026-10-09 (ruling 1).
 **Rationale**: OPM stamps the UUID label and the managed-by label in one apply, so the state needs a third party to rewrite one label of an unrecorded object. A UUID label alone is not proof that OPM manages the object.
 
 ### What replaces the proof-list refusals of other tools
@@ -135,5 +137,5 @@ The cli adopts no unlabelled CRD by itself and offers no flag for it. The annota
 ## Risks / Trade-offs
 
 - A manifest-installed operator fails install at the guard and needs one annotation for each object, or a delete of the earlier install. Accepted by the owner: "Nobody runs OPM".
-- An annotated earlier controller Deployment fails in the instance apply, after the CRD step, on its immutable selector. Install is idempotent; the user deletes that Deployment and runs install again. Not unit-tested here: the fake cluster does not enforce immutability.
+- An annotated earlier controller Deployment fails in the instance apply, after the CRD step, on its immutable selector. Install is idempotent; the user deletes that Deployment and runs install again. `docs/site/diagnostics/adopt-an-existing-object.md` says to delete the earlier Deployment first; nothing is built for it (ruling 3). Not unit-tested here: the fake cluster does not enforce immutability.
 - The cli's e2e suite loses its only test that starts from a release manifest. No other e2e test reads the deleted fixture.
