@@ -16,5 +16,5 @@
 
 ## 3. Correct the known-limit notes
 
-- [ ] 3.1 Rewrite the registry failure sentence of `docs/site/authoring/publish-a-module.md`: a refusing token endpoint is a refused credential on the push; a 403 on a fetch still reads as not found
-- [ ] 3.2 `task docs:bundle:check` and `task openspec:check` green, then commit `docs(publish): name a token endpoint refusal as a refused credential`
+- [x] 3.1 Rewrite the registry failure sentence of `docs/site/authoring/publish-a-module.md`: a refusing token endpoint is a refused credential on the push; a 403 on a fetch still reads as not found
+- [x] 3.2 `task docs:bundle:check` and `task openspec:check` green, then commit `docs(publish): name a token endpoint refusal as a refused credential`
