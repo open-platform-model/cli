@@ -14,7 +14,6 @@ import (
 
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
-	"github.com/open-platform-model/library/opm/k8s/ownership"
 )
 
 var widgetGVK = schema.GroupVersionKind{Group: "example.io", Version: "v1", Kind: "Widget"}
@@ -53,37 +52,4 @@ func TestTerminatingObjects_ResolvesByDiscovery(t *testing.T) {
 	_, err = terminatingObjects(ctx, widgetClient(widgetDown), []*unstructured.Unstructured{widget()})
 	require.Error(t, err)
 	assert.True(t, apierrors.IsServiceUnavailable(err))
-}
-
-func TestGetLive_ResolvesByDiscovery(t *testing.T) {
-	ctx := context.Background()
-	var readErr *MigrationReadError
-
-	live, err := getLive(ctx, widgetClient(widgetNotServed), widgetGVK, "default", "main", true)
-	require.NoError(t, err, "a rendered object of a kind that is not served yet does not exist")
-	assert.Nil(t, live)
-
-	_, err = getLive(ctx, widgetClient(widgetNotServed), widgetGVK, "default", "main", false)
-	require.ErrorAs(t, err, &readErr, "a proof-list kind that is not served is a failed read, not an absent object")
-	assert.True(t, kubernetes.IsKindNotServed(err))
-
-	for _, unservedIsAbsent := range []bool{true, false} {
-		_, err = getLive(ctx, widgetClient(widgetDown), widgetGVK, "default", "main", unservedIsAbsent)
-		require.ErrorAs(t, err, &readErr)
-		assert.True(t, apierrors.IsServiceUnavailable(err))
-	}
-}
-
-// A delete the migration proved is never "done" when its kind cannot be
-// resolved.
-func TestDeleteProven_UnresolvedKindStops(t *testing.T) {
-	for name, outcome := range map[string]kubetest.Outcome{"kind not served": widgetNotServed, "discovery down": widgetDown} {
-		t.Run(name, func(t *testing.T) {
-			w := widget()
-			plan := &MigrationPlan{deleteVerdicts: map[objKey]ownership.DeleteVerdict{keyOf(w): {}}}
-			err := deleteProven(context.Background(), widgetClient(outcome), plan, w)
-			var stopped *MigrationStoppedError
-			require.ErrorAs(t, err, &stopped)
-		})
-	}
 }

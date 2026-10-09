@@ -39,9 +39,9 @@ func adoptedElsewhere(obj *unstructured.Unstructured) *unstructured.Unstructured
 }
 
 // clientSideApplied gives a live object fields of a client-side kubectl
-// apply, which the migration hands to opm-cli with a managedFields patch.
+// apply.
 func clientSideApplied(obj *unstructured.Unstructured) *unstructured.Unstructured {
-	obj.SetManagedFields([]metav1.ManagedFieldsEntry{{Manager: clientSideApplyManager, Operation: metav1.ManagedFieldsOperationUpdate}})
+	obj.SetManagedFields([]metav1.ManagedFieldsEntry{{Manager: "kubectl-client-side-apply", Operation: metav1.ManagedFieldsOperationUpdate}})
 	return obj
 }
 
@@ -146,26 +146,11 @@ func TestPlanInstall_GuardRefusesWhatAnotherInstanceOwns(t *testing.T) {
 	}
 }
 
-// The managedFields patch of the migration would reach the controller
-// Deployment of the case above if the guard did not refuse: without the
-// adopt annotation the same object is planned for the field-ownership move.
-func TestPlanInstall_GuardedObjectIsOneTheMigrationWouldPatch(t *testing.T) {
-	fastPolling(t)
-	rendered := moduleObjects(renderOpts{})
-	fc := newFakeCluster(t, clientSideApplied(liveOf(rendered, kindDeployment, ControllerDeploymentName)))
-
-	plan, err := PlanInstall(context.Background(), newEnv(fc, &fakeRender{objs: rendered}),
-		testResolution("v0.1.0"), defaultTarget, PlanOptions{Timeout: time.Second})
-
-	require.NoError(t, err)
-	assert.Equal(t, []string{"Deployment/" + OperatorNamespace + "/" + ControllerDeploymentName}, paths(plan.Migration.MoveOwnership))
-}
-
 // With a record, a read the guard fails refuses the install as a guard
 // refusal, like the guard's other refusals, and nothing is written.
 func TestPlanInstall_GuardReadFailureWithARecord(t *testing.T) {
 	fc := newFakeCluster(t, recordListing())
-	denyRoleReads(fc, 3) // the terminating wait and the migration proof read it first
+	denyRoleReads(fc, 2) // the terminating wait reads it first
 	r := &fakeRender{objs: moduleObjects(renderOpts{})}
 
 	_, err := PlanInstall(context.Background(), newEnv(fc, r), testResolution("v0.1.0"), defaultTarget, PlanOptions{Timeout: time.Second})
@@ -176,10 +161,9 @@ func TestPlanInstall_GuardReadFailureWithARecord(t *testing.T) {
 	assert.Empty(t, fc.Writes())
 }
 
-// An object of an earlier operator manifest's proof list (a CRD, the
-// Namespace, the controller Deployment) that carries another instance's
-// identity never reaches the guard: the migration proof, which runs first,
-// refuses it. That refusal exits 2 as well and writes nothing.
+// A CRD that carries another instance's identity is refused by the guard
+// in the check phase, as any other object: the refusal exits 2, names the
+// other instance and the adopt annotation, and writes nothing.
 func TestPlanInstall_CRDOfAnotherInstanceRefusesBeforeAnyWrite(t *testing.T) {
 	fastPolling(t)
 	rendered := moduleObjects(renderOpts{})
@@ -189,10 +173,10 @@ func TestPlanInstall_CRDOfAnotherInstanceRefusesBeforeAnyWrite(t *testing.T) {
 	plan, err := PlanInstall(context.Background(), newEnv(fc, &fakeRender{objs: rendered}),
 		testResolution("v0.1.0"), defaultTarget, PlanOptions{Timeout: time.Second})
 
-	var me *MigrationRefusalError
-	require.ErrorAs(t, err, &me, "the command exits 2 on a migration refusal")
-	assert.Contains(t, err.Error(), "CustomResourceDefinition/"+crd)
-	assert.Contains(t, err.Error(), "carries the identity of instance")
+	var ge *GuardError
+	require.ErrorAs(t, err, &ge, "the command exits 2 on a guard refusal")
+	assert.Contains(t, err.Error(), "CustomResourceDefinition/"+crd+" belongs to module instance "+otherInstanceUUID)
+	assert.Contains(t, err.Error(), opmlabels.AnnotationAdopt+"="+testInstanceUUID)
 	assert.Nil(t, plan)
 	assert.Empty(t, fc.Writes())
 }

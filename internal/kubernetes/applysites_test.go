@@ -26,8 +26,6 @@ import (
 //   - internal/operator/install.go:Install: the CRD step, whose objects the
 //     guard allowed in the check phase of the same command, and the --rbac
 //     objects, which belong to no instance and stay outside the guard.
-//   - internal/operator/migration_execute.go:MoveOwnership: the field-ownership
-//     moves, on objects the guard allowed in the check phase.
 //   - internal/operator/uninstall.go: the finalizer removal on a
 //     ModuleInstance record during uninstall.
 var allowedApplySites = []string{
@@ -36,7 +34,6 @@ var allowedApplySites = []string{
 	"internal/kubernetes/apply.go:applyOne",
 	"internal/kubernetes/apply.go:applyStage",
 	"internal/operator/install.go:Install",
-	"internal/operator/migration_execute.go:MoveOwnership",
 	"internal/operator/uninstall.go:removeOneCleanupFinalizer",
 	"internal/workflow/apply/apply.go:Execute",
 }

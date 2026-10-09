@@ -18,14 +18,11 @@ import (
 // DELETE to the cluster, as "<file relative to the repo root>:<function>".
 // Every object of an instance is deleted by RunDeletion, through its
 // sendDelete: only when the library's deletion plan names the delete, after
-// the delete verdict. The two others are named exceptions: the operator
-// install's migration deletes run under a verdict taken when the plan was
-// made (the one exception 0012:D4:R1 allows), and the ModuleInstance record
-// is the CLI's own.
+// the delete verdict. The other is a named exception: the ModuleInstance
+// record is the CLI's own.
 var allowedDeleteSites = []string{
 	"internal/inventory/store.go:DeleteCR",
 	"internal/kubernetes/deletion.go:sendDelete",
-	"internal/operator/migration_execute.go:deleteProven",
 }
 
 // cliKubernetesPackage is this package's import path. Its own

@@ -19,9 +19,9 @@ import (
 const managerRole = "opm-operator-manager-role"
 
 // denyRoleReads makes every read of managerRole from the nth on answer
-// Forbidden. PlanInstall reads each object it applies three times: in the
-// terminating wait, in the migration proof and in the apply guard. n picks
-// the check that meets the denial.
+// Forbidden. PlanInstall reads each object it applies twice: in the
+// terminating wait and in the apply guard. n picks the check that meets the
+// denial.
 func denyRoleReads(fc *fakeCluster, n int32) {
 	var reads atomic.Int32
 	fc.fake.PrependReactor("get", "clusterroles", func(action k8stesting.Action) (bool, runtime.Object, error) {
@@ -40,7 +40,7 @@ func denyRoleReads(fc *fakeCluster, n int32) {
 // guard fails is a *GuardError and exits 2, like the guard's other refusals.
 // An object that is unreadable from the start never reaches the guard: the
 // terminating wait reads it first, and its error exits by the API error (4
-// for Forbidden), as does the migration proof's.
+// for Forbidden).
 func TestPlanInstall_UnreadableObjectRefuses(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -53,20 +53,11 @@ func TestPlanInstall_UnreadableObjectRefuses(t *testing.T) {
 			want: "checking ClusterRole/" + managerRole + " before apply",
 			check: func(t *testing.T, err error) {
 				var ge *GuardError
-				var me *MigrationReadError
-				assert.False(t, errors.As(err, &ge) || errors.As(err, &me), "a plain wrapped API error")
+				assert.False(t, errors.As(err, &ge), "a plain wrapped API error")
 			},
 		},
 		{
-			name: "denied from the second read: the migration proof refuses", firstDeny: 2,
-			want: "operator migration refused: cannot read ClusterRole/" + managerRole,
-			check: func(t *testing.T, err error) {
-				var me *MigrationReadError
-				require.ErrorAs(t, err, &me)
-			},
-		},
-		{
-			name: "denied at the third read: the apply guard refuses", firstDeny: 3,
+			name: "denied at the second read: the apply guard refuses", firstDeny: 2,
 			want: "cannot check whether ClusterRole/" + managerRole,
 			check: func(t *testing.T, err error) {
 				var ge *GuardError

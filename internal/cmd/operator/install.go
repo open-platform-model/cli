@@ -66,14 +66,6 @@ included), and install waits for the controller Deployment's rollout.
 Objects left terminating by a previous uninstall are waited out first; all
 waits share the one --timeout budget.
 
-An operator installed from an earlier release manifest (by an older CLI or
-kubectl apply) is migrated: install takes over exactly the objects it
-proves that manifest created, recreates the controller Deployment once
-(its selector changes, so patches made to it are lost; pass them as
-values), and deletes the earlier role bindings the module replaces. An
-object that fails the proof refuses the install before anything is
-written, and an interrupted migration completes on the next run.
-
 The operator's settings are instance values: -f/--values files are layered
 over the values recorded on the operator's instance, so a reinstall keeps
 every recorded value it does not change; --reset-values starts from the
@@ -262,11 +254,9 @@ func runOperatorInstall(ctx context.Context, cfg *config.GlobalConfig, kf *cmdut
 	return nil
 }
 
-// withRerunHint says a failure after the CRD step is safe to re-run, unless
-// the error says so itself (a migration that stopped partway).
+// withRerunHint says a failure after the CRD step is safe to re-run.
 func withRerunHint(result *oplib.InstallResult, err error) error {
-	var stopped *oplib.MigrationStoppedError
-	if result != nil && result.CRDs > 0 && !errors.As(err, &stopped) {
+	if result != nil && result.CRDs > 0 {
 		return fmt.Errorf("%w (install is idempotent, safe to re-run)", err)
 	}
 	return err
@@ -348,18 +338,14 @@ func installError(err error) error {
 			err, oplib.OperatorModulePath)}
 	}
 	var (
-		ownedErr     *oplib.OwnedRecordError
-		guardErr     *oplib.GuardError
-		migrationErr *oplib.MigrationRefusalError
+		ownedErr *oplib.OwnedRecordError
+		guardErr *oplib.GuardError
 	)
-	if oplib.IsRefusal(err) || errors.As(err, &ownedErr) || errors.As(err, &guardErr) || errors.As(err, &migrationErr) {
+	if oplib.IsRefusal(err) || errors.As(err, &ownedErr) || errors.As(err, &guardErr) {
 		return &opmexit.ExitError{Code: opmexit.ExitValidationError, Err: err}
 	}
-	var (
-		rolloutErr *oplib.RolloutError
-		stoppedErr *oplib.MigrationStoppedError
-	)
-	if errors.As(err, &rolloutErr) || errors.As(err, &stoppedErr) {
+	var rolloutErr *oplib.RolloutError
+	if errors.As(err, &rolloutErr) {
 		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: err}
 	}
 	return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err}
