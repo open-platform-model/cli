@@ -141,8 +141,9 @@ func (e *GuardError) Unwrap() error { return e.Err }
 // (CheckTarget), the status-subresource permission check, the wait for
 // terminating objects and, last, the apply guard over every object the plan
 // applies, with or without a record. No object is admitted by a proof of
-// where it came from: the record and the adopt annotation alone let an
-// existing object pass. The terminating wait starts the
+// where it came from: an existing object passes when the record lists it,
+// when it is annotated for adoption by this instance, or when it carries
+// OPM's managed-by label and no other instance's UUID. The terminating wait starts the
 // --timeout budget the writes then share.
 func PlanInstall(ctx context.Context, env InstallEnv, res *modref.Resolution, target Target, opts PlanOptions) (*Plan, error) {
 	rec, err := inventory.GetRecord(ctx, env.Client, OperatorInstanceName, OperatorNamespace)

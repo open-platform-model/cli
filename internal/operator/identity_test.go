@@ -9,9 +9,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	opmlabels "github.com/open-platform-model/library/opm/k8s/labels"
+
+	"github.com/open-platform-model/cli/internal/inventory"
 )
 
 // adoptedHere sets the adopt annotation of a live object to the operator
@@ -22,9 +25,14 @@ func adoptedHere(obj *unstructured.Unstructured) *unstructured.Unstructured {
 }
 
 // manifestApplied turns a rendered fixture object into what an opm-operator
-// release manifest left in a cluster: kustomize's labels, no OPM label.
+// release manifest left in a cluster: no label at all on a CRD, kustomize's
+// labels on the others, no OPM label.
 func manifestApplied(obj *unstructured.Unstructured) *unstructured.Unstructured {
 	live := obj.DeepCopy()
+	if live.GetKind() == kindCustomResourceDefinition {
+		live.SetLabels(nil)
+		return live
+	}
 	live.SetLabels(map[string]string{
 		"app.kubernetes.io/managed-by": "kustomize",
 		"app.kubernetes.io/name":       "opm-operator",
@@ -181,6 +189,40 @@ func TestPlanInstall_OwnUnrecordedObjects(t *testing.T) {
 
 	t.Run("with OPM's labels: pass", func(t *testing.T) {
 		fc, err := planOver(t, PlanOptions{}, liveCopies(rendered, keep)...)
+		require.NoError(t, err)
+		assert.Empty(t, fc.Writes())
+	})
+
+	// A first install stamps every object; with its record gone, the cluster
+	// is what a run that stopped before writing the record leaves behind.
+	t.Run("with OPM's labels: a run that lost its record completes and records them", func(t *testing.T) {
+		releasedCLI(t)
+		fastPolling(t)
+		fc := newFakeCluster(t)
+		_, err := install(t, fc, &fakeRender{objs: rendered}, PlanOptions{})
+		require.NoError(t, err)
+		uid := fc.mustGet(deploymentGVR, OperatorNamespace, ControllerDeploymentName).GetUID()
+		require.NoError(t, fc.client.ResourceClient(inventory.ModuleInstanceGVR, OperatorNamespace).Delete(context.Background(), OperatorInstanceName, metav1.DeleteOptions{}))
+		require.Nil(t, fc.record())
+
+		result, err := install(t, fc, &fakeRender{objs: rendered}, PlanOptions{})
+
+		require.NoError(t, err)
+		assert.True(t, result.Recorded)
+		assert.Len(t, entryNames(fc.record()), len(rendered))
+		assert.Equal(t, uid, fc.mustGet(deploymentGVR, OperatorNamespace, ControllerDeploymentName).GetUID(), "nothing is recreated")
+	})
+
+	// The guard's rule for every apply: OPM manages the object and no other
+	// instance's UUID is on it. The migration proof used to refuse this for
+	// the objects on its list.
+	t.Run("OPM's managed-by label and no UUID label: pass", func(t *testing.T) {
+		fc, err := planOver(t, PlanOptions{}, liveCopies(rendered, func(o *unstructured.Unstructured) *unstructured.Unstructured {
+			labels := o.GetLabels()
+			delete(labels, opmlabels.ModuleInstanceUUID)
+			o.SetLabels(labels)
+			return o
+		})...)
 		require.NoError(t, err)
 		assert.Empty(t, fc.Writes())
 	})
