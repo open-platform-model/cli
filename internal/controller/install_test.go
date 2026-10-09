@@ -334,6 +334,40 @@ func TestPlanCRDsOnly_RefusesCRDsOPMDoesNotManage(t *testing.T) {
 	assert.Empty(t, fc.Writes())
 }
 
+// The CRDs-only form reads no record, so it judges every CRD as on a first
+// install of the controller's instance: a CRD that carries OPM's managed-by
+// label and the UUID of another instance is refused, and the refusal names
+// that instance and the adopt annotation.
+func TestPlanCRDsOnly_RefusesCRDsOfAnotherInstance(t *testing.T) {
+	embeddedForTestInstance(t)
+	theirs := ownedBy(labeled(renderedCRDObject(inventory.CRDNameModuleInstances, true), "crds", "0.1.0"), otherInstanceUUID)
+	fc := newFakeCluster(t, theirs)
+
+	_, err := installCRDsOnly(t, fc, &fakeRender{}, PlanOptions{})
+	var guardErr *GuardError
+	require.ErrorAs(t, err, &guardErr)
+	assert.Contains(t, err.Error(), "CustomResourceDefinition/"+inventory.CRDNameModuleInstances+" belongs to module instance "+otherInstanceUUID)
+	assert.Contains(t, err.Error(), opmlabels.AnnotationAdopt+"="+testInstanceUUID)
+	assert.Empty(t, fc.Writes())
+}
+
+// A CRD OPM does not manage that is annotated for adoption by the
+// controller's instance passes the guard and is applied over: the annotation
+// is the one way the CRDs-only form takes over a CRD it did not install.
+func TestInstall_CRDsOnlyAppliesOverAnAnnotatedCRD(t *testing.T) {
+	fastPolling(t)
+	embeddedForTestInstance(t)
+	foreign := renderedCRDObject(inventory.CRDNameModuleInstances, true)
+	foreign.SetAnnotations(map[string]string{opmlabels.AnnotationAdopt: testInstanceUUID})
+	fc := newFakeCluster(t, foreign)
+
+	result, err := installCRDsOnly(t, fc, &fakeRender{}, PlanOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, 4, result.CRDs)
+	assert.Equal(t, testInstanceUUID,
+		fc.mustGet(crdGVR, "", inventory.CRDNameModuleInstances).GetLabels()[opmlabels.ModuleInstanceUUID])
+}
+
 // "CRDs a newer module version installed are not replaced": module version
 // 0.2.0 installed the CRDs (a full install, or --crds-only from a CLI that
 // pins it), so --crds-only at the 0.1.0 pin refuses with exit 2, names both
