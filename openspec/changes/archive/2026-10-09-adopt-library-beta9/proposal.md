@@ -18,7 +18,7 @@ Library v1.0.0-beta.9 is released (library#228). It is a breaking release for Go
 - No verdict of `ownership.CanApply` or `ownership.CanDelete` changes for a caller that sets no `Admit`. The cli sets none, so no apply, prune or delete decision changes.
 - No change to commands, flags, exit codes or output.
 
-SemVer class: PATCH (no behaviour a user sees changes). The commit type is `fix(deps)` with no `!`.
+SemVer class: PATCH after GA (no behaviour a user sees changes). During beta it ships as the next `-beta.N`. The commit type is `fix(deps)` with no `!`.
 
 ## Capabilities
 
