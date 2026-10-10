@@ -1,8 +1,8 @@
 ## Why
 
-The cli's cascade references pin `open-platform-model/.github` at `0f9c6ac`. That commit does not accept the repository name `opm-controller`. `.github` PR 20 (`6df4000`, "accept opm-controller beside opm-operator", change a) makes every map in `wiring/lib.sh` accept both names with the same values. The cli must pin it before the `opm-operator` repository is renamed, because the name the cascade reads comes from `GITHUB_REPOSITORY` and flips at the rename whatever commit the caller pins.
+The cli's cascade references pin `open-platform-model/.github` at `0f9c6ac`. That commit does not accept the repository name `opm-controller`. `.github` PR 20 (`6df4000`, "accept opm-controller beside opm-operator") makes every map in `wiring/lib.sh` accept both names with the same values. The cli must pin it before the `opm-operator` repository is renamed, because the name the cascade reads comes from `GITHUB_REPOSITORY` and flips at the rename whatever commit the caller pins.
 
-PR 20 changes `wiring/lib.sh`, which both `cascade-notify` and `cascade-publish` run. The owner waived the canary for this one change (`DECISIONS.md` 2026-10-09), so the library, opm-operator and the cli may move in one round; the owner merges the library pull request first.
+PR 20 changes `wiring/lib.sh`, which both `cascade-notify` and `cascade-publish` run. The owner waived the canary rule of the workspace `RELEASING.md`, "Moving the cascade pin", for this one change, so the library, opm-operator and the cli may move in one round; the owner merges the library pull request first.
 
 PR 20 keeps `mirror_sources` for the cli as it was. The cli's files on `origin/main` (`0d0c2e80`) match the recorded sha256 for all three (`pins.sh` `3c3f50ed...e3e1`, `classes` `4a0a74ff...e528`, `cascade.sh` `55223391...0387`; the cli has no `.tasks/cascade/lib.sh`), so the drift refusal passes for the cli.
 

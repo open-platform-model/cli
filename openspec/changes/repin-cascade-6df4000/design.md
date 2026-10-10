@@ -11,7 +11,7 @@ The pin moves by the procedure of the workspace `RELEASING.md`, "Moving the casc
 ## Decisions
 
 - **No new copy of `wiring-check.sh`.** `cmp` against the `.github` object at `6df4000` shows no difference, so the copy stays. Alternative: copy the file again; rejected, because it changes nothing and hides that the file did not move.
-- **One pull request, as the previous repin.** Alternative: fold the cli into one pull request with the library and opm-operator; rejected, because the owner merges library first, then the two receivers, each on its own checks.
+- **One pull request in the cli, as the previous repin.** Alternative: wait for the library repin to merge and release first; rejected, because the owner waived the canary rule for this change and each repository moves on its own checks.
 
 ## Risks / Trade-offs
 
