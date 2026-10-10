@@ -1,6 +1,6 @@
 ## Why
 
-The Kubernetes controller OPM ships is renamed from `opm-operator` to `opm-controller` (0032:D1, decided 2026-10-05): it is a generic delivery engine in the family of Flux's controllers and Argo CD, not an "operator" carrying one application's day-2 knowledge. The controller repo, image, namespace, CUE module (`opmodel.dev/modules/opm_controller@v0`, sub-package `controller`) and CRD fields move in the controller's own change; the cli must follow in the same cutover, with no alias, no warning and no trace of the old name.
+The Kubernetes controller OPM ships is renamed from `opm-operator` to `opm-controller` (decided 2026-10-05): it is a generic delivery engine in the family of Flux's controllers and Argo CD, not an "operator" carrying one application's day-2 knowledge. The controller repo, image, namespace, CUE module (`opmodel.dev/modules/opm_controller@v0`, sub-package `controller`) and CRD fields move in the controller's own change; the cli must follow in the same cutover, with no alias, no warning and no trace of the old name.
 
 ## What Changes
 
@@ -28,4 +28,3 @@ Release class: MAJOR after GA (a renamed command, a changed `spec.owner` value);
 ## Impact
 
 - Needs, before merge: the controller's first release under the new name (`v1.0.0-beta.9`, image `ghcr.io/open-platform-model/opm-controller`) and the module `opm_controller` `0.1.0`, so `task controller:pin VERSION=0.1.0` can write the pin; the renamed fixtures published.
-- Delivers the cli side of 0032:D1 ("The operator becomes the controller"), declared in `enhancement.yaml`.
