@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Out-of-band verification of a published catalog (enhancement 0011, slice cli-catalog-gates, decision D7): `opm catalog registry check` runs the consumer's identity verification — and optionally the predecessor comparison — against a build already in a registry, on demand. It is an aid with the D35 contract stated in its own help text: nothing requires it to have been run, and enforcement exists only at publish; it does not make an unchecked catalog trustworthy, it makes it checkable.
+Out-of-band verification of a published catalog (enhancement 0011, slice cli-catalog-gates): `opm catalog registry check` runs the consumer's identity verification — and optionally the predecessor comparison — against a build already in a registry, on demand. It is an aid with the aid-not-guarantee contract of enhancement 0010 stated in its own help text: nothing requires it to have been run, and enforcement exists only at publish; it does not make an unchecked catalog trustworthy, it makes it checkable.
 
 ## Requirements
 

@@ -44,7 +44,7 @@ The `K8sFlags` struct SHALL provide an `AddTo(*cobra.Command)` method that regis
 
 ### Requirement: InstanceSelectorFlags carries and validates the resolved instance selector
 
-The `InstanceSelectorFlags` struct SHALL carry the resolved instance selector (`InstanceName` or `InstanceID`, plus `Namespace`). Commands SHALL build it from their positional `<file|name|uuid>` argument through `InstanceArg.ToSelectorFlags`; no command registers `--instance-name`/`--instance-id` flags for cluster queries. It SHALL provide a `Validate()` method that enforces mutual exclusivity between `InstanceName` and `InstanceID`, and requires exactly one to be present. <!-- Was: ReleaseSelectorFlags, --release-name/--release-id (enhancement 0002 ("Every `release`-named file and directory is renamed on disk (extends D8 to the filesystem)")/D-X4.2) -->
+The `InstanceSelectorFlags` struct SHALL carry the resolved instance selector (`InstanceName` or `InstanceID`, plus `Namespace`). Commands SHALL build it from their positional `<file|name|uuid>` argument through `InstanceArg.ToSelectorFlags`; no command registers `--instance-name`/`--instance-id` flags for cluster queries. It SHALL provide a `Validate()` method that enforces mutual exclusivity between `InstanceName` and `InstanceID`, and requires exactly one to be present. <!-- Was: ReleaseSelectorFlags, --release-name/--release-id (enhancement 0002 ("Every `release`-named file and directory is renamed on disk (extends D8 to the filesystem)")) -->
 
 #### Scenario: Both selectors set is rejected
 

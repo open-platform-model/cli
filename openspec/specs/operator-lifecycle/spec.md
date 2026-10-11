@@ -1,6 +1,6 @@
 ## Purpose
 
-Operator lifecycle surface: `opm operator install` / `opm operator uninstall`, the pinned operator module the CLI installs as its own instance, readiness waits, uninstall safety, and the CLI's server-side-apply field-manager identity. Slice B2 of enhancement 0006 (D5, D23, D32–D35).
+Operator lifecycle surface: `opm operator install` / `opm operator uninstall`, the pinned operator module the CLI installs as its own instance, readiness waits, uninstall safety, and the CLI's server-side-apply field-manager identity. Slice B2 of enhancement 0006.
 
 ## Requirements
 

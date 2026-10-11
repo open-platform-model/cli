@@ -1,6 +1,6 @@
 ## Purpose
 
-`opm registry login [host]` — interactive credential entry into the standard OCI/docker credential file, the store CUE's resolver reads for both push and pull. Enhancement 0011 ("`opm login` exists, targets the resolved registry, and stores credentials where CUE already reads them") (mechanism: docker config as the named default) and D24 (the `registry` command group names what is authenticated to). Verify-then-write: the credential is probed against the registry before anything lands, and the shared file is edited one `auths` entry at a time.
+`opm registry login [host]` — interactive credential entry into the standard OCI/docker credential file, the store CUE's resolver reads for both push and pull. Enhancement 0011 ("`opm login` exists, targets the resolved registry, and stores credentials where CUE already reads them") (mechanism: docker config as the named default) and the same enhancement's rule that the `registry` command group names what is authenticated to. Verify-then-write: the credential is probed against the registry before anything lands, and the shared file is edited one `auths` entry at a time.
 
 ## Requirements
 
