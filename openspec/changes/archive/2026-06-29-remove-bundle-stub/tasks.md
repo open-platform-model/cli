@@ -28,7 +28,7 @@
 - [x] 5.2 `render_test.go`: `TestRenderFromReleaseFile_RejectsBundleRelease` now asserts `unknown instance kind` (the new upstream failure). Passes.
 - [x] 5.3 `git rm internal/cmd/release/testdata/bundle_release.cue` (was orphaned — test helpers create temp fixtures inline). **Deviation (intentional, per the task's conditional):** `TestReleaseVetCmd_RejectsBundleRelease` does **not** depend on that fixture (it tests arg-count enforcement), so it is left for X3 to rename/drop with the `rel-commands` → `inst-commands` rename (D-X2.3). Not touched here.
 
-## 6. Doc + comment cleanup (D12)
+## 6. Doc + comment cleanup (enhancement 0002: the old-name breadcrumb at every rename site)
 
 - [x] 6.1 `pkg/core/resource.go`: dropped the "rendering a BundleRelease … multiple ModuleReleases" sentence from the `Resource` doc comment. The `Release` *field* name is left (X1-gap/X4).
 - [x] 6.2 No `pkg/bundle` reference in `CLAUDE.md` / `README.md` / `AGENTS.md` — nothing to change.

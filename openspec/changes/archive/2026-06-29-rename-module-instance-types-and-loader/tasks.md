@@ -4,7 +4,7 @@
 - [x] 1.2 Rename type `Release` → `Instance` and `ReleaseMetadata` → `InstanceMetadata`; update the `MatchComponents` receiver and all field/doc comments; flip `#ModuleRelease` → `#ModuleInstance` in doc comments. Add `// Was: Release` / `// Was: ReleaseMetadata` breadcrumbs (enhancement 0002).
 - [x] 1.3 Update `pkg/module/parse.go`: `ParseModuleRelease` → `ParseModuleInstance`, return `*Instance`, no input mutation; breadcrumb the old name.
 
-## 2. Loader kind detection + instance-file convention (`loader-api`, `instance-file-loading`, D9)
+## 2. Loader kind detection + instance-file convention (`loader-api`, `instance-file-loading`, enhancement 0002)
 
 - [x] 2.1 `git mv pkg/loader/release_kind.go pkg/loader/instance_kind.go`
 - [x] 2.2 Rename `DetectReleaseKind` → `DetectInstanceKind`; flip the switch to `case "ModuleInstance", "BundleRelease":` (module string flips per D-X1.1; `"BundleRelease"` stays for X2 — breadcrumb it).

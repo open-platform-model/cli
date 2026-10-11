@@ -28,13 +28,13 @@ The detection switch becomes `case "ModuleInstance", "BundleRelease":`. The cons
 
 **Why now and not deferred:** nothing in today's ecosystem emits `"ModuleInstance"` *until* a consumer pins `core@v1`; the `modules/`+`releases/` re-pin is separately tracked. But the CLI must be ready the moment they do, and the wire string is intrinsic to the kind-detection capability X1 owns — splitting it out would leave a second rename pass over the same switch. It rides with X1.
 
-### D-X1.2 — Instance-file convention is a hard flip (D9): `instance.cue` only, no `release.cue` fallback
+### D-X1.2 — Instance-file convention is a hard flip (enhancement 0002): `instance.cue` only, no `release.cue` fallback
 
 Inside a package directory the loader resolves `instance.cue`; if absent it errors (`… does not contain instance.cue`). `release.cue` is **not** accepted as a fallback. Justification: enhancement 0002's hard-rename / no-alias conclusion plus the CLI having no external users (no compatibility owed). A dual-detect alias would be dead complexity (CLI CONSTITUTION §VII, YAGNI). The mirror of the operator's already-shipped `InstanceFileNotFound` behavior.
 
 ### D-X1.3 — `releasefile` → `instancefile` package rename keeps the bundle branches intact (X1/X2 seam)
 
-`internal/releasefile/` is renamed to `internal/instancefile/` and `GetReleaseFile` → `GetInstanceFile` in X1, because the package name carries the `release` token (D10) and its module branch is X1's. But the package also dispatches `BundleRelease` and returns `*bundle.Release` / `*bundle.ReleaseMetadata`. Those bundle symbols are **left unchanged** — X1 renames the *container* and the *module* path; X2 renames the *bundle* path. The result is a transitional file where an `instancefile` package still references `bundle.Release`; this is intentional and reconciled when X2 lands in the same PR. A `// Was: …` / `// TODO(X2): …` breadcrumb marks each deferred bundle site so the seam is explicit, not accidental drift.
+`internal/releasefile/` is renamed to `internal/instancefile/` and `GetReleaseFile` → `GetInstanceFile` in X1, because the package name carries the `release` token (enhancement 0002: every `release`-named file and directory is renamed) and its module branch is X1's. But the package also dispatches `BundleRelease` and returns `*bundle.Release` / `*bundle.ReleaseMetadata`. Those bundle symbols are **left unchanged** — X1 renames the *container* and the *module* path; X2 renames the *bundle* path. The result is a transitional file where an `instancefile` package still references `bundle.Release`; this is intentional and reconciled when X2 lands in the same PR. A `// Was: …` / `// TODO(X2): …` breadcrumb marks each deferred bundle site so the seam is explicit, not accidental drift.
 
 ### D-X1.4 — The type-rename compile web is updated in place, reference-only, even in X3/X4-owned packages
 

@@ -23,7 +23,7 @@ Branch: `0002-cli-x1-rename-module-instance` (stacked on X1 `7a9175d` + X2; atom
 
 - [x] 4.1 In `internal/cmd/instance/instance_test.go`, rename `TestReleaseVetCmd_RejectsBundleRelease` → `TestInstanceVetCmd_*` and align its assertion to post-X2 reality (a stray `kind: "BundleRelease"` now errors via `DetectInstanceKind`'s default → `unknown instance kind: "BundleRelease"`, not the removed friendly message). Rename any other `TestRelease*` test funcs in this file to `TestInstance*`.
 
-## 5. Live user docs (D-X3.5, D11)
+## 5. Live user docs (D-X3.5, enhancement 0002)
 
 - [x] 5.1 `README.md`: `### Release Operations (`opm release`)` → `### Instance Operations (`opm instance`)`; the steer prose `use `opm release`` → `use `opm instance``; the `./bin/opm release vet|build|apply` invocations → `instance`. Add a one-line "Renamed from `opm release` (enhancement 0002)" note near the section head.
 - [x] 5.2 `QUICKSTART.md`: change only the `opm release …` command **verbs** → `opm instance …`. **Leave** the `./examples/releases/**/release.cue` example *paths* untouched (X4 owns the example-tree move).
