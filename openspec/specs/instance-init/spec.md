@@ -7,13 +7,13 @@
 
 ### Requirement: Init writes a complete standalone instance package
 
-`opm instance init` SHALL write exactly three files into the target directory, forming a standalone CUE module whose package evaluates to a `#ModuleInstance`. Every line derives from the acquired module; nothing is copied from a template the user did not name. Source: 0016:D1:R1/R3.
+`opm instance init` SHALL write exactly three files into the target directory, forming a standalone CUE module whose package evaluates to a `#ModuleInstance`. Every line derives from the acquired module; nothing is copied from a template the user did not name. Source: enhancement 0016 ("A new CLI command scaffolds an on-disk instance package from a published module reference").
 
-- `cue.mod/module.cue` declares the package's own module path, a language version, and dependencies: the deployed module pinned to the exact resolved version, `opmodel.dev/core` at the version the module itself declares, and the rest of the dependency closure. The file SHALL be exactly what `opm module tidy` leaves, so a tidy check of it passes. Source: 0016:D9:R1.
+- `cue.mod/module.cue` declares the package's own module path, a language version, and dependencies: the deployed module pinned to the exact resolved version, `opmodel.dev/core` at the version the module itself declares, and the rest of the dependency closure. The file SHALL be exactly what `opm module tidy` leaves, so a tidy check of it passes. Source: enhancement 0016 ("The generated module file pins the module exactly, carries core at the module's major, and names a local placeholder module path").
 - `instance.cue` declares `package instance`, imports core at the module's core major and the module at its major, embeds `core.#ModuleInstance`, sets `metadata.name` and `metadata.namespace`, and sets `#module` to the imported module.
 - `values.cue` declares `package instance` and one `values` field, filled as "Values start from the author's intended source" requires.
 
-The package's own module path SHALL default to `instance.local/<instance-name>@v0`. `--module-path` (string, default empty) overrides it with any valid major-qualified module path. The path is never looked up in a registry. Source: 0016:D9:R3.
+The package's own module path SHALL default to `instance.local/<instance-name>@v0`. `--module-path` (string, default empty) overrides it with any valid major-qualified module path. The path is never looked up in a registry. Source: enhancement 0016 ("The generated module file pins the module exactly, carries core at the module's major, and names a local placeholder module path").
 
 #### Scenario: Package for a published module
 
@@ -24,7 +24,7 @@ The package's own module path SHALL default to `instance.local/<instance-name>@v
 #### Scenario: Builds with no step in between
 
 - **WHEN** init has written a package whose values satisfy the module's `#config`
-- **THEN** `opm instance build <dir>/instance.cue` and `opm instance vet <dir>/instance.cue` both succeed without any other command in between, and the package loads from CUE's module cache when the registry is unreachable. Source: 0016:D1:R2, 0016:D9:R2
+- **THEN** `opm instance build <dir>/instance.cue` and `opm instance vet <dir>/instance.cue` both succeed without any other command in between, and the package loads from CUE's module cache when the registry is unreachable. Source: enhancement 0016 ("A new CLI command scaffolds an on-disk instance package from a published module reference" and "The generated module file pins the module exactly, carries core at the module's major, and names a local placeholder module path")
 
 #### Scenario: Module path override
 
@@ -33,7 +33,7 @@ The package's own module path SHALL default to `instance.local/<instance-name>@v
 
 ### Requirement: Init arguments mirror module init
 
-The command SHALL take `[instance-name] [module-path]` positionals and the flags `--from <module-path>`, `--version <vN | X.Y.Z>`, `--namespace`/`-n <ns>`, `--dir <dir>` and `--module-path <path>`. With one positional, a value containing `/` or `.` is the module path, and anything else is the instance name. `--from` is another spelling of the module path; naming the module path twice SHALL be refused with exit 2 rather than ranked. The module path SHALL be major-free: a path carrying a major suffix is refused with exit 2 and a hint to select the major with `--version`. The instance name and the namespace SHALL each match the core name type (lowercase letters, digits and `-`, starting and ending with a letter or digit, at most 63 characters), checked before any registry access. `--dir` SHALL default to the instance name. When the instance name, the module path or the namespace is missing and a terminal is attached, the command SHALL prompt for it, in that order; without a terminal the omission SHALL be refused with exit 2 naming the missing input (the positional or `--from` for the module path, `--namespace` for the namespace). A prompted value passes the same checks as the flag or positional it replaces, before any registry access. Source: 0016:D5:R1/R4.
+The command SHALL take `[instance-name] [module-path]` positionals and the flags `--from <module-path>`, `--version <vN | X.Y.Z>`, `--namespace`/`-n <ns>`, `--dir <dir>` and `--module-path <path>`. With one positional, a value containing `/` or `.` is the module path, and anything else is the instance name. `--from` is another spelling of the module path; naming the module path twice SHALL be refused with exit 2 rather than ranked. The module path SHALL be major-free: a path carrying a major suffix is refused with exit 2 and a hint to select the major with `--version`. The instance name and the namespace SHALL each match the core name type (lowercase letters, digits and `-`, starting and ending with a letter or digit, at most 63 characters), checked before any registry access. `--dir` SHALL default to the instance name. When the instance name, the module path or the namespace is missing and a terminal is attached, the command SHALL prompt for it, in that order; without a terminal the omission SHALL be refused with exit 2 naming the missing input (the positional or `--from` for the module path, `--namespace` for the namespace). A prompted value passes the same checks as the flag or positional it replaces, before any registry access. Source: enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-free module path, and floats to the highest core-compatible major when no version is given").
 
 #### Scenario: Positional module path
 
@@ -72,7 +72,7 @@ The command SHALL take `[instance-name] [module-path]` positionals and the flags
 
 ### Requirement: Init selects the module version like every published-module command
 
-The module version SHALL be resolved exactly as the `published-module-resolution` capability defines: `--version vN` takes the newest release within major N (never a development build), an exact SemVer pins that tag, and no `--version` takes the newest release of the highest major whose core dependency major equals the CLI's core major, skipping any other major. Source: 0016:D5:R2/R3.
+The module version SHALL be resolved exactly as the `published-module-resolution` capability defines: `--version vN` takes the newest release within major N (never a development build), an exact SemVer pins that tag, and no `--version` takes the newest release of the highest major whose core dependency major equals the CLI's core major, skipping any other major. Source: enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-free module path, and floats to the highest core-compatible major when no version is given").
 
 #### Scenario: Highest core-compatible major
 
@@ -88,11 +88,11 @@ The module version SHALL be resolved exactly as the `published-module-resolution
 
 `values.cue` SHALL be filled from the first applicable source in this order, and the report SHALL name the source used:
 
-1. The module's `initValues`, when the module declares it. Its content is rendered even when non-concrete: a defaulted field appears as its default, an undefaulted disjunction appears as the disjunction, and an optional field is omitted. No `debugValues` content SHALL reach the package. Source: 0016:D3:R2, 0016:D4:R3.
-2. Otherwise the module's `debugValues`, when the whole value is concrete once defaults are applied. A `debugValues` with any field left without a value (a bare type, an undefaulted disjunction, or `_`) is not concrete and falls to the next rung. The report SHALL warn the user to review the file before deploying. Source: 0016:D2:R1/R2/R3.
-3. Otherwise `values: {}`. The report SHALL warn that the values file is empty and point at `opm instance vet <dir>/instance.cue` for the contract the user must now satisfy. Source: 0016:D6:R1/R2.
+1. The module's `initValues`, when the module declares it. Its content is rendered even when non-concrete: a defaulted field appears as its default, an undefaulted disjunction appears as the disjunction, and an optional field is omitted. No `debugValues` content SHALL reach the package. Source: enhancement 0016 ("`#Module` gains an optional field carrying the author-intended init template, taking precedence over `debugValues`" and "The field is `initValues?: _`, open and optional, with no schema-side `#config` assertion").
+2. Otherwise the module's `debugValues`, when the whole value is concrete once defaults are applied. A `debugValues` with any field left without a value (a bare type, an undefaulted disjunction, or `_`) is not concrete and falls to the next rung. The report SHALL warn the user to review the file before deploying. Source: enhancement 0016 ("`debugValues` is the default template source for the generated `values.cue`").
+3. Otherwise `values: {}`. The report SHALL warn that the values file is empty and point at `opm instance vet <dir>/instance.cue` for the contract the user must now satisfy. Source: enhancement 0016 ("With no usable template source, init writes `values: {}` and warns").
 
-A concrete non-struct source SHALL be rendered verbatim. When the chosen source renders as an empty struct, the report SHALL still name that source and SHALL also carry the empty-file warning pointing at `opm instance vet <dir>/instance.cue`. `values.cue` SHALL open with a comment naming the source it was filled from. Source: 0016:D6:R3.
+A concrete non-struct source SHALL be rendered verbatim. When the chosen source renders as an empty struct, the report SHALL still name that source and SHALL also carry the empty-file warning pointing at `opm instance vet <dir>/instance.cue`. `values.cue` SHALL open with a comment naming the source it was filled from. Source: enhancement 0016 ("With no usable template source, init writes `values: {}` and warns").
 
 #### Scenario: debugValues used and flagged
 
@@ -126,7 +126,7 @@ A concrete non-struct source SHALL be rendered verbatim. When the chosen source 
 
 ### Requirement: Init writes all or nothing, and only where a standalone package belongs
 
-The command SHALL refuse with exit 2, before any registry access, when the target directory already exists (whether empty or holding a module or instance package), or when the target directory would sit inside an existing CUE module (a parent directory holds `cue.mod/module.cue`). The package SHALL be written completely or not at all: on any failure after writing starts, nothing is left at the target path or beside it, so a retry into the same directory is never refused because of init's own leftovers. Source: 0016:D5:R5/R6, 0016:D10:R1.
+The command SHALL refuse with exit 2, before any registry access, when the target directory already exists (whether empty or holding a module or instance package), or when the target directory would sit inside an existing CUE module (a parent directory holds `cue.mod/module.cue`). The package SHALL be written completely or not at all: on any failure after writing starts, nothing is left at the target path or beside it, so a retry into the same directory is never refused because of init's own leftovers. Source: enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-free module path, and floats to the highest core-compatible major when no version is given" and "Init refuses a target directory inside an existing CUE module").
 
 #### Scenario: Existing directory refused
 
@@ -145,7 +145,7 @@ The command SHALL refuse with exit 2, before any registry access, when the targe
 
 ### Requirement: Init reports what it wrote and does not validate it
 
-Init SHALL NOT evaluate the generated package against the module's `#config`. On success it SHALL report: the resolution (module path, selected major and version, and how it was chosen, with every skipped higher major and its reason); the values source and any warning; the files written; and a closing line naming `opm instance vet <dir>/instance.cue`. The pinned version SHALL appear in the report; pins never float. Exit codes SHALL be those of `opm module init`: 0 written, 2 refused, 3 registry unreachable at any stage, including while the dependency closure is resolved; an unexpected internal failure exits 1. Source: 0016:D5:R3/R7, 0016:D9:R4, 0016:D8.
+Init SHALL NOT evaluate the generated package against the module's `#config`. On success it SHALL report: the resolution (module path, selected major and version, and how it was chosen, with every skipped higher major and its reason); the values source and any warning; the files written; and a closing line naming `opm instance vet <dir>/instance.cue`. The pinned version SHALL appear in the report; pins never float. Exit codes SHALL be those of `opm module init`: 0 written, 2 refused, 3 registry unreachable at any stage, including while the dependency closure is resolved; an unexpected internal failure exits 1. Source: enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-free module path, and floats to the highest core-compatible major when no version is given", "The generated module file pins the module exactly, carries core at the module's major, and names a local placeholder module path" and "Init does not validate the generated package; it tells the user how to").
 
 #### Scenario: Success report
 
@@ -169,7 +169,7 @@ Init SHALL NOT evaluate the generated package against the module's `#config`. On
 
 ### Requirement: Only a registry that gave no response counts as unreachable
 
-While `opm instance init` acquires the module archive and while it resolves the staged package's dependency closure, a registry failure SHALL count as unreachable (exit 3) when no HTTP response was received: a refused connection, a DNS or TLS failure, or a timeout. A registry answer that a dependency of the staged package is not held SHALL NOT count as unreachable: init exits 1 naming the failure. Reading the module's own module file, between resolution and acquire, stays exit 3 for every failure. Source: 0016:D5:R7. The CLI SHALL take the unreachable decision from the library's typed fetch classification and SHALL NOT match the registry error's message text itself. Source: 0021:D8:R12.
+While `opm instance init` acquires the module archive and while it resolves the staged package's dependency closure, a registry failure SHALL count as unreachable (exit 3) when no HTTP response was received: a refused connection, a DNS or TLS failure, or a timeout. A registry answer that a dependency of the staged package is not held SHALL NOT count as unreachable: init exits 1 naming the failure. Reading the module's own module file, between resolution and acquire, stays exit 3 for every failure. Source: enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-free module path, and floats to the highest core-compatible major when no version is given"). The CLI SHALL take the unreachable decision from the library's typed fetch classification and SHALL NOT match the registry error's message text itself. Source: enhancement 0021 ("A beta line reaches GA only when its exit criteria hold").
 
 #### Scenario: A dependency the registry does not hold
 

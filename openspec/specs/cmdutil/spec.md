@@ -44,7 +44,7 @@ The `K8sFlags` struct SHALL provide an `AddTo(*cobra.Command)` method that regis
 
 ### Requirement: InstanceSelectorFlags carries and validates the resolved instance selector
 
-The `InstanceSelectorFlags` struct SHALL carry the resolved instance selector (`InstanceName` or `InstanceID`, plus `Namespace`). Commands SHALL build it from their positional `<file|name|uuid>` argument through `InstanceArg.ToSelectorFlags`; no command registers `--instance-name`/`--instance-id` flags for cluster queries. It SHALL provide a `Validate()` method that enforces mutual exclusivity between `InstanceName` and `InstanceID`, and requires exactly one to be present. <!-- Was: ReleaseSelectorFlags, --release-name/--release-id (0002 D10/D-X4.2) -->
+The `InstanceSelectorFlags` struct SHALL carry the resolved instance selector (`InstanceName` or `InstanceID`, plus `Namespace`). Commands SHALL build it from their positional `<file|name|uuid>` argument through `InstanceArg.ToSelectorFlags`; no command registers `--instance-name`/`--instance-id` flags for cluster queries. It SHALL provide a `Validate()` method that enforces mutual exclusivity between `InstanceName` and `InstanceID`, and requires exactly one to be present. <!-- Was: ReleaseSelectorFlags, --release-name/--release-id (enhancement 0002 ("Every `release`-named file and directory is renamed on disk (extends D8 to the filesystem)")/D-X4.2) -->
 
 #### Scenario: Both selectors set is rejected
 
@@ -63,7 +63,7 @@ The `InstanceSelectorFlags` struct SHALL carry the resolved instance selector (`
 
 ### Requirement: InstanceSelectorFlags provides a LogName helper
 
-The `InstanceSelectorFlags` struct SHALL provide a `LogName()` method that returns the instance name if set, or a truncated instance ID prefix (first 8 characters) formatted as `"instance:<prefix>"` otherwise. This is used for scoped logger creation. <!-- Was: ReleaseSelectorFlags.LogName, "release:<prefix>" (0002 D10) -->
+The `InstanceSelectorFlags` struct SHALL provide a `LogName()` method that returns the instance name if set, or a truncated instance ID prefix (first 8 characters) formatted as `"instance:<prefix>"` otherwise. This is used for scoped logger creation. <!-- Was: ReleaseSelectorFlags.LogName, "release:<prefix>" (enhancement 0002, "Every `release`-named file and directory is renamed on disk (extends D8 to the filesystem)") -->
 
 #### Scenario: LogName prefers instance name
 
@@ -209,7 +209,7 @@ The `instance` subcommands that consume `InstanceSelectorFlags` SHALL resolve th
 
 ### Requirement: Shared inventory resolution helper in the query workflow
 
-`query.ResolveInventory` (in `internal/workflow/query`) SHALL resolve a `ModuleInstance` record from an `*InstanceSelectorFlags`. If `InstanceID` is non-empty, it SHALL resolve via `inventory.FindRecordByInstanceUUID` (list the namespace's CRs, match `status.instanceUUID`); otherwise it SHALL resolve via `inventory.GetRecord` (direct GET by `InstanceName`). When no record is found, it SHALL return an `InstanceNotFoundError` with exit code 5. On success it SHALL also return the live resources and the missing entries from `inventory.DiscoverResourcesFromInventory`. <!-- Was: cmdutil.ResolveInventory over *ReleaseSelectorFlags, ReleaseID/ReleaseName, ReleaseNotFoundError (0002 D10) -->
+`query.ResolveInventory` (in `internal/workflow/query`) SHALL resolve a `ModuleInstance` record from an `*InstanceSelectorFlags`. If `InstanceID` is non-empty, it SHALL resolve via `inventory.FindRecordByInstanceUUID` (list the namespace's CRs, match `status.instanceUUID`); otherwise it SHALL resolve via `inventory.GetRecord` (direct GET by `InstanceName`). When no record is found, it SHALL return an `InstanceNotFoundError` with exit code 5. On success it SHALL also return the live resources and the missing entries from `inventory.DiscoverResourcesFromInventory`. <!-- Was: cmdutil.ResolveInventory over *ReleaseSelectorFlags, ReleaseID/ReleaseName, ReleaseNotFoundError (enhancement 0002, "Every `release`-named file and directory is renamed on disk (extends D8 to the filesystem)") -->
 
 #### Scenario: Resolve by instance name
 

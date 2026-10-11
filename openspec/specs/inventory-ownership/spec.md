@@ -68,7 +68,7 @@ The mapping from `spec.owner` to a CLI execution mode SHALL be implemented in ex
 
 ### Requirement: Ownership is exclusive across tools
 
-The CLI and the operator SHALL treat ownership as exclusive, coordinated through the `ModuleInstance` CR's `spec.owner` field. The CLI MUST NOT act as the resource reconciler (apply, prune, inventory write, status write) for an instance whose `spec.owner` is not `cli`. The operator skips render/apply/prune for `spec.owner: cli` instances (operator-side contract, enhancement 0006 D3/A4).
+The CLI and the operator SHALL treat ownership as exclusive, coordinated through the `ModuleInstance` CR's `spec.owner` field. The CLI MUST NOT act as the resource reconciler (apply, prune, inventory write, status write) for an instance whose `spec.owner` is not `cli`. The operator skips render/apply/prune for `spec.owner: cli` instances (operator-side contract, enhancement 0006 ("Explicit `spec.owner` marker; the operator skips CLI-owned CRs")/A4).
 
 #### Scenario: CLI sees operator-owned instance
 

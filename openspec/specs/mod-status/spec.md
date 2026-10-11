@@ -6,7 +6,7 @@ Defines how `opm instance status` discovers tracked resources from persisted ins
 
 ### Requirement: Status discovers resources via ownership inventory
 
-The `opm instance status` command SHALL read the persisted instance inventory record (the `ModuleInstance` CR) for the instance named by its positional `<file|name|uuid>` argument to discover its tracked resources. A UUID argument SHALL resolve via `inventory.FindRecordByInstanceUUID` (list the CRs in the namespace, match `status.instanceUUID`); a name argument SHALL resolve via `inventory.GetRecord` (direct GET by name). Once the record is found, it SHALL perform one targeted GET per tracked entry via `inventory.DiscoverResourcesFromInventory`. It MUST NOT require module source or re-rendering. It MUST NOT use a cluster-wide label-scan to discover workload resources. <!-- Was: release inventory record, --release-id/--instance-name (0002 D8/D-X4.2) -->
+The `opm instance status` command SHALL read the persisted instance inventory record (the `ModuleInstance` CR) for the instance named by its positional `<file|name|uuid>` argument to discover its tracked resources. A UUID argument SHALL resolve via `inventory.FindRecordByInstanceUUID` (list the CRs in the namespace, match `status.instanceUUID`); a name argument SHALL resolve via `inventory.GetRecord` (direct GET by name). Once the record is found, it SHALL perform one targeted GET per tracked entry via `inventory.DiscoverResourcesFromInventory`. It MUST NOT require module source or re-rendering. It MUST NOT use a cluster-wide label-scan to discover workload resources. <!-- Was: release inventory record, --release-id/--instance-name (enhancement 0002 ("Hard rename, no alias window; `semver: major` (resolves OQ3, OQ4)")/D-X4.2) -->
 
 #### Scenario: Discover by instance UUID
 
@@ -87,7 +87,7 @@ The `--output`/`-o` flag SHALL accept `wide` as a valid value in addition to `ta
 
 ### Requirement: Status header does not depend on inventory change history
 
-The status output SHALL display a metadata header above the resource table containing instance name, namespace, aggregate health status, and a resource summary. Module version and ownership metadata SHALL come from the persisted instance inventory record (`instanceMetadata`, `moduleMetadata`, `createdBy`) when present. The command SHALL NOT require inventory change-history metadata such as source version, raw values, or per-change timestamps, and it MUST NOT require module source or re-rendering. <!-- Was: release name, release inventory record, releaseMetadata (0002 D8/D9) -->
+The status output SHALL display a metadata header above the resource table containing instance name, namespace, aggregate health status, and a resource summary. Module version and ownership metadata SHALL come from the persisted instance inventory record (`instanceMetadata`, `moduleMetadata`, `createdBy`) when present. The command SHALL NOT require inventory change-history metadata such as source version, raw values, or per-change timestamps, and it MUST NOT require module source or re-rendering. <!-- Was: release name, release inventory record, releaseMetadata (enhancement 0002, "Hard rename, no alias window; `semver: major` (resolves OQ3, OQ4)" and "The instance-file naming convention moves: `release.cue` → `instance.cue`") -->
 
 #### Scenario: Header sourced from persisted inventory
 

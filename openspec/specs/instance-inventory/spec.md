@@ -36,7 +36,7 @@ The CLI SHALL persist instance inventory in a `ModuleInstance` custom resource (
 
 After resources are applied and pruned, the CLI SHALL write, via the status subresource with field manager `opm-cli`: `status.inventory` (revision, digest, count, entries), `status.instanceUUID`, `status.lastAppliedRenderDigest`, `status.lastAppliedSourceDigest`, `status.lastAppliedConfigDigest`, and `status.lastAppliedAt`. The CLI MUST NOT write `status.conditions`, `status.observedGeneration`, `status.lastAttempted*`, `status.failureCounters`, `status.history`, or `status.nextRetryAt`.
 
-The digest fields SHALL be operator-parity: `lastAppliedRenderDigest` SHALL be the library's shared render digest, `opm/k8s/inventory.RenderDigest`, over the render's single export (see `kernel-render`), which leaves the managed-by label value out so the CLI and the operator digest one render to the same value (0012:D6:R2); `status.inventory.digest` SHALL be the library's `inventory.Digest` of the written entries (see "Deterministic inventory digest"); `lastAppliedSourceDigest` SHALL be computed as the operator's `ModuleSourceDigest` (SHA-256 of the canonical `path@version` reference — identical on both actors' CUE-native paths), and `lastAppliedConfigDigest` SHALL match the operator's `ConfigDigest` canonical-JSON semantics including the empty case (SHA-256 of no bytes).
+The digest fields SHALL be operator-parity: `lastAppliedRenderDigest` SHALL be the library's shared render digest, `opm/k8s/inventory.RenderDigest`, over the render's single export (see `kernel-render`), which leaves the managed-by label value out so the CLI and the operator digest one render to the same value (enhancement 0012, "Labels are stamped by the CUE render; the shared render digest ignores the runtime-name label value"); `status.inventory.digest` SHALL be the library's `inventory.Digest` of the written entries (see "Deterministic inventory digest"); `lastAppliedSourceDigest` SHALL be computed as the operator's `ModuleSourceDigest` (SHA-256 of the canonical `path@version` reference — identical on both actors' CUE-native paths), and `lastAppliedConfigDigest` SHALL match the operator's `ConfigDigest` canonical-JSON semantics including the empty case (SHA-256 of no bytes).
 
 #### Scenario: Status subset after successful apply
 
@@ -154,7 +154,7 @@ The recorded inventory MUST NOT require or embed:
 
 ### Requirement: Deterministic inventory digest
 
-The CLI SHALL compute the inventory digest with the library's `opm/k8s/inventory.Digest`, which hashes a canonical field-by-field encoding of the entries. The digest SHALL depend only on the entries' field values, never on their order or on how the CLI serialises an entry, and two inventories that differ in their set of entries or in any field of an entry SHALL produce different digests. The CLI SHALL NOT compute an inventory digest of its own. Source: 0012:D7:R2/R3. The release that first records this digest SHALL carry a migration note naming the one-time change of the stored value. Source: 0012:D7:R4.
+The CLI SHALL compute the inventory digest with the library's `opm/k8s/inventory.Digest`, which hashes a canonical field-by-field encoding of the entries. The digest SHALL depend only on the entries' field values, never on their order or on how the CLI serialises an entry, and two inventories that differ in their set of entries or in any field of an entry SHALL produce different digests. The CLI SHALL NOT compute an inventory digest of its own. Source: enhancement 0012 ("The stale set is component-blind, and the inventory digest hashes a canonical field encoding"). The release that first records this digest SHALL carry a migration note naming the one-time change of the stored value. Source: enhancement 0012 ("The stale set is component-blind, and the inventory digest hashes a canonical field encoding").
 
 #### Scenario: Same entries in different order produce same digest
 
@@ -198,7 +198,7 @@ When an apply rendered with `--skip-unprovided` and the kernel skipped at least 
 
 ### Requirement: Inventory entries are the library's component-blind entries
 
-The CLI SHALL represent each currently owned Kubernetes resource as the library's `opm/k8s/inventory.Entry` (group, kind, namespace, name, API version, component), and SHALL NOT declare an entry type of its own. Two entries SHALL be the same object when their group, kind, namespace and name agree, as `inventory.SameObject` compares them: neither the API version nor the component SHALL count, so an API version migration or a component rename never makes an object look like a different one. Source: 0012:D7:R1.
+The CLI SHALL represent each currently owned Kubernetes resource as the library's `opm/k8s/inventory.Entry` (group, kind, namespace, name, API version, component), and SHALL NOT declare an entry type of its own. Two entries SHALL be the same object when their group, kind, namespace and name agree, as `inventory.SameObject` compares them: neither the API version nor the component SHALL count, so an API version migration or a component rename never makes an object look like a different one. Source: enhancement 0012 ("The stale set is component-blind, and the inventory digest hashes a canonical field encoding").
 
 #### Scenario: Same object at a different API version
 
