@@ -155,7 +155,7 @@ type ClusterPlatform struct {
 // ClusterPlatformGetter fetches the cluster Platform CR. It returns
 // (doc, "", nil) on success and (nil, unavailable-reason, nil) when the CR
 // is absent or unreadable in a way that permits warn-fallback (NotFound,
-// Forbidden — 0006:D21). Any other error is fatal to resolution.
+// Forbidden — enhancement 0006). Any other error is fatal to resolution.
 type ClusterPlatformGetter func(ctx context.Context) (doc *ClusterPlatform, unavailable string, err error)
 
 // ErrClusterRead marks a fatal failure to read the cluster Platform: the
@@ -315,7 +315,7 @@ func (k DepsKind) owner() string {
 // The registry the operator recorded on status wins over the authored spec
 // whenever it holds entries: it is the union the operator resolved from the
 // subscriptions and the active TransformerRegistration claims, and it is what
-// the running package was generated from (0015:D13/D17). The spec is the
+// the running package was generated from (enhancement 0015). The spec is the
 // fallback for a cluster no operator has generated for.
 //
 // Two divergences between spec and effective package are warned, never

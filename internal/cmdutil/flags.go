@@ -40,7 +40,7 @@ func (f *RenderFlags) AddTo(cmd *cobra.Command) {
 }
 
 // The --platform help text of the render-bearing commands: the flag names a
-// platform module directory (0019:D5), never a data file, and outranks every
+// platform module directory (enhancement 0019), never a data file, and outranks every
 // other platform source. The module commands fall back to the module's own
 // deps, the instance commands to the instance package's.
 const (
@@ -69,7 +69,7 @@ func (f *K8sFlags) AddTo(cmd *cobra.Command) {
 }
 
 // InstanceSelectorFlags holds flags for identifying an instance on the cluster
-// (delete, status). Was: ReleaseSelectorFlags (0002:D10).
+// (delete, status). Was: ReleaseSelectorFlags (enhancement 0002).
 type InstanceSelectorFlags struct {
 	InstanceName string
 	InstanceID   string

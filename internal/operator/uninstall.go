@@ -17,7 +17,7 @@ import (
 )
 
 // The ModuleInstance CRD coordinates are defined once in internal/inventory
-// (0006:D1/D13); these package-local aliases keep the existing
+// (enhancement 0006); these package-local aliases keep the existing
 // call sites (RBAC rule construction, finalizer name) readable.
 const (
 	opmodelAPIGroup         = inventory.GroupOpmodel
@@ -218,7 +218,7 @@ func (e *NoRecordError) Error() string {
 }
 
 // Uninstall deletes what the operator instance's record lists, except CRDs
-// and the Namespace, then the record (0021:D11:R11). With no record it
+// and the Namespace, then the record (enhancement 0021). With no record it
 // deletes nothing and returns a *NoRecordError. Before deleting anything it
 // checks for ModuleInstances still carrying the operator's cleanup
 // finalizer and refuses (or, with opts.RemoveFinalizers, strips the

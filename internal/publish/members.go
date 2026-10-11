@@ -30,7 +30,7 @@ type Member struct {
 	// refuses the absence).
 	Name string
 	// APIVersion is metadata.apiVersion, when concrete; "" for transformers
-	// (structurally, 0010:D44) and for members that fail to state one.
+	// (structurally, enhancement 0010) and for members that fail to state one.
 	APIVersion string
 	// Value is the loaded definition value.
 	Value cue.Value
@@ -46,7 +46,7 @@ var memberKindDirs = []string{"resources", "traits", "blueprints"}
 
 // memberDiscriminators maps a member definition's concrete kind field to the
 // kind directory it belongs under. The discriminator is what separates members
-// from the fragments and schemas defined beside them (0011:D22): a definition
+// from the fragments and schemas defined beside them (enhancement 0011): a definition
 // without one is not a member and is never gated.
 var memberDiscriminators = map[string]string{
 	"Resource":             "resources",
@@ -63,7 +63,7 @@ var memberDiscriminators = map[string]string{
 // cannot enumerate the tree: #Catalog exposes only #transformers, which reach
 // about half the contract members and no blueprints (measured, design.md). A
 // directory walk also visits only this catalog's own definitions, so
-// cross-catalog references (0010:D17) are excluded structurally.
+// cross-catalog references (enhancement 0010) are excluded structurally.
 //
 // A member package that fails to load is a refusal — the tree's root loaded,
 // so a broken subpackage is a finding about the member tree, not a load

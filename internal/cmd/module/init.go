@@ -250,7 +250,7 @@ func runScaffold(c *cobra.Command, cfg *config.GlobalConfig, newPath, templateRe
 	return nil
 }
 
-// runRepair is the adopt-and-repair path (0011:D20): detect, show every file to
+// runRepair is the adopt-and-repair path (enhancement 0011): detect, show every file to
 // be created or edited, confirm a second time, apply.
 func runRepair(c *cobra.Command, cfg *config.GlobalConfig, dir, pathArg string, yes bool) error {
 	k := config.NewKernel(cfg.Registry)
@@ -307,7 +307,7 @@ func promptModulePath(c *cobra.Command) (string, error) {
 }
 
 // confirm reads a yes/no answer, refusing on a plain non-interactive stdin —
-// the second confirmation cannot be defaulted through a pipe (0011:D20); --yes is
+// the second confirmation cannot be defaulted through a pipe (enhancement 0011); --yes is
 // the explicit bypass.
 func confirm(c *cobra.Command, prompt string) (bool, error) {
 	r, interactive := cmdutil.StdinReader(c)

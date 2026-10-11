@@ -17,7 +17,7 @@ import (
 
 // ClusterPlatformGetterFor returns a ClusterPlatformGetter that reads the
 // singleton cluster Platform CR via the dynamic client. NotFound and
-// Forbidden are reported as warn-fallback conditions, not errors (0006:D21).
+// Forbidden are reported as warn-fallback conditions, not errors (enhancement 0006).
 //
 // The whole document is returned, spec and status undecoded: the effective
 // registry the operator recorded lives on status, and resolution generates
@@ -101,7 +101,7 @@ func createClusterPlatform(ctx context.Context, dyn dynamic.Interface, spec Spec
 		return platformCreated, nil
 	case apierrors.IsAlreadyExists(err):
 		// The API server's name-uniqueness check is the synchronization
-		// primitive (0006:D22): a concurrent create won the race — success-noop.
+		// primitive (enhancement 0006): a concurrent create won the race — success-noop.
 		return platformAlreadyPresent, nil
 	case apierrors.IsForbidden(err):
 		return platformWriteForbidden, nil
@@ -116,7 +116,7 @@ func createClusterPlatform(ctx context.Context, dyn dynamic.Interface, spec Spec
 const defaultPlatformType = "kubernetes"
 
 // EnsureClusterPlatformForCatalog seeds the singleton cluster Platform with a
-// single subscription to catalogPath at version, write-if-absent (0006:D22):
+// single subscription to catalogPath at version, write-if-absent (enhancement 0006):
 // plain create with field manager opm-cli, never SSA, never update, an
 // existing Platform left untouched, a Forbidden create degraded to a warning.
 // The spec was resolved from the registry, so the reporting names the catalog

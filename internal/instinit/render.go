@@ -1,5 +1,5 @@
 // Package instinit generates the standalone instance package `opm instance
-// init` writes for a published module (0016:D1/D7/D9): cue.mod/module.cue
+// init` writes for a published module (enhancement 0016): cue.mod/module.cue
 // pinning the module and core, instance.cue binding the module to a
 // #ModuleInstance, and values.cue holding the starting values.
 //

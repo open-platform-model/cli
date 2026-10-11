@@ -14,10 +14,10 @@ import (
 var emptyValues = []byte("{}")
 
 // initValuesPath is the #Module field an author sets for a new instance
-// package to start from (0016:D3/D4).
+// package to start from (enhancement 0016).
 var initValuesPath = cue.ParsePath("initValues")
 
-// PickValues walks the values ladder over an acquired module (0016:D2/D3/D6):
+// PickValues walks the values ladder over an acquired module (enhancement 0016):
 // initValues when the module declares it, else debugValues when the whole
 // value is concrete once defaults apply, else empty. initValues is read from
 // the module's package (the library has no accessor for it), debugValues
@@ -63,7 +63,7 @@ func concrete(v cue.Value) bool {
 }
 
 // IsEmpty reports whether values renders as an empty struct, which the
-// report flags whatever source it came from (0016:D6:R3).
+// report flags whatever source it came from (enhancement 0016).
 func IsEmpty(values []byte) bool {
 	return bytes.Equal(bytes.Join(bytes.Fields(values), nil), emptyValues)
 }

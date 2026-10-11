@@ -51,7 +51,7 @@ var (
 	ErrNotStruct             = errors.New("operand is not a struct")
 )
 
-// CheckAtLevel is the level-aware entry point (0010:D34): the additive-only
+// CheckAtLevel is the level-aware entry point (enhancement 0010): the additive-only
 // promise binds at beta and GA only, so an alpha apiVersion returns (nil, nil)
 // without evaluating the operands. The apiVersion is the primitive's own — a
 // catalog's release version is an independent axis and must not be passed
@@ -202,7 +202,7 @@ func walkStruct(path string, pit, nit *cue.Iterator, next cue.Value, underMetada
 			continue
 		}
 		// An optional field that becomes required breaks every consumer
-		// that omitted it (0010:D27). Judged on the selectors: the leaf
+		// that omitted it (enhancement 0010). Judged on the selectors: the leaf
 		// subsume below compares value domains and cannot see a constraint
 		// marker. A defaulted field that loses its default is the default
 		// rule's finding, not this one's.
@@ -385,7 +385,7 @@ func leafIdentical(prev, next cue.Value) bool {
 	return bytes.Equal(pb, nb)
 }
 
-// checkDefaults enforces default immutability (0010:D27). Only authored
+// checkDefaults enforces default immutability (enhancement 0010). Only authored
 // defaults are compared (see [authoredDefault]), and only when the prior build
 // has one — adding a default where none existed is additive. When either
 // side's default is non-concrete, equality is judged by mutual subsumption so

@@ -13,7 +13,7 @@ package schema
 //
 // The config file is scalar data only — no CUE imports, no providers
 // (retired by 0006:D39; catalog selection lives in the
-// sibling platform module ~/.opm/platform/, 0019:D5).
+// sibling platform module ~/.opm/platform/, enhancement 0019).
 #Config: {
 	// registry is the default registry for CUE module resolution.
 	// Can be overridden by --registry flag or OPM_REGISTRY env var.
@@ -29,7 +29,7 @@ package schema
 
 	// skewPolicy governs how a render responds when a module's cue.mod
 	// requires a newer build of an OPM-namespace path (core or a catalog)
-	// than the platform pins (0019:D18).
+	// than the platform pins (enhancement 0019).
 	// - "warn" (default): render against the platform's build and report the skew
 	// - "refuse": fail the render before evaluation
 	// Applies to --platform directories; when the cluster Platform CR is the

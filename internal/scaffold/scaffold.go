@@ -21,7 +21,7 @@ import (
 )
 
 // InitialVersion is the version every scaffold starts at, written in the
-// defaulted form so release automation owns it from the first commit (0011:D12).
+// defaulted form so release automation owns it from the first commit (enhancement 0011).
 const InitialVersion = "0.1.0"
 
 // modulePathRE is the shape a new module path must have: a dotted first
@@ -36,7 +36,7 @@ var packageNameRE = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 // ValidateNewModulePath checks the path a scaffold will be re-identified to:
 // module-path shaped with an explicit major (init never invents one), and a
 // leaf that is a valid CUE package name, because the leaf becomes the root
-// package, metadata.name, and the identity's path leaf all at once (0010:D8).
+// package, metadata.name, and the identity's path leaf all at once (enhancement 0010).
 func ValidateNewModulePath(path string) error {
 	if !modulePathRE.MatchString(path) {
 		return fmt.Errorf("module path %q must be <domain>/<...>/<name>@v<major> (e.g. example.com/modules/my_app@v0)", path)
@@ -191,7 +191,7 @@ func Run(ctx context.Context, k *kernel.Kernel, registry, newPath string, ref Te
 // 0011:D16's statement set plus the package clause, applied wholesale — correct
 // exactly because the user owns nothing in the tree yet; repair mode refuses
 // the same rewrite for the opposite reason. Metadata is untouched: it
-// derives (0011:D12).
+// derives (enhancement 0011).
 func Reidentify(dir, oldPath, newPath string) error {
 	if _, err := cueedit.SetCueModModule(dir, newPath); err != nil {
 		return fmt.Errorf("re-identifying cue.mod: %w", err)

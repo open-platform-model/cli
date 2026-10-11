@@ -166,7 +166,7 @@ func ReadCueModModule(dir string) (string, error) {
 // given module path (major suffix included), preserving all surrounding bytes
 // — comments, field order, the language stanza. Declaring the path the file
 // already declares writes nothing and returns changed false. The pipeline's
-// own reader stays read-only over this file (0011:D16); consumers of this writer
+// own reader stays read-only over this file (enhancement 0011); consumers of this writer
 // land with cli-template-modules (repair and re-identification).
 func SetCueModModule(dir, modulePath string) (changed bool, err error) {
 	if modulePath == "" {

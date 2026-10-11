@@ -102,7 +102,7 @@ func resolveVersion(p *Plan, opts Options) {
 			p.TagSource += " (default)"
 		}
 	case flag != "":
-		// Open + flag: the fill writes the working tree (0011:D12) — an in-memory
+		// Open + flag: the fill writes the working tree (enhancement 0011) — an in-memory
 		// overlay would publish bytes the tree does not hold. Push performs
 		// the write; the plan records it.
 		ver.Filled = true

@@ -19,7 +19,7 @@ import "github.com/Masterminds/semver/v3"
 // rule only on a prerelease-only history and would miss breaks that
 // prerelease pinners (0010:D14-blessed) can see. Selection here is pure —
 // enumerating and fetching the candidate are the caller's. Moved verbatim
-// from opm/materialize's since-deleted filterVersions path (0010:D14). Its
+// from opm/materialize's since-deleted filterVersions path (enhancement 0010). Its
 // only caller is template resolution's version selection
 // (cli-template-modules), which is why it lives here.
 func highestStable(published []string) string {

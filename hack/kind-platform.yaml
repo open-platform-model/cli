@@ -2,7 +2,7 @@
 # Applied by: task cluster:operator
 #
 # The subscription pins here MIRROR hack/platform/cue.mod/module.cue on
-# purpose. Apply renders against the cluster Platform (0006:D21), while the
+# purpose. Apply renders against the cluster Platform (enhancement 0006, "Platform-source flag surface (single `--platform <file>` override + automatic precedence, with source-provenance reporting); resolves OQ14"), while the
 # operator turns this same document into a platform module; tests that render
 # offline pass hack/platform/ with --platform. If the pins drifted, the two
 # could resolve different catalog builds and produce renders that were never

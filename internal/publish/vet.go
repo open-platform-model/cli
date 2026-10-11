@@ -11,7 +11,7 @@ import (
 )
 
 // VetChecks runs the subset of the publish gates `opm module vet` shares with
-// publish (0011:D16, 0011:D18, 0011:D21): identity conformance against #IdentityPackage,
+// publish (enhancement 0011): identity conformance against #IdentityPackage,
 // metadata ↔ identity derivation, cue.mod ↔ declared-path agreement, and the
 // version-major/path-major half of the tag rule. Concreteness is deliberately
 // not enforced — an open Version is a valid authoring state; publish is where

@@ -17,7 +17,7 @@ import (
 // NewRegistryClient builds a module-registry client through the same resolver
 // chain reads use: modconfig routes by CUE registry syntax and layers Docker
 // and Podman credentials under CUE's logins.json, so push and pull share one
-// path (0011:D11). No os.Setenv — the resolved registry rides the config struct.
+// path (enhancement 0011). No os.Setenv — the resolved registry rides the config struct.
 func NewRegistryClient(registry string) (*modregistry.Client, error) {
 	resolver, err := modconfig.NewResolver(&modconfig.Config{CUERegistry: registry})
 	if err != nil {

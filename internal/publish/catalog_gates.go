@@ -19,7 +19,7 @@ type CatalogGateOutcomes struct {
 	TraitsChecked int
 	TraitsRefused int
 	// Compat counts: members compared against a predecessor, refused by the
-	// comparison, skipped as alpha (0010:D34), and passing as new at their
+	// comparison, skipped as alpha (enhancement 0010), and passing as new at their
 	// name-and-apiVersion key.
 	CompatCompared int
 	CompatRefused  int
@@ -28,7 +28,7 @@ type CatalogGateOutcomes struct {
 	// CompatPrerelease: beta/GA members exempt because the module line is a
 	// release prerelease (0011:D26 clause 2); always rendered, 0 on a stable line.
 	CompatPrerelease int
-	// CompatDevExempt reports the build is a dev tag (0011:D26): the gate ran and
+	// CompatDevExempt reports the build is a dev tag (enhancement 0011): the gate ran and
 	// decided not to judge it, and the counts above are all zero.
 	CompatDevExempt bool
 }

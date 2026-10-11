@@ -9,7 +9,7 @@ import (
 )
 
 // Report is what `opm platform check` prints: the contract inventory core
-// derives for a platform (0015:D1, D2, D5, D18), plus the
+// derives for a platform (enhancement 0015), plus the
 // provenance of the platform it was read from.
 //
 // Every field is a report. A platform that is not fulfilled, not routable or
@@ -50,7 +50,7 @@ type Report struct {
 
 	// Comparable lists every pair of enabled transformers whose match
 	// predicates are comparable over a shared catalog-fulfilled contract
-	// (0015:D5). The library's row type is carried directly:
+	// (enhancement 0015). The library's row type is carried directly:
 	// the rows are data this report only prints, so a CLI copy would exist
 	// only to be converted into.
 	Comparable []libplatform.ComparablePredicates
@@ -106,7 +106,7 @@ func (r Report) Routable() bool { return r.routable }
 // apart by some component's shape. It is false exactly when [Report.Comparable]
 // carries a row, and it is the second value deciding the command's exit
 // status: platform-package generation refuses an undiscriminated platform
-// exactly as it refuses an over-subscribed one (0015:D5).
+// exactly as it refuses an over-subscribed one (enhancement 0015).
 func (r Report) Discriminated() bool { return r.discriminated }
 
 // Render returns the report text.

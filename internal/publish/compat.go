@@ -37,8 +37,8 @@ import (
 // the only escape is the apiVersion bump (a member no build has carried
 // passes).
 //
-// Transformers are excluded structurally (no apiVersion, 0010:D44) and alpha
-// members by policy (0010:D34), both before any registry work. Any transport
+// Transformers are excluded structurally (no apiVersion, enhancement 0010) and alpha
+// members by policy (enhancement 0010), both before any registry work. Any transport
 // failure during the walk aborts as a *ConnectivityError with no partial
 // verdict — the artifact was never judged; a package absent at a given
 // version is the scan's negative signal, never an error.
@@ -65,7 +65,7 @@ func gateCompat(p *Plan, opts Options) error {
 }
 
 // compatScan is the walk itself, shared by the publish gate and
-// `opm catalog registry check --compat` (0011:D7): partition the members
+// `opm catalog registry check --compat` (enhancement 0011): partition the members
 // (transformers structurally, alpha by policy, beta/GA by policy while the
 // module line is a release prerelease — all before any registry work), group
 // by package, and probe the given versions newest-first until every member
@@ -159,7 +159,7 @@ func eligibleByPackage(members []Member, lineIsPrerelease bool, g *CatalogGateOu
 
 // predecessorVersions filters the published tags to the scan's window —
 // strictly below the effective tag, within the declared major, release
-// prereleases (alpha/beta/rc) included and dev builds excluded (0011:D26) —
+// prereleases (alpha/beta/rc) included and dev builds excluded (enhancement 0011) —
 // ordered newest first, so each member resolves against the newest build
 // carrying it.
 //
@@ -193,7 +193,7 @@ func predecessorVersions(published []string, tag, major string) []string {
 // rc counters and never carry the identifier. 0011:D26 clause 1: a dev build is
 // neither judged by the compat gate nor used as a baseline. It is also the
 // one definition of "development build" the published-module resolver
-// (internal/modref) excludes from a float (0016:D5:R2).
+// (internal/modref) excludes from a float (enhancement 0016).
 func IsDevTag(tag string) bool {
 	pre := strings.TrimPrefix(semver.Prerelease(tag), "-")
 	if pre == "" {
@@ -210,7 +210,7 @@ func IsDevTag(tag string) bool {
 // isReleasePrerelease reports whether a tag is a release prerelease
 // (-alpha.N, -beta.N, -rc.N): any prerelease that is not a dev build. 0011:D26
 // clause 2 suspends the beta/GA compare while the module line is one; the
-// member-level model (0010:D34) is unchanged, only when publish enforces it.
+// member-level model (enhancement 0010) is unchanged, only when publish enforces it.
 func isReleasePrerelease(tag string) bool {
 	return semver.Prerelease(tag) != "" && !IsDevTag(tag)
 }
@@ -325,7 +325,7 @@ func findMember(members []Member, name, apiVersion string) (Member, bool) {
 }
 
 // provenancePaths is 0010:D30's denylist — the two metadata fields that
-// change per catalog release by construction (0010:D25) and are therefore exempt
+// change per catalog release by construction (enhancement 0010) and are therefore exempt
 // from the comparison. Direct children of metadata only, exactly the scope
 // the library's StripProvenance names.
 var provenancePaths = map[string]bool{

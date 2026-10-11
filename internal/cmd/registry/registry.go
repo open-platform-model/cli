@@ -1,5 +1,5 @@
 // Package registrycmd provides the registry command group — authenticating
-// to the OCI registries OPM publishes to and pulls from (0011:D11/D24).
+// to the OCI registries OPM publishes to and pulls from (enhancement 0011).
 package registrycmd
 
 import (

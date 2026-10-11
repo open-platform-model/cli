@@ -6,7 +6,7 @@
 // declares — decode the tree, read identity/identity.cue, unify it against
 // core's #IdentityPackage, split metadata.modulePath into repository and
 // major — and never edits the artifact to match a coordinate. What is
-// published is exactly the committed tree (0011:D2). Every evaluable gate runs,
+// published is exactly the committed tree (enhancement 0011). Every evaluable gate runs,
 // refusals accumulate into one list, and the resolved plan prints before any
 // push; --dry-run stops after the plan.
 package publish

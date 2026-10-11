@@ -26,7 +26,7 @@ import (
 )
 
 // FromInstanceFile prepares and renders an instance from a declarative
-// #ModuleInstance CUE package through the library kernel (0006:D9). The
+// #ModuleInstance CUE package through the library kernel (enhancement 0006). The
 // instance package, the named directory or the directory holding the named
 // .cue file, is acquired as one CUE package (instance.cue + values.cue +
 // overlays) with any -f values files
@@ -88,7 +88,7 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 		}
 	}
 
-	// Render provenance (0006:D7): an instance apply is local when
+	// Render provenance (enhancement 0006): an instance apply is local when
 	// its module's cue.mod/local-module.cue replaces a dependency; otherwise it
 	// resolves from registries. The same module root is the 0010:D19 module
 	// context the render's replacement warnings are worded against.
@@ -196,8 +196,8 @@ func instanceDepsOf(instanceDir, moduleRoot string) (*platform.ModuleDeps, error
 // module root (nearest cue.mod/module.cue) above dir — the directory holding
 // an instance file, or the module directory itself. "" when dir is under no
 // module root. It is where a developer's cue.mod/local-module.cue lives, so
-// it drives both the render provenance signal (0006:D7) and the wording of
-// the render's replacement warnings (0010:D19).
+// it drives both the render provenance signal (enhancement 0006) and the wording of
+// the render's replacement warnings (enhancement 0010).
 func moduleContextRoot(dir string) string {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
@@ -296,7 +296,7 @@ func renderInstance(
 // when two of a render's compiled objects share one apply identity, nil
 // otherwise. A build refuses exactly what an apply would have written twice,
 // and the CLI and the operator word the refusal identically because both
-// raise the library's error (0015:D15). Pure over the render output, so it is
+// raise the library's error (enhancement 0015). Pure over the render output, so it is
 // tested without a render.
 func refuseDuplicateIdentities(out *kernel.RenderResult) error {
 	if dups := object.Duplicates(out.Compiled); len(dups) > 0 {
@@ -308,7 +308,7 @@ func refuseDuplicateIdentities(out *kernel.RenderResult) error {
 // exportAndDigest exports the render's objects with exactly one
 // object.Export and computes the library's shared render digest over the
 // same exported set, so the digest and the apply objects come from one
-// export (0012:D6). The exported objects keep the input order. Both
+// export (enhancement 0012). The exported objects keep the input order. Both
 // failures exit with the general error code; a digest failure is
 // unreachable after a successful export.
 func exportAndDigest(resources []*object.Resource) ([]object.Exported, string, error) {

@@ -28,7 +28,7 @@ type LoaderOptions struct {
 // Load loads the OPM configuration into cfg, applying precedence rules.
 //
 // Loading is single-pass: ~/.opm/config.cue is import-free scalar data
-// (0006:D39), so the file is parsed and validated exactly once
+// (enhancement 0006), so the file is parsed and validated exactly once
 // and the registry resolves by ordinary flag > env > config precedence
 // afterwards. There is no registry-bootstrap pre-pass.
 //
@@ -94,7 +94,7 @@ func loadConfigFile(cfg *GlobalConfig, configPath string) (string, error) {
 		return "", fmt.Errorf("reading config file: %w", err)
 	}
 
-	// Data-only contract (0006:D39): reject CUE imports before evaluation.
+	// Data-only contract (enhancement 0006): reject CUE imports before evaluation.
 	// CompileBytes would happily resolve stdlib imports otherwise. (The
 	// platform beside this file is a CUE module since 0019:D5 and is built,
 	// not parsed as data.)
@@ -142,7 +142,7 @@ func loadConfigFile(cfg *GlobalConfig, configPath string) (string, error) {
 		cfg.Log.Kubernetes.APIWarnings = APIWarningsWarn
 	}
 
-	// Absent skewPolicy means warn (0019:D18).
+	// Absent skewPolicy means warn (enhancement 0019).
 	if cfg.SkewPolicy == "" {
 		cfg.SkewPolicy = SkewPolicyWarn
 	}

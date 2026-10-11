@@ -35,7 +35,7 @@ verify a build out of band, after the fact, from the consumer's side.`,
 	return c
 }
 
-// NewCatalogRegistryCheckCmd creates the catalog registry check command (0011:D7).
+// NewCatalogRegistryCheckCmd creates the catalog registry check command (enhancement 0011).
 func NewCatalogRegistryCheckCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var compat bool
 
