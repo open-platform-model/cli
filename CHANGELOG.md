@@ -1,5 +1,59 @@
 # Changelog
 
+## [1.0.0-beta.11](https://github.com/open-platform-model/cli/compare/v1.0.0-beta.10...v1.0.0-beta.11) (2026-10-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* **operator:** retire the legacy-manifest migration ([#357](https://github.com/open-platform-model/cli/issues/357))
+* run the ownership guard on every apply ([#349](https://github.com/open-platform-model/cli/issues/349))
+* judge every prune and delete with the library ownership verdict ([#347](https://github.com/open-platform-model/cli/issues/347))
+* **cmd:** keep PersistentVolumeClaims on delete and prune unless --delete-data ([#345](https://github.com/open-platform-model/cli/issues/345))
+* **deps:** bump library to v1.0.0-beta.7 ([#343](https://github.com/open-platform-model/cli/issues/343))
+* **apply:** remove the legacy inventory Secret path ([#333](https://github.com/open-platform-model/cli/issues/333))
+* on the first CLI apply with this release (instance apply, module apply or operator install), status.inventory.digest and status.lastAppliedRenderDigest on a CLI-owned ModuleInstance change once, with no object change: both now use the library's canonical encodings (the render digest leaves out the managed-by value). The cli never compares them, so nothing is re-applied; a rollback changes them again. The component-rename filter is gone because the stale set is component-blind (0012:D7). pkg/inventory is removed; import github.com/open-platform-model/library/opm/k8s/inventory (Entry, NewEntry, SameObject, StaleSet, Digest, RenderDigest).
+* the cli no longer exports `pkg/core` or `pkg/resourceorder`. Importers move to `github.com/open-platform-model/library/opm/k8s/object` (`Resource`, `Export`, `Weight`, `Sort`, `Direction`, the `Weight*` constants; `resourceorder.GetWeight` is `object.Weight`) and `.../opm/k8s/labels` (`core.Label*` constants drop the `Label` prefix and `Value` suffix, except `LabelManagedByValue`, now `ManagedByCLI`; `IsOPMManagedBy` keeps its name). Every value and weight is unchanged.
+* **deps:** bump library to v1.0.0-beta.6 ([#322](https://github.com/open-platform-model/cli/issues/322))
+
+### Features
+
+* adopt the library Kubernetes inventory package ([#329](https://github.com/open-platform-model/cli/issues/329)) ([cd10f2d](https://github.com/open-platform-model/cli/commit/cd10f2d289f119108cfc499d322da25aea0b3235))
+* **apply:** remove the legacy inventory Secret path ([#333](https://github.com/open-platform-model/cli/issues/333)) ([d2f4ee3](https://github.com/open-platform-model/cli/commit/d2f4ee3ec36b253dc14de96c00a75da53d0e988b))
+* **cmd:** align flag spellings, document exit codes, add --output to version ([#341](https://github.com/open-platform-model/cli/issues/341)) ([43fb70f](https://github.com/open-platform-model/cli/commit/43fb70f8bbd5d55fcbb245ac9c1cd4651a65386c))
+* **cmd:** keep PersistentVolumeClaims on delete and prune unless --delete-data ([#345](https://github.com/open-platform-model/cli/issues/345)) ([5aa8dc8](https://github.com/open-platform-model/cli/commit/5aa8dc88bbad8686b7f5bc5dce9ed51203f5ac5f))
+* delete pkg/core and pkg/resourceorder in favour of the library Kubernetes tier ([#328](https://github.com/open-platform-model/cli/issues/328)) ([bc84595](https://github.com/open-platform-model/cli/commit/bc84595e3d4bf97fe2fca8f99e64ee4cfeff4007))
+* **instance:** add --wait to instance delete ([#353](https://github.com/open-platform-model/cli/issues/353)) ([cabecbe](https://github.com/open-platform-model/cli/commit/cabecbe42d852c386c91419db3ffd4167acde8cc))
+* judge every prune and delete with the library ownership verdict ([#347](https://github.com/open-platform-model/cli/issues/347)) ([4bf7f04](https://github.com/open-platform-model/cli/commit/4bf7f04b093f2c13e8b9138358c624d4e8a71797))
+* run the ownership guard on every apply ([#349](https://github.com/open-platform-model/cli/issues/349)) ([3cba198](https://github.com/open-platform-model/cli/commit/3cba1982532120a07a0eb4ff7a9558bc9f119890))
+
+
+### Bug Fixes
+
+* **apply:** fail safe on an unreadable record, an unreadable object and a failed prune ([#332](https://github.com/open-platform-model/cli/issues/332)) ([557797f](https://github.com/open-platform-model/cli/commit/557797f3a634adc09a4eb90e0a259eb3804c7ad2))
+* **apply:** run the checks before --create-namespace creates the namespace ([#334](https://github.com/open-platform-model/cli/issues/334)) ([d5f730c](https://github.com/open-platform-model/cli/commit/d5f730c77740a5ca16de2e543633bcd6111f9448))
+* **apply:** show ownership refusals in a dry run ([#352](https://github.com/open-platform-model/cli/issues/352)) ([b1eea50](https://github.com/open-platform-model/cli/commit/b1eea50099d9db0557d193b63e29abf0e2a04ad6))
+* **cmd:** say what the operator does with claims of an operator-managed instance ([#348](https://github.com/open-platform-model/cli/issues/348)) ([9824c23](https://github.com/open-platform-model/cli/commit/9824c239dbac7a3de4de7743f4d4c84e5dd7a71a))
+* **config:** decide resolution answers from error types, not message text ([#346](https://github.com/open-platform-model/cli/issues/346)) ([4d4884f](https://github.com/open-platform-model/cli/commit/4d4884fa0a4d24c877611256c987537cef072974))
+* **config:** hint the registry login when a platform build meets a refused credential ([#351](https://github.com/open-platform-model/cli/issues/351)) ([7490647](https://github.com/open-platform-model/cli/commit/7490647039d393c5d982e3ce02375be4090f04bb))
+* **deps:** bump Go to 1.26.9 and golang.org/x/net to v0.60.0 ([#362](https://github.com/open-platform-model/cli/issues/362)) ([49dbbd6](https://github.com/open-platform-model/cli/commit/49dbbd6c567f87930774b3c9a04b57bdc1f1ebeb))
+* **deps:** bump library to v1.0.0-beta.6 ([#322](https://github.com/open-platform-model/cli/issues/322)) ([aaf70c3](https://github.com/open-platform-model/cli/commit/aaf70c36e7c8a59134bf47cec11003904429c4dd))
+* **deps:** bump library to v1.0.0-beta.7 ([#343](https://github.com/open-platform-model/cli/issues/343)) ([68f7879](https://github.com/open-platform-model/cli/commit/68f7879f4263cf627ceaa7cdec118b647eaaa481))
+* **deps:** bump library to v1.0.0-beta.8 ([#356](https://github.com/open-platform-model/cli/issues/356)) ([03ec437](https://github.com/open-platform-model/cli/commit/03ec437412bc070077eae723aef192e4c40614af))
+* **deps:** bump library to v1.0.0-beta.9 ([#359](https://github.com/open-platform-model/cli/issues/359)) ([09b0b81](https://github.com/open-platform-model/cli/commit/09b0b812cb6fcd5dccb79173e4adefa1fa5f2d92))
+* keep the instance when delete or uninstall cannot read a tracked resource; read-only commands warn ([#314](https://github.com/open-platform-model/cli/issues/314)) ([bd4d1a7](https://github.com/open-platform-model/cli/commit/bd4d1a7cbd65fee02e9a7c6dfb637f804fdfa880))
+* **publish:** name registry errors by cause and say when no registry is configured ([#339](https://github.com/open-platform-model/cli/issues/339)) ([5201c0e](https://github.com/open-platform-model/cli/commit/5201c0e25b3db320801cc96fa74614f8ab8e6e36))
+* report a failed record delete and a failed diff read as errors ([#338](https://github.com/open-platform-model/cli/issues/338)) ([7b6962f](https://github.com/open-platform-model/cli/commit/7b6962f29131e9ec6981bda690df9e8de737aa44))
+* resolve resource names by API discovery instead of guessed plurals ([#342](https://github.com/open-platform-model/cli/issues/342)) ([a12373a](https://github.com/open-platform-model/cli/commit/a12373a5d11180a92ea84c67b50de813a93f95ac))
+
+
+### Code Refactoring
+
+* classify registry failures by the library's typed errors ([#325](https://github.com/open-platform-model/cli/issues/325)) ([e5b8c50](https://github.com/open-platform-model/cli/commit/e5b8c502fa1f4cda527c5b84e657e323edf45e3e))
+* **kubernetes:** judge health with the library opm/k8s/health ([#330](https://github.com/open-platform-model/cli/issues/330)) ([5cc2c4c](https://github.com/open-platform-model/cli/commit/5cc2c4c0eb6c5907b830f0b360e9ace5e9be1d41))
+* **operator:** retire the legacy-manifest migration ([#357](https://github.com/open-platform-model/cli/issues/357)) ([3c3dbe0](https://github.com/open-platform-model/cli/commit/3c3dbe03f22c056e6378fd651335362b4e9b0523))
+* read instance and module fields through library accessors ([#327](https://github.com/open-platform-model/cli/issues/327)) ([be1157d](https://github.com/open-platform-model/cli/commit/be1157d5f75f0ff07839b5f7d70abd06726002f0))
+* run every instance delete and prune on the library deletion plan ([#350](https://github.com/open-platform-model/cli/issues/350)) ([2602c43](https://github.com/open-platform-model/cli/commit/2602c433125fd51fb9c447e2032ffcb89a4e495f))
+
 ## [1.0.0-beta.10](https://github.com/open-platform-model/cli/compare/v1.0.0-beta.9...v1.0.0-beta.10) (2026-10-05)
 
 
