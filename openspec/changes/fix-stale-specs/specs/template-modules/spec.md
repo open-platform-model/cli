@@ -53,7 +53,7 @@ A template's identity package SHALL declare `Version` as a concrete string liter
 
 #### Scenario: Scaffold identity is a literal
 
-- **WHEN** a module is scaffolded or repaired by `opm mod init`
+- **WHEN** a module is scaffolded by `opm mod init`, or repaired so that init creates its `identity/identity.cue`
 - **THEN** its `identity/identity.cue` declares `Version` as a plain literal with no default arm and no `#VersionType`
 - **AND** a fresh scaffold declares `Version: "0.1.0"`
 - **AND** `opm module build` on the result passes the loader shape gate

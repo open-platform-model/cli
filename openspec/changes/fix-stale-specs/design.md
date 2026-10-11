@@ -14,8 +14,10 @@ checked against a test or a run. Paths are relative to the cli repo at the base 
   "missing identity refuses when the module states no version". When the identity file exists,
   repair leaves its `Version` alone (`repair.go:196-208` plans a `ModulePath` edit only). Init repairs when the directory holds a module and no template is named (`internal/cmd/module/init.go:118-125`).
   The scenario `Scaffold identity is a literal` keeps its name and its literal-form promise.
-  Its body now covers both paths. A new scenario `Repair adopts the version the tree states`
-  names the repair case.
+  Its WHEN now covers a scaffold and a repair that creates the identity file; a repair that
+  finds the file leaves its `Version` form alone, so the scenario does not claim it. Two new
+  scenarios, `Repair adopts the version the tree states` and `Repair refuses a tree that
+  states no version`, name the repair cases.
 - **Default major.** `ParseTemplateRef` sets `Major` from the baked table only for a bare word
   that names an official template and has no suffix (`internal/scaffold/ref.go:116-121`). A
   literal path takes only its own suffix (`ref.go:122-123`). With no major, `LookupPath` is the

@@ -9,7 +9,7 @@
 - [x] 2.1 Each new statement traced to code by path and line (design.md); no code change (`git diff base -- . ':!openspec'` is empty)
 - [x] 2.2 `task fmt`, `task vet`, `task lint` and `task test:unit` green
 - [x] 2.3 `openspec validate --all --strict --no-interactive` and `enh cite-lint` report 0 findings
-- [ ] 2.4 Review and fixes; commit docs(openspec): follow the review of fix-stale-specs where it changes files
+- [x] 2.4 Review and fixes; commit docs(openspec): follow the review of fix-stale-specs
 
 ## 3. Archive
 

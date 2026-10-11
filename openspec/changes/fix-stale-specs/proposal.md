@@ -28,7 +28,7 @@ After GA it would be PATCH; beta ships nothing for it.
 None.
 
 ### Modified Capabilities
-- `template-modules`: three MODIFIED requirements. Every live scenario name stays; two scenarios
+- `template-modules`: three MODIFIED requirements. Every live scenario name stays; four scenarios
   are new.
 
 ## Enhancement
