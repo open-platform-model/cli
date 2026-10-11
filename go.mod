@@ -1,6 +1,6 @@
 module github.com/open-platform-model/cli
 
-go 1.26.0
+go 1.26.9
 
 require (
 	cuelabs.dev/go/oci/ociregistry v0.0.0-20260717083115-5eb5795f322a
