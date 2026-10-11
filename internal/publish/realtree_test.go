@@ -31,7 +31,7 @@ const realTreeRegistry = "opmodel.dev=ghcr.io/open-platform-model,registry.cue.w
 // below the alpha releases includes `-0.dev.*` builds predating 0010:D49, whose trees the
 // convention cannot see into — probes there return the scan's negative
 // signal and the walk continues. Acceptable: that horizon is entirely
-// alpha-era, and alpha promises nothing (0010:D34).
+// alpha-era, and alpha promises nothing (enhancement 0010).
 func TestRealTree_CatalogOpm(t *testing.T) {
 	src, err := filepath.Abs(filepath.Join("..", "..", "..", "catalog_opm", "src"))
 	require.NoError(t, err)

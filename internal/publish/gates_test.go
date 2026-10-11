@@ -266,7 +266,7 @@ metadata: {
 }
 
 // TestGate_Override covers all four presence/flag states for both kinds
-// (0011:D6). The flag waives the gate for modules only, and changes nothing else.
+// (enhancement 0011). The flag waives the gate for modules only, and changes nothing else.
 func TestGate_Override(t *testing.T) {
 	// The override entry names a dep that is pinned but never imported, so
 	// the tree still loads without resolving it.

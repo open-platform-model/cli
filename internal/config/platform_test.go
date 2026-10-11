@@ -127,7 +127,7 @@ func TestBuildPlatformModule_NotAModule(t *testing.T) {
 func TestBuildPlatformModule_HackPlatformBuilds(t *testing.T) {
 	// Registry-backed: the maintained hack/platform/ module must build
 	// against the published core and catalogs, and each entry's version
-	// must be the build its cue.mod pins (derived readout, 0019:D5).
+	// must be the build its cue.mod pins (derived readout, enhancement 0019).
 	dir := copyHackPlatform(t)
 	pins := hackCatalogPins(t, dir)
 

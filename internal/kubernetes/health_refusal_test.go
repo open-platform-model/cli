@@ -70,7 +70,7 @@ const libraryHealthPath = "github.com/open-platform-model/library/opm/k8s/health
 // bound directly to a name of the library's health package, such as
 // `type Status = health.Status` or `var Healthy = health.IsHealthy`, as
 // "path:line: name". Such a re-export would let the copy's names come back
-// as aliases (0012:D3:R6).
+// as aliases (enhancement 0012).
 func healthAliasDecls(fset *token.FileSet, file *ast.File) []string {
 	local := healthImportName(file)
 	if local == "" || local == "_" || local == "." {
@@ -143,7 +143,7 @@ func valueBound(s *ast.ValueSpec, boundToHealth func(ast.Expr) bool) bool {
 }
 
 // TestNoLocalHealthEvaluator refuses a reintroduced copy of the readiness
-// evaluator (0012:D3:R6). Readiness is the library's
+// evaluator (enhancement 0012). Readiness is the library's
 // github.com/open-platform-model/library/opm/k8s/health: use health.Status,
 // health.Evaluate, health.IsHealthy and health.Aggregate. The check is by
 // name, so it catches the old copy coming back; a rewritten evaluator under

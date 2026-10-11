@@ -35,7 +35,7 @@ func digestResources(t *testing.T, managedBy, team string) []*object.Resource {
 // retiredRenderDigest is the value the CLI's own render digest gave for the
 // three-object set of TestExportAndDigest_DiffersFromTheRetiredDigest. The
 // stored render digest changes once, in the release that first records the
-// library's shared digest, on purpose (0012:D6, 0012:D7:R4).
+// library's shared digest, on purpose (enhancement 0012).
 const retiredRenderDigest = "sha256:0404868537e1114e9ea6e7d02af68ba6a4693531727c4be713212753de6840ae"
 
 func TestExportAndDigest_IsTheLibraryDigestOfTheExport(t *testing.T) {
@@ -53,7 +53,7 @@ func TestExportAndDigest_IsTheLibraryDigestOfTheExport(t *testing.T) {
 }
 
 // The managed-by value is the runtime's name, so the CLI and the operator
-// digest one render equally (0012:D6:R2).
+// digest one render equally (enhancement 0012).
 func TestExportAndDigest_IgnoresTheManagedByValue(t *testing.T) {
 	_, cli, err := exportAndDigest(digestResources(t, "opm-cli", "a"))
 	require.NoError(t, err)
@@ -62,7 +62,7 @@ func TestExportAndDigest_IgnoresTheManagedByValue(t *testing.T) {
 	assert.Equal(t, cli, operator)
 }
 
-// Any other label moves the digest (0012:D6:R3).
+// Any other label moves the digest (enhancement 0012).
 func TestExportAndDigest_AnotherLabelMovesTheDigest(t *testing.T) {
 	_, a, err := exportAndDigest(digestResources(t, "opm-cli", "a"))
 	require.NoError(t, err)

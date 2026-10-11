@@ -122,7 +122,7 @@ func memberCatalogFiles() map[string]string {
 `
 	// A member-shaped definition outside the kind directories: the walk never
 	// visits schemas/, so it is excluded structurally — the same mechanism
-	// that keeps referenced foreign primitives out (0010:D17).
+	// that keeps referenced foreign primitives out (enhancement 0010).
 	files["schemas/foreign.cue"] = `package schemas
 
 #ForeignResource: {

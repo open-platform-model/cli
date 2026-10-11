@@ -253,7 +253,7 @@ func TestE2E_ModInit_FromClonesAnyPublishedModule(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	donor := publishModuleFixture(t, func(files map[string]string) {
-		// The donor derives its metadata from its identity package (0011:D12) —
+		// The donor derives its metadata from its identity package (enhancement 0011) —
 		// what makes a clone follow the rewritten identity. kind is required
 		// by the registry loader's shape gate.
 		files["module.cue"] = `package demo

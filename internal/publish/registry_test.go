@@ -166,7 +166,7 @@ deps: "example.com/dep@v1": v: "v1.4.0"
 }
 
 // TestPush_RoundTrip publishes and resolves the module back: the published
-// bytes are the committed tree (0011:D2), identity file included.
+// bytes are the committed tree (enhancement 0011), identity file included.
 func TestPush_RoundTrip(t *testing.T) {
 	registry := emptyTestRegistry(t)
 	files := moduleFiles()
@@ -219,7 +219,7 @@ metadata: {
 	require.Equal(t, "1.3.0", p.FillVersion)
 	require.NoError(t, Push(context.Background(), opts, p))
 
-	// The working tree was written (0011:D12)…
+	// The working tree was written (enhancement 0011)…
 	onDisk, err := os.ReadFile(filepath.Join(dir, "identity", "identity.cue"))
 	require.NoError(t, err)
 	assert.Contains(t, string(onDisk), `#VersionType & "1.3.0"`)
@@ -237,7 +237,7 @@ metadata: {
 
 // TestPush_Authenticated pushes through modconfig's credential chain against
 // a registry requiring basic auth — push and pull share one resolver path
-// (0011:D11), so `docker login` is all CI needs.
+// (enhancement 0011), so `docker login` is all CI needs.
 func TestPush_Authenticated(t *testing.T) {
 	reg, err := modregistrytest.NewServer(
 		ocimem.NewWithConfig(&ocimem.Config{ImmutableTags: true}),

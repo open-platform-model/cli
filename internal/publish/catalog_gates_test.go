@@ -133,7 +133,7 @@ func TestGateMemberFQN_StaleCatalogVersion(t *testing.T) {
 }
 
 func TestGateMemberFQN_TransformerOmitsAPIVersionCleanly(t *testing.T) {
-	// Direction one of the conditional optional (0010:D44): a transformer declares
+	// Direction one of the conditional optional (enhancement 0010): a transformer declares
 	// no apiVersion and passes — its arm is selected before the absent
 	// optional is reached.
 	p := runFixture(t, KindCatalog, memberCatalogFiles())

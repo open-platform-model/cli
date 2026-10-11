@@ -4,7 +4,7 @@
 // subpackages can source `ModulePath`/`Version` without a circular import,
 // and the root `catalog.cue` can stamp transformer metadata in lockstep.
 //
-// Committed with the REAL values (0010:D5): a checkout and a
+// Committed with the REAL values (enhancement 0010): a checkout and a
 // published artifact compute the same FQNs — the `0.0.0-dev` sentinel is
 // gone. `Version` stays a CUE *default* so the publish task's transient
 // `version_override.cue` can still stamp `-dev.*` branch builds; release
@@ -18,7 +18,7 @@ package identity
 #VersionType: string & =~"^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
 
 // ModulePath is the catalog's complete CUE module path, major suffix included
-// — byte-identical to cue.mod's `module:` field (0010:D1).
+// — byte-identical to cue.mod's `module:` field (enhancement 0010).
 ModulePath: "opmodel.dev/catalogs/opm@v2"
 
 // Version is the catalog's bare SemVer — the build every implementation key

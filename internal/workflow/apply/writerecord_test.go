@@ -175,7 +175,7 @@ func clientCapturingStatusWrite(onStatusPatch func([]byte)) *kubernetes.Client {
 // sorted entries' JSON, hashed) gave for the entries of
 // TestWriteInstanceRecord_StoresTheLibraryInventoryDigest. The stored digest
 // changes once, in the release that first records the library's encoding, on
-// purpose (0012:D7:R4); this literal keeps that change visible.
+// purpose (enhancement 0012); this literal keeps that change visible.
 const retiredInventoryDigest = "sha256:ff47fc33e679f4ab80a04244a33d8ae6887140412f0c0709506a03b5354a7ca4"
 
 // The status write records the library's inventory digest of the entries it

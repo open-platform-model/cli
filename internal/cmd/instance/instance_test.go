@@ -166,7 +166,7 @@ func TestNewInstanceDeleteCmd(t *testing.T) {
 }
 
 // Operator-owned instances are no longer refused by delete — they route to the
-// finalizer-delegating path (0006:D18). Ownership routing itself is
+// finalizer-delegating path (enhancement 0006). Ownership routing itself is
 // covered by inventory.ResolveOwnership's tests; here we only assert that
 // delete consumes that resolver rather than a private rule of its own.
 func TestInstanceDelete_OperatorOwnedRoutesToDelegation(t *testing.T) {

@@ -140,7 +140,7 @@ func TestReportRender(t *testing.T) {
 		},
 		{
 			// A comparable pair is a separate refusal from
-			// over-subscription (0015:D5): this platform's
+			// over-subscription (enhancement 0015): this platform's
 			// contracts each have one supplier, so it is routable, and
 			// the two transformers are still never told apart.
 			name: "comparable only",
@@ -528,7 +528,7 @@ func TestDiscriminatedIsTheOtherGate(t *testing.T) {
 	assert.False(t, overSubscribed.Routable())
 	assert.True(t, overSubscribed.Discriminated(), "over-subscription says nothing about predicates")
 
-	// `fulfilled` decides neither gate (0015:D18).
+	// `fulfilled` decides neither gate (enhancement 0015).
 	unfulfilled := NewReport(flagRes(), &libplatform.ContractInventory{
 		DefinedBy:     map[string]string{backup: catOPM},
 		RequiredBy:    map[string][]string{backup: {}},

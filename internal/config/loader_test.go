@@ -444,7 +444,7 @@ config: {
 }
 
 func TestLoadConfigFile_ImportsRejected(t *testing.T) {
-	// Data-only contract (0006:D39): even CUE stdlib imports are rejected,
+	// Data-only contract (enhancement 0006): even CUE stdlib imports are rejected,
 	// mirroring the platform-file guard.
 	configPath := writeConfig(t, `package config
 
