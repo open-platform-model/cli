@@ -12,7 +12,11 @@ enhancement id appears only beside a reason in words, never alone, never as a de
 - **Fixtures stay.** `tests/fixtures/` is published to GHCR and `hack/fixtures.sh check` demands
   a new version for any edit. The tool and the lint skip it with `--exclude`.
 - **Live specs by wording only.** The edits keep every requirement and scenario name, so
-  `openspec validate --all --strict` still passes and no delta is needed.
+  `openspec validate --all --strict` still passes and no delta is needed. One exception: the
+  `kernel-render` requirement `Local-replacement renders warn` lost its id suffix, because a
+  citation in a requirement heading becomes part of the requirement name. The archived delta
+  specs that quote the name follow. A live requirement that a quoted title would push past 500
+  characters names the enhancement with a short reason instead.
 - **No lint task and no CI call here.** The pinned `enh` commits do not exist on a merged
   branch yet. A later task adds both.
 - **OpenSpec pin.** The 1.12.0 pin stays unless `openspec validate --all --strict` under 1.14.1
@@ -23,5 +27,6 @@ enhancement id appears only beside a reason in words, never alone, never as a de
 - A wrong tool edit in a comment changes its meaning. Mitigation: spot-read at least 40 edits,
   and the review samples at least 60 changed lines.
 - A code line changes by mistake. Mitigation: the review filters `git diff -U0` to code lines.
-- Test messages and help text: the rewrite keeps the meaning; no test asserts on the old text
-  (checked with `task test`).
+- Test messages: the rewrite keeps the meaning; no test asserts on the old text (checked with
+  `task test:unit`). `task check` and `task test` also run the integration and e2e suites against
+  the shared kind cluster, so this change does not use them.
