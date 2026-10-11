@@ -87,7 +87,7 @@ The `--output`/`-o` flag SHALL accept `wide` as a valid value in addition to `ta
 
 ### Requirement: Status header does not depend on inventory change history
 
-The status output SHALL display a metadata header above the resource table containing instance name, namespace, aggregate health status, and a resource summary. Module version and ownership metadata SHALL come from the persisted instance inventory record (`instanceMetadata`, `moduleMetadata`, `createdBy`) when present. The command SHALL NOT require inventory change-history metadata such as source version, raw values, or per-change timestamps, and it MUST NOT require module source or re-rendering. <!-- Was: release name, release inventory record, releaseMetadata (enhancement 0002, "Hard rename, no alias window; `semver: major` (resolves OQ3, OQ4)" and "The instance-file naming convention moves: `release.cue` → `instance.cue`") -->
+The status output SHALL display a metadata header above the resource table containing instance name, namespace, aggregate health status, and a resource summary. Module version and ownership metadata SHALL come from the persisted instance inventory record (`instanceMetadata`, `moduleMetadata`, `createdBy`) when present. The command SHALL NOT require inventory change-history metadata such as source version, raw values, or per-change timestamps, and it MUST NOT require module source or re-rendering. <!-- Was: release name, release inventory record, releaseMetadata (enhancement 0002: hard rename with no alias window; instance files are `instance.cue`) -->
 
 #### Scenario: Header sourced from persisted inventory
 

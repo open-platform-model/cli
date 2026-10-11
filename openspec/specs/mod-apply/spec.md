@@ -106,7 +106,7 @@ The `module apply` subcommand SHALL accept the following flags with the listed b
 
 ### Requirement: Instance identity is derived in CUE, not the CLI
 
-The synthetic instance's `metadata.uuid` SHALL be computed by the catalog's CUE schema (`SHA1(OPMNamespace, "<moduleUUID>:<name>:<namespace>")`) and SHALL NOT be generated, randomized, or persisted by the CLI itself. The CLI SHALL read the computed UUID from the rendered `ModuleInstance` and use it as the `instanceID` passed to the apply workflow. <!-- Was: synthetic release, ModuleRelease, releaseID (enhancement 0002, "Hard rename, no alias window; `semver: major` (resolves OQ3, OQ4)" and "The instance-file naming convention moves: `release.cue` → `instance.cue`") -->
+The synthetic instance's `metadata.uuid` SHALL be computed by the catalog's CUE schema (`SHA1(OPMNamespace, "<moduleUUID>:<name>:<namespace>")`) and SHALL NOT be generated, randomized, or persisted by the CLI itself. The CLI SHALL read the computed UUID from the rendered `ModuleInstance` and use it as the `instanceID` passed to the apply workflow. <!-- Was: synthetic release, ModuleRelease, releaseID (enhancement 0002: hard rename with no alias window; instance files are `instance.cue`) -->
 
 #### Scenario: Stable UUID across runs
 

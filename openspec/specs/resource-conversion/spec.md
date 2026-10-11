@@ -8,7 +8,7 @@ Defines how the CLI turns a render's compiled objects into Kubernetes objects: i
 
 ### Requirement: Label keys come from the library
 
-The CLI SHALL read every OPM label key and managed-by value, and decide whether a managed-by value is an OPM runtime, through the library's `opm/k8s/labels` (`ManagedBy`, `ManagedByCLI`, `ManagedByController`, `ManagedByLegacy`, `Component`, `ComponentName`, `ModuleInstanceName`, `ModuleInstanceNamespace`, `ModuleInstanceUUID`, `IsOPMManagedBy`), and SHALL NOT keep a copy of them (enhancement 0012, "The Kubernetes runtime surface homes in the library's Kubernetes tier (supersedes only the placement conclusion of the CLI inventory and handoff enhancement)").
+The CLI SHALL read every OPM label key and managed-by value, and decide whether a managed-by value is an OPM runtime, through the library's `opm/k8s/labels` (`ManagedBy`, `ManagedByCLI`, `ManagedByController`, `ManagedByLegacy`, `Component`, `ComponentName`, `ModuleInstanceName`, `ModuleInstanceNamespace`, `ModuleInstanceUUID`, `IsOPMManagedBy`), and SHALL NOT keep a copy of them (enhancement 0012: the library's Kubernetes tier owns the label vocabulary).
 
 #### Scenario: Label values are unchanged
 

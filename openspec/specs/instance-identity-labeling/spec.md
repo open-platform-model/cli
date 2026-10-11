@@ -6,7 +6,7 @@ Defines how the OPM CLI extracts identity UUIDs from CUE evaluation output and i
 
 ### Requirement: Identity fields on build metadata
 
-The build pipeline SHALL extract `metadata.uuid` from both the `#Module` and `#ModuleInstance` CUE evaluation output and populate them on the Go-side metadata structs (`ModuleMetadata` and `InstanceMetadata`). <!-- Was: #ModuleRelease / ReleaseMetadata (enhancement 0002, "Hard rename, no alias window; `semver: major` (resolves OQ3, OQ4)" and "The instance-file naming convention moves: `release.cue` → `instance.cue`") -->
+The build pipeline SHALL extract `metadata.uuid` from both the `#Module` and `#ModuleInstance` CUE evaluation output and populate them on the Go-side metadata structs (`ModuleMetadata` and `InstanceMetadata`). <!-- Was: #ModuleRelease / ReleaseMetadata (enhancement 0002: hard rename with no alias window; instance files are `instance.cue`) -->
 
 #### Scenario: Module with uuid field
 
