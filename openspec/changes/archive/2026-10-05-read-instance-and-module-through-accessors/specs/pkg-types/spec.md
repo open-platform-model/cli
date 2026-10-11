@@ -15,7 +15,7 @@ The CLI SHALL read the other kernel artifact fields the library exposes through 
 - the metadata of the module an instance embeds through `Instance.ModuleMetadata()`, where a nil result is a module with no metadata and the CLI carries it as zero metadata;
 - a module's `debugValues` through `Module.DebugValues()`, and its `#config` through `Module.ConfigSchema()`.
 
-There SHALL be no `pkg/bundle/` package — bundle support is not implemented (enhancement 0002 ("The `BundleRelease` stub is removed, not renamed (supersedes D7)") removed the bundle path; enhancement 0002 ("The `BundleRelease` stub is removed, not renamed (supersedes D7)") supersedes enhancement 0002 ("`BundleRelease` is renamed to `BundleInstance`")).
+There SHALL be no `pkg/bundle/` package — bundle support is not implemented (enhancement 0002 removed the bundle path and dropped the earlier rename of `BundleRelease`).
 
 #### Scenario: External tool imports pkg/core
 - **WHEN** an external Go module imports `github.com/open-platform-model/cli/pkg/core`

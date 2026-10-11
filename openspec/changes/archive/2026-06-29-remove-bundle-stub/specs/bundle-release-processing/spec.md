@@ -1,7 +1,7 @@
 ## REMOVED Requirements
 
 ### Requirement: Internal release parsing returns a barebones BundleRelease without validation
-**Reason**: The bundle path is unreachable dead code (enhancement 0002 ("The `BundleRelease` stub is removed, not renamed (supersedes D7)"), supersedes D7). No `internal/cmd` command targets it, and the only producer of `kind: "BundleRelease"` is the deprecated `catalog/core/v1alpha1/bundlerelease` module — no bundle kind exists in `core`/`catalog_opm`/`catalog_kubernetes`. The internal `GetInstanceFile` bundle parse arm and helpers (`bareBundleRelease`, `mustBundleReleaseMetadata`, `bestEffortBundleMetadata`) are deleted.
+**Reason**: The bundle path is unreachable dead code (enhancement 0002 ("The `BundleRelease` stub is removed, not renamed (supersedes D7)")). No `internal/cmd` command targets it, and the only producer of `kind: "BundleRelease"` is the deprecated `catalog/core/v1alpha1/bundlerelease` module — no bundle kind exists in `core`/`catalog_opm`/`catalog_kubernetes`. The internal `GetInstanceFile` bundle parse arm and helpers (`bareBundleRelease`, `mustBundleReleaseMetadata`, `bestEffortBundleMetadata`) are deleted.
 **Migration**: None. Bundle files were never rendered — they were parsed only to be rejected. A `kind: "BundleRelease"` file now fails earlier at kind detection with `unknown instance kind: "BundleRelease"`. If bundle support is built in future, this capability is reintroduced under the Instance vocabulary (`BundleInstance`).
 
 ### Requirement: BundleRelease exposes processing-stage fields

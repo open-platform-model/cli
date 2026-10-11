@@ -26,5 +26,5 @@ There SHALL be no `pkg/bundle/` package — bundle support is not implemented (e
 ## REMOVED Requirements
 
 ### Requirement: Bundle and Release types
-**Reason**: The bundle path is removed (enhancement 0002 ("The `BundleRelease` stub is removed, not renamed (supersedes D7)"), supersedes D7). The `pkg/bundle` package — `Bundle`, `BundleMetadata`, `Release`, `ReleaseMetadata`, and the `Releases map[string]*module.Instance` field — is deleted; it was unreachable dead code with no production caller.
+**Reason**: The bundle path is removed (enhancement 0002 ("The `BundleRelease` stub is removed, not renamed (supersedes D7)")). The `pkg/bundle` package — `Bundle`, `BundleMetadata`, `Release`, `ReleaseMetadata`, and the `Releases map[string]*module.Instance` field — is deleted; it was unreachable dead code with no production caller.
 **Migration**: None. External tools never consumed `pkg/bundle` in a supported flow. Bundle types are reintroduced under the Instance vocabulary only if bundle support is built.
