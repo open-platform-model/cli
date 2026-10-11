@@ -430,7 +430,7 @@ else
 fi
 
 # S16 module-only move: only PinnedModuleVersion moves, to a module release
-# that deploys the same operator (enhancement 0021, "The operator's install artifact is a registry module on its own version train"); the title counts one moved pin
+# that deploys the same operator (enhancement 0021); the title counts one moved pin
 # and the body has a row for the module and none for the operator release.
 # Needs the real resolver for title and body, which read no registry.
 if [ -z "${CASCADE_RESOLVER_REAL:-}" ]; then

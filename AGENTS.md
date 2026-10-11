@@ -116,7 +116,7 @@ Read when entering `cli/`:
 
 - `adr/` - Architecture Decision Records
 - `cmd/opm/` - CLI entrypoint + root command wiring.
-- `internal/cmd/` - Cobra command implementations (command groups: `module`, `catalog`, `instance`, `config`, `operator`, `registry`; `module`/`catalog` each carry a `version set` subgroup — offline, idempotent identity Version writes; `module` also carries `template list` — the baked official-template table — and an `init` that scaffolds by fetch-and-re-identify or repairs an existing tree behind a second confirmation (enhancement 0011); `registry` carries `login` — interactive credential entry into the docker config file, enhancement 0011 ("`opm login` exists, targets the resolved registry, and stores credentials where CUE already reads them" and "The login command is `opm registry login`"); `instance` carries `init` — a standalone instance package for a published module, enhancement 0016).
+- `internal/cmd/` - Cobra command implementations (command groups: `module`, `catalog`, `instance`, `config`, `operator`, `registry`; `module`/`catalog` each carry a `version set` subgroup — offline, idempotent identity Version writes; `module` also carries `template list` — the baked official-template table — and an `init` that scaffolds by fetch-and-re-identify or repairs an existing tree behind a second confirmation (enhancement 0011); `registry` carries `login` — interactive credential entry into the docker config file, enhancement 0011; `instance` carries `init` — a standalone instance package for a published module, enhancement 0016).
 - `internal/cmdutil/` - shared flags, annotations, command-facing helpers.
 - `internal/config/` - config resolution, schema validation, defaults.
 - `internal/publish/` - identity-driven publish pipeline (enhancement 0011): gates, refusal catalog, plan/dry-run, registry lookup + push; also the vet-shared identity/coordinate checks.
@@ -384,7 +384,7 @@ export OPM_REGISTRY="$CUE_REGISTRY"
 Default is none: a comment says what the code does and why, in its own words.
 
 - When a rationale genuinely lives in an enhancement, name the enhancement by its id beside the reason in words, once at the symbol: `// Version writes are offline by design (enhancement 0011).` Several enhancements: `(enhancements 0010 and 0011)`.
-- Never write an id alone, and never a decision number (`0011:D9`, `0011 D9`, `D9`) or an open-question number. Decision numbers change when an entry is split or renumbered. The reason in words is what survives.
+- Never write an id alone, and never a decision number (`NNNN:Dn`, `NNNN Dn`, `Dn`) or an open-question number. Decision numbers change when an entry is split or renumbered. The reason in words is what survives.
 - Read an entry with `openspec show <id>-<slug> --store opm-enhancements`.
 - Never a section, slice, phase, task or design-doc-local number (`§8.1`, `slice C2`, `task 4.2`, `design LD3`). They are not stable identifiers.
 - Never in scaffold templates, generated files, fixtures a user copies, or CLI output strings. Those reach people who have no access to the enhancements repo.

@@ -263,7 +263,7 @@ tasks:
     deps: [build]
     cmds:
       # --config keeps this hermetic: the dev-cluster tooling must not depend on
-      # a developer's personal ~/.opm being present or in the enhancement 0006 ("`~/.opm` becomes two import-free data files: `config.cue` drops `providers`/`cacheDir`, D21's local default platform is the sibling `~/.opm/platform.cue`; folded into C2") format.
+      # a developer's personal ~/.opm being present or in the data-only format of enhancement 0006.
       # --skip-platform: hack/kind-platform.yaml below is the Platform. The
       # local-registry opt-in is an instance value, never a Deployment patch.
       - |

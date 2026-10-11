@@ -35,8 +35,8 @@ linters:
     depguard:
       rules:
         # The Kubernetes object wrapper, the OPM label vocabulary and the
-        # kind-class weight table are the library's (enhancement 0012, "The Kubernetes runtime surface homes in the library's Kubernetes tier (supersedes only the placement conclusion of the CLI inventory and handoff enhancement)" and "Ordering is kind-class order in the Kubernetes tier; no module-internal ordering is planned, and cross-module order belongs to a future Bundle"), and so
-        # are the inventory entry, stale set and digests (enhancement 0012, "The stale set is component-blind, and the inventory digest hashes a canonical field encoding").
+        # kind-class weight table are the library's (enhancement 0012), and so
+        # are the inventory entry, stale set and digests (enhancement 0012).
         # The cli deleted its copies; this rule stops one coming back under
         # the old import paths. No allow list: nothing else is denied.
         retired-kubernetes-copies:

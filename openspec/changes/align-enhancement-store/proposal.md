@@ -3,7 +3,7 @@
 ## Why
 
 The enhancements move to an OpenSpec store (`opm-enhancements`). Decision numbers do not
-survive that move: an entry is renumbered, split or retired, and a citation such as `0011:D9`
+survive that move: an entry is renumbered, split or retired, and a citation by decision number
 then points at nothing. Every citation in cli becomes an enhancement id beside a reason in words.
 No citation is a decision number, and none is a lone id. The old `enhancement.yaml` link between
 a change and an enhancement is replaced by one `Delivers` line in the proposal.

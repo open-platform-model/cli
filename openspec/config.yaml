@@ -123,7 +123,7 @@ context: |
   ### Comments
   - Default to no enhancement reference: say what the code does and why, in the comment's own words.
   - When the rationale genuinely lives in an enhancement, name the enhancement by its id beside the reason in words, once at the symbol: `// Version writes are offline by design (enhancement 0011).` Several enhancements: `(enhancements 0010 and 0011)`.
-  - An enhancement id appears only beside a reason in words, never alone, and never as a decision number (`0011:D9`, `0011 D9`, `D9`) or an open-question number. Decision numbers change when an entry is split or renumbered.
+  - An enhancement id appears only beside a reason in words, never alone, and never as a decision number (`NNNN:Dn`, `NNNN Dn`, `Dn`) or an open-question number. Decision numbers change when an entry is split or renumbered.
   - Enhancements live in the OpenSpec store `opm-enhancements` (see `references:`). Read an entry with `openspec show <id>-<slug> --store opm-enhancements`; its `tasks.md` says which repo still has work.
   - A change here delivers a line of an entry's `tasks.md` and says so in its proposal (`## Enhancement`, `Delivers NNNN, task X.Y.`).
   - Never cite a section, slice, phase, task or design-doc-local id (`§8.1`, `slice C2`, `task 4.2`, `design LD3`). They are not stable identifiers.

@@ -44,7 +44,7 @@ fi
 
 # The operator module pin and the operator release it deploys, both from
 # internal/operator/pin.go: a module release that deploys the same operator
-# still shows as a moved pin (enhancement 0021, "The operator's install artifact is a registry module on its own version train").
+# still shows as a moved pin (enhancement 0021).
 pin=internal/operator/pin.go
 if has "$pin"; then
   row github.com/open-platform-model/opm-operator opm-operator \
