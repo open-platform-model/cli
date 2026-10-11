@@ -17,7 +17,7 @@ Gates: a published `library` release carrying `opm/helper/platformmodule` and th
 ## 3. internal/workflow/render
 
 - [x] 3.1 `kernel.go`: `renderEnv{kernel, platform *platform.Platform, resolution, spec Spec, skew kernel.SkewPolicy}`; `resolvePlatformEnv` = `Resolve` → `AcquirePlatformFromDir(dir, {Registry})` → `SpecFromPlatform`; skew chosen per design (CR field > config key > warn); provenance line names the directory and a `refuse` policy.
-- [x] 3.2 `render.go`: `FromInstanceFile` acquires with `AcquireInstanceFromDir(dir, opts, WithValues(sources...))` from `LoadSourceFromFile` per `-f` file; delete `unifyValuesFiles` and the `ProcessModuleInstance` call; `compileInstance` → `renderInstance` calling `Kernel.Render`; `Result.Warnings` from `RenderResult.Warnings` (+ D19 warning).
+- [x] 3.2 `render.go`: `FromInstanceFile` acquires with `AcquireInstanceFromDir(dir, opts, WithValues(sources...))` from `LoadSourceFromFile` per `-f` file; delete `unifyValuesFiles` and the `ProcessModuleInstance` call; `compileInstance` → `renderInstance` calling `Kernel.Render`; `Result.Warnings` from `RenderResult.Warnings` (+ enhancement 0010 warning).
 - [x] 3.3 `types.go`: drop `MatchPlan`, `Components`; `PlatformSpec` becomes `platform.Spec`; doc comments.
 - [x] 3.4 `printValidationError` handles `*kernel.RenderError` (message + diagnostics rows) and `*oerrors.SkewError`; decide the verbose pair listing by reading `internal/cmd/module`'s verbose printer, then fix `verbose_output_test.go`. Update `render_test.go`, `module_test.go`.
 - [x] 3.5 `internal/workflow/apply/apply.go`: seed call passes `result.PlatformSpec` (new type); no behaviour change; test for "seed carries derived versions".

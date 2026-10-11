@@ -5,7 +5,7 @@
 See `proposal.md` § Why. Today's pieces:
 
 - `internal/workflow/render/render.go` `renderInstance` is the one `Kernel.Render` call. `RenderInput` carries instance, platform, `RuntimeName` and the skew policy.
-- The D19 warning is one constant (`localReplacementWarning`) emitted by `warnLocalReplacement` when `loader.HasLocalModuleReplacement(moduleRoot)` is true: a file-presence test on the module context, never on the platform directory.
+- The enhancement 0010 warning is one constant (`localReplacementWarning`) emitted by `warnLocalReplacement` when `loader.HasLocalModuleReplacement(moduleRoot)` is true: a file-presence test on the module context, never on the platform directory.
 - `pkg/loader/provenance.go` parses `local-module.cue` with `CompileBytes` to answer "any local `replaceWith`?"; `internal/publish/gates.go` `readReplacements` parses it again, beside `module.cue`'s pins, for the publish refusal.
 - The platform reaches a render as a directory: `--platform <dir>`, the local default platform module beside the config, or a module generated from the cluster CR (which never carries the file).
 - The library change of the same name adds `RenderInput.LocalReplacements bool` and `RenderDiagnostics.Replacements []kernel.Replacement{Path, Target, By}` (path-sorted, `By` is `"platform"` or `"instance"`), and refuses an input carrying the file when the flag is off.
@@ -52,7 +52,7 @@ func replacementWarnings(rows []kernel.Replacement, moduleRoot string) []string
 //     "local replacement of <Path> in <moduleRoot>/cue.mod/local-module.cue is ignored: the platform names that path; redirect it in the platform module's cue.mod/local-module.cue"
 ```
 
-`moduleRoot` is the existing D19 module context (`loader.ModuleRootFrom` of the instance file's directory, or the module directory). Platform-side entries are only ever reported through rows: the platform is authoritative, nothing of its file can be inert. An entry counts as honoured only when an `instance` row carries its path: a `platform` row on the same path is the platform's replacement in effect, and the module's own redirect of that path is still inert (the platform names it), so both lines are emitted.
+`moduleRoot` is the existing enhancement 0010 module context (`loader.ModuleRootFrom` of the instance file's directory, or the module directory). Platform-side entries are only ever reported through rows: the platform is authoritative, nothing of its file can be inert. An entry counts as honoured only when an `instance` row carries its path: a `platform` row on the same path is the platform's replacement in effect, and the module's own redirect of that path is still inert (the platform names it), so both lines are emitted.
 
 ### One reader in `pkg/loader`
 
@@ -95,7 +95,7 @@ WARN local replacement of opmodel.dev/catalogs/opm@v4 in /home/dev/my-app/cue.mo
 
 ## Risks / Trade-offs
 
-- [A developer applies to a cluster with a replacement in effect] → already the D6 local-first story: the CR carries the declared reference, `source: local` is stamped, and operator handoff aborts on the digest (enhancement 0006 ("`opm instance handoff`, the migration feature").4). Unchanged.
+- [A developer applies to a cluster with a replacement in effect] → already the enhancement 0010 local-first story: the CR carries the declared reference, `source: local` is stamped, and operator handoff aborts on the digest (enhancement 0006 ("`opm instance handoff`, the migration feature").4). Unchanged.
 - [The library bump lands before this change] → every render of a directory carrying the file refuses; the bump and the opt-in ship in one PR (Migration Plan).
 - [Warning volume on a directory with many redirects] → one line per honoured or inert entry, sorted by path; acceptable for a developer-only condition.
 

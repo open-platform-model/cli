@@ -1,4 +1,4 @@
-Branch: `0002-cli-x1-rename-module-instance` (stacked on X1 `7a9175d` + X2 + X3 `8e6311e`; atomic-PR / bulk-archive model — **not** a fresh branch). X4 is the slice that drives full `task test` green for the first time in the wave. Every rename site carries a `// Was:` breadcrumb (D11/D12). The X1-gap `pkg/loader` public-API accuracy residue and the `modules/`+`releases/` `release.cue` sweep are **out of scope** (see proposal).
+Branch: `0002-cli-x1-rename-module-instance` (stacked on X1 `7a9175d` + X2 + X3 `8e6311e`; atomic-PR / bulk-archive model — **not** a fresh branch). X4 is the slice that drives full `task test` green for the first time in the wave. Every rename site carries a `// Was:` breadcrumb (enhancement 0002). The X1-gap `pkg/loader` public-API accuracy residue and the `modules/`+`releases/` `release.cue` sweep are **out of scope** (see proposal).
 
 ## 1. Label domain (`instance-identity-labeling`, D4)
 

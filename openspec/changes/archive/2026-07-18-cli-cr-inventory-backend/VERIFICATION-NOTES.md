@@ -98,7 +98,7 @@ mechanism are unit-tested, but **no live test exercises the annotation**:
   not set `SourceLocal`, so the annotation is never stamped in these runs.
 - The only path that stamps it is a real `opm instance apply` / `opm module
   apply` of a locally-replaced module — which is blocked by §2.1.
-- Therefore the D7 scenarios "local render stamps the annotation" and "registry
+- Therefore the enhancement 0006 scenarios "local render stamps the annotation" and "registry
   re-apply clears it (SSA field-ownership removal)" have **not** been confirmed
   end-to-end on a cluster. This is the one behavior in the change with only
   unit-level coverage.

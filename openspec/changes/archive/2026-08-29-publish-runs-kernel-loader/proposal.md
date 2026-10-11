@@ -26,4 +26,4 @@ None.
 - Dependency: the loader is already embedded (`internal/workflow/render` uses it); no new module.
 - SemVer: MINOR (`feat(publish)`): a new gate can refuse trees that previously passed. That is the intent; every such tree was already unloadable.
 - Complexity: one gate function; the loader call already exists elsewhere in the CLI. Justified by closing the class of defect rather than the instance.
-- Enhancement: 0011 (D16-D18 gate family, and the "publish never judges differently from a consumer" principle). Create `enhancement.yaml` declaring `implements: 0011` with the gate decisions the design cites.
+- Enhancement: 0011 (its identity and tag gate family, and the "publish never judges differently from a consumer" principle). Create `enhancement.yaml` declaring `implements: 0011` with the gate decisions the design cites.

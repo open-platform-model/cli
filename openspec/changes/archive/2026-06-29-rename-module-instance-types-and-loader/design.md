@@ -10,7 +10,7 @@ The whole CLI rename (X1–X4) lands as **one atomic per-repo PR, bulk-archived*
 
 - Rename the prepared module-instance Go type and its loader/kind-detection surface to `Instance` vocabulary.
 - Flip the **module** wire kind string to `"ModuleInstance"` (core@v1 compatibility).
-- Adopt the D9 instance-file convention (`instance.cue`), hard-replacing `release.cue`.
+- Adopt the enhancement 0002 instance-file convention (`instance.cue`), hard-replacing `release.cue`.
 - Leave a clean X1/X2 seam so the bundle rename is a separable, additive follow-up within the same PR.
 
 **Non-Goals**
@@ -30,7 +30,7 @@ The detection switch becomes `case "ModuleInstance", "BundleRelease":`. The cons
 
 ### D-X1.2 — Instance-file convention is a hard flip (D9): `instance.cue` only, no `release.cue` fallback
 
-Inside a package directory the loader resolves `instance.cue`; if absent it errors (`… does not contain instance.cue`). `release.cue` is **not** accepted as a fallback. Justification: D8's hard-rename / no-alias conclusion plus the CLI having no external users (no compatibility owed). A dual-detect alias would be dead complexity (CLI CONSTITUTION §VII, YAGNI). The mirror of the operator's already-shipped `InstanceFileNotFound` behavior.
+Inside a package directory the loader resolves `instance.cue`; if absent it errors (`… does not contain instance.cue`). `release.cue` is **not** accepted as a fallback. Justification: enhancement 0002's hard-rename / no-alias conclusion plus the CLI having no external users (no compatibility owed). A dual-detect alias would be dead complexity (CLI CONSTITUTION §VII, YAGNI). The mirror of the operator's already-shipped `InstanceFileNotFound` behavior.
 
 ### D-X1.3 — `releasefile` → `instancefile` package rename keeps the bundle branches intact (X1/X2 seam)
 

@@ -1,6 +1,6 @@
 ## Context
 
-Slice X2 of enhancement 0002. Originally "rename `BundleRelease` → `BundleInstance`" (D7); rescoped by enhancement decision **D15** (supersedes D7) to *remove* the bundle path entirely. X2 planning established the bundle surface is unreachable dead code: `internal/workflow/render/render.go` parses a bundle file into a `*bundle.Release` only to reject it one line later (`"bundle releases are not yet supported"`); the would-be consumers — `pkg/render/bundle_renderer.go` (`Bundle`/`NewBundle`/`Bundle.Execute`/`BundleResult`) and `pkg/render/process_bundlerelease.go` (`ProcessBundleRelease`, a validate-then-`not implemented yet` stub) — have **zero production callers** (tests only). The only producer of `kind: "BundleRelease"` is the deprecated `catalog/core/v1alpha1/bundlerelease`; no bundle kind exists in `core`/`catalog_opm`/`catalog_kubernetes`.
+Slice X2 of enhancement 0002. Originally "rename `BundleRelease` → `BundleInstance`" (enhancement 0002); rescoped by a later decision of enhancement 0002 (which supersedes the rename) to *remove* the bundle path entirely. X2 planning established the bundle surface is unreachable dead code: `internal/workflow/render/render.go` parses a bundle file into a `*bundle.Release` only to reject it one line later (`"bundle releases are not yet supported"`); the would-be consumers — `pkg/render/bundle_renderer.go` (`Bundle`/`NewBundle`/`Bundle.Execute`/`BundleResult`) and `pkg/render/process_bundlerelease.go` (`ProcessBundleRelease`, a validate-then-`not implemented yet` stub) — have **zero production callers** (tests only). The only producer of `kind: "BundleRelease"` is the deprecated `catalog/core/v1alpha1/bundlerelease`; no bundle kind exists in `core`/`catalog_opm`/`catalog_kubernetes`.
 
 This lands in the single atomic per-repo CLI PR (X1–X4) and bulk-archives with the other cli slices. X1 (module-instance types/loader) is committed and left precise `// TODO(0002 X2)` breadcrumbs marking the bundle seam.
 
@@ -14,7 +14,7 @@ This lands in the single atomic per-repo CLI PR (X1–X4) and bulk-archives with
 
 **Non-Goals:**
 
-- Renaming `BundleRelease` → `BundleInstance`. Superseded by D15. `BundleInstance` is reintroduced only if/when real bundle support is built.
+- Renaming `BundleRelease` → `BundleInstance`. Superseded by enhancement 0002. `BundleInstance` is reintroduced only if/when real bundle support is built.
 - Keeping a friendly "bundle not supported" message. Option B removes detection; a bundle file now errors via `DetectInstanceKind`'s default arm → `unknown instance kind: "BundleRelease"`.
 - The `rel-commands` → `inst-commands` rename and its bundle-rejection scenario — owned by **X3** (see D-X2.3).
 - The module-instance *field* renames (`Resource.Release`, `ModuleResult.Release`, `BundleResult.ReleaseOrder`) — X1-gap / X4 territory, not bundle-specific.
@@ -46,8 +46,8 @@ X1 renamed `module.Release` → `module.Instance` in code but did not author `pk
 
 - **Terser error for a stray bundle file.** Low impact — bundles were never renderable; the file would have errored regardless, one step later.
 - **Two slices touching overlapping specs in one PR.** Mitigated by clean ownership: X2 owns `bundle-release-processing`/`engine-rendering`/`loader-api`/`validation-gates`/`pkg-types`; X3 owns `rel-commands`. No capability is delta'd by both.
-- **Reviving bundle support later costs reintroduction.** Accepted: D15's rationale is that renaming dead code is worse — a live-looking `BundleInstance` stub is a maintenance trap. A future bundle enhancement re-adds the surface deliberately, under the Instance vocabulary.
+- **Reviving bundle support later costs reintroduction.** Accepted: enhancement 0002's rationale is that renaming dead code is worse — a live-looking `BundleInstance` stub is a maintenance trap. A future bundle enhancement re-adds the surface deliberately, under the Instance vocabulary.
 
 ## Migration Notes
 
-No external consumers (memory: the CLI has no external API consumers; D8/D15 hard-removal, no shim). User-visible delta: a `kind: "BundleRelease"` `.cue` file now fails with `unknown instance kind: "BundleRelease"` instead of `"bundle releases are not yet supported - use a #ModuleRelease file"`.
+No external consumers (memory: the CLI has no external API consumers; enhancement 0002 hard-removal, no shim). User-visible delta: a `kind: "BundleRelease"` `.cue` file now fails with `unknown instance kind: "BundleRelease"` instead of `"bundle releases are not yet supported - use a #ModuleRelease file"`.

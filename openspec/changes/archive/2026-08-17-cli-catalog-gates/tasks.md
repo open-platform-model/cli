@@ -24,7 +24,7 @@
 ## 4. registry check
 
 - [x] 4.1 `opm catalog registry check <path@version> [--compat]` under a new `registry` subgroup: pull, identity concreteness + coordinate agreement, member inventory report; `--compat` runs 3.x against the fetched build. Exit 0/2/3.
-- [x] 4.2 Help text carries the D35 aid-not-guarantee sentence verbatim (graduation-gated); constructor + e2e output tests.
+- [x] 4.2 Help text carries the enhancement 0010 aid-not-guarantee sentence verbatim (graduation-gated); constructor + e2e output tests.
 
 ## 5. Real-tree smoke + gates
 
@@ -34,5 +34,5 @@
 ## 6. Record + cross-repo corrections
 
 - [x] 6.1 enhancement 0011: slice → done + `openspec_ref` + history event; log the open question (beta+ member removal refused by nothing); note the refusal-11 pre-D49 wording as superseded by the shipped gate.
-- [x] 6.2 0011 amendment decision (`Amends: D9`, via the enhancements workflow): strike the `highestStable` implementation note; demote the one-prior-build claim to the no-removals fast path; state the literal rule as implemented.
+- [x] 6.2 Amendment decision of enhancement 0011 on predecessor selection (via the enhancements workflow): strike the `highestStable` implementation note; demote the one-prior-build claim to the no-removals fast path; state the literal rule as implemented.
 - [x] 6.3 Library follow-up (small separate PR): `catalog-compatibility` spec's "Predecessor Selection" re-scoped; `HighestStable` re-documented as the float selector — its disposition is settled: `cli-template-modules` makes it template resolution's version selector (its first true caller), so it stays.

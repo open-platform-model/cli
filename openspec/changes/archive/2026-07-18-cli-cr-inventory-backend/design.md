@@ -60,7 +60,7 @@ Gates 1–3 are read-only cluster probes; RBAC failures reading the Platform in 
 
 ### D6: Migration — read Secret once, write CR, delete Secret only after status write succeeds
 
-On apply, when the CR is absent but a legacy inventory Secret exists (direct name + label fallback, today's lookup): build the CR from the Secret record (entries/revision/digest/count into `status.inventory`, record UUID into `instanceUUID`, timestamps into `lastAppliedAt`; spec comes from the *current* apply's module/values), proceed with the normal apply, and delete the Secret **only after** the CR status write succeeds. A failure anywhere leaves the Secret intact and the release discoverable by a re-run. `status`/`delete`/`list`/`diff` never read Secrets (enhancement 0006 ("Migration of existing Secret inventories") as amended by D14 — no fallback window); an instance tracked only by a Secret reappears on its next apply.
+On apply, when the CR is absent but a legacy inventory Secret exists (direct name + label fallback, today's lookup): build the CR from the Secret record (entries/revision/digest/count into `status.inventory`, record UUID into `instanceUUID`, timestamps into `lastAppliedAt`; spec comes from the *current* apply's module/values), proceed with the normal apply, and delete the Secret **only after** the CR status write succeeds. A failure anywhere leaves the Secret intact and the release discoverable by a re-run. `status`/`delete`/`list`/`diff` never read Secrets (enhancement 0006 ("Migration of existing Secret inventories") as amended by enhancement 0006 — no fallback window); an instance tracked only by a Secret reappears on its next apply.
 
 ### D7: Render provenance annotation — written here, consumed by C3's handoff as a fail-closed pre-gate (resolves an open question of enhancement 0006)
 
@@ -85,7 +85,7 @@ The loader records render provenance; when the module bytes did not come from pu
 
 ## Migration Plan
 
-Single release, no flags, no window: ship, re-apply live instances once (each apply migrates its own Secret), done. Rollback = previous CLI binary, which still reads any not-yet-migrated Secrets; already-migrated instances would need a manual re-apply under the old binary to recreate Secrets (accepted, D14). Docs: `apply`/`delete`/`list`/`status` reference pages and the QUICKSTART gain the CRD-prerequisite note and the `opm operator install --crds-only` first-run step.
+Single release, no flags, no window: ship, re-apply live instances once (each apply migrates its own Secret), done. Rollback = previous CLI binary, which still reads any not-yet-migrated Secrets; already-migrated instances would need a manual re-apply under the old binary to recreate Secrets (accepted, enhancement 0006). Docs: `apply`/`delete`/`list`/`status` reference pages and the QUICKSTART gain the CRD-prerequisite note and the `opm operator install --crds-only` first-run step.
 
 ## Open Questions
 

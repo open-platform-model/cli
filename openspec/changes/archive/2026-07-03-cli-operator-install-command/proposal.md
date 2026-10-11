@@ -1,6 +1,6 @@
 # Proposal: cli-operator-install-command
 
-> Slice B2 of enhancement `0006` (CLI CR Inventory, Library Kernel Adoption, and Operator Handoff). Implements decisions D5, D23 (install-side half), D32, D33, D34, D35.
+> Slice B2 of enhancement `0006` (CLI CR Inventory, Library Kernel Adoption, and Operator Handoff). Implements the install-side decisions of enhancement 0006: operator and CRD install, field-manager rename, uninstall safety, one embedded artifact.
 
 ## Why
 

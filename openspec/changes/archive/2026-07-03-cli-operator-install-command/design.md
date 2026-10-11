@@ -2,7 +2,7 @@
 
 ## Context
 
-Enhancement 0006 fixed the product surface in its decision log — noun-first `opm operator install [--crds-only] [--rbac]` / `opm operator uninstall [--remove-finalizers]` (D32), install/uninstall-only scope with the `opm-cli` field-manager rename (D33), uninstall safety semantics (D34), single embedded artifact + pin + fetch + readiness wait (D35). This design does not re-litigate those; it decides how they map onto the CLI codebase.
+Enhancement 0006 fixed the product surface in its decision log — noun-first `opm operator install [--crds-only] [--rbac]` / `opm operator uninstall [--remove-finalizers]`, install/uninstall-only scope with the `opm-cli` field-manager rename, uninstall safety semantics, single embedded artifact + pin + fetch + readiness wait (all in enhancement 0006). This design does not re-litigate those; it decides how they map onto the CLI codebase.
 
 Current state that shapes the design:
 
@@ -16,17 +16,17 @@ Current state that shapes the design:
 
 **Goals:**
 
-- `opm operator install/uninstall` per D32–D35, with all cluster writes attributed to field manager `opm-cli`.
+- `opm operator install/uninstall` per enhancement 0006, with all cluster writes attributed to field manager `opm-cli`.
 - One embedded artifact; CRD subset always derived by filtering, structurally unable to drift from the full install.
 - Bounded, observable readiness waits whose machinery slice C3 (`instance handoff`) can reuse for its "operator installed and ready" precondition.
 - Uninstall that cannot wedge the cluster: CRDs and Namespace preserved, finalizer refusal by default.
 
 **Non-Goals:**
 
-- No apply-path changes: no missing-CRD hint, no version-skew gates — C1's scope (D33).
+- No apply-path changes: no missing-CRD hint, no version-skew gates — C1's scope (enhancement 0006).
 - No operator upgrade orchestration; `install` is idempotent SSA, not a package manager (0006 README out-of-scope).
-- No checksum/signature verification of fetched artifacts (deferred by D35).
-- No reconciliation of `--version`-fetched vs embedded CRD schema differences — the CLI-≥-cluster contract is C1's gate (D24).
+- No checksum/signature verification of fetched artifacts (deferred by enhancement 0006).
+- No reconciliation of `--version`-fetched vs embedded CRD schema differences — the CLI-≥-cluster contract is C1's gate (enhancement 0006).
 
 ## Decisions
 
@@ -54,7 +54,7 @@ Pure functions over parsed docs keep everything unit-testable without a cluster,
 
 ### 4. Pin + refresh: one constant next to the embed, `task operator:sync`
 
-The pinned tag lives as a single Go constant (e.g. `internal/operator/manifest.go: PinnedOperatorVersion = "v1.0.0-alpha.2"`) beside the `go:embed` directive. `task operator:sync VERSION=<tag>` downloads `https://github.com/open-platform-model/opm-operator/releases/download/<tag>/install.yaml` into the embed location and rewrites the constant — the whole upgrade is one reviewable diff. `--version <tag>` at runtime fetches the same URL over HTTPS (10–30s timeout, clear error on 404 naming the tag) and feeds the identical parse/plan path; per D35 no checksum verification.
+The pinned tag lives as a single Go constant (e.g. `internal/operator/manifest.go: PinnedOperatorVersion = "v1.0.0-alpha.2"`) beside the `go:embed` directive. `task operator:sync VERSION=<tag>` downloads `https://github.com/open-platform-model/opm-operator/releases/download/<tag>/install.yaml` into the embed location and rewrites the constant — the whole upgrade is one reviewable diff. `--version <tag>` at runtime fetches the same URL over HTTPS (10–30s timeout, clear error on 404 naming the tag) and feeds the identical parse/plan path; per enhancement 0006 no checksum verification.
 
 *Alternative — infer the pin from `go.mod` or a config file:* rejected; the CLI has no Go dependency on opm-operator (enhancement 0006 ("The CLI imports `library` only; it does not import `opm-operator` (no controller-runtime, no Flux); supersedes D4's dependency direction") forbids the module edge), and a config file adds a second source of truth for what is a build-time property.
 
@@ -75,7 +75,7 @@ Before deleting anything, uninstall lists `moduleinstances` cluster-wide via the
 
 ### 7. `--rbac` is valid with and without `--crds-only`
 
-D23/D32 word `--rbac` against the CRDs-only path (its motivating user), but a full-install cluster whose CLI drivers are non-admins is coherent. The flag emits the `opm-cli-user` ClusterRole (full verbs on `moduleinstances`, get/patch/update on `moduleinstances/status`, get/list on `platforms`) and, when `--user`/`--group` is given, one ClusterRoleBinding. Objects are constructed in Go as `unstructured` (not embedded YAML templates — they take runtime parameters). `--user`/`--group` without `--rbac` is a flag-validation error (fail-early, Constitution I).
+enhancement 0006 word `--rbac` against the CRDs-only path (its motivating user), but a full-install cluster whose CLI drivers are non-admins is coherent. The flag emits the `opm-cli-user` ClusterRole (full verbs on `moduleinstances`, get/patch/update on `moduleinstances/status`, get/list on `platforms`) and, when `--user`/`--group` is given, one ClusterRoleBinding. Objects are constructed in Go as `unstructured` (not embedded YAML templates — they take runtime parameters). `--user`/`--group` without `--rbac` is a flag-validation error (fail-early, Constitution I).
 
 ### 8. Field-manager rename is a one-constant change, sequenced first
 
@@ -84,7 +84,7 @@ D23/D32 word `--rbac` against the CRDs-only path (its motivating user), but a fu
 ## Risks / Trade-offs
 
 - **[E2E needs the operator image]** The kind-cluster e2e's rollout wait requires pulling the pinned operator image from GHCR (or preloading it). → Verify pull access in the e2e environment first; if unavailable, e2e asserts through CRD `Established` + Deployment *created*, and rollout-ready is covered by a documented manual/integration path.
-- **[Fetched `--version` artifact skew]** A newer fetched `install.yaml` may carry CRDs/fields this CLI predates; nothing gates that here. → Accepted for this slice; D24's CLI-≥-cluster gate lands in C1. `--version` output names the tag it installed.
+- **[Fetched `--version` artifact skew]** A newer fetched `install.yaml` may carry CRDs/fields this CLI predates; nothing gates that here. → Accepted for this slice; enhancement 0006's CLI-≥-cluster gate lands in C1. `--version` output names the tag it installed.
 - **[Finalizer strip races the operator]** If the operator is still running when `--remove-finalizers` strips, a concurrent reconcile may re-add finalizers. → Acceptable: uninstall deletes the Deployment immediately after; a re-added finalizer just re-triggers the refusal on a rerun, which is safe and visible.
 - **[Field ownership transfer noise]** After the rename, the first re-apply of pre-existing releases shows all fields migrating `opm` → `opm-cli` in managedFields. → Cosmetic; no behavior change (`Force: true` preexists). Noted in the task so reviewers aren't surprised by e2e managedFields diffs.
 - **[GitHub fetch is a new failure surface]** Air-gapped or rate-limited environments can't use `--version`. → The embedded default needs no network; the error message says to use the embedded version or `task operator:sync` from a connected machine.

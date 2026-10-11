@@ -106,7 +106,7 @@ opm instance init [name] [module-path] [flags]
  11. report (see Example output)
 ```
 
-Step 9 writes the core pin explicitly at the module's own version, and tidy only completes the closure. That matches 0016 experiment 03, which wrote the module and core pins and tidy added one catalog pin. It also makes D9's "core at the module's major" hold regardless of which core release is newest.
+Step 9 writes the core pin explicitly at the module's own version, and tidy only completes the closure. That matches 0016 experiment 03, which wrote the module and core pins and tidy added one catalog pin. It also makes enhancement 0016's "core at the module's major" hold regardless of which core release is newest.
 
 ### Exit codes and messages
 
@@ -172,22 +172,22 @@ Error: standard input is not a terminal, so the namespace cannot be asked
 ### Refusing a target inside a CUE module
 
 **Context**: enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-free module path, and floats to the highest core-compatible major when no version is given") refuses only an existing directory. A standalone package nested in another CUE module's tree is legal CUE, but the enclosing module's tooling may walk into it.
-**Decision**: Refuse (user decision 2026-09-28). The enhancement records it as enhancement 0016 ("Init refuses a target directory inside an existing CUE module"), which amends D5.
+**Decision**: Refuse (user decision 2026-09-28). The enhancement records it as enhancement 0016 ("Init refuses a target directory inside an existing CUE module"), which amends enhancement 0016.
 **Rationale**: Relaxing a refusal later is non-breaking; tightening one later is breaking. Colocated instances, which need no `cue.mod` of their own, stay out of scope.
 
 ### What counts as a concrete `debugValues`
 
 **Context**: enhancement 0016 ("With no usable template source, init writes `values: {}` and warns") sends a `debugValues` that is "not concrete" to `values: {}` without defining the word for a partly concrete struct such as `{image: "nginx:1.27", replicas: int}`. Separately, `module-renders-against-own-deps` gives fixtures `debugValues: {}`, which is concrete but renders an empty file.
 **Options considered**:
-1. Render a partial `debugValues` the way `initValues` renders, sending only `_` or an absent field to empty: keeps the author's values, but narrows D6 and would need an amending decision in 0016.
-2. The whole value must be concrete once defaults apply (chosen): D6 as written. `opm module build` already needs a concrete `debugValues`, so a published module rarely has a partial one.
+1. Render a partial `debugValues` the way `initValues` renders, sending only `_` or an absent field to empty: keeps the author's values, but narrows enhancement 0016 and would need an amending decision in 0016.
+2. The whole value must be concrete once defaults apply (chosen): enhancement 0016 as written. `opm module build` already needs a concrete `debugValues`, so a published module rarely has a partial one.
 **Decision**: Option 2 (user decision 2026-09-29): `debugValues.Validate(cue.Final(), cue.Concrete(true))` decides the rung. A source that renders as an empty struct keeps its name in the report (enhancement 0016, "`debugValues` is the default template source for the generated `values.cue`") and also gets the empty-file warning.
 
 ### A registry failure during tidy exits 3
 
 **Context**: enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-free module path, and floats to the highest core-compatible major when no version is given") gives an unreachable registry exit 3, at any stage. `cuemod.Tidy` returns cmd/cue's error as it came, with no connectivity type, and `opm module tidy` maps every resolution or registry failure to exit 1.
 **Options considered**:
-1. Exit 1 for every tidy failure: matches `opm module tidy`, but breaks D5:R7 when the registry drops between acquire and tidy.
+1. Exit 1 for every tidy failure: matches `opm module tidy`, but breaks the registry-failure requirement of enhancement 0016 when the registry drops between acquire and tidy.
 2. Classify a tidy error as a connectivity failure and return a `*publish.ConnectivityError` (exit 3): `errors.As` to `net.Error` first, cmd/cue's error text as the fallback.
 **Decision**: Option 2 (user decision 2026-09-28). The classifier sits beside `cuemod.Tidy` so `opm module tidy` can adopt it later; this change leaves that command's exit codes as they are.
 **Rationale**: A script that retries on exit 3 then treats a registry outage the same at every stage of init.

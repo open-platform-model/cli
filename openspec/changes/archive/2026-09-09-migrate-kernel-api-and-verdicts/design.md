@@ -54,7 +54,7 @@ Constraint: the target library alpha does not exist yet. Every task must be veri
 **Context**: enhancement 0011 ("Predecessor selection is D9's literal rule: a backward scan of the published history, prereleases included") kept `HighestStable` only because template resolution calls it. That caller is `scaffold.ResolveTemplateVersion`, and nothing else in this repo calls it.
 **Explored**: (A) keep it exported beside the ladder in `internal/compat`; (B) unexported in `internal/scaffold`.
 **Decision**: B, carrying `predecessor.go`'s doc comment and the four cases of `predecessor_test.go`.
-**Rationale**: it shares nothing with the comparator but the semver import, and it has no compatibility semantics at all — a "compat" package holding a float selector is the confusion D23 had to spend a paragraph explaining away. The doc comment travels because it is the thing that prevents the confusion returning; only its pointer to the gate-side rule is re-aimed at `internal/publish`.
+**Rationale**: it shares nothing with the comparator but the semver import, and it has no compatibility semantics at all — a "compat" package holding a float selector is the confusion enhancement 0011 had to spend a paragraph explaining away. The doc comment travels because it is the thing that prevents the confusion returning; only its pointer to the gate-side rule is re-aimed at `internal/publish`.
 
 ### The publish gate takes a kernel rather than growing one
 

@@ -61,7 +61,7 @@ This revises enhancement 0006 ("CRD/operator version skew: CLI-≥-cluster invar
 - the CRD field floor (`GateCRDFieldFloor`, `spec.owner` and `status.inventory`), which catches only a CRD missing those fields; and
 - a process rule for the supervisor and operator authors: an operator `feat!` that the released cli cannot drive merges only after the cli release that can drive it. There is never a `Release-As: 1.1.0-beta.1` or any other minor or major hop during beta. opm-operator records the same rule on its side.
 
-The owner accepted an inert gate for the whole beta, and with it this revision of D24, when choosing the MAJOR.MINOR ceiling (owner decision 3). Final ceiling semantics are the canon GA-exit item "ceiling gate semantics final (OQ14)". The live spec Purpose line citing D24 is left as a pointer to the origin; the requirement text in the delta states the MAJOR.MINOR rule. Section 1 also rewrites the `thineditor.go` comment and the `gates.go` doc so neither claims full-version semantics.
+The owner accepted an inert gate for the whole beta, and with it this revision of enhancement 0006, when choosing the MAJOR.MINOR ceiling (owner decision 3). Final ceiling semantics are the canon GA-exit item "ceiling gate semantics final (OQ14)". The live spec Purpose line citing enhancement 0006 is left as a pointer to the origin; the requirement text in the delta states the MAJOR.MINOR rule. Section 1 also rewrites the `thineditor.go` comment and the `gates.go` doc so neither claims full-version semantics.
 
 ### D2. The version line moves by a squash-message footer, never by config
 

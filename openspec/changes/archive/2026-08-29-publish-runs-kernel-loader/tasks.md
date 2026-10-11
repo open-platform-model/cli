@@ -1,7 +1,7 @@
 ## 1. internal/publish
 
 - [x] 1.1 Add `gateKernelLoad(ctx, p, opts)` calling `loaderfile.LoadModulePackage(ctx, p.Dir, loaderfile.LoadOptions{Registry: opts.Registry})` for `KindModule`; map the error to a `Refusal` per design D4, branching on the loader sentinels with `errors.Is`.
-- [x] 1.2 Wire it into `Run` after `resolveVersion` (so D3's open-identity skip can read the tristate) and before the derivation gates; accumulate, no short-circuit.
+- [x] 1.2 Wire it into `Run` after `resolveVersion` (so enhancement 0011's open-identity skip can read the tristate) and before the derivation gates; accumulate, no short-circuit.
 - [x] 1.3 Number the gate (msg 12) in its doc comment and the `Run` wiring comment, matching the existing per-gate numbering (there is no catalog listing in `refusal.go`).
 - [x] 1.4 Ensure `VetChecks` (`vet.go`) runs the same gate at the same position.
 

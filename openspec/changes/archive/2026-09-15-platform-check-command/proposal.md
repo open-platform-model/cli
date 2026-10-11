@@ -14,7 +14,7 @@ The same libraries also added the defining catalog to the unresolved-demand row,
 - `cmdutil.FormatUnresolvedDemands` gains the defining catalog: a demand whose contract an enabled catalog lists now reads "defined by `<catalog>`, nothing on this platform implements it" instead of the bare nothing-implements line. The row has carried `DefinedBy` since library alpha.30; the formatter has been discarding it.
 - `internal/cmd/root.go` registers the new group.
 
-**Not in this change**: enhancement 0015 ("A cluster's render is reproduced by pulling the operator-generated platform package"), reproducing a cluster's render by fetching the effective registry. That needs the operator's registration acceptance to exist first, and it changes what "which platform" means; this command reads a platform module, not a cluster. D5's comparable-predicate duplicates are also out, still deferred by OQ9.
+**Not in this change**: enhancement 0015 ("A cluster's render is reproduced by pulling the operator-generated platform package"), reproducing a cluster's render by fetching the effective registry. That needs the operator's registration acceptance to exist first, and it changes what "which platform" means; this command reads a platform module, not a cluster. enhancement 0015's comparable-predicate duplicates are also out, still deferred by an open question of that entry.
 
 ## Impact
 

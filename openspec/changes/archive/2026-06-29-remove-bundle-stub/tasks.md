@@ -12,7 +12,7 @@
 ## 3. Remove the bundle parse path from `internal/instancefile` (`bundle-release-processing`)
 
 - [x] 3.1 Removed `KindBundleRelease` const, the `Bundle *bundle.Release` field, the bundle switch arm, the `bareBundleRelease` / `mustBundleReleaseMetadata` / `bestEffortBundleMetadata` helpers, the `pkg/bundle` import, and the `// TODO(0002 X2)` breadcrumbs. `FileRelease` struct name kept (X3 surface).
-- [x] 3.2 Package doc comment now reads "a #ModuleInstance" only, with a removal breadcrumb (D15).
+- [x] 3.2 Package doc comment now reads "a #ModuleInstance" only, with a removal breadcrumb (enhancement 0002).
 - [x] 3.3 Removed `TestGetInstanceFile_BundleReleasePartial` and `TestGetInstanceFile_FailsWhenBundleMetadataNotConcrete`.
 
 ## 4. Remove loader bundle detection (`loader-api`, `validation-gates`)
@@ -39,7 +39,7 @@
 - [x] 7.2 Lint: the bundle-removal diff introduces **0 new issues**. One pre-existing `goconst` (`pkg/loader/provider.go:26` `"kubernetes"`) is in an untouched file and reproduces at the X1 commit (`git stash`-verified) — not X2's to fix.
 - [x] 7.3 `go build ./...` and `go vet ./...` both green.
 - [x] 7.4 `pkg/render`, `pkg/loader` (incl. registry-backed synth tests), and `internal/instancefile` all green. **`internal/workflow/render` has one pre-existing X1-gap failure** — `TestRenderFromReleaseFile_ValidValuesDoNotPanicAcrossRuntimes` uses a stale `kind: "ModuleRelease"` fixture (verbatim in X1 commit `7a9175d:internal/workflow/render/render_test.go:127`); the X2 bundle test in that file passes. Full-suite green is gated on the X3/X4 fixture reconciliation in the same atomic PR (matches X1's documented "not green alone" model).
-- [x] 7.5 Grep sweep: no surviving bundle *code*. Remaining `bundle` tokens are D15 removal-breadcrumbs, rejection-test names, the X3-owned `cmd/release` test (D-X2.3), and deliberately-left `pkg/errors`/`cmdutil` prose (D-X2.5).
+- [x] 7.5 Grep sweep: no surviving bundle *code*. Remaining `bundle` tokens are enhancement 0002 removal-breadcrumbs, rejection-test names, the X3-owned `cmd/release` test (D-X2.3), and deliberately-left `pkg/errors`/`cmdutil` prose (D-X2.5).
 - [x] 7.6 `openspec validate remove-bundle-stub --strict` passes.
 
 ## Implementation notes / deviations

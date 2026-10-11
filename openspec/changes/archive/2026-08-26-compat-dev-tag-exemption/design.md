@@ -2,7 +2,7 @@
 
 See proposal.md for motivation. The gate lives in `internal/publish/compat.go`: `gateCompat` (publish) and `RegistryCheck` (`check.go:135`) both call `predecessorVersions(published, tag, major)` then `compatScan`. `CatalogGateOutcomes` carries four counters (`CompatCompared`, `CompatRefused`, `CompatAlpha`, `CompatNew`) rendered by `plan.go:renderCatalogGates` and `check.go`'s report; `Plan.CompatChecked` already distinguishes "not completed" from counts. The effective tag comes from `resolveVersion` (`identity.go`) as `"v" + Version`; `catalog_opm/.tasks/branch-tag.sh` stamps `v<M>.<m>.<p>-0.dev.<count>.g<sha>` into the working tree before publish, so the dev shape reaches the gate as an ordinary `p.Tag`.
 
-Constraints: enhancement 0011 ("The compatibility gate ignores dev builds and stands down while the module line is itself a prerelease") clause 1 is the policy; D23's literal scan (release prereleases included, newest first) stays. Principle VII: no flag, the dev shape is recognised, never declared.
+Constraints: enhancement 0011 ("The compatibility gate ignores dev builds and stands down while the module line is itself a prerelease") clause 1 is the policy; enhancement 0011's literal scan (release prereleases included, newest first) stays. Principle VII: no flag, the dev shape is recognised, never declared.
 
 ## Goals / Non-Goals
 
@@ -45,12 +45,12 @@ Signatures:
 
 ```go
 // isDevTag reports whether tag's prerelease segment carries a dev identifier
-// (branch-tag.sh's v<M>.<m>.<p>-0.dev.<count>.g<sha>); D26 clause 1.
+// (branch-tag.sh's v<M>.<m>.<p>-0.dev.<count>.g<sha>); enhancement 0011 clause 1.
 func isDevTag(tag string) bool
 
 type CatalogGateOutcomes struct {
     // existing counters ...
-    CompatDevExempt bool // D26: dev build, neither judged nor a baseline
+    CompatDevExempt bool // enhancement 0011: dev build, neither judged nor a baseline
 }
 ```
 

@@ -17,7 +17,7 @@ The local default platform SHALL be a CUE module directory (`~/.opm/platform/`, 
 #### Scenario: Key-to-import drift refuses
 
 - **WHEN** a `#registry` entry is keyed at one catalog path but embeds an import of a different catalog
-- **THEN** building the platform module fails with a conflict at a path naming that entry (the D5 binding), and vet surfaces it
+- **THEN** building the platform module fails with a conflict at a path naming that entry (the enhancement 0019 binding), and vet surfaces it
 
 ## REMOVED Requirements
 

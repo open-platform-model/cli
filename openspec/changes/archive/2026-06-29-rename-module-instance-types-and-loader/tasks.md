@@ -1,7 +1,7 @@
 ## 1. Module-instance type (`module-instance-type`)
 
 - [x] 1.1 `git mv pkg/module/release.go pkg/module/instance.go`
-- [x] 1.2 Rename type `Release` → `Instance` and `ReleaseMetadata` → `InstanceMetadata`; update the `MatchComponents` receiver and all field/doc comments; flip `#ModuleRelease` → `#ModuleInstance` in doc comments. Add `// Was: Release` / `// Was: ReleaseMetadata` breadcrumbs (D11/D12).
+- [x] 1.2 Rename type `Release` → `Instance` and `ReleaseMetadata` → `InstanceMetadata`; update the `MatchComponents` receiver and all field/doc comments; flip `#ModuleRelease` → `#ModuleInstance` in doc comments. Add `// Was: Release` / `// Was: ReleaseMetadata` breadcrumbs (enhancement 0002).
 - [x] 1.3 Update `pkg/module/parse.go`: `ParseModuleRelease` → `ParseModuleInstance`, return `*Instance`, no input mutation; breadcrumb the old name.
 
 ## 2. Loader kind detection + instance-file convention (`loader-api`, `instance-file-loading`, D9)
@@ -22,7 +22,7 @@
 - [x] 4.1 `git mv internal/releasefile/ internal/instancefile/` and `get_release_file.go` → `get_instance_file.go` (+ `_test.go`); change `package releasefile` → `package instancefile`.
 - [x] 4.2 `GetReleaseFile` → `GetInstanceFile`; const `KindModuleRelease` → `KindModuleInstance` (value `"ModuleInstance"`); retype `ModuleParseData.Metadata` to `*module.InstanceMetadata`; rename `bareModuleRelease`/`mustModuleReleaseMetadata` → instance forms.
 - [x] 4.3 Leave the bundle branch intact (X1/X2 seam): `KindBundleRelease`, `FileRelease.Bundle *bundle.Release`, `bareBundleRelease`, `mustBundleReleaseMetadata` stay verbatim. Add `// TODO(0002 X2): rename bundle path` breadcrumbs at each deferred site.
-- [x] 4.4 Update the `internal/releasefile` reference in `cli/CLAUDE.md` package map to `internal/instancefile` (D12 doc consistency).
+- [x] 4.4 Update the `internal/releasefile` reference in `cli/CLAUDE.md` package map to `internal/instancefile` (enhancement 0002 doc consistency).
 
 ## 5. Receiver-method + processing surfaces (`module-instance-receiver-methods`, `module-instance-processing`)
 
@@ -49,7 +49,7 @@
 
 ## Implementation notes / deviations
 
-- **D10 completeness (beyond task list):** `pkg/loader/release_file.go` (and `release_file_test.go`) also `git mv`'d to `instance_file.go` — the file housed `LoadInstanceFile` but the task list only enumerated `release_kind.go`. Renaming it completes D10 ("rename every release-named file"); no behavior change.
+- **enhancement 0002 completeness (beyond task list):** `pkg/loader/release_file.go` (and `release_file_test.go`) also `git mv`'d to `instance_file.go` — the file housed `LoadInstanceFile` but the task list only enumerated `release_kind.go`. Renaming it completes enhancement 0002 ("rename every release-named file"); no behavior change.
 - **goconst (8.2 nuance):** the module wire string is now the package const `kindModuleInstance` in `synth.go` (mirroring the existing `kindBundleRelease`), used by the `DetectInstanceKind` switch. This removes a goconst finding whose *shape* pre-existed on `main` (the old `"ModuleRelease"`/`"BundleRelease"` switch literals). Touched files are lint-clean; the package retains pre-existing goconst debt in untouched files (`provider.go` `"kubernetes"`, etc.), so "0 issues" holds for touched files, not the whole pre-existing baseline.
 - **Catalog-pin drift (3.3 flag, unresolved by design):** `synth.go` still imports `opmodel.dev/core/v1alpha1/modulerelease@v1` and applies `#ModuleRelease` (catalog-side wire contract). Left verbatim with a `FLAG` breadcrumb at `loadSynthWrapper`; tracked as a separate catalog-pin follow-up, not an X1 task.
 - **Transitional mixed vocabulary (D-X1.3):** `internal/instancefile` and `synth.go` intentionally mix `Instance` (X1) and `Bundle*`/`Release` (X2) names; every deferred site carries a `// Was:` or `// TODO(0002 X2)` breadcrumb. Reconciled when X2 lands in the same atomic PR.

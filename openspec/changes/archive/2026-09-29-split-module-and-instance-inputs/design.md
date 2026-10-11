@@ -183,7 +183,7 @@ Error: /home/me/src/my_app is a module, not an instance; build it with: opm modu
 ### Grammar: major-free path plus `--version`, or `path@version`
 
 **Context**: Enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-free module path, and floats to the highest core-compatible major when no version is given") fixes the published-module grammar for `opm instance init`. `module build` and `apply` could have used the `@vN` suffix every other CUE tool uses.
-**Explored**: 0016 `03-decisions.md` D5 and experiments 01, 02 and 07; the conversation that produced this change.
+**Explored**: the decisions page of enhancement 0016 and experiments 01, 02 and 07; the conversation that produced this change.
 **Options considered**:
 1. `path@vN` / `path@vX.Y.Z` positional: familiar from CUE, but a second spelling beside init's.
 2. Major-free path plus `--version` (enhancement 0016, "`opm instance init` mirrors `opm module init`, takes a major-free module path, and floats to the highest core-compatible major when no version is given"): one spelling for every command that deploys a published module; no version picks the newest line this CLI can build. `opm module init --from` keeps its `@vN` template grammar, which `internal/scaffold` owns.

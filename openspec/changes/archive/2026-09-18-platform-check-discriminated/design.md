@@ -2,7 +2,7 @@
 
 ## Context
 
-See `proposal.md` § Why. The decision is in enhancement 0015, completed in opm-operator by `platform-inventory-gate`; this change lands the same verdict in the CLI pre-flight, per OQ9's resolution.
+See `proposal.md` § Why. The decision is in enhancement 0015, completed in opm-operator by `platform-inventory-gate`; this change lands the same verdict in the CLI pre-flight, per the resolution of that open question.
 
 Current state, read 2026-09-18 against cli main (library `v1.0.0-alpha.31`, `DefaultCorePin` `v2.0.0-alpha.9`):
 
@@ -102,7 +102,7 @@ func (r Report) Routable() bool      // unchanged
 func (r Report) Discriminated() bool // new: true exactly when no pair is comparable
 ```
 
-The library's row type is used directly (Principle VII: a CLI copy would exist only to be converted into). `discriminated` stays unexported like the other two booleans so `NewReport` remains the only constructor and the rows cannot drift from the verdict. `Routable()` keeps its meaning and its D18 test; the command combines the two accessors rather than the report growing a third "may generate" accessor, because the two refusals are worded and fixed differently.
+The library's row type is used directly (Principle VII: a CLI copy would exist only to be converted into). `discriminated` stays unexported like the other two booleans so `NewReport` remains the only constructor and the rows cannot drift from the verdict. `Routable()` keeps its meaning and its enhancement 0015 test; the command combines the two accessors rather than the report growing a third "may generate" accessor, because the two refusals are worded and fixed differently.
 
 ### Rendering
 
@@ -113,7 +113,7 @@ comparable transformer pairs: 1
   Enabled transformers whose match predicates are comparable over a shared
   catalog-fulfilled contract: every component the narrower one matches is
   also matched by the broader one, so both would render (enhancement 0015
-  D5). A platform package cannot be generated from this platform until one
+  enhancement 0015). A platform package cannot be generated from this platform until one
   catalog is disabled or the transformers are discriminated by a required
   label value or a required trait.
   testing.opmodel.dev/catalogs/velero/transformers/mirror@1.4.0 (broader)
@@ -146,7 +146,7 @@ The refusal error, returned with `Printed: true` after the report:
 platform ./platforms/staging cannot generate a platform package: 0 over-subscribed contract(s), 1 comparable transformer pair(s)
 ```
 
-The help text's exit-code list gains `comparable` beside `over-subscribed`, with the D5 one-liner.
+The help text's exit-code list gains `comparable` beside `over-subscribed`, with the enhancement 0015 one-liner.
 
 ### The plurality fixture is split
 
@@ -184,7 +184,7 @@ The help text's exit-code list gains `comparable` beside `over-subscribed`, with
 
 ### Exit rule combined in the command, not in a new accessor
 
-**Context**: `Routable()` is documented as the only exit input, and its test pins D18's asymmetry.
+**Context**: `Routable()` is documented as the only exit input, and its test pins enhancement 0015's asymmetry.
 **Explored**:
 1. A `Generable()` accessor returning `routable && discriminated`, the command reading only that.
 2. Two accessors, the command refusing when either is false.

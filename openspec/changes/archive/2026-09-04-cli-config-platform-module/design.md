@@ -37,13 +37,13 @@ Command syntax is unchanged: `opm config init [--force]`, `opm config vet`. No n
 1. `opmodel.dev/platforms/local@v0` — the namespace enhancement 0019 ("The Platform CR keeps naming a catalog coordinate; the operator generates the platform package") explicitly reserves as reserved-unpublished for platforms.
 2. An example.com-style placeholder — avoids the production namespace but invents a second convention beside the reserved one.
 **Decision**: option 1.
-**Rationale**: a main module's own path is never fetched, publishing platforms is disallowed outright (D6), and the reserved namespace exists precisely so generated/local platforms have a home that can never collide with a published artifact.
+**Rationale**: a main module's own path is never fetched, publishing platforms is disallowed outright (enhancement 0019), and the reserved namespace exists precisely so generated/local platforms have a home that can never collide with a published artifact.
 
 ### Pins live in `cue.mod`; `platform.cue` carries no versions
 
-**Context**: D5 derives an entry's `version` from the imported catalog; two answers to one question is the shape D5 removed.
+**Context**: enhancement 0019 derives an entry's `version` from the imported catalog; two answers to one question is the shape enhancement 0019 removed.
 **Decision**: the template's `cue.mod/module.cue` pins core + both catalogs; `platform.cue` entries are `{#catalog: <import>}` only. Template comments document the bump loop (edit pin, `opm config vet`).
-**Rationale**: byte-for-byte the D5 contract; the derived readout plus the key binding turn a wrong pin or wrong import into a build conflict vet surfaces.
+**Rationale**: byte-for-byte the enhancement 0019 contract; the derived readout plus the key binding turn a wrong pin or wrong import into a build conflict vet surfaces.
 **As implemented**: the pins are Go literals (`DefaultCorePin`, `DefaultCatalogPins`, index-aligned with `DefaultCatalogPaths`) rendered into the embedded `cue.mod`, not a CUE string block; the root `platform-pins.sh` bumps each by its key comment, and the legacy data literal plus `spec_test.go` derive from the same values, so no second literal tracks them. Core is a hand-pinned literal because the library at this pin cannot supply its verified release; `cli-render-switch` may switch it to `schema.DefaultSchemaVersion()`.
 
 Template sketch (final import spellings verified against the published catalogs at implementation time — the catalog root package name is confirmed from the artifact, not assumed):
@@ -116,4 +116,4 @@ Lands on the 0019 release train (see proposal § Sequencing): branch-ordered aft
 
 ## Open Questions
 
-None blocking. The exact D5 core prerelease and catalog builds the template pins are filled at implementation time from what is published (the same hand-pin rule as today).
+None blocking. The exact enhancement 0019 core prerelease and catalog builds the template pins are filled at implementation time from what is published (the same hand-pin rule as today).
