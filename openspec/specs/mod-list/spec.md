@@ -6,7 +6,7 @@ Defines how `opm instance list` discovers deployed instances from persisted inst
 
 ### Requirement: List command discovers instances via persisted ownership inventory
 
-The `opm instance list` command SHALL discover all deployed module instances by listing persisted instance inventory records in the target namespace. It SHALL use the `ListRecords` function from the inventory package. It MUST NOT require module source, re-rendering, knowledge of specific instance names, or inventory change-history fields to identify the current owned resource set for an instance. <!-- Was: "discovers releases", "release inventory records", "release names" (enhancement 0002: instance files are `instance.cue`) -->
+The `opm instance list` command SHALL discover all deployed module instances by listing persisted instance inventory records in the target namespace. It SHALL use the `ListRecords` function from the inventory package. It MUST NOT require module source, re-rendering, knowledge of specific instance names, or inventory change-history fields to identify the current owned resource set for an instance. <!-- Was: "discovers releases", "release inventory records", "release names" (enhancement 0002) -->
 
 #### Scenario: List discovers via ListRecords
 
