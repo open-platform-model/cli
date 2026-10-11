@@ -14,16 +14,16 @@ This slice replaces the Secret with the `ModuleInstance` CR as the single invent
 
 - `apply`/`delete`/`status`/`list`/`diff` read/write the `ModuleInstance` CR; the Secret backend is deleted.
 - The CLI writes exactly the enhancement 0006 ("The CLI writes a strict subset of status") status subset (as amended by enhancement 0006 ("The CLI writes no `status.conditions`; conditions are operator-exclusive (amends D2, resolves OQ11)") — no conditions) and the enhancement 0006 ("Explicit `spec.owner` marker; the operator skips CLI-owned CRs") `spec.owner: cli` marker; `spec.module` is always the canonical declared reference (enhancement 0006 ("Spec contents when applying from a local module") write-side, enhancement 0006 ("`cue.mod/local-module.cue` is the sanctioned local-module workflow; `spec.module` always carries the canonical declared reference; the CR never represents a local path")).
-- Pre-apply gates: missing-CRD hint, CRD field floor, operator-version ceiling, status-RBAC pre-flight (0006/D24, D27, D23b, D33).
+- Pre-apply gates: missing-CRD hint, CRD field floor, operator-version ceiling, status-RBAC pre-flight (enhancement 0006).
 - One-time Secret→CR migration, delete-Secret-after-success, no deprecation window (enhancement 0006, "Migration of existing Secret inventories" and "No backwards-compatibility or deprecation burden; the CUE v0.17-alpha bump is accepted").
-- `cuelang.org/go` v0.16.1 → v0.17.1 (enhancement 0006, "The CLI's CUE bump retargets to v0.17.1 and relocates from C2 to C1; library/operator pin bumps happen outside this enhancement; amends the first clause of its earlier CLI pin decision"), with the `cue.mod/local-module.cue` loader behavior verified and surfaced as render provenance (0006/D37, OQ17).
+- `cuelang.org/go` v0.16.1 → v0.17.1 (enhancement 0006, "The CLI's CUE bump retargets to v0.17.1 and relocates from C2 to C1; library/operator pin bumps happen outside this enhancement; amends the first clause of its earlier CLI pin decision"), with the `cue.mod/local-module.cue` loader behavior verified and surfaced as render provenance (enhancement 0006).
 
 **Non-Goals:**
 
 - Kernel adoption, platform resolution, `--platform` flag, `#ModuleInstance` synthesis retirement (C2).
 - `opm instance handoff`, the thin-editor apply mode for operator-owned CRs, delete symmetry (C3) — this slice ships refusals at the branch point C3 will extend.
 - Any operator-side change (A6 lands in opm-operator).
-- Prune-behavior changes: stale-set/rename-safety/existence-check logic is ported as-is (enhancement 0006, "Revert the shared `library/opm/inventory` package (the CLI and operator keep independent local inventory implementations); supersedes D13's shared-logic clause and D26"); reconciling the CLI/operator stale-set base relation is 0006/OQ15, open.
+- Prune-behavior changes: stale-set/rename-safety/existence-check logic is ported as-is (enhancement 0006, "Revert the shared `library/opm/inventory` package (the CLI and operator keep independent local inventory implementations); supersedes D13's shared-logic clause and D26"); reconciling the CLI/operator stale-set base relation is an open question of enhancement 0006.
 
 ## Decisions
 
@@ -62,15 +62,15 @@ Gates 1–3 are read-only cluster probes; RBAC failures reading the Platform in 
 
 On apply, when the CR is absent but a legacy inventory Secret exists (direct name + label fallback, today's lookup): build the CR from the Secret record (entries/revision/digest/count into `status.inventory`, record UUID into `instanceUUID`, timestamps into `lastAppliedAt`; spec comes from the *current* apply's module/values), proceed with the normal apply, and delete the Secret **only after** the CR status write succeeds. A failure anywhere leaves the Secret intact and the release discoverable by a re-run. `status`/`delete`/`list`/`diff` never read Secrets (enhancement 0006 ("Migration of existing Secret inventories") as amended by D14 — no fallback window); an instance tracked only by a Secret reappears on its next apply.
 
-### D7: Render provenance annotation — written here, consumed by C3's handoff as a fail-closed pre-gate (resolves 0006/OQ17)
+### D7: Render provenance annotation — written here, consumed by C3's handoff as a fail-closed pre-gate (resolves an open question of enhancement 0006)
 
 The loader records render provenance; when the module bytes did not come from pure registry resolution — the main module is a local directory, **or** the main module's `cue.mod/local-module.cue` contains any local-path `replaceWith` (conservative: any replacement marks the render, since replaced dependencies also change bytes) — the CLI stamps `module-instance.opmodel.dev/source: local` on the CR in the spec apply. When a later apply resolves fully from registries, the annotation is omitted from the applied document and SSA field ownership removes it. The annotation **only ever blocks**: C3's handoff refuses while it is present ("last apply used a local module — publish and re-apply, then hand off"), and the authoritative backstop is C3's verification render, which MUST bypass `local-module.cue` and resolve `spec.module` strictly from the registry — otherwise a local replacement would make enhancement 0006 ("`opm instance handoff`, the migration feature").4's digest check self-consistent and meaningless. Stripping the annotation by hand grants nothing (the strict-registry digest gate stands behind it); a checkout byte-identical to the published module clears naturally via the re-apply the error prescribes. The C3-side requirements are recorded in enhancement 0006 with this OQ17 resolution; this slice ships the write side plus detection.
 
-### D8: `instance list` — native CR list (0006/D29)
+### D8: `instance list` — native CR list (enhancement 0006)
 
 `ListInventories` is replaced by a namespace-scoped `ModuleInstance` list; a new `--all-namespaces` flag issues a cluster-wide list. Insufficient RBAC surfaces as a clear, actionable error (no label fallback, no silent narrowing). Health evaluation (`internal/workflow/query/list.go`) keeps its per-entry discovery, fed from the CR record. `--instance-id` selectors resolve by listing and matching `status.instanceUUID`.
 
-### D9: CUE v0.17.1 in the same slice (0006/D36)
+### D9: CUE v0.17.1 in the same slice (enhancement 0006)
 
 `go.mod` bumps `cuelang.org/go` v0.16.1 → v0.17.1 first (trial-verified 2026-07-16: zero code changes, unit suite green). An integration fixture with a `cue.mod/local-module.cue` replacement verifies the loader honors `replaceWith` end-to-end — the same mechanism D7's detection relies on. If the loader's own resolution wiring bypasses the local module file, that is fixed here (it must go through the SDK's standard module resolution).
 

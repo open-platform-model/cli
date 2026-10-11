@@ -22,7 +22,7 @@ None.
 
 ### Modified Capabilities
 
-- `kernel-render`: the "Local-replacement renders warn (enhancement 0010, "A moved-ahead dev checkout is accepted and warned about, not versioned around")" requirement changes from a file-presence warning to: the render opts in, honoured replacements are warned from the kernel's rows, and an inert module-side replacement is warned as such.
+- `kernel-render`: the "Local-replacement renders warn (enhancement 0010)" requirement changes from a file-presence warning to: the render opts in, honoured replacements are warned from the kernel's rows, and an inert module-side replacement is warned as such.
 
 ## Impact
 

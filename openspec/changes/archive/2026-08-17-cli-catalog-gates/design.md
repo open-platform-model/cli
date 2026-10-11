@@ -30,7 +30,7 @@ per member (beta/GA, non-transformer):
 
 **Context**: `#Catalog` exposes only `#transformers`; transformers reference ~36 of 70 contract members and zero blueprints — a value walk cannot enumerate the tree. Refusal 9's example shows a `metadata.labels.*` violation path, so the compared operand is the whole member value, not `spec`.
 **Decision**: enumerate `<kind>/<apiVersion>/` directories (contract kinds) plus the flat `transformers/` package from the tree being published; within each loaded package, iterate definitions and filter by the concrete `kind` discriminator every core kind carries. The compat operands are the member *definitions* post-`StripProvenance`; `spec` remains a non-concrete schema throughout (the compat walk was built for definition values — `cue.Schema()` subsume at leaves).
-**Cross-catalog exclusion for free**: a directory walk only visits the catalog's own definitions (0010 D17's scope), where a value walk would drag referenced foreign primitives in.
+**Cross-catalog exclusion for free**: a directory walk only visits the catalog's own definitions (the scope of enhancement 0010), where a value walk would drag referenced foreign primitives in.
 
 ### Concrete evaluation, and why the pipeline's filter is not reused
 

@@ -129,7 +129,7 @@ read record (identity R) -> ... -> apply rendered objects (identity N stamped by
 **Decision**: Option 3 (owner decision of 2026-10-08: when `opm operator install` meets an object it needs that another instance owns, it refuses with exit 2 before changing anything).
 **Rationale**: The earlier Deployment must go before the module's Deployment can apply, so an install that skips it cannot complete, and would report success on an operator it did not replace. This is the one place where the cli refuses on an object annotated for another instance, and it departs from the letter of enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override"); the enhancement needs a revision note for it.
 
-#### The stale set (0012:D7:R1)
+#### The stale set (enhancement 0012)
 
 **Context**: enhancement 0012 ("The stale set is component-blind, and the inventory digest hashes a canonical field encoding") binds the end state: the stale set is exactly what the instance recorded and no longer renders.
 **Decision**: The stale set is computed as today (`inventory.StaleSet`) and is not filtered. Ownership is decided per stale object by the verdict; an object the verdict skips is left in the cluster and leaves the record.

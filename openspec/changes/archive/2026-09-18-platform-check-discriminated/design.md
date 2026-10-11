@@ -2,7 +2,7 @@
 
 ## Context
 
-See `proposal.md` § Why. The decision is `enhancements/0015` D5, completed in opm-operator by `platform-inventory-gate`; this change lands the same verdict in the CLI pre-flight, per OQ9's resolution.
+See `proposal.md` § Why. The decision is in enhancement 0015, completed in opm-operator by `platform-inventory-gate`; this change lands the same verdict in the CLI pre-flight, per OQ9's resolution.
 
 Current state, read 2026-09-18 against cli main (library `v1.0.0-alpha.31`, `DefaultCorePin` `v2.0.0-alpha.9`):
 
@@ -76,7 +76,7 @@ verdict lines appear only in the two packages this change edits.
 
 **Non-Goals**
 
-- A gate at platform resolution for the render commands (0015 D6's change).
+- A gate at platform resolution for the render commands (enhancement 0015).
 - Any change to the kernel's render-time diagnostics or `internal/workflow/render/validation.go`.
 - `--output json`.
 

@@ -101,7 +101,7 @@ Deleting a finalizer-armed CR with no running controller wedges it in `Terminati
 - [Fresh-cache verification render needs registry reachability and adds seconds of latency] → inherent to the safety property (D38); the failure mode is a clear resolution error, and handoff is rare.
 - [Post-flip failure leaves the instance operator-owned with no CLI-native undo] → by design (D16); LD5 mandates the error message say so explicitly with the manual investigation path. The alternative (auto-revert) reintroduces the reverse-handoff design surface D16 excluded.
 - [Thin-editor apply against a suspended or crash-looping operator waits full timeout] → LD1 reports last observed condition on timeout rather than a bare deadline error.
-- [Entry-set equality could mask an operator rendering *different but same-identity* resources] → out of scope by 0006/D40's rationale: D7.4's digest gate already proved content parity pre-flip; identity-set stability is the correct post-flip observable.
+- [Entry-set equality could mask an operator rendering *different but same-identity* resources] → out of scope by the rationale of enhancement 0006: D7.4's digest gate already proved content parity pre-flip; identity-set stability is the correct post-flip observable.
 
 ## Migration Plan
 

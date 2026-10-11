@@ -50,7 +50,7 @@ Options considered:
 1. Keep the strict compare and have the supervisor enforce ordering (freeze operator main from G5 to G6, follow every operator release with a cli release). Fragile: operator `docs` commits cut releases, and counters restart at `beta.1` in both repos, so headroom is 0 to +1.
 2. Give the cli a higher first beta counter (for example `beta.6`) as headroom. Buys time, fixes nothing, and makes the counters meaningless.
 3. Compare MAJOR.MINOR.PATCH, ignoring only the prerelease. Still refuses operator patch releases the cli has not matched.
-4. **Compare MAJOR.MINOR (chosen).** Owner decision 3; matches the 0021 OQ14 position that cli and operator share MAJOR.MINOR and release patches independently.
+4. **Compare MAJOR.MINOR (chosen).** Owner decision 3; matches the position of enhancement 0021 that cli and operator share MAJOR.MINOR and release patches independently.
 
 Exit code and message: unchanged (non-zero, "your CLI (X) is older than the cluster operator (Y) — upgrade the CLI ..."). The refusal now fires only across a minor boundary.
 

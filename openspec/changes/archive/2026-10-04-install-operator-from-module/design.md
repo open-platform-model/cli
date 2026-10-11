@@ -145,7 +145,7 @@ func Uninstall(ctx context.Context, client *kubernetes.Client, opts UninstallOpt
 
 #### Render platform
 
-**Decision**: install calls the render with `DepsOnly`: no `--platform`, `Cluster: nil`, `Deps` from the module's `cue.mod/module.cue` (`moduleDepsOf`, `module.go:177-196`). The cluster Platform is never read for the render, so a missing, stalled or differently subscribed Platform neither changes nor refuses it. Experiment 02 step 4 is the case it removes: its reinstall rendered through the seeded Platform and produced the same render digest only because that Platform subscribed to the same catalog release (4.5.2) the module pins. Install is the recovery path, so it must not depend on the Platform it may be repairing. This narrows 0006:D11's precedence for this one instance; every other render keeps it.
+**Decision**: install calls the render with `DepsOnly`: no `--platform`, `Cluster: nil`, `Deps` from the module's `cue.mod/module.cue` (`moduleDepsOf`, `module.go:177-196`). The cluster Platform is never read for the render, so a missing, stalled or differently subscribed Platform neither changes nor refuses it. Experiment 02 step 4 is the case it removes: its reinstall rendered through the seeded Platform and produced the same render digest only because that Platform subscribed to the same catalog release (4.5.2) the module pins. Install is the recovery path, so it must not depend on the Platform it may be repairing. This narrows the platform-source precedence of enhancement 0006 for this one instance; every other render keeps it.
 
 #### The ceiling and the target check
 

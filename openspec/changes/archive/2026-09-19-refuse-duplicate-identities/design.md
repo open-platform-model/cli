@@ -2,7 +2,7 @@
 
 ## Context
 
-See `proposal.md` § Why. The decision is `enhancements/0015` D15, completed by the operator; this change is the CLI's matching refusal.
+See `proposal.md` § Why. The decision is in enhancement 0015, completed by the operator; this change is the CLI's matching refusal.
 
 Current state, read 2026-09-19 against cli main (`809ea15`, library `v1.0.0-alpha.32`):
 
@@ -41,7 +41,7 @@ if err := refuseDuplicateIdentities(out); err != nil {
 
 ```go
 // refuseDuplicateIdentities returns the library's duplicate-identity error
-// when two compiled objects share one apply identity (0015:D15), nil
+// when two compiled objects share one apply identity (enhancement 0015), nil
 // otherwise. Pure over the render output, so it is tested without a render.
 func refuseDuplicateIdentities(out *kernel.RenderResult) error {
 	if dups := objectset.Duplicates(out.Compiled); len(dups) > 0 {

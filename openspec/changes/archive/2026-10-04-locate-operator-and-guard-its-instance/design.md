@@ -97,7 +97,7 @@ func runInstanceDelete(...) error {
 }
 
 // deleteResolvedInstance guards an instance that deploys the operator, then
-// branches on ownership (0006:D18).
+// branches on ownership (enhancement 0006).
 func deleteResolvedInstance(ctx context.Context, c *kubernetes.Client, rsf *cmdutil.InstanceSelectorFlags, namespace string,
     inv *inventory.Record, live []*unstructured.Unstructured, timeout time.Duration, dryRun bool, log *log.Logger) error {
     if err := guardOperatorInstanceDelete(ctx, c, inv); err != nil {

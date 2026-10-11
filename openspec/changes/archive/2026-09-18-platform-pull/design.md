@@ -2,7 +2,7 @@
 
 ## Context
 
-See `proposal.md` § Why. The decision is `enhancements/0015` D6 (reproduce a cluster's render by pulling the operator-generated package), reframed: the package is a pure function of inputs that are all on the Platform CR, and the CLI already runs that function.
+See `proposal.md` § Why. The decision is in enhancement 0015 (reproduce a cluster's render by pulling the operator-generated package), reframed: the package is a pure function of inputs that are all on the Platform CR, and the CLI already runs that function.
 
 Current state, read 2026-09-18 against cli main (library `v1.0.0-alpha.32`):
 

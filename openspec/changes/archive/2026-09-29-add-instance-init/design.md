@@ -1,6 +1,6 @@
 ## Context
 
-See proposal.md for motivation and specs/instance-init/spec.md for the behavior contract. Enhancement 0016 (`enhancements/0016/03-decisions.md`, D1 to D9) is the design intent this change implements; its experiments 01 to 08 back the choices below.
+See proposal.md for motivation and specs/instance-init/spec.md for the behavior contract. Enhancement 0016 is the design intent this change implements; its experiments 01 to 08 back the choices below.
 
 Current state that shapes the approach:
 

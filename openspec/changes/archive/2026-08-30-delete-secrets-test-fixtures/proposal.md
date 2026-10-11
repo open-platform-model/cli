@@ -28,4 +28,4 @@ None.
 2. Tests: none reference the fixture; `go test ./internal/cmd/module/...` is unaffected.
 3. Registry: the fixture declared `example.com/modules/secrets_module@v0` and was never published. Nothing on GHCR changes.
 4. Downstream: none. `opm-operator` carries no equivalent fixture.
-5. No enhancement decision is implemented here; the removal follows `enhancements/0013` D9 landing in `catalog_opm`, recorded there.
+5. No enhancement decision is implemented here; the removal follows the landing of enhancement 0013 in `catalog_opm`, recorded there.

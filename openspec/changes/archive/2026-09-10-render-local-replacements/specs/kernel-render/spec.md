@@ -1,6 +1,6 @@
 ## MODIFIED Requirements
 
-### Requirement: Local-replacement renders warn (0010 D19)
+### Requirement: Local-replacement renders warn (enhancement 0010)
 
 Every render SHALL enable the kernel's local replacements, so a `cue.mod/local-module.cue` in the module context (the main module of an instance-file render, or the module directory of a module render) or in the platform module directory reaches the render build under the kernel's precedence: the platform's replacements whole, the module's only for paths the platform's dependency list does not name. The CLI SHALL word the kernel's replacement rows as warnings, one per honoured replacement, naming the replaced path, the directory or module it was served from and whether the module or the platform supplied it, and stating that the rendered bytes may not correspond to any published build. For each `replaceWith` in the module context's own `cue.mod/local-module.cue` that no row honours, the CLI SHALL warn that the platform names that path and that the redirect belongs in the platform module's `cue.mod/local-module.cue`. The warnings SHALL NOT block the render or alter its output. A context without the file SHALL produce no such warning. Both render entry points SHALL perform this. The provenance signal (`SourceLocal`, the `module-instance.opmodel.dev/source: local` annotation) keeps its file-presence rule.
 

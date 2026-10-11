@@ -261,7 +261,7 @@ The glyphs are whatever `output.FormatVetCheck`, `FormatCheckmark` and `FormatRe
 **Decision**: `replacementWarnings` gains the carried set. A carried row is worded with the module side's label (`instance`, the label module renders already use for their own rows), and a local-file entry is inert only when no row carries its path with the same target.
 **Rationale**: Without it the author sees both "in effect" and "ignored" for one redirect.
 
-### Relation to 0006:D21
+### Relation to the platform-source precedence of enhancement 0006
 
 Enhancement 0006 ("Platform-source flag surface (single `--platform <file>` override + automatic precedence, with source-provenance reporting); resolves OQ14") says offline `build`/`render` use `--platform` or the local default only. This change keeps its load-bearing half (build never reads the cluster) and replaces the local default with the module's deps for `module build` and `module vet`. No enhancement decision is implemented here, so the change carries no `enhancement.yaml`.
 

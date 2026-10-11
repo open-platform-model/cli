@@ -47,7 +47,7 @@ Branch: `0002-cli-x1-rename-module-instance` (stacked on X1 `7a9175d` + X2; atom
 
 ## Implementation notes / deviations
 
-- **Held from archive.** Per the atomic-PR / bulk-archive model, X3 stays active alongside X1/X2/X4 and is bulk-archived with them; the `enhancements/0002/config.yaml` history event is recorded at bulk-archive time, not here.
+- **Held from archive.** Per the atomic-PR / bulk-archive model, X3 stays active alongside X1/X2/X4 and is bulk-archived with them; the history event of enhancement 0002 is recorded at bulk-archive time, not here.
 - **mod-\* and `ReleaseSelectorFlags` deferred to X4 (D-X3.6).** A documented deviation from `planned-changes.md`'s literal X3 wording — single-ownership over double-delta.
 - **Not green alone (by design).** `task test` (integration/e2e) reconciles with X4 in the same PR.
 

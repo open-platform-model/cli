@@ -41,7 +41,7 @@
 ## 7. Record
 
 - [x] 7.1 enhancement 0010: slice → `done`, `openspec_ref: "cli/cli-coordinate-adoption"`, history event; record the declared-coordinate deviation (02-design:213 reinterpretation) and the D19 predicate refinement.
-- [x] 7.2 `enhancements/0011/plan.yaml`: add the `cli-publish-pipeline → 0010:cli-coordinate-adoption` compile-dependency edge (with the enhancement-slicing skill loaded).
+- [x] 7.2 the plan of enhancement 0011: add the `cli-publish-pipeline → cli-coordinate-adoption` (enhancement 0010) compile-dependency edge (with the enhancement-slicing skill loaded).
 
 ## 8. Blocked on operator release `v1.0.0-alpha.9` (final tail)
 

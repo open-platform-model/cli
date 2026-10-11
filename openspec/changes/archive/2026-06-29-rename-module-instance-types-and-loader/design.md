@@ -42,7 +42,7 @@ Inside a package directory the loader resolves `instance.cue`; if absent it erro
 
 ### D-X1.5 — Capability-dir renames use the operator's archive mechanic
 
-Each renamed capability is authored as a delta under the **new** dir name with `## ADDED Requirements` containing the full updated (instance-vocab) requirement blocks, prefixed by a `<!-- Renamed from \`old-name\` (0002 D10) -->` breadcrumb. The old spec dir is removed via `git mv`at archive time. This mirrors the opm-operator X-wave (`release-*` → `modulepackage-*`) so the two repos' archives read consistently.`loader-api` and `validation-gates` keep their names (no `release` token) and use `## MODIFIED Requirements` with full updated content.
+Each renamed capability is authored as a delta under the **new** dir name with `## ADDED Requirements` containing the full updated (instance-vocab) requirement blocks, prefixed by a `<!-- Renamed from \`old-name\` (enhancement 0002) -->` breadcrumb. The old spec dir is removed via `git mv`at archive time. This mirrors the opm-operator X-wave (`release-*` → `modulepackage-*`) so the two repos' archives read consistently.`loader-api` and `validation-gates` keep their names (no `release` token) and use `## MODIFIED Requirements` with full updated content.
 
 ## Risks / Trade-offs
 

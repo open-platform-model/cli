@@ -92,7 +92,7 @@ gate phase (both modes), for each templates/<t>/; the first failing step fails t
 any failure -> print "gates failed for: <list>; nothing published", exit 1
 --dry-run   -> exit 0
 publish phase (release only), for each template in order, acting on its verdict:
-  skip    -> "already published; skipped" (the caller-side filter of 0011:D15)
+  skip    -> "already published; skipped" (the caller-side filter of enhancement 0011)
   publish -> opm module publish ./<dir>; a failure exits 1
 ```
 

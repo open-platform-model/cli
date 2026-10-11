@@ -144,7 +144,7 @@ Nothing blocks the code, but before archive:
    help strings; the generated site pages are downstream).
 8. **Archive this change** (`openspec archive`): on archive, record the
    `history` event's `slice: cli/<archive-date>-cli-cr-inventory-backend` in
-   `enhancements/0006/config.yaml` (the event body is already appended; only the
+   the config of enhancement 0006 (the event body is already appended; only the
    archive-date slice ref is pending), and flip
    enhancement 0006 implementation status if appropriate.
 9. **Commit the branch** `feat/cli-cr-inventory-backend` — nothing is committed

@@ -52,7 +52,7 @@ type Report struct {
 func NewReport(res Resolution, inv *libplatform.ContractInventory) Report
 func (r Report) Render() string
 // Routable reports whether the platform may be generated from; it is the
-// only value that decides the command's exit status (0015 D18).
+// only value that decides the command's exit status (enhancement 0015).
 func (r Report) Routable() bool
 ```
 
