@@ -125,7 +125,7 @@ context: |
   - When the rationale genuinely lives in an enhancement, name the enhancement by its id beside the reason in words, once at the symbol: `// Version writes are offline by design (enhancement 0011).` Several enhancements: `(enhancements 0010 and 0011)`.
   - An enhancement id appears only beside a reason in words, never alone, and never as a decision number (`NNNN:Dn`, `NNNN Dn`, `Dn`) or an open-question number. Decision numbers change when an entry is split or renumbered.
   - Enhancements live in the OpenSpec store `opm-enhancements` (see `references:`). Read an entry with `openspec show <id>-<slug> --store opm-enhancements`; its `tasks.md` says which repo still has work.
-  - A change here delivers a line of an entry's `tasks.md` and says so in its proposal (`## Enhancement`, `Delivers NNNN, task X.Y.`).
+  - A change that delivers a line of an entry's `tasks.md` says so in its proposal (`## Enhancement`, `Delivers NNNN, task X.Y.`).
   - Never cite a section, slice, phase, task or design-doc-local id (`§8.1`, `slice C2`, `task 4.2`, `design LD3`). They are not stable identifiers.
   - Never put a reference in a scaffold template, a generated file, a fixture a user copies, or a CLI output string. Those reach people with no access to the enhancements repo.
   - No `Was:` rename history in comments; `git log` owns it.
@@ -249,3 +249,6 @@ operations:
         breaks), because only the title reaches main under the BLANK squash message. In per-section mode each section commit is the PR title and therefore a
         release trigger; the change stays active on main between PRs, and spec sync waits for
         archive after the last PR."
+  archive:
+    guidance:
+      - "If the change delivers a line of an enhancement's `tasks.md`, a PR on `enhancements` ticks that line."
