@@ -68,8 +68,8 @@ func toWant(vs []Violation) []wantViolation {
 	return out
 }
 
-// TestCheck ports the 14 experiment cases — every change class 0010:D27 names,
-// nested variants, and the two label cases 0010:OQ16 turns on — plus edge cases
+// TestCheck ports the 14 experiment cases — every change class enhancement 0010 names,
+// nested variants, and the two label cases that an open question of enhancement 0010 turns on — plus edge cases
 // beyond the experiment's dispatch. A nil want means the change is legal.
 //
 // The "change default" class reports twice at the same path: the explicit
@@ -155,7 +155,7 @@ func TestCheck(t *testing.T) {
 		{"optional field removed", `#X: {x: string, y?: string}`, `#X: {x: string}`,
 			[]wantViolation{{"y", KindFieldRemoved}}},
 
-		// Posture transitions (0010:D27: an optional field must not become
+		// Posture transitions (enhancement 0010: an optional field must not become
 		// required). Judged on the selector; the value domain is judged
 		// separately, so a posture change that also narrows reports both.
 		{"optional made required (!)", `#X: {y?: string}`, `#X: {y!: string}`,
@@ -362,7 +362,7 @@ func TestOptionRawIsLoadBearing(t *testing.T) {
 // The member-reference shapes measured on catalog_opm PR 51 (cli issue 165):
 // a trait's appliesTo and a blueprint's composedResources embed whole
 // members, whose metadata.catalogVersion differs between builds by
-// construction. Before the walk applied 0010:D30 at depth, the list leaf's
+// construction. Before the walk applied the provenance exemption (enhancement 0010) at depth, the list leaf's
 // subsume named the nested catalogVersion and refused an unchanged member.
 func memberRefSrc(version, nameField string) string {
 	return `

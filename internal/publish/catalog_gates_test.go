@@ -58,7 +58,7 @@ func TestGateMemberFQN_MissingAPIVersionCaughtConcretely(t *testing.T) {
 }
 
 func TestGateMemberFQN_WrongDepthFiling(t *testing.T) {
-	// The flat shape that predates 0010:D49: authored modulePath omits the apiVersion
+	// The flat shape that predates the version-segment filing of enhancement 0010: authored modulePath omits the apiVersion
 	// segment. The identity-derived filing conflicts with the authored value.
 	files := memberCatalogFiles()
 	files["resources/v1beta1/thing.cue"] = `package v1beta1
@@ -127,7 +127,7 @@ func TestGateMemberFQN_StaleCatalogVersion(t *testing.T) {
 	require.False(t, p.Go())
 	errs := refusalErrors(p)
 	// Both the provenance field and the build-keyed fqn name the stale build
-	// — the case 0010:D21 measured passing `cue vet -c` at exit 0.
+	// — the case enhancement 0010 measured passing `cue vet -c` at exit 0.
 	assert.Contains(t, errs, "declaredCatalogVersion")
 	assert.Contains(t, errs, "1.1.0")
 }
@@ -164,7 +164,7 @@ func TestGateTraitOptional_PinnedPostureRefused(t *testing.T) {
 }
 
 func TestGateTraitOptional_AlphaTraitsIncluded(t *testing.T) {
-	// The 0010:D34 alpha carve-out is compat-only: a v1alpha1 trait pinning its
+	// The alpha carve-out (enhancement 0010) is compat-only: a v1alpha1 trait pinning its
 	// posture is refused like any other. Asserted, not assumed.
 	files := memberCatalogFiles()
 	files["traits/v1alpha1/experimental.cue"] = strings.Replace(

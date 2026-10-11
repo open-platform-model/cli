@@ -209,7 +209,7 @@ func TestEnumerateMembers_ModelFields(t *testing.T) {
 }
 
 func TestEnumerateMembers_FlatFiledContractMemberStillReached(t *testing.T) {
-	// A contract member filed flat at its kind prefix (the shape 0010:D49 replaced)
+	// A contract member filed flat at its kind prefix (the shape enhancement 0010 replaced)
 	// must be enumerated so the FQN gate can refuse it — invisible would mean
 	// unrefusable.
 	files := catalogFiles()

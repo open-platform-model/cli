@@ -126,7 +126,7 @@ func TestRun_NonexistentDirIsAnError(t *testing.T) {
 	assert.Contains(t, err.Error(), "does not exist")
 }
 
-// TestPush_OverrideNeverBakedIn pins the mechanism behind 0011:D6's "replacements
+// TestPush_OverrideNeverBakedIn pins the mechanism behind the rule of enhancement 0011, "replacements
 // are ignored either way": modzip omits cue.mod/local-module.cue from the
 // created zip, so the published artifact can only resolve published deps.
 func TestPush_OverrideNeverBakedIn(t *testing.T) {

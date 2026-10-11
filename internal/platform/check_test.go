@@ -453,7 +453,7 @@ func TestRenderDoesNotReorderTheInventory(t *testing.T) {
 	assert.Equal(t, []string{container, backup}, inv.Comparable[0].Contracts, "a row's contract order is untouched")
 }
 
-// TestRoutableIsAGateAndFulfilledIsNot pins the asymmetry 0015:D18
+// TestRoutableIsAGateAndFulfilledIsNot pins the asymmetry that enhancement 0015
 // requires: `unfulfilled` is a report and `overSubscribed` is the gate, so an
 // unfulfilled-only platform is routable and an over-subscribed one is not.
 // Do not "fix" this into a single healthy/unhealthy verdict: a pre-flight that
@@ -469,7 +469,7 @@ func TestRoutableIsAGateAndFulfilledIsNot(t *testing.T) {
 		Routable:      true,
 		Discriminated: true,
 	})
-	assert.True(t, unfulfilled.Routable(), "an unfulfilled contract is reported, never a gate (0015:D18)")
+	assert.True(t, unfulfilled.Routable(), "an unfulfilled contract is reported, never a gate (enhancement 0015)")
 
 	overSubscribed := NewReport(flagRes(), &libplatform.ContractInventory{
 		DefinedBy:      map[string]string{backup: catK8up},
@@ -498,9 +498,9 @@ func TestRoutableIsAGateAndFulfilledIsNot(t *testing.T) {
 }
 
 // TestDiscriminatedIsTheOtherGate pins that the report carries two independent
-// gates, not one. Enhancement 0015:D5 makes a comparable pair a condition
-// platform-package generation refuses on, exactly as 0010:D37 does over-subscription
-// — and 0015:D18 keeps `fulfilled` out of both. The three are orthogonal: a platform
+// gates, not one. Enhancement 0015 makes a comparable pair a condition
+// platform-package generation refuses on, exactly as enhancement 0010 does over-subscription
+// — and enhancement 0015 keeps `fulfilled` out of both. The three are orthogonal: a platform
 // can fail either gate while passing the other, so the command reads both
 // accessors rather than a single combined verdict that would hide which fired.
 func TestDiscriminatedIsTheOtherGate(t *testing.T) {
@@ -515,7 +515,7 @@ func TestDiscriminatedIsTheOtherGate(t *testing.T) {
 		Discriminated: false,
 	})
 	assert.True(t, undiscriminated.Routable(), "a comparable pair is not over-subscription")
-	assert.False(t, undiscriminated.Discriminated(), "0015:D5: generation refuses a comparable pair")
+	assert.False(t, undiscriminated.Discriminated(), "generation refuses a comparable pair (enhancement 0015)")
 
 	overSubscribed := NewReport(flagRes(), &libplatform.ContractInventory{
 		DefinedBy:      map[string]string{backup: catK8up},

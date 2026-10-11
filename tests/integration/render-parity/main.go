@@ -1,6 +1,6 @@
 //go:build ignore
 
-// Render-digest parity check (0006:D30 gate).
+// Render-digest parity check (enhancement 0006 gate).
 //
 // Renders the SAME module two ways and requires byte-identical render digests:
 //

@@ -178,8 +178,8 @@ metadata: {
 	assert.Contains(t, details, "v2")
 }
 
-// TestGate_Namespace pins the four passing cases from 0011's
-// schemas/target.cue — the constraint 0011:D13 exists to keep from growing until
+// TestGate_Namespace pins the four passing cases from enhancement 0011's
+// schemas/target.cue — the constraint that domain ownership exists to keep from growing until
 // it refuses a third party's own domain — and the measured must-fail shapes.
 func TestGate_Namespace(t *testing.T) {
 	passing := []struct {

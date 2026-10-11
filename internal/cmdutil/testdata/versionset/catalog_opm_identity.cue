@@ -31,7 +31,7 @@ Version: #VersionType | *"2.0.0-alpha.3" // x-release-please-version
 RegistryPath: "opmodel.dev/catalogs/opm"
 
 // kindPrefix mirrors core's #IdentityPackage.kindPrefix — one BASE prefix per
-// kind (0010:D42, amended by 0010:D49). Contract members file exactly
+// kind (enhancement 0010). Contract members file exactly
 // one segment beneath it, under their own apiVersion — a segment derived from
 // the member's key, so filing and key cannot drift — while transformers file
 // at the prefix itself. Every member's metadata.modulePath carries the

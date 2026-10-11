@@ -184,7 +184,7 @@ func TestNoLocalHealthEvaluator(t *testing.T) {
 		return nil
 	})
 	require.NoError(t, err)
-	assert.Empty(t, found, "the cli declares readiness evaluator names of its own; use github.com/open-platform-model/library/opm/k8s/health instead (0012:D3:R6)")
+	assert.Empty(t, found, "the cli declares readiness evaluator names of its own; use github.com/open-platform-model/library/opm/k8s/health instead (enhancement 0012)")
 }
 
 // The scan fires on the copy it exists to refuse.

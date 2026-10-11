@@ -27,8 +27,8 @@ const realTreeRegistry = "opmodel.dev=ghcr.io/open-platform-model,registry.cue.w
 // breaking alphas, so a stable-line comparison cannot hold) without refusals.
 //
 // KNOWN BOUND (documented, deliberate): the predecessor scan probes by the
-// 0010:D49 filing convention (<kind>/<apiVersion> packages). The published history
-// below the alpha releases includes `-0.dev.*` builds predating 0010:D49, whose trees the
+// filing convention of enhancement 0010 (<kind>/<apiVersion> packages). The published history
+// below the alpha releases includes `-0.dev.*` builds predating that convention, whose trees the
 // convention cannot see into — probes there return the scan's negative
 // signal and the walk continues. Acceptable: that horizon is entirely
 // alpha-era, and alpha promises nothing (enhancement 0010).
@@ -93,7 +93,7 @@ func TestRealTree_CatalogOpm(t *testing.T) {
 	require.NotEmpty(t, preds, "the live history should hold at least one predecessor build")
 
 	// lineIsPrerelease=true: the tree ships breaking alphas on a release
-	// prerelease line, and 0011:D26 clause 2 exempts beta/GA members there, so
+	// prerelease line, and enhancement 0011 exempts beta/GA members there, so
 	// a stable-line comparison cannot hold against the live history. The walk
 	// must still be exercised: at least one member is either compared or
 	// counted as prerelease-exempt.
