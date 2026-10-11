@@ -383,9 +383,9 @@ export OPM_REGISTRY="$CUE_REGISTRY"
 
 Default is none: a comment says what the code does and why, in its own words.
 
-- When a rationale genuinely lives in an enhancement, name the enhancement by its id beside the reason in words, once at the symbol: `// Version writes are offline by design (enhancement 0011).` Several enhancements: `(enhancements 0010 and 0011)`.
-- Never write an id alone, and never a decision number (`NNNN:Dn`, `NNNN Dn`, `Dn`) or an open-question number. Decision numbers change when an entry is split or renumbered. The reason in words is what survives.
-- Read an entry with `openspec show <id>-<slug> --store opm-enhancements`.
+- In all text (proposal, design, specs, docs and comments), when a rationale genuinely lives in an enhancement, name the enhancement by its id beside the reason in words, once at the symbol (in a comment): `// Version writes are offline by design (enhancement 0011).` Several enhancements: `(enhancements 0010 and 0011)`.
+- Never write an id alone, and never a decision number (`NNNN:Dn`, `NNNN Dn`, `Dn`) or an open-question number. The store has no decision numbers. The reason in words is what survives.
+- Read an entry with `openspec show <id>-<slug> --store opm-enhancements`. If OpenSpec warns that the store `opm-enhancements` is not registered, report the warning and go on; the human runs `task enhancements:register`.
 - Never a section, slice, phase, task or design-doc-local number (`§8.1`, `slice C2`, `task 4.2`, `design LD3`). They are not stable identifiers.
 - Never in scaffold templates, generated files, fixtures a user copies, or CLI output strings. Those reach people who have no access to the enhancements repo.
 - No `Was:` rename history. `git log` owns it.
@@ -393,7 +393,7 @@ Default is none: a comment says what the code does and why, in its own words.
 
 ### Enhancement delivery in OpenSpec changes
 
-If a change delivers a line of an enhancement's `tasks.md`, its `proposal.md` has `## Enhancement` with one line `Delivers NNNN, task X.Y.` per task. Otherwise the section says `None.`. A pull request on the `enhancements` repo ticks the line; the change carries no other declaration.
+If a change delivers a line of an enhancement's `tasks.md`, its `proposal.md` has `## Enhancement` with one line `Delivers NNNN, task X.Y.` per task. Otherwise the section says `None.`. If the change delivers such a line, name it in the PR body; after the repo PR merges, a PR on the `enhancements` repo ticks the line. The change carries no other declaration.
 
 ## Coding Guidelines
 

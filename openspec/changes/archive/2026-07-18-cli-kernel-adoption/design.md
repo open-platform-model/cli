@@ -62,7 +62,7 @@ File shape (data-only, no imports): `name`, `type`, `registry: {<catalog-path>: 
 
 With no imports in `~/.opm`, nothing needs `CUE_REGISTRY` before parsing. Delete `BootstrapRegistry`, `configHasProviders`, `extractProviders`, and the phase-2 registry env dance; `Load` parses `config.cue` once, validates against the (shrunk) schema, and resolves registry by flag > env > config like every other field. Schema drops `providers` and `cacheDir`. `GlobalConfig` drops `Providers` and `CueContext`. `opm config init` writes `config.cue` + `platform.cue`, creates no `cue.mod`, runs no `cue mod tidy`; `DefaultModuleTemplate` is deleted. `opm config vet` validates both files against their embedded schemas.
 
-### LD6: Solo-cluster Platform write-if-absent is create-only (D22)
+### LD6: Solo-cluster Platform write-if-absent is create-only (enhancement 0006: a plain `Create` that tolerates `AlreadyExists`)
 
 On cluster-facing apply, when the cluster has no `Platform` CR and resolution fell back to the local default, the CLI creates the singleton `cluster` Platform from the resolved local spec via a plain dynamic-client `Create` (field manager `opm-cli`), treating `AlreadyExists` as success-noop. Never SSA (create-or-update would clobber), never an update. RBAC denial on create degrades to a warning — the render already succeeded against the local platform (enhancement 0006).
 
@@ -83,7 +83,7 @@ Its motivation (running `cue mod tidy` for `~/.opm`) is deleted by enhancement 0
 - [Kernel match semantics differ from the CLI pipeline's → existing modules render differently] → The kernel is the contract (0001); differences are correctness fixes by definition, but each must be *visible*: port the CLI's render golden/fixture tests onto the kernel path before deleting `pkg/render`, and diff their output as part of the task sequence, not after.
 - [Materialize performs registry I/O on every render → offline `build` breaks without a reachable registry] → Same exposure the operator has; the CUE module cache serves repeat pulls. Document that `build` needs registry access for catalog resolution (the old pipeline needed it for provider imports — not a regression).
 - [Parity experiment of enhancement 0006 blocked by evaluator skew] → enhancement 0006 precondition tracked in 0006: `library`/`opm-operator` on the same CUE line. The parity test is kind+registry-gated and reports skew explicitly rather than failing obscurely.
-- [Non-admin cannot read cluster `Platform` → warn-fallback renders against a different platform than the cluster's, diff may show drift] → Accepted by enhancement 0006/OQ12: warn + provenance banner instead of refusal (refusal would break the accessibility rule of enhancement 0006).
+- [Non-admin cannot read cluster `Platform` → warn-fallback renders against a different platform than the cluster's, diff may show drift] → Accepted by enhancement 0006: warn + provenance banner instead of refusal (refusal would break the accessibility rule of enhancement 0006).
 - [Users with an existing `~/.opm` (providers block, cue.mod) hit validation errors] → `opm config vet`/load errors name the removed fields and point at `opm config init`; one-time migration, no window (enhancement 0006).
 - [Big-bang slice] → Mitigated by strict task ordering (below): config simplification and platform resolution land as separate reviewable phases before the pipeline swap; each phase keeps `task check` green.
 

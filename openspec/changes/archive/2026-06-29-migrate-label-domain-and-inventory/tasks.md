@@ -1,6 +1,6 @@
 Branch: `0002-cli-x1-rename-module-instance` (stacked on X1 `7a9175d` + X2 + X3 `8e6311e`; atomic-PR / bulk-archive model — **not** a fresh branch). X4 is the slice that drives full `task test` green for the first time in the wave. Every rename site carries a `// Was:` breadcrumb (enhancement 0002). The X1-gap `pkg/loader` public-API accuracy residue and the `modules/`+`releases/` `release.cue` sweep are **out of scope** (see proposal).
 
-## 1. Label domain (`instance-identity-labeling`, D4)
+## 1. Label domain (`instance-identity-labeling`, enhancement 0002: the label domain moves)
 
 - [x] 1.1 `pkg/core/labels.go`: rename `LabelModuleReleaseName`/`LabelModuleReleaseNamespace`/`LabelModuleReleaseUUID` → `LabelModuleInstance{Name,Namespace,UUID}`; flip the three literal values `module-release.opmodel.dev/{name,namespace,uuid}` → `module-instance.opmodel.dev/{name,namespace,uuid}`; update the doc comments ("release name label" → "instance name label"). Add `// Was: module-release.opmodel.dev/*` breadcrumbs.
 - [x] 1.2 Update the two production consumers of the literal: `internal/inventory/crud.go` (the `// 2. Fallback: list Secrets with label …` comment + the GetInventory UUID-label selector; the `FindInventoryByReleaseName` name-label selector) → `module-instance.opmodel.dev/*`. Grep-confirm `grep -rn "module-release.opmodel.dev" pkg internal` returns only `// Was:` breadcrumbs afterward.

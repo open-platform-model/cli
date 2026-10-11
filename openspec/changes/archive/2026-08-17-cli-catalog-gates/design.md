@@ -55,7 +55,7 @@ per member (beta/GA, non-transformer):
 - Test harness: hermetic — publish builds 1..N of a fixture catalog into the in-process immutable registry, then gate build N+1. Cases pinned from the decision tree: clean pass; field-removed refusal (9's shape); alpha member skipped by compat but caught by FQN gate on a filing error; remove-then-readd refused (the option-2 divergence case); prerelease-predecessor compared (the option-1 divergence case); new-package pass; connectivity abort; posture unstated/pinned refusals; the enhancement 0010-opacity bound documented in a test comment.
 - Real-tree smoke: `catalog_opm/src` must pass the member and posture gates as-is (66 compat / 120 FQN / 27 posture) — run against GHCR in the registry-backed tier.
 
-## Amendment (measured during implementation): the D30 exemption is a violation filter, not StripProvenance
+## Amendment (measured during implementation): the provenance exemption of enhancement 0010 is a violation filter, not StripProvenance
 
 Two comparator facts surfaced only against the real tree (`catalog_opm/src` vs the live GHCR history), and both forced a deviation from the "StripProvenance both operands" wording above — same rule, different application point:
 

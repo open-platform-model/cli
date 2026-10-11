@@ -75,7 +75,7 @@ Refuse rather than repair. Adopting the fresh module and values would flip a doc
 
 This is detect-and-retry, not atomicity: a change landing between the re-read and the apply microseconds later still wins. Closing that fully needs an SSA `resourceVersion` precondition, which the inventory store does not currently express for any writer. Accepted — the residual window is orders of magnitude smaller than the render window it replaces, and the failure mode returns to "last writer wins" rather than "silent revert reported as success".
 
-### LD5: D40 verdict computation reads status only
+### LD5: The inventory-stable verdict (enhancement 0006) is computed from status only
 
 Success = `Ready: True` (for the post-flip generation) ∧ `status.inventory.entries` as a *set* equals the pre-flip snapshot (order-insensitive; entries are identity tuples) ∧ `revision` strictly greater ∧ no entry lost (the zero-pruned observable). The relabel is reported from the entry count ("operator adopted N resources — managed-by relabel only, no workload changes"). Failure/timeout exits non-zero with the operator's condition message and an explicit statement that ownership remains `operator` (enhancement 0006 ("Reverse handoff (`--to cli`) is out of scope; supersedes the reverse-mode portion of D7") — the CLI must not auto-revert; the error names `kubectl` and operator logs as the investigation path).
 
