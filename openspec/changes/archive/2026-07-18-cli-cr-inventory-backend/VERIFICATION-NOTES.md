@@ -146,7 +146,7 @@ Nothing blocks the code, but before archive:
    `history` event's `slice: cli/<archive-date>-cli-cr-inventory-backend` in
    `enhancements/0006/config.yaml` (the event body is already appended; only the
    archive-date slice ref is pending), and flip
-   `enhancements/0006` implementation status if appropriate.
+   enhancement 0006 implementation status if appropriate.
 9. **Commit the branch** `feat/cli-cr-inventory-backend` — nothing is committed
    yet.
 

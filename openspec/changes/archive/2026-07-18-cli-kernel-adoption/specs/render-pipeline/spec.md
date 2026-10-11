@@ -1,12 +1,12 @@
 # Delta: render-pipeline (cli-kernel-adoption)
 
-The CLI's own render pipeline is deleted; renders go through the library kernel (0006 D9). Capability retired wholesale — successor requirements live in `kernel-render`.
+The CLI's own render pipeline is deleted; renders go through the library kernel (enhancement 0006, "The CLI replaces its own render/match pipeline entirely with the `library` kernel"). Capability retired wholesale — successor requirements live in `kernel-render`.
 
 ## REMOVED Requirements
 
 ### Requirement: LoadedComponent carries annotations
 
-**Reason**: `pkg/render`'s component model is deleted; the kernel's compile model carries component metadata (0006 D9).
+**Reason**: `pkg/render`'s component model is deleted; the kernel's compile model carries component metadata (enhancement 0006, "The CLI replaces its own render/match pipeline entirely with the `library` kernel").
 **Migration**: Kernel `CompileResult`/`ComponentSummary`.
 
 ### Requirement: TransformerComponentMetadata carries annotations

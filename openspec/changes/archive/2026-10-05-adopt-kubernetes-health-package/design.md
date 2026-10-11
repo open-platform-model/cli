@@ -34,7 +34,7 @@ Callers at the base, re-checked by grep (18 production sites): `internal/kuberne
 
 ### KH1. The library package is imported as `health`, with no alias type
 
-Every file that needs the vocabulary imports `github.com/open-platform-model/library/opm/k8s/health` under its own name, `health`. The cli has no package of that name, unlike `inventory`, so no `k8s` prefix is needed. Struct fields change type from `HealthStatus` to `health.Status`; the JSON and YAML tags stay. `internal/kubernetes` declares no `HealthStatus = health.Status` alias and no re-exported constants (0012:D3:R6). The one local variable named `health` (`buildResourceHealth` in `status.go`) is renamed `verdict` so it does not shadow the package.
+Every file that needs the vocabulary imports `github.com/open-platform-model/library/opm/k8s/health` under its own name, `health`. The cli has no package of that name, unlike `inventory`, so no `k8s` prefix is needed. Struct fields change type from `HealthStatus` to `health.Status`; the JSON and YAML tags stay. `internal/kubernetes` declares no `HealthStatus = health.Status` alias and no re-exported constants (enhancement 0012, "The Kubernetes runtime decisions live in a fenced tier, `opm/k8s`, beside the kernel and inside the library module"). The one local variable named `health` (`buildResourceHealth` in `status.go`) is renamed `verdict` so it does not shadow the package.
 
 `internal/output` does not import the package. `FormatHealthStatus` keeps its string literals and its comment names `health.IsHealthy` as the healthy set: `output` is imported by every command, and importing a Kubernetes-tier package there would pull apimachinery into it for seven strings the constant table (KH4) already pins.
 
@@ -56,7 +56,7 @@ Every file that needs the vocabulary imports `github.com/open-platform-model/lib
 
 **Decision**: option 2.
 
-**Rationale**: 0012:D3:R6 asks for no implementation of the package's decisions, and the fold is one. Equivalence, checked by reading the base code:
+**Rationale**: enhancement 0012 ("The Kubernetes runtime decisions live in a fenced tier, `opm/k8s`, beside the kernel and inside the library module") asks for no implementation of the package's decisions, and the fold is one. Equivalence, checked by reading the base code:
 - `GetInstanceStatus`: every row (live, missing as `Missing`, unreadable as `Unknown`) carries a status; `allReady` is false exactly when some row's status fails `IsHealthy` (`Missing` and `Unknown` both fail it). So `health.Aggregate(rowStatuses, 0)` gives the same verdict, and its ready count equals `Summary.Ready`. `Summary.Total` and `Summary.NotReady` stay computed as now (total minus ready).
 - `aggregateStatus` in `tree.go`: Unknown when there are no evaluated nodes (both branches return Unknown), NotReady when any node fails `IsHealthy`, else Ready. That is `health.Aggregate(nodeStatuses, 0)` with the counts dropped. The function keeps its name and its depth-0 comment; its `resourceCount` parameter only fed a branch that returned the same value as the other, so it goes.
 - `list.go`: `health.Aggregate(statuses of live, len(missing)+len(unreadable))`, the library's proven replacement for `QuickInstanceHealth`. The `tests/integration/inst-list` program does the same inline.
@@ -79,7 +79,7 @@ In section 2 only identifiers in these files change (`HealthReady` becomes `heal
 
 ### KH5. The refusal check is a parse of the repo's Go files
 
-**Context**: 0012:D3:R6 asks the frontend's checks to refuse a reintroduced copy. The earlier adoptions refused a deleted *package path* with `depguard`. Here the copy lived in `internal/kubernetes`, which stays, so there is no import path to deny.
+**Context**: enhancement 0012 ("The Kubernetes runtime decisions live in a fenced tier, `opm/k8s`, beside the kernel and inside the library module") asks the frontend's checks to refuse a reintroduced copy. The earlier adoptions refused a deleted *package path* with `depguard`. Here the copy lived in `internal/kubernetes`, which stays, so there is no import path to deny.
 
 **Explored**: the cli's `.golangci.yml` rules (`depguard` and `forbidigo` settings) and how the `pkg/core`, `pkg/resourceorder` and `pkg/inventory` adoptions refused their copies.
 
@@ -88,7 +88,7 @@ In section 2 only identifiers in these files change (`HealthReady` becomes `heal
 2. A unit test that parses every non-test `.go` file under the repo root (skipping `.git`, `.claude`, `testdata` and `vendor`) with `go/parser` and fails on a top-level declaration named `HealthStatus`, `EvaluateHealth`, `QuickInstanceHealth`, `IsHealthy`, or any function whose name starts with `evaluate` and ends with `Health`. In `internal/kubernetes`, where the copy lived, it also fails on a top-level type alias or value bound directly to a name of the library package (`type Status = health.Status`, `var Healthy = health.IsHealthy`), under whatever name the file imports it.
 3. No check, relying on review.
 
-**Decision**: option 2, in `internal/kubernetes/health_refusal_test.go`, with a doc comment citing 0012:D3:R6 and naming the library package to use instead.
+**Decision**: option 2, in `internal/kubernetes/health_refusal_test.go`, with a doc comment citing enhancement 0012 ("The Kubernetes runtime decisions live in a fenced tier, `opm/k8s`, beside the kernel and inside the library module") and naming the library package to use instead.
 
 **Rationale**: it runs in `task test:unit` and CI with no new tool. It is name-based, so it catches the copy coming back as it was, not a rewritten evaluator under new names; that residual is held by review, as 0012 holds other imports. The test proves it fires by running the same scans over in-memory sources that declare `func EvaluateHealth` and re-export the library's names.
 

@@ -2,7 +2,7 @@
 
 ### Requirement: Stale resource detection
 
-After rendering and before apply, the system SHALL compute the stale set with the library's `opm/k8s/inventory.StaleSet`: every previous inventory entry that no current entry is the same object as, comparing group, kind, namespace and name only. The component and the API version SHALL NOT count, so an object that moved to another component or another API version of its group is never stale. Resources in the stale set are candidates for pruning. Source: 0012:D7:R1.
+After rendering and before apply, the system SHALL compute the stale set with the library's `opm/k8s/inventory.StaleSet`: every previous inventory entry that no current entry is the same object as, comparing group, kind, namespace and name only. The component and the API version SHALL NOT count, so an object that moved to another component or another API version of its group is never stale. Resources in the stale set are candidates for pruning. Source: enhancement 0012 ("The stale set is component-blind, and the inventory digest hashes a canonical field encoding").
 
 #### Scenario: Resource removed from module
 
@@ -55,5 +55,5 @@ The apply flow SHALL follow this sequence: (1) render resources, (2) compute man
 ## REMOVED Requirements
 
 ### Requirement: Component-rename safety check
-**Reason**: The stale set is component-blind (0012:D7), so a component rename never puts an object in it and there is nothing for a filter to rescue. The filter and its call are deleted. No prune decision changes.
+**Reason**: The stale set is component-blind (enhancement 0012, "The stale set is component-blind, and the inventory digest hashes a canonical field encoding"), so a component rename never puts an object in it and there is nothing for a filter to rescue. The filter and its call are deleted. No prune decision changes.
 **Migration**: None. Both of its scenarios hold as scenarios of "Stale resource detection" ("Component renamed without resource change is not stale", "Removal under a renamed component stays stale").

@@ -53,7 +53,7 @@ The CLI SHALL embed exactly one operator artifact — the pinned opm-operator re
 
 ### Requirement: `--version` fetches the release asset instead of the embed
 
-`opm operator install --version <tag>` SHALL fetch `install.yaml` from the opm-operator GitHub release `<tag>` over HTTPS and feed it through the same parse/plan/apply path as the embedded artifact. Fetch failures SHALL produce a clear error naming the tag and URL; no checksum or signature verification is performed at this stage (0006/D35). The command output SHALL name which version was installed and whether it came from the embed or a fetch.
+`opm operator install --version <tag>` SHALL fetch `install.yaml` from the opm-operator GitHub release `<tag>` over HTTPS and feed it through the same parse/plan/apply path as the embedded artifact. Fetch failures SHALL produce a clear error naming the tag and URL; no checksum or signature verification is performed at this stage (enhancement 0006, "One embedded artifact: `dist/install.yaml`, CRDs as a filtered subset; pinned version with a refresh task; `--version` fetches the GitHub release asset; install waits for completion"). The command output SHALL name which version was installed and whether it came from the embed or a fetch.
 
 #### Scenario: Fetching a valid tag
 

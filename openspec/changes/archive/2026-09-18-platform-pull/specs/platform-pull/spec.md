@@ -1,6 +1,6 @@
 ## Purpose
 
-Define `opm platform pull`: the command that reproduces a cluster's platform package on the laptop from the Platform CR's effective inputs, so a local build renders what the cluster renders (enhancement 0015 D6).
+Define `opm platform pull`: the command that reproduces a cluster's platform package on the laptop from the Platform CR's effective inputs, so a local build renders what the cluster renders (enhancement 0015, "A cluster's render is reproduced by pulling the operator-generated platform package").
 
 ## ADDED Requirements
 

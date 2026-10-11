@@ -5,7 +5,7 @@ then the registry call, then the cluster write, then the command that wires them
 
 ## 1. Shared catalog path constant
 
-- [x] 1.1 Add `DefaultCatalogPath = "opmodel.dev/catalogs/opm@v2"` to `internal/config` with a comment naming it as the single first-party catalog install seeds (0010 D47). It lives in `config`, not `platform`, because `platform` already imports `config` and the reverse would be an import cycle.
+- [x] 1.1 Add `DefaultCatalogPath = "opmodel.dev/catalogs/opm@v2"` to `internal/config` with a comment naming it as the single first-party catalog install seeds (enhancement 0010, "The first-party catalogs consolidate into one: `catalog_opm` absorbs `catalog_kubernetes` and `catalog_opm_experimental` on the v2 line"). It lives in `config`, not `platform`, because `platform` already imports `config` and the reverse would be an import cycle.
 - [x] 1.2 Convert `config.DefaultPlatformTemplate` from a `const` to a `fmt.Sprintf` `var` over that constant, matching the shape `DefaultConfigTemplate` already uses directly above it.
 - [x] 1.3 Confirm the rendered template is byte-identical: `go test ./internal/config/... ./internal/cmd/config/...` passes unchanged, including the `opmodel.dev/catalogs/opm@v2` assertion in `internal/cmd/config/init_test.go`.
 

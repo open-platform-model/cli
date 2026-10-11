@@ -9,7 +9,7 @@ Current state that shapes the approach:
 - Input guards judge by file name: `ValidateModuleInputPath` refuses a directory holding `instance.cue`; `ValidateInstanceInputPath` refuses one holding `module.cue`. Enhancement 0016's experiment 03 hit the first one: `opm instance build .` in an instance package fails with "is an instance package, not a module".
 - The kernel's shape gate classifies packages by `kind` and wraps `oerrors.ErrWrongKind` when the kind does not match the acquire verb (`library/opm/errors`).
 - Version listing: `publish.NewRegistryClient(...).ModuleVersions` on a major-free path returns every major's tags (0016 experiment 01). A candidate's dependencies are readable from its module file alone (`modconfig.Registry.ModFile`), about 0.7 s cold per major against GHCR (experiment 02).
-- Selection predicates exist in two forms: `scaffold`'s `highestStable` (prerelease fallback that can return a dev build, experiment 07) and `publish`'s `isDevTag`/`isReleasePrerelease`. The rule 0016 D5 fixes for init is the publish one.
+- Selection predicates exist in two forms: `scaffold`'s `highestStable` (prerelease fallback that can return a dev build, experiment 07) and `publish`'s `isDevTag`/`isReleasePrerelease`. The rule enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-free module path, and floats to the highest core-compatible major when no version is given") fixes for init is the publish one.
 - The CLI's core major is the major of the library's `schema.DefaultSchemaVersion()` (`v2` today).
 
 ## Goals / Non-Goals
@@ -53,7 +53,7 @@ Rule, applied before any registry access (spec: "`opm module build` ... accepts 
 
 **Options considered**:
 1. Existence first (on disk means local, else registry): silent, and a typo in a directory name turns into a registry lookup with a confusing "no published versions" error.
-2. A separate `--from <module-path>` flag for the registry form: explicit, but two ways to name the thing `module build` builds, and 0016 D5 uses the positional for the module path.
+2. A separate `--from <module-path>` flag for the registry form: explicit, but two ways to name the thing `module build` builds, and enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-free module path, and floats to the highest core-compatible major when no version is given") uses the positional for the module path.
 3. Shape first with an ambiguity refusal (chosen): the Go-toolchain convention (paths with a `./` prefix are local), no behavior change for `.`, `./x` or plain `my-module`, and a loud refusal for the one ambiguous case.
 
 **Decision**: Option 3. The only invocation that changes meaning is a bare dotted relative directory (`opm module build web.app`), which is now refused with the `./web.app` hint instead of silently guessed.
@@ -182,11 +182,11 @@ Error: /home/me/src/my_app is a module, not an instance; build it with: opm modu
 
 ### Grammar: major-free path plus `--version`, or `path@version`
 
-**Context**: Enhancement 0016 D5 fixes the published-module grammar for `opm instance init`. `module build` and `apply` could have used the `@vN` suffix every other CUE tool uses.
+**Context**: Enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-free module path, and floats to the highest core-compatible major when no version is given") fixes the published-module grammar for `opm instance init`. `module build` and `apply` could have used the `@vN` suffix every other CUE tool uses.
 **Explored**: 0016 `03-decisions.md` D5 and experiments 01, 02 and 07; the conversation that produced this change.
 **Options considered**:
 1. `path@vN` / `path@vX.Y.Z` positional: familiar from CUE, but a second spelling beside init's.
-2. Major-free path plus `--version` (0016 D5): one spelling for every command that deploys a published module; no version picks the newest line this CLI can build. `opm module init --from` keeps its `@vN` template grammar, which `internal/scaffold` owns.
+2. Major-free path plus `--version` (enhancement 0016, "`opm instance init` mirrors `opm module init`, takes a major-free module path, and floats to the highest core-compatible major when no version is given"): one spelling for every command that deploys a published module; no version picks the newest line this CLI can build. `opm module init --from` keeps its `@vN` template grammar, which `internal/scaffold` owns.
 **Decision**: Option 2, user decision 2026-09-28.
 **Rationale**: One resolver, and one spelling for deploying a published module. The core-compatible default is the answer a deployer wants and is cheap to compute (one module-file read per candidate major).
 
@@ -194,7 +194,7 @@ Error: /home/me/src/my_app is a module, not an instance; build it with: opm modu
 
 **Context**: "Newest" was agreed for floats; `scaffold`'s rule can return a dev build on a dev-only major (0016 experiment 07).
 **Decision**: Newest stable, else the newest prerelease that is not a dev build; a float never picks a dev build; an exact pin may name any published tag.
-**Rationale**: Same rule as 0016 D5:R2, so `module apply` and `instance init` never disagree about "newest".
+**Rationale**: Same rule as enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-free module path, and floats to the highest core-compatible major when no version is given"), so `module apply` and `instance init` never disagree about "newest".
 
 ### Removing the module-directory branch from `opm instance build`
 
@@ -206,7 +206,7 @@ Error: /home/me/src/my_app is a module, not an instance; build it with: opm modu
 
 ### Warning when `module apply` deploys `debugValues`
 
-**Context**: Without `-f`, `module apply` deploys the module's `debugValues`, the author's test fixture, which may hold throwaway hostnames or dummy credentials. Nothing is printed about it today. The published form makes `module apply` look like a real way to deploy, and `--name`/`-n` hide the `-debug` default name. Enhancement 0016 names this risk for `opm instance init` and answers it with a review warning (0016 D2:R3).
+**Context**: Without `-f`, `module apply` deploys the module's `debugValues`, the author's test fixture, which may hold throwaway hostnames or dummy credentials. Nothing is printed about it today. The published form makes `module apply` look like a real way to deploy, and `--name`/`-n` hide the `-debug` default name. Enhancement 0016 names this risk for `opm instance init` and answers it with a review warning (enhancement 0016, "`debugValues` is the default template source for the generated `values.cue`").
 **Options considered**:
 1. Warn only for a published module: the local-directory form has the same gap.
 2. Refuse a published apply without `-f`: blocks a quick try from the registry.

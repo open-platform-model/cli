@@ -2,7 +2,7 @@
 
 ## Context
 
-See `proposal.md` § Why. The enhancement is `enhancements/0015`; this command is the CLI consumer its `02-design.md` names for D1's inventory, D2's arity rule and D18's report-versus-gate split.
+See `proposal.md` § Why. The enhancement is enhancement 0015; this command is the CLI consumer its `02-design.md` names for D1's inventory, D2's arity rule and D18's report-versus-gate split.
 
 Current state, read 2026-09-15 against cli `v1.0.0-alpha.20` (library `v1.0.0-alpha.30`):
 
@@ -23,7 +23,7 @@ Current state, read 2026-09-15 against cli `v1.0.0-alpha.20` (library `v1.0.0-al
 
 **Non-Goals**
 
-- Enhancement 0015 D6, fetching a cluster's effective registry. It depends on the operator's registration acceptance and redefines what "which platform" means.
+- Enhancement 0015 ("A cluster's render is reproduced by pulling the operator-generated platform package"), fetching a cluster's effective registry. It depends on the operator's registration acceptance and redefines what "which platform" means.
 - D5's comparable-predicate duplicates, still deferred by OQ9.
 - A `--output json` mode. No command in this repo has a shared one, and adding a schema before a consumer asks for it is surface without a reader; the report is built as a value so a later flag is a rendering choice, not a rewrite.
 

@@ -1,6 +1,6 @@
 # Delta: module-instance-parsing (cli-kernel-adoption)
 
-`ParseModuleInstance` is deleted; kernel `ProcessModuleInstance`/`SynthesizeInstance` prepare instances (0006 D9).
+`ParseModuleInstance` is deleted; kernel `ProcessModuleInstance`/`SynthesizeInstance` prepare instances (enhancement 0006, "The CLI replaces its own render/match pipeline entirely with the `library` kernel").
 
 ## REMOVED Requirements
 

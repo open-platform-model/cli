@@ -8,7 +8,7 @@ Nothing today can publish an OPM artifact from its committed source. The catalog
 
 Enhancement 0011's answer is one publish pipeline with two entry points — `opm module publish` and `opm catalog publish` — that derives coordinates from the artifact's identity instead of rewriting the artifact to match a coordinate: decode, read `identity/identity.cue`, unify it against core's shipped `#IdentityPackage` (CUE produces the diagnostic — refusal 10), derive path/repo/major/tag by reading and splitting `metadata.modulePath`, run the gates, push. What is published is what is committed (D2). Both CI cutover slices (`catalogs-publish-cutover`, `modules-publish-cutover`) and 0010's two republish migrations wait behind this slice; `cli-catalog-gates` builds its compatibility and member gates on this pipeline.
 
-This slice also lands a check that has never existed anywhere: the version-major/path-major agreement (`#IdentityPackage.VersionMajor`) — core deleted its own assertions of that relation citing publish-side validation (0010 D43/D45), so until this pipeline runs, the relation is enforced by nothing.
+This slice also lands a check that has never existed anywhere: the version-major/path-major agreement (`#IdentityPackage.VersionMajor`) — core deleted its own assertions of that relation citing publish-side validation (enhancement 0010, "The version-major agreement is asserted in the identity package alone, for `#Catalog`" and "The version-major agreement is asserted in the identity package alone for `#Module` too"), so until this pipeline runs, the relation is enforced by nothing.
 
 ## What Changes
 

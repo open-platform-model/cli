@@ -1,6 +1,6 @@
 # Proposal — cli-catalog-gates
 
-> Slice `cli-catalog-gates` of enhancement `0011`. Decisions D7, D9, D22 (+ 0010 D17, D21, D25, D28, D34, D35, D42, D49). Depends on `cli-publish-pipeline` (extends its gate run) and `library-compat-comparator` (consumes `opm/compat`).
+> Slice `cli-catalog-gates` of enhancement `0011`. Decisions D7, D9, D22 (+ enhancement 0010 ("The primitive-under-catalog-path constraint is a publish gate, not a schema constraint", "A primitive's `fqn` is authored from the identity package, and `version` stays required", "`apiVersion` is authored per primitive; `version` is renamed `catalogVersion`", "An unresolved primitive demand is an error; a trait's optionality is stated by its catalog and overridden by the attachment", "Contract API versions follow the Kubernetes ladder, and the promise is keyed to the level", "Compatibility enforcement is publish-side only; a catalog check command is an aid, not a guarantee", "Every primitive kind is flat, and `catalog_opm`'s blueprints move up one segment" and "Contract kinds file under a version segment (`<kind>/<apiVersion>/`) derived from the key")). Depends on `cli-publish-pipeline` (extends its gate run) and `library-compat-comparator` (consumes `opm/compat`).
 
 ## Why
 

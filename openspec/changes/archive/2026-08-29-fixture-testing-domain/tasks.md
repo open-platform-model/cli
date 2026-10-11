@@ -56,7 +56,7 @@
 - [x] 5.2 Update the restatements: root `Taskfile.yml`, `.tasks/config.yml`,
       `.tasks/registry/docker.yml`, `.claude/settings.json`'s allowlisted export string.
 - [x] 5.3 Update `cli/CLAUDE.md`'s registry section and add the fixture-authoring rule.
-- [x] 5.4 Record the slice on `enhancements/0011` with a history event.
+- [x] 5.4 Record the slice on enhancement 0011 with a history event.
 
 ## 6. Verification
 
@@ -86,7 +86,7 @@
       with `--catalog-prerelease` by hand); (b) the six operator-reconciled e2e tests fail inside the
       operator: `deployment-transformer@2.0.0-alpha.8 ... undefined field: #names`. The pinned
       operator v1.0.0-alpha.11 embeds library alpha.13; filling #component from the evaluated value
-      (library alpha.15, 0019 D1) is what exposes #names to transformers, and no operator release
+      (library alpha.15, enhancement 0019 ("Pure-CUE unification is the parity oracle, and divergence is closed by removing kernel behaviour")) is what exposes #names to transformers, and no operator release
       embeds it yet (alpha.13 -> library alpha.14; opm-operator#106 bumps main to alpha.20). 6.4
       completes once an operator release carries library >= alpha.15 and the cli pin follows.
 

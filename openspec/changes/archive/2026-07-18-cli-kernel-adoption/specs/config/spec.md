@@ -1,6 +1,6 @@
 # Delta: config (cli-kernel-adoption)
 
-Single-pass config loading; `providers`/`cacheDir` leave the schema; the provider row leaves the precedence chain (enhancement 0006 D39).
+Single-pass config loading; `providers`/`cacheDir` leave the schema; the provider row leaves the precedence chain (enhancement 0006, "`~/.opm` becomes two import-free data files: `config.cue` drops `providers`/`cacheDir`, D21's local default platform is the sibling `~/.opm/platform.cue`; folded into C2").
 
 ## MODIFIED Requirements
 
@@ -143,10 +143,10 @@ The following debug log lines SHALL be retained:
 
 ### Requirement: Consolidated verbose debug output for build pipeline
 
-**Reason**: The build pipeline it instruments (`pkg/render`, `ProviderLoader`) is deleted; renders go through the library kernel (0006 D9).
+**Reason**: The build pipeline it instruments (`pkg/render`, `ProviderLoader`) is deleted; renders go through the library kernel (enhancement 0006, "The CLI replaces its own render/match pipeline entirely with the `library` kernel").
 **Migration**: Kernel-path verbose output is covered by the `kernel-render` capability; no CLI-side pipeline logs remain.
 
 ### Requirement: Config default template uses v1 module paths
 
-**Reason**: The default template no longer declares a CUE module or provider imports at all — `~/.opm` is import-free (0006 D39).
+**Reason**: The default template no longer declares a CUE module or provider imports at all — `~/.opm` is import-free (enhancement 0006, "`~/.opm` becomes two import-free data files: `config.cue` drops `providers`/`cacheDir`, D21's local default platform is the sibling `~/.opm/platform.cue`; folded into C2").
 **Migration**: See `config-commands` — `opm config init` writes scalar-only `config.cue` plus `platform.cue`.

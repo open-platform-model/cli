@@ -56,7 +56,7 @@ Pure functions over parsed docs keep everything unit-testable without a cluster,
 
 The pinned tag lives as a single Go constant (e.g. `internal/operator/manifest.go: PinnedOperatorVersion = "v1.0.0-alpha.2"`) beside the `go:embed` directive. `task operator:sync VERSION=<tag>` downloads `https://github.com/open-platform-model/opm-operator/releases/download/<tag>/install.yaml` into the embed location and rewrites the constant — the whole upgrade is one reviewable diff. `--version <tag>` at runtime fetches the same URL over HTTPS (10–30s timeout, clear error on 404 naming the tag) and feeds the identical parse/plan path; per D35 no checksum verification.
 
-*Alternative — infer the pin from `go.mod` or a config file:* rejected; the CLI has no Go dependency on opm-operator (0006/D13 forbids the module edge), and a config file adds a second source of truth for what is a build-time property.
+*Alternative — infer the pin from `go.mod` or a config file:* rejected; the CLI has no Go dependency on opm-operator (enhancement 0006 ("The CLI imports `library` only; it does not import `opm-operator` (no controller-runtime, no Flux); supersedes D4's dependency direction") forbids the module edge), and a config file adds a second source of truth for what is a build-time property.
 
 ### 5. Readiness waits: new bounded poll in `internal/operator`, condition checks from `health.go` where they fit
 
@@ -69,7 +69,7 @@ The wait function takes a set of target objects and a per-object readiness predi
 
 ### 6. Finalizer guard: read via dynamic client, strip only `opmodel.dev/cleanup`
 
-Before deleting anything, uninstall lists `moduleinstances` cluster-wide via the existing dynamic client (GVR hardcoded in `internal/operator`; the CLI deliberately has no opm-operator type imports per 0006/D13). Any instance whose `metadata.finalizers` contains `opmodel.dev/cleanup` triggers the refusal, listing each `namespace/name`. With `--remove-finalizers`, the CLI removes exactly that finalizer via a JSON patch on each instance, prints the orphaning consequence, then proceeds. RBAC failure on the list (user can delete Deployments but not list moduleinstances) fails closed with the standard `cmdutil.ExitCodeFromK8sError` mapping — uninstall does not proceed blind.
+Before deleting anything, uninstall lists `moduleinstances` cluster-wide via the existing dynamic client (GVR hardcoded in `internal/operator`; the CLI deliberately has no opm-operator type imports per enhancement 0006 ("The CLI imports `library` only; it does not import `opm-operator` (no controller-runtime, no Flux); supersedes D4's dependency direction")). Any instance whose `metadata.finalizers` contains `opmodel.dev/cleanup` triggers the refusal, listing each `namespace/name`. With `--remove-finalizers`, the CLI removes exactly that finalizer via a JSON patch on each instance, prints the orphaning consequence, then proceeds. RBAC failure on the list (user can delete Deployments but not list moduleinstances) fails closed with the standard `cmdutil.ExitCodeFromK8sError` mapping — uninstall does not proceed blind.
 
 *Alternative — strategic-merge or SSA for finalizer removal:* rejected; finalizers is a shared list not owned by `opm-cli`, a targeted JSON patch (test-and-remove) is the precise, minimal write.
 
@@ -79,7 +79,7 @@ D23/D32 word `--rbac` against the CRDs-only path (its motivating user), but a fu
 
 ### 8. Field-manager rename is a one-constant change, sequenced first
 
-`internal/kubernetes/labels.go: fieldManagerName = "opm"` → `"opm-cli"`. The only SSA write site is `apply.go`; ownership of previously-applied resources transfers on next apply through the existing `Force: true`. Landed as the first task so every new write this slice adds is born under the final manager name. No transition handling: no external users (0006/D14).
+`internal/kubernetes/labels.go: fieldManagerName = "opm"` → `"opm-cli"`. The only SSA write site is `apply.go`; ownership of previously-applied resources transfers on next apply through the existing `Force: true`. Landed as the first task so every new write this slice adds is born under the final manager name. No transition handling: no external users (enhancement 0006, "No backwards-compatibility or deprecation burden; the CUE v0.17-alpha bump is accepted").
 
 ## Risks / Trade-offs
 

@@ -107,7 +107,7 @@ Reading inventory SHALL be a direct GET of the `ModuleInstance` by name and name
 
 ### Requirement: Inventory Secret name convention
 
-**Reason**: The inventory Secret is replaced by the `ModuleInstance` CR (enhancement 0006 D1); there is no Secret to name.
+**Reason**: The inventory Secret is replaced by the `ModuleInstance` CR (enhancement 0006, "The CLI writes a `ModuleInstance` CR instead of a Secret"); there is no Secret to name.
 **Migration**: The CR is named after the instance in the instance namespace; the one-time migration (see `secret-inventory-migration`) ports existing Secrets.
 
 ### Requirement: Inventory Secret labels

@@ -1,12 +1,12 @@
 # Delta: component-matching (cli-kernel-adoption)
 
-CLI-side component-to-transformer matching is deleted; the kernel's matcher (enhancement 0001 model) is the single implementation (0006 D9). Capability retired wholesale.
+CLI-side component-to-transformer matching is deleted; the kernel's matcher (enhancement 0001 model) is the single implementation (enhancement 0006, "The CLI replaces its own render/match pipeline entirely with the `library` kernel"). Capability retired wholesale.
 
 ## REMOVED Requirements
 
 ### Requirement: Match components against transformer definitions
 
-**Reason**: Matching is the kernel's (0006 D9); the CLI carries no second implementation.
+**Reason**: Matching is the kernel's (enhancement 0006, "The CLI replaces its own render/match pipeline entirely with the `library` kernel"); the CLI carries no second implementation.
 **Migration**: Kernel `Match` via `kernel-render`.
 
 ### Requirement: Match details recorded for rejection reporting

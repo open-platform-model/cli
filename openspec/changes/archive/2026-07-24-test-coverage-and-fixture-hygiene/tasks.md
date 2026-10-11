@@ -2,7 +2,7 @@
 
 ## 1. Live coverage additions (kind + CRDs; existing integration tier)
 
-- [x] 1.1 `tests/integration/ssa-ownership/main.go`: new step pair — `ApplySpec` with `SourceLocal: true` → assert `module-instance.opmodel.dev/source: local` on the live object; re-apply with `false` → assert annotation removed by SSA (closes the open C1 VERIFICATION-NOTES item; 0006 D38 gate input)
+- [x] 1.1 `tests/integration/ssa-ownership/main.go`: new step pair — `ApplySpec` with `SourceLocal: true` → assert `module-instance.opmodel.dev/source: local` on the live object; re-apply with `false` → assert annotation removed by SSA (closes the open C1 VERIFICATION-NOTES item; enhancement 0006 ("The provenance annotation is kept and promoted to a fail-closed handoff pre-gate; the handoff verification render MUST bypass local replacements (resolves OQ17)") gate input)
 - [x] 1.2 `tests/integration/migration/main.go`: idempotence scenario — CR present + leftover legacy Secret → apply → Secret deleted without being read as inventory, no duplicate migration, single clean end state
 
 ## 2. Unit coverage additions

@@ -1,6 +1,6 @@
 ## ADDED Requirements
 
-<!-- Renamed from `module-release-type` (enhancement 0002 D10). Spec dir is git mv'd at archive. -->
+<!-- Renamed from `module-release-type` (enhancement 0002, "Every `release`-named file and directory is renamed on disk (extends D8 to the filesystem)"). Spec dir is git mv'd at archive. -->
 
 ### Requirement: module.Instance represents a fully prepared module instance
 The `pkg/module` package SHALL export an `Instance` struct containing four fields: `Metadata *InstanceMetadata` (decoded instance identity), `Module Module` (the original module definition), `Spec cue.Value` (the concrete, values-filled, complete `#ModuleInstance` CUE value), and `Values cue.Value` (the concrete, merged values applied to the instance).

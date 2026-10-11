@@ -1,8 +1,8 @@
 ## Why
 
-`cue.mod/local-module.cue` is the sanctioned local-development mechanism (0006 D37), and every CLI load path honours it today because the developer's directory is the main module of that load. The render is the exception: the library kernel generates its own main module and, on library releases up to `v1.0.0-alpha.28`, promotes only each input's `cue.mod/module.cue`, so a developer's redirect of a shared module, of a never-published module, or of the catalog is silently dropped at render and the published pin resolves instead. The CLI's D19 warning ("demanded keys may not correspond to published bytes") therefore describes a render that does not happen.
+`cue.mod/local-module.cue` is the sanctioned local-development mechanism (enhancement 0006, "`cue.mod/local-module.cue` is the sanctioned local-module workflow; `spec.module` always carries the canonical declared reference; the CR never represents a local path"), and every CLI load path honours it today because the developer's directory is the main module of that load. The render is the exception: the library kernel generates its own main module and, on library releases up to `v1.0.0-alpha.28`, promotes only each input's `cue.mod/module.cue`, so a developer's redirect of a shared module, of a never-published module, or of the catalog is silently dropped at render and the published pin resolves instead. The CLI's D19 warning ("demanded keys may not correspond to published bytes") therefore describes a render that does not happen.
 
-The library change `render-local-replacements` (library repo, same name) promotes those redirects into the render module under the platform-wins precedence of 0019 D13, behind a per-render opt-in on `RenderInput`, refuses an input carrying the file when the opt-in is off, and reports every honoured replacement as a diagnostics row. This change makes the CLI opt in and word the rows.
+The library change `render-local-replacements` (library repo, same name) promotes those redirects into the render module under the platform-wins precedence of enhancement 0019 ("The render module's `cue.mod` is derived by promotion, never computed, and a render refuses when derivation cannot cover a path"), behind a per-render opt-in on `RenderInput`, refuses an input carrying the file when the opt-in is off, and reports every honoured replacement as a diagnostics row. This change makes the CLI opt in and word the rows.
 
 ## What Changes
 
@@ -22,7 +22,7 @@ None.
 
 ### Modified Capabilities
 
-- `kernel-render`: the "Local-replacement renders warn (0010 D19)" requirement changes from a file-presence warning to: the render opts in, honoured replacements are warned from the kernel's rows, and an inert module-side replacement is warned as such.
+- `kernel-render`: the "Local-replacement renders warn (enhancement 0010, "A moved-ahead dev checkout is accepted and warned about, not versioned around")" requirement changes from a file-presence warning to: the render opts in, honoured replacements are warned from the kernel's rows, and an inert module-side replacement is warned as such.
 
 ## Impact
 

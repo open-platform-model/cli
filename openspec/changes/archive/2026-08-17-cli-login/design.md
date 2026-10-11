@@ -9,7 +9,7 @@ One small command over one careful file writer. The design's center of gravity i
 ### Name: `opm registry login`, not top-level `opm login`
 
 **Context**: D11 drafted the command as top-level `opm login`. On review of this slice's artifacts the name read as ambiguous — "do I log in to OPM or to something else?" — because `opm` is a platform tool with no hosted OPM service behind it, unlike docker/podman/oras/cue where the registry is the only possible referent of "login".
-**Decision**: `opm registry login [host]` — a new `registry` root command group, `login` its first subcommand. Recorded as 0011 D24 (amends D11); flags, defaults, and the whole contract are unchanged. Helm is the precedent: a package tool pushing to OCI registries it does not operate, answering the same ambiguity with `helm registry login`. The capability name (`registry-login`) and the existing `opm catalog registry check` subgroup already use the noun.
+**Decision**: `opm registry login [host]` — a new `registry` root command group, `login` its first subcommand. Recorded as enhancement 0011 ("The login command is `opm registry login`") (amends D11); flags, defaults, and the whole contract are unchanged. Helm is the precedent: a package tool pushing to OCI registries it does not operate, answering the same ambiguity with `helm registry login`. The capability name (`registry-login`) and the existing `opm catalog registry check` subgroup already use the noun.
 **Rationale**: the command names what you authenticate to, and the group gives logout and the `docker-credential-opm` helper flow a home when they arrive.
 
 ### Store: docker config, not `logins.json`, not device flow

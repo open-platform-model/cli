@@ -1,6 +1,6 @@
 ## ADDED Requirements
 
-<!-- Renamed from `module-release-processing` (enhancement 0002 D10). Spec dir is git mv'd at archive. -->
+<!-- Renamed from `module-release-processing` (enhancement 0002, "Every `release`-named file and directory is renamed on disk (extends D8 to the filesystem)"). Spec dir is git mv'd at archive. -->
 
 ### Requirement: ProcessModuleInstance is the public rendering entrypoint
 The `pkg/render` package SHALL export `ProcessModuleInstance` that accepts a prepared `*module.Instance` and a `*provider.Provider`, and returns `*ModuleResult`. It SHALL own the full rendering pipeline: component finalization, matching, and execution.

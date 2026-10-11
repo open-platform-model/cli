@@ -1,10 +1,10 @@
 ## MODIFIED Requirements
 
-<!-- enhancement 0002 D6/D10 — X3-deferred to X4 per D-X3.6 (single capability owner). Restates the requirement whose normative text changes under the rename: the shared selector-flags bundle (InstanceSelectorFlags, --instance-name/--instance-id). Per-scenario flag-string swaps in the other event requirements ride the archive spec-sync / hygiene pass. -->
+<!-- enhancement 0002 ("The CLI user-facing command group `release` is renamed to `instance`" and "Every `release`-named file and directory is renamed on disk (extends D8 to the filesystem)") — X3-deferred to X4 per D-X3.6 (single capability owner). Restates the requirement whose normative text changes under the rename: the shared selector-flags bundle (InstanceSelectorFlags, --instance-name/--instance-id). Per-scenario flag-string swaps in the other event requirements ride the archive spec-sync / hygiene pass. -->
 
 ### Requirement: Events command uses shared instance selector flags
 
-The command SHALL use `InstanceSelectorFlags` for `--instance-name`/`--instance-id`/`-n` with the same mutual exclusivity validation as `mod status` and `mod delete`. Exactly one of `--instance-name` or `--instance-id` MUST be provided. <!-- Was: ReleaseSelectorFlags, --release-name/--release-id (0002 D10/D-X4.2) -->
+The command SHALL use `InstanceSelectorFlags` for `--instance-name`/`--instance-id`/`-n` with the same mutual exclusivity validation as `mod status` and `mod delete`. Exactly one of `--instance-name` or `--instance-id` MUST be provided. <!-- Was: ReleaseSelectorFlags, --release-name/--release-id (enhancement 0002 ("Every `release`-named file and directory is renamed on disk (extends D8 to the filesystem)")/D-X4.2) -->
 
 #### Scenario: Both selectors provided
 
@@ -18,7 +18,7 @@ The command SHALL use `InstanceSelectorFlags` for `--instance-name`/`--instance-
 
 ### Requirement: Events command discovers instance resources and their children
 
-The `opm mod events` command SHALL discover OPM-managed resources via `cmdutil.ResolveInventory` (inventory-based discovery), then walk ownerReferences downward to find Kubernetes-owned children (ReplicaSets, Pods) of workload resources. The combined set of resource UIDs SHALL be used to filter events. <!-- Was: "discovers release resources" (0002 D9) -->
+The `opm mod events` command SHALL discover OPM-managed resources via `cmdutil.ResolveInventory` (inventory-based discovery), then walk ownerReferences downward to find Kubernetes-owned children (ReplicaSets, Pods) of workload resources. The combined set of resource UIDs SHALL be used to filter events. <!-- Was: "discovers release resources" (enhancement 0002, "The instance-file naming convention moves: `release.cue` → `instance.cue`") -->
 
 #### Scenario: Events include Pod-level events from Deployment children
 

@@ -2,7 +2,7 @@
 
 See proposal.md. After `compat-dev-tag-exemption`, `gateCompat` and `RegistryCheck` already classify the effective tag once (`isDevTag`) before the scan. `eligibleByPackage` (`compat.go`) partitions members: transformers out, unparseable apiVersion out, alpha into `CompatAlpha`, the rest into the walk. `CatalogGateOutcomes` is rendered by `plan.go:renderCatalogGates` and `check.go`.
 
-Constraints: 0011 D26 clause 2. 0010 D34's member-level model is unchanged; the library's `CheckAtLevel` keeps keying on the member's apiVersion and must not learn about module versions (its doc comment says so explicitly; the module version is "an independent axis"). The policy therefore lives in the cli gate, not in `library/opm/compat`.
+Constraints: enhancement 0011 ("The compatibility gate ignores dev builds and stands down while the module line is itself a prerelease") clause 2. 0010 D34's member-level model is unchanged; the library's `CheckAtLevel` keeps keying on the member's apiVersion and must not learn about module versions (its doc comment says so explicitly; the module version is "an independent axis"). The policy therefore lives in the cli gate, not in `library/opm/compat`.
 
 ## Goals / Non-Goals
 

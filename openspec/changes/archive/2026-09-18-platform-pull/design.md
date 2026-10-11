@@ -144,7 +144,7 @@ Error messages name the directory and the flag, the CR and the reason, or the fa
 
 ### Regenerate from the CR, not transfer bytes
 
-**Context**: D6 says "retrieves the operator-generated platform package"; 0019 D6 says the package is never published or served.
+**Context**: D6 says "retrieves the operator-generated platform package"; enhancement 0019 ("The Platform CR keeps naming a catalog coordinate; the operator generates the platform package") says the package is never published or served.
 **Explored**:
 1. Serve the package from the operator (a ConfigMap, an OCI artifact, a subresource): new operator surface, a second copy of the bytes to keep consistent, and it contradicts the no-publish posture the reserved namespace exists for.
 2. Regenerate from `status.registry` with the shared generator: no new surface; byte-identical by construction when CLI and operator embed the same library release, because the generator, the closure derivation and the module path are the same code and the core pin follows the library.

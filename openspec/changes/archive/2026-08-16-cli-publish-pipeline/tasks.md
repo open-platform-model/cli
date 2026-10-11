@@ -44,4 +44,4 @@
 
 ## 8. Record
 
-- [x] 8.1 `enhancements/0011/`: slice → `done` + `openspec_ref` + history event, recording the three deviations (package-name refusal message drafted CLI-side; tidiness gate not reproduced — decode covers the load-failure class; `internal/cueedit` writer landed here for `cli-authoring-commands` to reuse) and the D4 evidence correction (catalog-vs-module `cue vet` asymmetry) so 03-decisions.md's stale sentence is not propagated.
+- [x] 8.1 enhancement 0011: slice → `done` + `openspec_ref` + history event, recording the three deviations (package-name refusal message drafted CLI-side; tidiness gate not reproduced — decode covers the load-failure class; `internal/cueedit` writer landed here for `cli-authoring-commands` to reuse) and the D4 evidence correction (catalog-vs-module `cue vet` asymmetry) so 03-decisions.md's stale sentence is not propagated.

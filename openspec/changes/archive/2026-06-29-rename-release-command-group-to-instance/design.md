@@ -1,6 +1,6 @@
 ## Context
 
-Slice X3 of enhancement [0002](../../../../enhancements/0002/) (`Release` → `Instance` rename). X1 (committed on branch `0002-cli-x1-rename-module-instance`) renamed the `pkg/module` types, the loader, and the instance-file convention; X2 removed the dead bundle path. The user-facing command verb is still `opm release`, the cobra group still lives in `internal/cmd/release/`, and the command-target plumbing (`internal/cmdutil/release_{arg,target}.go`, `internal/workflow/query` call sites) still carries the `Release` name. X3 renames that surface to `instance`.
+Slice X3 of enhancement 0002 (`Release` → `Instance` rename). X1 (committed on branch `0002-cli-x1-rename-module-instance`) renamed the `pkg/module` types, the loader, and the instance-file convention; X2 removed the dead bundle path. The user-facing command verb is still `opm release`, the cobra group still lives in `internal/cmd/release/`, and the command-target plumbing (`internal/cmdutil/release_{arg,target}.go`, `internal/workflow/query` call sites) still carries the `Release` name. X3 renames that surface to `instance`.
 
 This lands in the single atomic per-repo CLI PR (X1–X4) and bulk-archives with the other cli slices. It depends on X1 (committed); it is not independently gated on `library`. It is co-implemented with X4 (label domain + inventory + example/fixture moves), which shares some files (`QUICKSTART.md`, `internal/workflow/query/inventory_test.go`) but no identifiers.
 
@@ -40,7 +40,7 @@ internal/workflow/query/status.go         command-target call sites only
 
 ### D-X3.1 — Drop `rel`; do not keep it as a back-compat alias
 
-The cobra group changes `Use: "release"` → `"instance"` and `Aliases: ["rel"]` → `["inst"]`, with no `"release"`/`"rel"` retained for compatibility. Rationale: enhancement D8 is a hard rename (no alias), and the CLI has no external consumers, so there is no migration audience to cushion. Keeping `rel` would preserve the exact vocabulary the rename exists to retire and muddy `--help`. Trade-off accepted: existing muscle memory and any local scripts using `opm release …` break — acceptable for a pre-1.0 alpha with no external users. Source: enhancement 0002 D8; user direction 2026-06-28.
+The cobra group changes `Use: "release"` → `"instance"` and `Aliases: ["rel"]` → `["inst"]`, with no `"release"`/`"rel"` retained for compatibility. Rationale: enhancement D8 is a hard rename (no alias), and the CLI has no external consumers, so there is no migration audience to cushion. Keeping `rel` would preserve the exact vocabulary the rename exists to retire and muddy `--help`. Trade-off accepted: existing muscle memory and any local scripts using `opm release …` break — acceptable for a pre-1.0 alpha with no external users. Source: enhancement 0002 ("Hard rename, no alias window; `semver: major` (resolves OQ3, OQ4)"); user direction 2026-06-28.
 
 ### D-X3.2 — Rename the X2-deferred `TestReleaseVetCmd_RejectsBundleRelease`
 

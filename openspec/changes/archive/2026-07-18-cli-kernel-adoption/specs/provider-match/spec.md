@@ -1,12 +1,12 @@
 # Delta: provider-match (cli-kernel-adoption)
 
-Provider-driven matching is retired; the kernel matches against the materialized platform (0006 D9/D39). Capability retired wholesale.
+Provider-driven matching is retired; the kernel matches against the materialized platform (enhancement 0006, "The CLI replaces its own render/match pipeline entirely with the `library` kernel" and "`~/.opm` becomes two import-free data files: `config.cue` drops `providers`/`cacheDir`, D21's local default platform is the sibling `~/.opm/platform.cue`; folded into C2"). Capability retired wholesale.
 
 ## REMOVED Requirements
 
 ### Requirement: Provider exposes a Match method
 
-**Reason**: `pkg/provider` is deleted (0006 D39).
+**Reason**: `pkg/provider` is deleted (enhancement 0006, "`~/.opm` becomes two import-free data files: `config.cue` drops `providers`/`cacheDir`, D21's local default platform is the sibling `~/.opm/platform.cue`; folded into C2").
 **Migration**: Kernel `Match` against the materialized platform.
 
 ### Requirement: Matching algorithm evaluates required labels, resources, and traits

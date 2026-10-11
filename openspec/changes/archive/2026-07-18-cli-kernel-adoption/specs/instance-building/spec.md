@@ -1,6 +1,6 @@
 # Delta: instance-building (cli-kernel-adoption)
 
-Loading/synthesis routes through the library kernel; the CLI-side synthetic-wrapper machinery is retired (enhancement 0006 D9; 0002 carryover). Behavioral requirements (values validation, concreteness, CUE-derived metadata, value-selection fallback, `mod vet` debugValues) are unchanged and stay in the main spec.
+Loading/synthesis routes through the library kernel; the CLI-side synthetic-wrapper machinery is retired (enhancement 0006 ("The CLI replaces its own render/match pipeline entirely with the `library` kernel"); 0002 carryover). Behavioral requirements (values validation, concreteness, CUE-derived metadata, value-selection fallback, `mod vet` debugValues) are unchanged and stay in the main spec.
 
 ## MODIFIED Requirements
 
@@ -38,20 +38,20 @@ All paths run the kernel's Module Gate equivalent (`ValidateModuleValues*` / `Pr
 
 ### Requirement: Synthesis path resolves the catalog dep through the registry
 
-**Reason**: The synthetic-wrapper CUE module (`loadSynthWrapper`) is deleted; kernel `SynthesizeInstance` resolves the `#ModuleInstance` schema through the kernel's schema cache (0002 carryover, 0006 D9).
+**Reason**: The synthetic-wrapper CUE module (`loadSynthWrapper`) is deleted; kernel `SynthesizeInstance` resolves the `#ModuleInstance` schema through the kernel's schema cache (0002 carryover, enhancement 0006 ("The CLI replaces its own render/match pipeline entirely with the `library` kernel")).
 **Migration**: No user-facing change — modules still declare their own deps; the wrapper's `opmodel.dev/core/v1alpha1@v1` pin ceases to exist.
 
 ### Requirement: Synth wrapper and user module load the same catalog version
 
-**Reason**: There is no synth wrapper; schema/version binding is the kernel's responsibility (0006 D9).
+**Reason**: There is no synth wrapper; schema/version binding is the kernel's responsibility (enhancement 0006, "The CLI replaces its own render/match pipeline entirely with the `library` kernel").
 **Migration**: Version-binding behavior is the kernel contract shipped by `library` (enhancement 0001).
 
 ### Requirement: `LoadInstanceFile()` loads a standalone `.cue` file with import resolution
 
-**Reason**: Replaced by the kernel's source/instance-package loading (0006 D9).
+**Reason**: Replaced by the kernel's source/instance-package loading (enhancement 0006, "The CLI replaces its own render/match pipeline entirely with the `library` kernel").
 **Migration**: Use kernel `LoadInstancePackage`/`LoadSourceFromFile` + `ProcessModuleInstance`.
 
 ### Requirement: `LoadModulePackage()` loads a local module CUE package
 
-**Reason**: Replaced by kernel `LoadModulePackage` (0006 D9).
+**Reason**: Replaced by kernel `LoadModulePackage` (enhancement 0006, "The CLI replaces its own render/match pipeline entirely with the `library` kernel").
 **Migration**: Call the kernel wrapper; `pkg/loader`'s copy is deleted.

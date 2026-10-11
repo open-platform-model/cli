@@ -1,10 +1,10 @@
 ## MODIFIED Requirements
 
-<!-- enhancement 0002 D4/D9/D10. Restates only the deploy requirements whose normative text changes under the rename: the identity-label key (FR-D-065), the persisted "instance inventory record" noun, and the `--instance-id`/`--instance-name` selector flags on `mod delete`. The bulk of the FR-D-0xx render/apply/prune behavior is unchanged and rides the archive spec-sync. -->
+<!-- enhancement 0002 ("The label domain moves to `module-instance.opmodel.dev/*` (resolves OQ2)", "The instance-file naming convention moves: `release.cue` → `instance.cue`" and "Every `release`-named file and directory is renamed on disk (extends D8 to the filesystem)"). Restates only the deploy requirements whose normative text changes under the rename: the identity-label key (FR-D-065), the persisted "instance inventory record" noun, and the `--instance-id`/`--instance-name` selector flags on `mod delete`. The bulk of the FR-D-0xx render/apply/prune behavior is unchanged and rides the archive spec-sync. -->
 
 ### Requirement: Legacy CLI-managed instances remain mutable by the CLI
 
-`opm mod apply` and `opm mod delete` SHALL continue to manage instances created by an earlier CLI. Identity-label injection SHALL use the instance label domain. <!-- Was: "Legacy CLI-managed releases", module-release.opmodel.dev/uuid (0002 D4) -->
+`opm mod apply` and `opm mod delete` SHALL continue to manage instances created by an earlier CLI. Identity-label injection SHALL use the instance label domain. <!-- Was: "Legacy CLI-managed releases", module-release.opmodel.dev/uuid (enhancement 0002, "The label domain moves to `module-instance.opmodel.dev/*` (resolves OQ2)") -->
 
 | Requirement | Detail |
 | --- | --- |
@@ -31,7 +31,7 @@
 
 ### Requirement: mod apply writes current instance inventory record after successful apply
 
-After all resources are successfully applied, `opm mod apply` SHALL persist the current instance inventory record for the instance. The persisted form SHALL store top-level `createdBy`, `instanceMetadata`, `moduleMetadata`, and the current owned resource set directly instead of a history-bearing inventory shape. <!-- Was: "release inventory record", releaseMetadata (0002 D8/D9) -->
+After all resources are successfully applied, `opm mod apply` SHALL persist the current instance inventory record for the instance. The persisted form SHALL store top-level `createdBy`, `instanceMetadata`, `moduleMetadata`, and the current owned resource set directly instead of a history-bearing inventory shape. <!-- Was: "release inventory record", releaseMetadata (enhancement 0002, "Hard rename, no alias window; `semver: major` (resolves OQ3, OQ4)" and "The instance-file naming convention moves: `release.cue` → `instance.cue`") -->
 
 #### Scenario: Successful apply persists current instance inventory record
 

@@ -10,11 +10,11 @@ See `proposal.md` for the motivation. The state of the code at the base of this 
 Constraints:
 
 - The library verdict is pure. The caller reads the live object and hands it in; the library reads no cluster and words the skip (`opm/k8s/ownership` package doc).
-- The contract is 0012:D4:R1, 0012:D7:R1 and 0012:D8:R7 and R8.
+- The contract is enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply", "The stale set is component-blind, and the inventory digest hashes a canonical field encoding" and "The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override") and R8.
 - The fail-safe rules stay: a failed prune keeps the entry (cli#332), a failed record delete is an error (cli#338), reads resolve kinds by discovery (cli#342), PersistentVolumeClaims are kept unless `--delete-data` (cli#345), errors are told apart by type and never by message text (cli#346).
 - No command syntax changes. No flag is added, removed or renamed.
 
-Reversibility: costly two-way. The cli can change how it calls the verdict at any release. What users see (which objects a prune or delete leaves) is the contract of 0012:D8, already accepted by the owner.
+Reversibility: costly two-way. The cli can change how it calls the verdict at any release. What users see (which objects a prune or delete leaves) is the contract of enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override"), already accepted by the owner.
 
 ## Goals / Non-Goals
 
@@ -29,7 +29,7 @@ Reversibility: costly two-way. The cli can change how it calls the verdict at an
 
 - The apply guard, the adopt annotation on apply, and the hand-over on apply: change `guard-every-apply-by-ownership`.
 - The deletion protocol: `opm/k8s/lifecycle`, the order, the finalizer hold, the propagation policy. A later change replaces the two delete loops with the library's deletion plan; this change keeps the loops and changes only the per-object decision and the precondition.
-- The delete of the cli's own `ModuleInstance` record, and the removal of the cleanup finalizer from other instances' records by `operator uninstall`. Neither is a delete of an instance's object under 0012:D8.
+- The delete of the cli's own `ModuleInstance` record, and the removal of the cleanup finalizer from other instances' records by `operator uninstall`. Neither is a delete of an instance's object under enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override").
 - A change to the dry run.
 
 ## Decisions
@@ -121,17 +121,17 @@ read record (identity R) -> ... -> apply rendered objects (identity N stamped by
 
 #### The migration's deletes: refuse, not skip
 
-**Context**: Install deletes the earlier Deployment and the superseded bindings (0012:D8:R7). `CanDelete` can skip one, in practice when its adopt annotation names another instance. 0012:D8:R8 words that case as a skip.
+**Context**: Install deletes the earlier Deployment and the superseded bindings (enhancement 0012, "The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override"). `CanDelete` can skip one, in practice when its adopt annotation names another instance. Enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override") words that case as a skip.
 **Options considered**:
 1. Status quo: delete on the proof alone.
 2. Skip the object and go on.
 3. Refuse the install in the check phase, exit 2, naming the object and its owner.
 **Decision**: Option 3 (owner decision of 2026-10-08: when `opm operator install` meets an object it needs that another instance owns, it refuses with exit 2 before changing anything).
-**Rationale**: The earlier Deployment must go before the module's Deployment can apply, so an install that skips it cannot complete, and would report success on an operator it did not replace. This is the one place where the cli refuses on an object annotated for another instance, and it departs from the letter of 0012:D8:R8; the enhancement needs a revision note for it.
+**Rationale**: The earlier Deployment must go before the module's Deployment can apply, so an install that skips it cannot complete, and would report success on an operator it did not replace. This is the one place where the cli refuses on an object annotated for another instance, and it departs from the letter of enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override"); the enhancement needs a revision note for it.
 
 #### The stale set (0012:D7:R1)
 
-**Context**: 0012:D7:R1 binds the end state: the stale set is exactly what the instance recorded and no longer renders.
+**Context**: enhancement 0012 ("The stale set is component-blind, and the inventory digest hashes a canonical field encoding") binds the end state: the stale set is exactly what the instance recorded and no longer renders.
 **Decision**: The stale set is computed as today (`inventory.StaleSet`) and is not filtered. Ownership is decided per stale object by the verdict; an object the verdict skips is left in the cluster and leaves the record.
 **Rationale**: The requirement's end state holds, and the mechanism is the library's.
 
@@ -146,14 +146,14 @@ Codes: 0 success, 1 general, 2 validation, 3 connectivity, 4 permission denied, 
 
 | # | Case | Before | After | Reason |
 | --- | --- | --- | --- | --- |
-| 1 | Prune; the live stale object is not OPM-managed, carries a UUID other than the recorded one, or is adopted elsewhere | exit 0; deleted | exit 0; `left behind`, entry dropped | Audit finding B1; 0012:D4:R1, 0012:D8:R8. No code change. |
+| 1 | Prune; the live stale object is not OPM-managed, carries a UUID other than the recorded one, or is adopted elsewhere | exit 0; deleted | exit 0; `left behind`, entry dropped | Audit finding B1; enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply" and "The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override"). No code change. |
 | 2 | Prune; the live read fails with an error other than NotFound | no read was made; the delete was tried | exit 1 after the record write, entry kept; a discovery failure keeps its code (4 or 3) | The failed-prune rule of cli#332 and cli#342, applied to the new read. |
 | 3 | Prune; the DELETE answers Conflict on the UID precondition | not possible | as row 2: exit 1, entry kept | The library's rule: a failed precondition is never reported as deleted. |
 | 4 | Prune on the first apply after the module's path changed; stale objects carry the recorded identity | exit 0; deleted | exit 0; deleted | No change: prune judges with the recorded identity. |
-| 5 | `instance delete`, `operator uninstall`; the live object's adopt annotation names another instance | deleted | `left behind`; exit code unchanged (0 when nothing failed) | 0012:D8:R8. |
+| 5 | `instance delete`, `operator uninstall`; the live object's adopt annotation names another instance | deleted | `left behind`; exit code unchanged (0 when nothing failed) | enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override"). |
 | 6 | `instance delete`, `operator uninstall`; left-behind reasons | "no longer managed by OPM", "owned by another instance" | the library's messages | One wording for both frontends. No code change. |
 | 7 | `instance delete`, `operator uninstall`; the DELETE answers Conflict on the UID precondition | not possible | a per-resource error, record kept; `instance delete` exits with the code of `deleteFailureExitCode` (`internal/cmd/instance/delete_exit.go`), as for any failed delete | As row 3. |
-| 8 | `operator install`; a proven earlier Deployment or binding gets a skip verdict (in practice: its adopt annotation names another instance) | deleted | exit 2; migration refusal naming the object and the instance, nothing written | Owner decision of 2026-10-08; 0012:D8:R8: no instance deletes an object annotated for another. |
+| 8 | `operator install`; a proven earlier Deployment or binding gets a skip verdict (in practice: its adopt annotation names another instance) | deleted | exit 2; migration refusal naming the object and the instance, nothing written | Owner decision of 2026-10-08; enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override"): no instance deletes an object annotated for another. |
 
 Example, row 1 (`opm instance apply`):
 
@@ -173,7 +173,7 @@ The reason is the library's text and MUST NOT be reworded by the cli. The lines 
 
 - Assets: objects in the cluster that this instance does not own, and their data.
 - Trust boundary: the cluster API. Live labels and annotations are input that any principal with patch rights on the object can set.
-- Threats and mitigations: deleting an object another party created or recreated under a recorded name (the live read, the verdict and the UID precondition); deciding on a read that failed (every check fails closed). Baseline: the contract of 0012:D8 and the library's verdict tests.
+- Threats and mitigations: deleting an object another party created or recreated under a recorded name (the live read, the verdict and the UID precondition); deciding on a read that failed (every check fails closed). Baseline: the contract of enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override") and the library's verdict tests.
 - The cli decides nothing about delete ownership itself after this change. Its own policy is limited to read errors, exit codes and output.
 - Residual risk, owner: the cli maintainers. Enhancement 0012 records two risks of the adopt annotation (a mistyped UUID, an annotation removed too early) in its `05-risks.md`; the one below is not there yet and belongs beside them. A principal with patch rights on an object, and no delete rights, can set the adopt annotation to another instance's UUID. The object then survives `opm instance delete` and `opm operator uninstall`, and a prune. For a role binding or a network policy that is a grant or a rule that outlives the removal of its instance. On a proven earlier binding it blocks `opm operator install` (row 8).
 - Detection: the object is never left silently. Each is printed as a `left behind` warning that names the instance in the annotation, and the closing line of `instance delete` and `operator uninstall` gives the number left behind. The exit code stays 0, because a left-behind object is the contract's outcome and not a failure.

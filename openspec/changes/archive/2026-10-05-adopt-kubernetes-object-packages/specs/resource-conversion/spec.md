@@ -1,7 +1,7 @@
 ## REMOVED Requirements
 
 ### Requirement: Resource wraps cue.Value with provenance
-**Reason**: `pkg/core.Resource` is deleted. The library's `opm/k8s/object.Resource` is the same wrapper, field for field (0012:D1).
+**Reason**: `pkg/core.Resource` is deleted. The library's `opm/k8s/object.Resource` is the same wrapper, field for field (enhancement 0012, "The Kubernetes runtime surface homes in the library's Kubernetes tier (supersedes only the placement conclusion of the CLI inventory and handoff enhancement)").
 **Migration**: Use `object.Resource`, built from the kernel output with `object.NewResource` or `object.Resources`.
 
 ### Requirement: Resource provides accessor methods
@@ -34,7 +34,7 @@ The CLI SHALL convert a render's compiled objects with the library's `opm/k8s/ob
 
 ### Requirement: Label keys come from the library
 
-The CLI SHALL read every OPM label key and managed-by value, and decide whether a managed-by value is an OPM runtime, through the library's `opm/k8s/labels` (`ManagedBy`, `ManagedByCLI`, `ManagedByController`, `ManagedByLegacy`, `Component`, `ComponentName`, `ModuleInstanceName`, `ModuleInstanceNamespace`, `ModuleInstanceUUID`, `IsOPMManagedBy`), and SHALL NOT keep a copy of them (0012:D1).
+The CLI SHALL read every OPM label key and managed-by value, and decide whether a managed-by value is an OPM runtime, through the library's `opm/k8s/labels` (`ManagedBy`, `ManagedByCLI`, `ManagedByController`, `ManagedByLegacy`, `Component`, `ComponentName`, `ModuleInstanceName`, `ModuleInstanceNamespace`, `ModuleInstanceUUID`, `IsOPMManagedBy`), and SHALL NOT keep a copy of them (enhancement 0012, "The Kubernetes runtime surface homes in the library's Kubernetes tier (supersedes only the placement conclusion of the CLI inventory and handoff enhancement)").
 
 #### Scenario: Label values are unchanged
 
@@ -43,7 +43,7 @@ The CLI SHALL read every OPM label key and managed-by value, and decide whether 
 
 ### Requirement: Object order comes from the library weight table
 
-Every CLI path that orders Kubernetes objects (apply, delete, prune, the `instance tree` view, the `module build` output, and the operator install and uninstall, which apply and delete through the same paths) SHALL order by the library's kind-class weight, `opm/k8s/object.Weight`. Apply, delete, prune and the tree view SHALL sort through `object.Sort`, ascending for apply and descending for delete and prune, and SHALL keep objects of equal weight in their input order. The `module build` output SHALL break equal weights by namespace, then name, as the `cmd-structure` requirement for its output order states. The CLI SHALL NOT keep its own weight table. Every weight constant, group-version-kind entry and kind entry of the table the CLI applied by before the move SHALL keep its weight in `object.Weight`, so the order of every kind the CLI table held is unchanged; the library's own weight-table guard test covers entries the library adds (0012:D5:R1/R2).
+Every CLI path that orders Kubernetes objects (apply, delete, prune, the `instance tree` view, the `module build` output, and the operator install and uninstall, which apply and delete through the same paths) SHALL order by the library's kind-class weight, `opm/k8s/object.Weight`. Apply, delete, prune and the tree view SHALL sort through `object.Sort`, ascending for apply and descending for delete and prune, and SHALL keep objects of equal weight in their input order. The `module build` output SHALL break equal weights by namespace, then name, as the `cmd-structure` requirement for its output order states. The CLI SHALL NOT keep its own weight table. Every weight constant, group-version-kind entry and kind entry of the table the CLI applied by before the move SHALL keep its weight in `object.Weight`, so the order of every kind the CLI table held is unchanged; the library's own weight-table guard test covers entries the library adds (enhancement 0012, "Ordering is kind-class order in the Kubernetes tier; no module-internal ordering is planned, and cross-module order belongs to a future Bundle").
 
 #### Scenario: Ascending order for apply
 

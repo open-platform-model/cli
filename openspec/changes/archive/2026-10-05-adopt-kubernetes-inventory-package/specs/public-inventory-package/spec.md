@@ -1,7 +1,7 @@
 ## REMOVED Requirements
 
 ### Requirement: Inventory contract is exposed as a public package
-**Reason**: The shared inventory contract moved to the library's Kubernetes tier, `opm/k8s/inventory`, so both frontends use one definition (0012:D1, 0012:D7). The cli deletes its copy.
+**Reason**: The shared inventory contract moved to the library's Kubernetes tier, `opm/k8s/inventory`, so both frontends use one definition (enhancement 0012, "The Kubernetes runtime surface homes in the library's Kubernetes tier (supersedes only the placement conclusion of the CLI inventory and handoff enhancement)" and "The stale set is component-blind, and the inventory digest hashes a canonical field encoding"). The cli deletes its copy.
 **Migration**: Import `github.com/open-platform-model/library/opm/k8s/inventory`; the proposal's migration note maps each removed name. The cli's rule is the `pkg-types` requirement "Core types exported in pkg/".
 
 ### Requirement: Public inventory package contains only reusable ownership concerns

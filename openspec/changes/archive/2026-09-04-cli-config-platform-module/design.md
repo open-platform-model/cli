@@ -2,7 +2,7 @@
 
 ## Context
 
-See `proposal.md` § Why. Current shape: `internal/config/templates.go` embeds a data-only `DefaultPlatformTemplate` (scalar `version` subscriptions), `internal/config/platform.go` validates it against the embedded `#PlatformFile` projection schema with an explicit import ban, and `internal/platform/resolve.go` decodes it into `synth.PlatformInput`. Under 0019 D5 the subscription shape no longer exists in core and `synth.Platform` is deleted by the library wave; the local default platform becomes a CUE module.
+See `proposal.md` § Why. Current shape: `internal/config/templates.go` embeds a data-only `DefaultPlatformTemplate` (scalar `version` subscriptions), `internal/config/platform.go` validates it against the embedded `#PlatformFile` projection schema with an explicit import ban, and `internal/platform/resolve.go` decodes it into `synth.PlatformInput`. Under enhancement 0019 ("A platform imports its catalog and embeds it whole into the registry entry, which derives everything else") the subscription shape no longer exists in core and `synth.Platform` is deleted by the library wave; the local default platform becomes a CUE module.
 
 Command syntax is unchanged: `opm config init [--force]`, `opm config vet`. No new flags.
 
@@ -34,7 +34,7 @@ Command syntax is unchanged: `opm config init [--force]`, `opm config vet`. No n
 
 **Context**: every CUE module declares a path; this one is never published.
 **Options considered**:
-1. `opmodel.dev/platforms/local@v0` — the namespace 0019 D6 explicitly reserves as reserved-unpublished for platforms.
+1. `opmodel.dev/platforms/local@v0` — the namespace enhancement 0019 ("The Platform CR keeps naming a catalog coordinate; the operator generates the platform package") explicitly reserves as reserved-unpublished for platforms.
 2. An example.com-style placeholder — avoids the production namespace but invents a second convention beside the reserved one.
 **Decision**: option 1.
 **Rationale**: a main module's own path is never fetched, publishing platforms is disallowed outright (D6), and the reserved namespace exists precisely so generated/local platforms have a home that can never collide with a published artifact.

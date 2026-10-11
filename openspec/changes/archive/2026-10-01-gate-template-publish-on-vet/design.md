@@ -390,7 +390,7 @@ Excluding comments would need a CUE-aware comparison instead of a byte compariso
 
 ### R7. enhancement.yaml
 
-None. The change fulfils the "vetted" intent of 0011:D25, but 0011 is archived with status `delivered`; the `template-modules` delta cites D25 as its source. No new decision is implemented.
+None. The change fulfils the "vetted" intent of enhancement 0011 ("Official templates are published modules in a reserved `templates` segment"), but 0011 is archived with status `delivered`; the `template-modules` delta cites D25 as its source. No new decision is implemented.
 
 ### R8. Which version a template may declare
 

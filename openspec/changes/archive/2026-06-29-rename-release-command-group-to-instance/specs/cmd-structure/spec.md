@@ -1,6 +1,6 @@
 ## MODIFIED Requirements
 
-<!-- X3 (enhancement 0002 D6): the `release`/`rel` command group is renamed to `instance`/`inst`, the package moves `internal/cmd/release/` → `internal/cmd/instance/`, the import alias `cmdrelease` → `cmdinstance`, and the constructor `NewReleaseCmd` → `NewInstanceCmd`. Only the command *verb* and its wiring change here. The `--release-name` flag names, the `#ModuleRelease`/`#ModuleInstance` core-type prose, and the `module-synthetic-release` capability cross-ref are intentionally left to their owning slices (X4 / C1-X1) to avoid double-editing. -->
+<!-- X3 (enhancement 0002, "The CLI user-facing command group `release` is renamed to `instance`"): the `release`/`rel` command group is renamed to `instance`/`inst`, the package moves `internal/cmd/release/` → `internal/cmd/instance/`, the import alias `cmdrelease` → `cmdinstance`, and the constructor `NewReleaseCmd` → `NewInstanceCmd`. Only the command *verb* and its wiring change here. The `--release-name` flag names, the `#ModuleRelease`/`#ModuleInstance` core-type prose, and the `module-synthetic-release` capability cross-ref are intentionally left to their owning slices (X4 / C1-X1) to avoid double-editing. -->
 
 ### Requirement: Command packages are organised by command group
 
@@ -27,7 +27,7 @@ The `internal/cmd/` package SHALL be split into sub-packages that mirror the cob
 
 ### Requirement: Instance command group registered at root level
 
-The root command SHALL register `opm instance` (alias: `inst`) as a top-level command group via `cmdinstance.NewInstanceCmd(&cfg)`. This SHALL follow the same dependency injection pattern as `mod` and `config` groups. The former `cmdrelease.NewReleaseCmd` registration is removed (no back-compat alias — enhancement 0002 D8).
+The root command SHALL register `opm instance` (alias: `inst`) as a top-level command group via `cmdinstance.NewInstanceCmd(&cfg)`. This SHALL follow the same dependency injection pattern as `mod` and `config` groups. The former `cmdrelease.NewReleaseCmd` registration is removed (no back-compat alias — enhancement 0002 ("Hard rename, no alias window; `semver: major` (resolves OQ3, OQ4)")).
 
 #### Scenario: Root command registers instance group
 

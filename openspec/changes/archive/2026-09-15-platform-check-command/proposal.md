@@ -9,12 +9,12 @@ The same libraries also added the defining catalog to the unresolved-demand row,
 ## What Changes
 
 - `opm platform check [dir]` (new command, new `platform` group): resolves a platform the way every other command does (the `--platform` flag, else the configured default), builds it through the kernel, reads `Contracts()`, and prints a report: the defined contracts and the catalog that defines each, the required demands per contract, the unfulfilled set, the over-subscribed set, and the two verdict lines. Read-only; it applies nothing and touches no cluster.
-- **Exit code carries the verdict**: clean exits 0; over-subscription exits with the validation code, because `Routable: false` is the condition the operator's generation step refuses on. An unfulfilled contract exits 0 with the report naming it, because enhancement 0015 D18 makes it a report and never a gate. That asymmetry is the whole point of the command and is spelled out in the spec.
+- **Exit code carries the verdict**: clean exits 0; over-subscription exits with the validation code, because `Routable: false` is the condition the operator's generation step refuses on. An unfulfilled contract exits 0 with the report naming it, because enhancement 0015 ("An unfulfilled contract is reported, never refused; only over-subscription refuses platform-package generation") makes it a report and never a gate. That asymmetry is the whole point of the command and is spelled out in the spec.
 - `internal/platform/check.go` (new): the report type and its rendering, mirroring `internal/publish/check.go`'s `CheckReport` / `Render()` / `Clean()` split so a report is testable without a cobra command.
 - `cmdutil.FormatUnresolvedDemands` gains the defining catalog: a demand whose contract an enabled catalog lists now reads "defined by `<catalog>`, nothing on this platform implements it" instead of the bare nothing-implements line. The row has carried `DefinedBy` since library alpha.30; the formatter has been discarding it.
 - `internal/cmd/root.go` registers the new group.
 
-**Not in this change**: enhancement 0015 D6, reproducing a cluster's render by fetching the effective registry. That needs the operator's registration acceptance to exist first, and it changes what "which platform" means; this command reads a platform module, not a cluster. D5's comparable-predicate duplicates are also out, still deferred by OQ9.
+**Not in this change**: enhancement 0015 ("A cluster's render is reproduced by pulling the operator-generated platform package"), reproducing a cluster's render by fetching the effective registry. That needs the operator's registration acceptance to exist first, and it changes what "which platform" means; this command reads a platform module, not a cluster. D5's comparable-predicate duplicates are also out, still deferred by OQ9.
 
 ## Impact
 

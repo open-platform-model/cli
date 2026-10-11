@@ -5,9 +5,9 @@ Shared domain types the CLI owns SHALL be exported under `pkg/` for reuse by ext
 - `pkg/errors/` — CLI error types, sentinels and grouped CUE error helpers
 - `pkg/loader/` — instance-file loading and local-replacement provenance readers
 
-The Kubernetes object wrapper, the OPM label vocabulary and the kind-class weight table SHALL NOT be declared in `pkg/`: they are the library's `opm/k8s/object` (`Resource`, `Export`, `Weight`, `Sort`) and `opm/k8s/labels`, and the CLI SHALL use those packages wherever it wraps a rendered object, reads or writes an OPM label, or orders objects. There SHALL be no `pkg/core/` and no `pkg/resourceorder/` package (0012:D1, 0012:D5:R2).
+The Kubernetes object wrapper, the OPM label vocabulary and the kind-class weight table SHALL NOT be declared in `pkg/`: they are the library's `opm/k8s/object` (`Resource`, `Export`, `Weight`, `Sort`) and `opm/k8s/labels`, and the CLI SHALL use those packages wherever it wraps a rendered object, reads or writes an OPM label, or orders objects. There SHALL be no `pkg/core/` and no `pkg/resourceorder/` package (enhancement 0012, "The Kubernetes runtime surface homes in the library's Kubernetes tier (supersedes only the placement conclusion of the CLI inventory and handoff enhancement)" and "Ordering is kind-class order in the Kubernetes tier; no module-internal ordering is planned, and cross-module order belongs to a future Bundle").
 
-The inventory entry, its identity comparison, the stale set, the inventory digest and the render digest SHALL NOT be declared in `pkg/`: they are the library's `opm/k8s/inventory` (`Entry`, `NewEntry`, `SameObject`, `StaleSet`, `Digest`, `RenderDigest`), and the CLI SHALL use that package wherever it builds or compares an inventory entry, computes a stale set or computes either digest. There SHALL be no `pkg/inventory/` package (0012:D1, 0012:D7).
+The inventory entry, its identity comparison, the stale set, the inventory digest and the render digest SHALL NOT be declared in `pkg/`: they are the library's `opm/k8s/inventory` (`Entry`, `NewEntry`, `SameObject`, `StaleSet`, `Digest`, `RenderDigest`), and the CLI SHALL use that package wherever it builds or compares an inventory entry, computes a stale set or computes either digest. There SHALL be no `pkg/inventory/` package (enhancement 0012, "The Kubernetes runtime surface homes in the library's Kubernetes tier (supersedes only the placement conclusion of the CLI inventory and handoff enhancement)" and "The stale set is component-blind, and the inventory digest hashes a canonical field encoding").
 
 Module and instance metadata types SHALL NOT be declared in `pkg/`: they are the library's `opm/schema.ModuleMetadata` and `opm/schema.InstanceMetadata` (aliased in `opm/module`), carried by every acquired artifact, and the CLI SHALL use those types wherever it holds decoded metadata. Where the CLI holds an acquired `*module.Module`, it SHALL read the module's identity fields (`name`, `modulePath`, `version`) from the module's decoded `Metadata` and SHALL NOT look them up in the module's `Package` value.
 
@@ -16,7 +16,7 @@ The CLI SHALL read the other kernel artifact fields the library exposes through 
 - the metadata of the module an instance embeds through `Instance.ModuleMetadata()`, where a nil result is a module with no metadata and the CLI carries it as zero metadata;
 - a module's `debugValues` through `Module.DebugValues()`, and its `#config` through `Module.ConfigSchema()`.
 
-There SHALL be no `pkg/bundle/` package — bundle support is not implemented (0002:D15 removed the bundle path; 0002:D15 supersedes 0002:D7).
+There SHALL be no `pkg/bundle/` package — bundle support is not implemented (enhancement 0002 ("The `BundleRelease` stub is removed, not renamed (supersedes D7)") removed the bundle path; enhancement 0002 ("The `BundleRelease` stub is removed, not renamed (supersedes D7)") supersedes enhancement 0002 ("`BundleRelease` is renamed to `BundleInstance`")).
 
 #### Scenario: External tool imports pkg/core
 - **WHEN** an external Go module imports `github.com/open-platform-model/cli/pkg/core`

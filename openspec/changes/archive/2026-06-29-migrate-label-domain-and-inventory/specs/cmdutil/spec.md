@@ -1,10 +1,10 @@
 ## MODIFIED Requirements
 
-<!-- enhancement 0002 D2/D6/D10. Restates only the requirements naming symbols that exist in code AND are renamed by X4: the InstanceSelectorFlags bundle, its LogName helper, the shared inventory-resolution helper, and the mod-command behavioral-equivalence flag references. The RenderFlags / RenderRelease / LoadReleasePackage requirements are pre-existing X1-gap residue (paused simplify-render-single-build names not present in code) and are out of scope per design D-X4.4 / the X1-gap exclusion. -->
+<!-- enhancement 0002 ("Scope is cross-cutting; the GitOps `Release` CRD is renamed to `ModulePackage` (supersedes D1)", "The CLI user-facing command group `release` is renamed to `instance`" and "Every `release`-named file and directory is renamed on disk (extends D8 to the filesystem)"). Restates only the requirements naming symbols that exist in code AND are renamed by X4: the InstanceSelectorFlags bundle, its LogName helper, the shared inventory-resolution helper, and the mod-command behavioral-equivalence flag references. The RenderFlags / RenderRelease / LoadReleasePackage requirements are pre-existing X1-gap residue (paused simplify-render-single-build names not present in code) and are out of scope per design D-X4.4 / the X1-gap exclusion. -->
 
 ### Requirement: InstanceSelectorFlags struct registers and validates instance identification flags
 
-The `InstanceSelectorFlags` struct SHALL provide an `AddTo(*cobra.Command)` method that registers `--instance-name` (string), `--instance-id` (string), and `--namespace`/`-n` (string). It SHALL also provide a `Validate()` method that enforces mutual exclusivity between `--instance-name` and `--instance-id`, and requires exactly one to be present. <!-- Was: ReleaseSelectorFlags, --release-name/--release-id (0002 D10/D-X4.2) -->
+The `InstanceSelectorFlags` struct SHALL provide an `AddTo(*cobra.Command)` method that registers `--instance-name` (string), `--instance-id` (string), and `--namespace`/`-n` (string). It SHALL also provide a `Validate()` method that enforces mutual exclusivity between `--instance-name` and `--instance-id`, and requires exactly one to be present. <!-- Was: ReleaseSelectorFlags, --release-name/--release-id (enhancement 0002 ("Every `release`-named file and directory is renamed on disk (extends D8 to the filesystem)")/D-X4.2) -->
 
 #### Scenario: Both selectors set is rejected
 
@@ -23,7 +23,7 @@ The `InstanceSelectorFlags` struct SHALL provide an `AddTo(*cobra.Command)` meth
 
 ### Requirement: InstanceSelectorFlags provides a LogName helper
 
-The `InstanceSelectorFlags` struct SHALL provide a `LogName()` method that returns the instance name if set, or a truncated instance ID prefix (first 8 characters) formatted as `"instance:<prefix>"` otherwise. This is used for scoped logger creation. <!-- Was: ReleaseSelectorFlags.LogName, "release:<prefix>" (0002 D10) -->
+The `InstanceSelectorFlags` struct SHALL provide a `LogName()` method that returns the instance name if set, or a truncated instance ID prefix (first 8 characters) formatted as `"instance:<prefix>"` otherwise. This is used for scoped logger creation. <!-- Was: ReleaseSelectorFlags.LogName, "release:<prefix>" (enhancement 0002, "Every `release`-named file and directory is renamed on disk (extends D8 to the filesystem)") -->
 
 #### Scenario: LogName prefers instance name
 
@@ -37,7 +37,7 @@ The `InstanceSelectorFlags` struct SHALL provide a `LogName()` method that retur
 
 ### Requirement: Shared inventory resolution helper in cmdutil
 
-`cmdutil.ResolveInventory` SHALL resolve an inventory record from an `*InstanceSelectorFlags` (carrying instance name and/or instance ID). If `flags.InstanceID` is non-empty, it SHALL resolve via `inventory.GetInventory` using the instance ID; if `flags.InstanceName` is also set, that name SHALL be used as the display name. If only `flags.InstanceName` is non-empty, it SHALL resolve via `inventory.FindInventoryByInstanceName`. When no inventory Secret is found, it SHALL return an `InstanceNotFoundError`. <!-- Was: *ReleaseSelectorFlags, ReleaseID/ReleaseName, ReleaseNotFoundError (0002 D10) -->
+`cmdutil.ResolveInventory` SHALL resolve an inventory record from an `*InstanceSelectorFlags` (carrying instance name and/or instance ID). If `flags.InstanceID` is non-empty, it SHALL resolve via `inventory.GetInventory` using the instance ID; if `flags.InstanceName` is also set, that name SHALL be used as the display name. If only `flags.InstanceName` is non-empty, it SHALL resolve via `inventory.FindInventoryByInstanceName`. When no inventory Secret is found, it SHALL return an `InstanceNotFoundError`. <!-- Was: *ReleaseSelectorFlags, ReleaseID/ReleaseName, ReleaseNotFoundError (enhancement 0002, "Every `release`-named file and directory is renamed on disk (extends D8 to the filesystem)") -->
 
 #### Scenario: Resolve by instance name
 

@@ -33,6 +33,6 @@
 
 ## 6. Record + cross-repo corrections
 
-- [x] 6.1 `enhancements/0011/`: slice → done + `openspec_ref` + history event; log the open question (beta+ member removal refused by nothing); note the refusal-11 pre-D49 wording as superseded by the shipped gate.
+- [x] 6.1 enhancement 0011: slice → done + `openspec_ref` + history event; log the open question (beta+ member removal refused by nothing); note the refusal-11 pre-D49 wording as superseded by the shipped gate.
 - [x] 6.2 0011 amendment decision (`Amends: D9`, via the enhancements workflow): strike the `highestStable` implementation note; demote the one-prior-build claim to the no-removals fast path; state the literal rule as implemented.
 - [x] 6.3 Library follow-up (small separate PR): `catalog-compatibility` spec's "Predecessor Selection" re-scoped; `HighestStable` re-documented as the float selector — its disposition is settled: `cli-template-modules` makes it template resolution's version selector (its first true caller), so it stays.

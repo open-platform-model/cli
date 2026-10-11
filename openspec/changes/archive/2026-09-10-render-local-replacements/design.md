@@ -95,7 +95,7 @@ WARN local replacement of opmodel.dev/catalogs/opm@v4 in /home/dev/my-app/cue.mo
 
 ## Risks / Trade-offs
 
-- [A developer applies to a cluster with a replacement in effect] → already the D6 local-first story: the CR carries the declared reference, `source: local` is stamped, and operator handoff aborts on the digest (0006 D7.4). Unchanged.
+- [A developer applies to a cluster with a replacement in effect] → already the D6 local-first story: the CR carries the declared reference, `source: local` is stamped, and operator handoff aborts on the digest (enhancement 0006 ("`opm instance handoff`, the migration feature").4). Unchanged.
 - [The library bump lands before this change] → every render of a directory carrying the file refuses; the bump and the opt-in ship in one PR (Migration Plan).
 - [Warning volume on a directory with many redirects] → one line per honoured or inert entry, sorted by path; acceptable for a developer-only condition.
 

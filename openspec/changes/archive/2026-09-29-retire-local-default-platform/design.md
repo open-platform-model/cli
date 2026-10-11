@@ -212,7 +212,7 @@ instance build/vet
 
 ### Seeding a Platform on apply
 
-**Context**: 0006:D12/D22 seeded the cluster Platform from the local default so a later operator install adopted it.
+**Context**: enhancement 0006 ("`Platform` carries no owner marker; the operator always owns the singleton; the CLI writes an un-owned `cluster` Platform in solo clusters" and "Solo-cluster `Platform` write-if-absent uses a plain `Create` that tolerates `AlreadyExists`, not SSA apply; refines D12's mechanism, resolves OQ13") seeded the cluster Platform from the local default so a later operator install adopted it.
 **Explored**: `opm operator install` already seeds its own Platform (`EnsureClusterPlatformForCatalog`, `internal/cmd/operator/install.go:196`) from the registry-resolved catalog.
 **Options considered**:
 1. Seed from the deps platform. The deps are one module's pins, not a cluster's; it would make the first module applied decide the cluster's catalogs.

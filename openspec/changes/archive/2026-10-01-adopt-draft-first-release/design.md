@@ -6,9 +6,9 @@ The workspace rule (owner, 2026-10-01, revised the same day): release tags are i
 
 - org ruleset `tags-immutable`: update, deletion, non-fast-forward on every tag, empty bypass list;
 - org ruleset `tags-create-app-only`: tag creation only by the opm-release-please App. A stale or hand-made tag therefore cannot exist, and the per-repo tag-commit assertion an earlier draft of this change carried is dropped;
-- GitHub immutable releases, for cli only after this change has shipped one real release (0021:D10:R8). The setting was briefly ON for cli on 2026-10-01, ahead of that plan; the owner turned it off and gate G-platform (b) records it OFF.
+- GitHub immutable releases, for cli only after this change has shipped one real release (enhancement 0021, "Release tags are immutable"). The setting was briefly ON for cli on 2026-10-01, ahead of that plan; the owner turned it off and gate G-platform (b) records it OFF.
 
-Immutable releases forbid adding, replacing or deleting assets after publish, so the current publish-then-upload order cannot run under them. The policy is enhancement 0021 D10 (on enhancements main); this change is the cli's share of it, 0021:D10:R1 and 0021:D10:R8, and opm-operator carries its own. It is Phase 1 of the owner's plan: the cli releases only from `main`. Release branches are Phase 2 (see "Phase 2" below) and nothing here prepares for them.
+Immutable releases forbid adding, replacing or deleting assets after publish, so the current publish-then-upload order cannot run under them. The policy is enhancement 0021 ("Release tags are immutable") (on enhancements main); this change is the cli's share of it, enhancement 0021 ("Release tags are immutable"), and opm-operator carries its own. It is Phase 1 of the owner's plan: the cli releases only from `main`. Release branches are Phase 2 (see "Phase 2" below) and nothing here prepares for them.
 
 No Go code, command, flag or exit code changes. The config rules about command syntax, flags, exit codes and example output do not apply; the CI-side error messages are specified instead.
 

@@ -8,7 +8,7 @@ One crossing with a decoupling seam. The Go retarget, fixture crossing, coordina
 
 ### The spec.module write stays declared, verified downstream
 
-**Context**: 0010 02-design:213 says the apply sites "write the coordinate actually fetched". Explored against the actual paths: `opm module apply` renders a local directory and fetches nothing (0006 D7; D9's own rationale cites this line); `opm instance apply` loads through `LoadInstancePackage`, which performs no identity verification; the only CLI registry fetch is handoff verification.
+**Context**: 0010 02-design:213 says the apply sites "write the coordinate actually fetched". Explored against the actual paths: `opm module apply` renders a local directory and fetches nothing (enhancement 0006 ("`opm instance handoff`, the migration feature"); D9's own rationale cites this line); `opm instance apply` loads through `LoadInstancePackage`, which performs no identity verification; the only CLI registry fetch is handoff verification.
 **Options considered**:
 1. Plumb the CUE resolution (the instance `cue.mod` deps pin) up to the write — fragile (MVS may resolve above the pin; multiple module imports), and still unavailable on the module-apply path.
 2. Write the declared coordinate, rely on the library's acquire-time verification (alpha.13) at every point the coordinate is later *consumed* (handoff verify, operator acquire), plus 0011's publish gates preventing lying artifacts at the source.
@@ -31,7 +31,7 @@ One crossing with a decoupling seam. The Go retarget, fixture crossing, coordina
 
 ### Seed version: hardcoded pin, three-way mirror
 
-**Context**: `DefaultPlatformTemplate` is a Go constant reachable by no automation (root `deps:update` skips it). `opm config init` is normatively forbidden registry access (`config-commands` spec, 0006 D39); a non-concrete placeholder fails `opm config vet` and three test consumers.
+**Context**: `DefaultPlatformTemplate` is a Go constant reachable by no automation (root `deps:update` skips it). `opm config init` is normatively forbidden registry access (`config-commands` spec, enhancement 0006 ("`~/.opm` becomes two import-free data files: `config.cue` drops `providers`/`cacheDir`, D21's local default platform is the sibling `~/.opm/platform.cue`; folded into C2")); a non-concrete placeholder fails `opm config vet` and three test consumers.
 **Options considered**: (1) hardcode + hand-bump; (2) resolve at init (needs a spec delta and new network surface in a command defined by its offline-ness); (3) placeholder forcing user edit (breaks unattended consumers).
 **Decision**: Option 1 — `version: "2.0.0-alpha.3"`. The mirror set is `internal/config/templates.go` + `hack/platform.cue` (same-commit contract, existing header) + the operator's `config/samples` Platform (recorded alignment, bumped on catalog releases as ordinary fixture updates). No new task (Principle VII): the drift mode is "old but resolvable" (immutable tags never dangle), caught when anyone bumps one peer.
 **Rationale**: matches the library's load-bearing-pin precedent and the operator track's identical choice; the failure mode of a stale pin under v2 (an old catalog) is strictly milder than the v1 template's measured failure (a stale range selecting nothing).

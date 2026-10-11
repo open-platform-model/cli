@@ -263,7 +263,7 @@ The glyphs are whatever `output.FormatVetCheck`, `FormatCheckmark` and `FormatRe
 
 ### Relation to 0006:D21
 
-0006:D21 says offline `build`/`render` use `--platform` or the local default only. This change keeps its load-bearing half (build never reads the cluster) and replaces the local default with the module's deps for `module build` and `module vet`. No enhancement decision is implemented here, so the change carries no `enhancement.yaml`.
+Enhancement 0006 ("Platform-source flag surface (single `--platform <file>` override + automatic precedence, with source-provenance reporting); resolves OQ14") says offline `build`/`render` use `--platform` or the local default only. This change keeps its load-bearing half (build never reads the cluster) and replaces the local default with the module's deps for `module build` and `module vet`. No enhancement decision is implemented here, so the change carries no `enhancement.yaml`.
 
 ### Spike findings
 
@@ -300,4 +300,4 @@ No migration. A user who relied on `module build` rendering against `~/.opm/plat
 
 ## Open Questions
 
-- Whether to record the 0006:D21 amendment in `enhancements/` (a governance record; it changes nothing here).
+- Whether to record the enhancement 0006 ("Platform-source flag surface (single `--platform <file>` override + automatic precedence, with source-provenance reporting); resolves OQ14") amendment in `enhancements/` (a governance record; it changes nothing here).

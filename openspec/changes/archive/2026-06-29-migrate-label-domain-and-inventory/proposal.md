@@ -2,7 +2,7 @@
 
 ## Why
 
-Slice **X4** of enhancement [0002](../../../../enhancements/0002/) — the `Release` → `Instance` rename — and the **final cli slice** before the atomic bulk-archive PR. X1 (`pkg/module` types + loader + instance-file convention), X2 (deleted the dead `BundleRelease` stub), and X3 (command group + every user-facing string) are committed on branch `0002-cli-x1-rename-module-instance` (HEAD `8e6311e`) and held from archive. X4 lands in the **same atomic PR** and bulk-archives with X1–X4.
+Slice **X4** of enhancement 0002 — the `Release` → `Instance` rename — and the **final cli slice** before the atomic bulk-archive PR. X1 (`pkg/module` types + loader + instance-file convention), X2 (deleted the dead `BundleRelease` stub), and X3 (command group + every user-facing string) are committed on branch `0002-cli-x1-rename-module-instance` (HEAD `8e6311e`) and held from archive. X4 lands in the **same atomic PR** and bulk-archives with X1–X4.
 
 X3 drew its boundary at **"Go symbols vs. user-facing strings"** (D-X3.7): every string a user *reads* when invoking `opm instance …` was renamed in X3; every remaining `Release`-named *identifier* — inventory record types, the label domain, the logger, cmdutil flag bundles, render file-opts — was explicitly deferred to X4. X4 closes that residue so that, post-PR, no `Release` token referring to the renamed concept survives outside `// Was:` breadcrumbs (D8 hard-rename, no alias). **X4 is the slice that drives the whole cli `task test` to green for the first time in the wave** — X1–X3 each intentionally left fixtures asserting `"ModuleRelease"` / `release.cue`, reconciled here.
 

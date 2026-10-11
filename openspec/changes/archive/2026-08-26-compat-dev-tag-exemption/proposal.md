@@ -1,6 +1,6 @@
 ## Why
 
-`catalog_opm`'s `branch-publish` workflow is refused by the compatibility gate on every dev push of a branch that tightens a beta member, and the verdict depends on which branch pushed a dev tag last rather than on the content (cli issue 165). Measured against `golang.org/x/mod/semver`: `-0.dev.*` orders below `-alpha.N`, so a dev tag's predecessor window contains only older dev tags, while a release tag's window is headed by the latest alpha and never reaches dev tags unless a member is absent from every release. Dev builds are throwaway iteration artifacts; judging them blinds the branch and baselining on them makes the gate non-deterministic. Enhancement 0011 D26 clause 1 amends D9/D23 to put dev builds outside the gate in both directions.
+`catalog_opm`'s `branch-publish` workflow is refused by the compatibility gate on every dev push of a branch that tightens a beta member, and the verdict depends on which branch pushed a dev tag last rather than on the content (cli issue 165). Measured against `golang.org/x/mod/semver`: `-0.dev.*` orders below `-alpha.N`, so a dev tag's predecessor window contains only older dev tags, while a release tag's window is headed by the latest alpha and never reaches dev tags unless a member is absent from every release. Dev builds are throwaway iteration artifacts; judging them blinds the branch and baselining on them makes the gate non-deterministic. Enhancement 0011 ("The compatibility gate ignores dev builds and stands down while the module line is itself a prerelease") clause 1 amends D9/D23 to put dev builds outside the gate in both directions.
 
 ## What Changes
 
@@ -29,4 +29,4 @@ Out of scope: the prerelease-module-line exemption (D26 clause 2, separate chang
 - `internal/publish/plan.go` and `internal/publish/check.go`: `compat gate` / `compat` row rendering.
 - `internal/publish/compat_test.go`, `check_test.go`: new hermetic multi-build cases.
 - Downstream: `catalog_opm/.github/workflows/branch-publish.yml` passes again once its pinned `opm` is bumped to the release carrying this change (delivery, not part of this change).
-- Implements enhancement 0011 D26 (clause 1); see `enhancement.yaml`.
+- Implements enhancement 0011 ("The compatibility gate ignores dev builds and stands down while the module line is itself a prerelease") (clause 1); see `enhancement.yaml`.

@@ -195,7 +195,7 @@ The help text's exit-code list gains `comparable` beside `over-subscribed`, with
 
 **Context**: the render commands build a platform (a local module, or one generated from the cluster CR) and nothing refuses an undiscriminated one; the render then doubles.
 **Explored**: reading `Contracts()` in `resolvePlatformEnv` for every render command in this change; deferring.
-**Decision**: defer to the 0015 D6 change.
+**Decision**: defer to the enhancement 0015 ("A cluster's render is reproduced by pulling the operator-generated platform package") change.
 **Rationale**: for the cluster arm the CLI generates the platform module itself (`GenerateClusterModule`), which is the step the operator gates, and that arm is about to change shape to read the effective registry; adding the gate twice, before and after that change, is the wrong order. The pre-flight is the surface this change owns.
 
 ## Risks / Trade-offs

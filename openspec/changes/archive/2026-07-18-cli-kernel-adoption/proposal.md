@@ -2,7 +2,7 @@
 
 ## Why
 
-The CLI still renders through its own pipeline (`pkg/render` + the match path in `pkg/loader`) while the operator renders through the `library` kernel — so the render digest the CLI writes to `status.lastAppliedRenderDigest` (C1) and the digest the operator computes on its first post-handoff reconcile are only equal by luck, not by construction. Enhancement 0006 D9 closes this by deleting the CLI's pipeline and rendering through the same kernel the operator runs; D30 makes CLI≡operator digest parity the accepted→implemented gate for this slice. The same slice clears the ground first (D39): `~/.opm` still carries a `providers` import block, a pinned `cue.mod` dependency set, and a two-phase bootstrap config loader — all machinery that exists solely to feed a `#Provider` concept the 0001 core rewrite removed.
+The CLI still renders through its own pipeline (`pkg/render` + the match path in `pkg/loader`) while the operator renders through the `library` kernel — so the render digest the CLI writes to `status.lastAppliedRenderDigest` (C1) and the digest the operator computes on its first post-handoff reconcile are only equal by luck, not by construction. Enhancement 0006 ("The CLI replaces its own render/match pipeline entirely with the `library` kernel") closes this by deleting the CLI's pipeline and rendering through the same kernel the operator runs; D30 makes CLI≡operator digest parity the accepted→implemented gate for this slice. The same slice clears the ground first (D39): `~/.opm` still carries a `providers` import block, a pinned `cue.mod` dependency set, and a two-phase bootstrap config loader — all machinery that exists solely to feed a `#Provider` concept the 0001 core rewrite removed.
 
 ## What Changes
 
