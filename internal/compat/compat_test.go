@@ -289,7 +289,7 @@ func TestCheckAtLevel(t *testing.T) {
 		for _, av := range []string{"v1alpha1", "v1alpha2"} {
 			vs, err := CheckAtLevel(av, prev, next)
 			require.NoError(t, err)
-			assert.Nil(t, vs, "alpha promises nothing (D34)")
+			assert.Nil(t, vs, "alpha promises nothing (enhancement 0010)")
 		}
 	})
 

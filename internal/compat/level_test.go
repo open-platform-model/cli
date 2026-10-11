@@ -43,7 +43,7 @@ func TestParseLevel(t *testing.T) {
 }
 
 func TestLevelEnforced(t *testing.T) {
-	assert.False(t, LevelAlpha.Enforced(), "alpha promises nothing (D34)")
+	assert.False(t, LevelAlpha.Enforced(), "alpha promises nothing (enhancement 0010)")
 	assert.True(t, LevelBeta.Enforced())
 	assert.True(t, LevelGA.Enforced())
 }

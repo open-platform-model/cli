@@ -204,7 +204,7 @@ func TestEnumerateMembers_ModelFields(t *testing.T) {
 	deploy := find("deploy")
 	assert.Equal(t, "transformers", deploy.Kind)
 	assert.Equal(t, "ComponentTransformer", deploy.Discriminator)
-	assert.Equal(t, "", deploy.APIVersion, "a transformer carries no apiVersion (D44)")
+	assert.Equal(t, "", deploy.APIVersion, "a transformer carries no apiVersion (enhancement 0010)")
 	assert.Equal(t, "transformers", deploy.PkgPath)
 }
 
