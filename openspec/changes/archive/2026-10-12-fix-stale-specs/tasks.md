@@ -13,5 +13,5 @@
 
 ## 3. Archive
 
-- [ ] 3.1 Archive the change; the sync writes the deltas into `openspec/specs/template-modules/spec.md`
-- [ ] 3.2 Commit docs(openspec): archive fix-stale-specs
+- [x] 3.1 Archive the change; the sync writes the deltas into `openspec/specs/template-modules/spec.md`
+- [x] 3.2 Commit docs(openspec): archive fix-stale-specs
