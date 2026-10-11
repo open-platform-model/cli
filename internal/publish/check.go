@@ -27,7 +27,7 @@ type CheckOptions struct {
 	// the "v" may be omitted).
 	Coordinate string
 
-	// Compat additionally runs the predecessor comparison (0011:D9's rule) for
+	// Compat additionally runs the predecessor comparison (the rule of enhancement 0011) for
 	// the fetched build, exactly as publish would have.
 	Compat bool
 
@@ -43,7 +43,7 @@ type CheckOptions struct {
 // identity, its member inventory, and every finding. Findings reuse the
 // publish Refusal shape — the check is the consumer's side of the same
 // contract — but the command frames them as findings: this is an aid, and
-// nothing was refused (0010:D35, enforcement exists only at publish).
+// nothing was refused (enhancement 0010: enforcement exists only at publish).
 type CheckReport struct {
 	// Repo and Version are the fetched coordinate, split.
 	Repo    string

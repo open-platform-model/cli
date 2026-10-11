@@ -9,8 +9,8 @@ import (
 	"cuelang.org/go/cue/format"
 )
 
-// provenanceDenylist is 0010:D30's exact set: the metadata fields that change
-// per catalog release by construction (0010:D25 — provenance only) and are
+// provenanceDenylist is the exact set (enhancement 0010): the metadata fields that change
+// per catalog release by construction (enhancement 0010 — provenance only) and are
 // therefore never contract surface. The comparison walk skips them directly
 // under any metadata field at every depth; nothing else is excluded —
 // identity fields and labels stay.
@@ -19,7 +19,7 @@ var provenanceDenylist = map[string]bool{
 	"description":    true,
 }
 
-// Violation is one breach of 0010:D27's additive-only rule, located by the
+// Violation is one breach of the additive-only rule (enhancement 0010), located by the
 // dotted path from the compared root. Violations are results, not errors
 // (opm/errors doctrine): the walk reports every breach it finds and never
 // fails. The primitive's name, apiVersion, and predecessor coordinate are
@@ -74,7 +74,7 @@ func CheckAtLevel(apiVersion string, prev, next cue.Value) ([]Violation, error) 
 	return Check(prev, next), nil
 }
 
-// Check reports every violation of 0010:D27's additive-only rule in next relative
+// Check reports every violation of the additive-only rule (enhancement 0010) in next relative
 // to prev: fields and options may be added and never removed; a newly added
 // field must be optional or defaulted; an existing field's default is
 // immutable. It is level-blind — see [CheckAtLevel] — and cannot fail given
@@ -82,10 +82,10 @@ func CheckAtLevel(apiVersion string, prev, next cue.Value) ([]Violation, error) 
 //
 // The comparison is a field-wise walk, deliberately not a single Subsume call
 // in either direction: adding a struct field makes a value more specific while
-// adding a disjunct makes it less specific, and 0010:D27 calls both "additive", so
+// adding a disjunct makes it less specific, and enhancement 0010 calls both "additive", so
 // the rule spans both directions of the lattice while one subsume call tests
-// one (measured 10/14 and 8/14 against the 0010:D27 change classes in
-// enhancements/0011/experiments/03-d27-compat-gate; the walk is 14/14).
+// one (measured 10/14 and 8/14 against the change classes of enhancement 0010 in
+// the compat-gate experiment of enhancement 0011; the walk is 14/14).
 // Structs recurse; leaves get a forward subsume, where it is correct for the
 // value domain; defaults are compared explicitly at every level, because
 // subsume is blind to them in both directions.
@@ -93,7 +93,7 @@ func CheckAtLevel(apiVersion string, prev, next cue.Value) ([]Violation, error) 
 // Three rules keep the walk from reporting non-changes (measured on
 // catalog_opm PR 51, cli issue 165):
 //
-//   - 0010:D30's provenance fields are skipped at every depth: catalogVersion
+//   - The provenance fields (enhancement 0010) are skipped at every depth: catalogVersion
 //     and description directly under any field named metadata, so a member
 //     reference embedded in another member (appliesTo, composedResources)
 //     does not report the referenced member's per-release provenance.
@@ -108,7 +108,7 @@ func Check(prev, next cue.Value) []Violation {
 }
 
 // walk compares one position. underMetadata is true when path names a direct
-// child of a field called metadata, which is where 0010:D30's denylist applies.
+// child of a field called metadata, which is where the provenance denylist (enhancement 0010) applies.
 func walk(path string, prev, next cue.Value, underMetadata bool, acc []Violation) []Violation {
 	// Defaults first, at every level — no subsume direction can see them.
 	acc = checkDefaults(path, prev, next, acc)
@@ -193,7 +193,7 @@ func walkStruct(path string, pit, nit *cue.Iterator, next cue.Value, underMetada
 		}
 		name := fieldName(sel)
 		if underMetadata && provenanceDenylist[name] {
-			continue // 0010:D30: per-release provenance, never contract surface
+			continue // per-release provenance (enhancement 0010), never contract surface
 		}
 		nf, present := added[name]
 		delete(added, name)
@@ -226,7 +226,7 @@ func walkStruct(path string, pit, nit *cue.Iterator, next cue.Value, underMetada
 	return acc
 }
 
-// required reports 0010:D27's posture of a field: a `!` field, or a regular
+// required reports the posture of a field (enhancement 0010): a `!` field, or a regular
 // field with no default, is required — a consumer must supply it. A `?` field
 // or a defaulted one is optional.
 func required(sel cue.Selector, v cue.Value) bool {
@@ -244,7 +244,7 @@ func required(sel cue.Selector, v cue.Value) bool {
 // walkList walks two closed lists of equal length element-wise, paths
 // name[i], and reports ok=false for any other pair (open lists, differing
 // lengths, non-lists), which the caller judges as a leaf. Element-wise is the
-// member-reference case (appliesTo, composedResources); 0010:D27 states no list
+// member-reference case (appliesTo, composedResources); enhancement 0010 states no list
 // semantics, so addition and removal keep their subsume verdict.
 func walkList(path string, prev, next cue.Value, acc []Violation) ([]Violation, bool) {
 	if prev.IncompleteKind() != cue.ListKind || next.IncompleteKind() != cue.ListKind {
@@ -299,7 +299,7 @@ func openListElements(v cue.Value) ([]cue.Value, bool) {
 
 // walkDefaults applies the default rule alone through one position and
 // everything below it: struct fields present on both sides (by name, hidden
-// fields and 0010:D30's provenance skipped as in [walkStruct]), the elements
+// fields and the provenance fields (enhancement 0010) skipped as in [walkStruct]), the elements
 // of equal-length closed lists, and the fixed elements of open lists.
 // Removed and added fields are not its concern.
 func walkDefaults(path string, prev, next cue.Value, underMetadata bool, acc []Violation) []Violation {

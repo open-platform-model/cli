@@ -17,7 +17,7 @@ import (
 //
 // Deliberately skipped here, because the operator does them: applying
 // resources, pruning stale ones, writing status, and the status-RBAC
-// pre-flight (0006:D23 — the CLI writes no status in this mode, so proving it may
+// pre-flight (enhancement 0006 — the CLI writes no status in this mode, so proving it may
 // would be theater). Still enforced by the caller before this point: the CRD
 // gates and the version-skew ceiling (enhancement 0006), which refuses a CLI whose
 // MAJOR.MINOR is below the operator's, since an old CLI writing spec for a

@@ -12,7 +12,7 @@ package schema
 // #Config defines the structure of the config struct.
 //
 // The config file is scalar data only — no CUE imports, no providers
-// (retired by 0006:D39; catalog selection lives in the
+// (retired by enhancement 0006; catalog selection lives in the
 // sibling platform module ~/.opm/platform/, enhancement 0019).
 #Config: {
 	// registry is the default registry for CUE module resolution.

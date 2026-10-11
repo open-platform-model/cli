@@ -78,7 +78,7 @@ func VetChecks(ctx context.Context, opts Options) (*Plan, *module.Module, error)
 		p.RegistryRepo, p.Major = before, after
 	}
 
-	// 0011:D18's evaluable half at vet: no tag argument exists, so the check is
+	// The evaluable half (enhancement 0011) at vet: no tag argument exists, so the check is
 	// that the declared version's major names the path's.
 	if ver := p.identityField("Version"); ver != nil && ver.State == StateConcrete {
 		p.Tag = "v" + ver.Value

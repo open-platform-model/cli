@@ -86,7 +86,7 @@ type InstanceFileOpts struct {
 	// values sources, in order.
 	ValuesFiles []string
 
-	// PlatformFlag is the --platform platform module directory (0006:D21;
+	// PlatformFlag is the --platform platform module directory (enhancement 0006;
 	// highest platform-source precedence).
 	PlatformFlag string
 	// ClusterPlatform reads the cluster Platform CR. nil skips the cluster:
@@ -138,7 +138,7 @@ type ModuleOpts struct {
 	// "<module.metadata.name>-debug".
 	Name string
 
-	// PlatformFlag is the --platform platform module directory (0006:D21;
+	// PlatformFlag is the --platform platform module directory (enhancement 0006;
 	// highest platform-source precedence).
 	PlatformFlag string
 	// ClusterPlatform reads the cluster Platform CR. nil (module build and

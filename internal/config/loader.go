@@ -96,7 +96,7 @@ func loadConfigFile(cfg *GlobalConfig, configPath string) (string, error) {
 
 	// Data-only contract (enhancement 0006): reject CUE imports before evaluation.
 	// CompileBytes would happily resolve stdlib imports otherwise. (The
-	// platform beside this file is a CUE module since 0019:D5 and is built,
+	// platform beside this file is a CUE module since enhancement 0019 and is built,
 	// not parsed as data.)
 	astFile, err := parser.ParseFile(configPath, content)
 	if err != nil {
@@ -248,7 +248,7 @@ func validateConfigSchema(ctx *cue.Context, value cue.Value, configPath string) 
 }
 
 // removedFieldHint returns a targeted hint when the validation error sits
-// at a field removed by 0006:D39 (providers, cacheDir) or at a
+// at a field removed by enhancement 0006 (providers, cacheDir) or at a
 // closed-enum key whose CUE error elides the allowed values (skewPolicy),
 // and the generic vet hint otherwise. The field is read from the path of the
 // CUE error, never from its message, so a value that holds one of those

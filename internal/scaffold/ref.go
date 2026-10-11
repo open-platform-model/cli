@@ -3,7 +3,7 @@
 // the baked official-template table that drives both shortcut expansion and
 // `opm module template list`, version resolution over the published history,
 // the staged-tree copy, and the re-identification pass that rewrites a cloned
-// template to the user's identity (enhancement 0011, D20/D25 and the
+// template to the user's identity (enhancement 0011 and the
 // cli-template-modules change).
 package scaffold
 

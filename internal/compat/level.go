@@ -1,7 +1,7 @@
 // Package compat implements publish-side catalog compatibility logic:
-// 0010:D27's additive-only comparison walk ([Check],
-// [CheckAtLevel]) and the 0010:D34 contract-level ladder ([Level], [ParseLevel],
-// [CompareAPIVersions]). 0010:D30's provenance exclusion is built into the
+// the additive-only comparison walk of enhancement 0010 ([Check],
+// [CheckAtLevel]) and the contract-level ladder ([Level], [ParseLevel],
+// [CompareAPIVersions]). The provenance exclusion is built into the
 // walk, which skips the denylisted metadata fields at every depth.
 //
 // The package is pure logic: no I/O, no registry access, no schema-cache
@@ -19,7 +19,7 @@ import (
 
 // Level is a contract apiVersion's position on the Kubernetes ladder
 // (enhancement 0010): vNalphaM → vNbetaM → vN. The level decides whether
-// 0010:D27's additive-only promise binds — see [Level.Enforced].
+// the additive-only promise binds — see [Level.Enforced].
 type Level int
 
 const (
@@ -51,9 +51,9 @@ var (
 	parseRE   = regexp.MustCompile(`^v([0-9]+)(?:(alpha|beta)([0-9]+))?$`)
 )
 
-// ParseLevel classifies a contract's apiVersion on the 0010:D34 ladder and reports
+// ParseLevel classifies a contract's apiVersion on the contract-level ladder and reports
 // its major. ok is false when the string is outside #APIVersionType's grammar
-// ("v1alpha", "V1", "1.2.0"); 0010:D34 keys enforcement to the primitive's own
+// ("v1alpha", "V1", "1.2.0"); the ladder keys enforcement to the primitive's own
 // apiVersion, never to the catalog's release version, which is an independent
 // axis.
 func ParseLevel(apiVersion string) (major int, l Level, ok bool) {
@@ -77,7 +77,7 @@ func ParseLevel(apiVersion string) (major int, l Level, ok bool) {
 	return major, LevelGA, true
 }
 
-// Enforced reports whether 0010:D27's additive-only promise binds at this level
+// Enforced reports whether the additive-only promise binds at this level
 // (enhancement 0010): beta and GA yes, alpha no — alpha's definition is that it promises
 // nothing, so the publish gate is off there.
 func (l Level) Enforced() bool { return l != LevelAlpha }

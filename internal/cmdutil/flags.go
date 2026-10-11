@@ -16,7 +16,7 @@ type RenderFlags struct {
 	Values       []string
 	Namespace    string
 	InstanceName string
-	// Platform is the --platform platform module directory (0006:D21;
+	// Platform is the --platform platform module directory (enhancement 0006;
 	// highest platform-source precedence). Supersedes the retired --provider
 	// flag.
 	Platform string
@@ -138,7 +138,7 @@ type InstanceFileFlags struct {
 	// The instance package already carries its own values.cue; these files
 	// are added on top of it as trailing values sources.
 	Values []string
-	// Platform is the --platform platform module directory (0006:D21;
+	// Platform is the --platform platform module directory (enhancement 0006;
 	// highest platform-source precedence). Supersedes the retired --provider
 	// flag.
 	Platform string

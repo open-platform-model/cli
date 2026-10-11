@@ -12,7 +12,7 @@ import (
 // classification (liberrors.Classify), never from the error's text. Classify
 // reads the typed chain first and owns the one text fallback for the forms
 // cue/load and cmd/cue flatten into a string; the library pins those forms
-// against the embedded CUE. Source: 0021:D8:R12.
+// against the embedded CUE. Source: enhancement 0021 (typed errors).
 
 // IsConnectivityError reports whether err means the registry could not be
 // reached: no HTTP response at all (a refused connection, a DNS or TLS

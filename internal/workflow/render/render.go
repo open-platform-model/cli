@@ -90,8 +90,8 @@ func FromInstanceFile(ctx context.Context, opts InstanceFileOpts) (*Result, erro
 
 	// Render provenance (enhancement 0006): an instance apply is local when
 	// its module's cue.mod/local-module.cue replaces a dependency; otherwise it
-	// resolves from registries. The same module root is the 0010:D19 module
-	// context the render's replacement warnings are worded against.
+	// resolves from registries. The same module root is the module
+	// context (enhancement 0010) the render's replacement warnings are worded against.
 	sourceLocal := loader.HasLocalModuleReplacement(moduleRoot)
 
 	// Without --platform the render falls back to the instance package's own
@@ -233,7 +233,7 @@ func newRenderInput(env *renderEnv, inst *module.Instance) kernel.RenderInput {
 // as a validation failure with the kernel's message and the diagnostics
 // printed beside it. A successful render is then refused when two of its
 // objects share one apply identity, before anything downstream can receive
-// the set. After that the 0010:D19 replacement warnings are emitted from the
+// the set. After that the replacement warnings (enhancement 0010) are emitted from the
 // kernel's rows against moduleRoot, the module context, and every demand
 // skipped under --skip-unprovided is warned about on the log stream.
 func renderInstance(
@@ -326,7 +326,7 @@ func exportAndDigest(resources []*object.Resource) ([]object.Exported, string, e
 // newResult assembles the workflow Result from the render output and the
 // render environment. Warnings are the render's advisory facts worded by the CLI from the
 // diagnostics rows (unhandled optional traits, skew under the warn policy);
-// the 0010:D19 local-replacement warnings are emitted directly by renderInstance
+// the local-replacement warnings (enhancement 0010) are emitted directly by renderInstance
 // from the replacement rows, after the render.
 func newResult(env *renderEnv, out *kernel.RenderResult, renderDigest string, values map[string]any, sourceLocal bool) *Result {
 	return &Result{

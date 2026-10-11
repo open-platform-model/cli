@@ -26,10 +26,10 @@ import (
 	"github.com/open-platform-model/cli/internal/output"
 )
 
-// gateCompat is 0011:D9's compatibility gate: every beta/GA member of the tree is
+// gateCompat is the compatibility gate of enhancement 0011: every beta/GA member of the tree is
 // compared against the last published build that shipped a member of that
-// name at that apiVersion, under 0010:D27's additive-only rule, via the
-// library comparator. The predecessor is found by 0011:D9's literal rule — scan
+// name at that apiVersion, under the additive-only rule (enhancement 0010), via the
+// library comparator. The predecessor is found by the literal rule of enhancement 0011 — scan
 // published versions strictly below the effective version, same major,
 // prereleases included, newest first — NOT by a stable-preferring selector: a
 // beta+ name-and-apiVersion key is a permanent claim on its own history, so
@@ -43,7 +43,7 @@ import (
 // verdict — the artifact was never judged; a package absent at a given
 // version is the scan's negative signal, never an error.
 //
-// A dev build (0011:D26 clause 1) is outside the gate in both directions: it is
+// A dev build (enhancement 0011, dev-build exemption) is outside the gate in both directions: it is
 // not judged here, and predecessorVersions never offers it as a baseline. The
 // gate still counts as run — CompatChecked is set — so the plan reports the
 // exemption rather than "not completed".
@@ -127,8 +127,8 @@ func compatScan(opts Options, repo string, versions []string, lineIsPrerelease b
 // eligibleByPackage partitions the members the compat gate binds to
 // (transformers excluded structurally, alpha members by policy, unclassifiable
 // apiVersions left to the FQN gate, and every beta/GA member counted as
-// prerelease-exempt while the module line is a release prerelease — 0011:D26
-// clause 2, the gate arms at the first stable tag) and groups them by
+// prerelease-exempt while the module line is a release prerelease — enhancement 0011:
+// the gate arms at the first stable tag) and groups them by
 // package, keys sorted for deterministic walk order.
 func eligibleByPackage(members []Member, lineIsPrerelease bool, g *CatalogGateOutcomes) (byPkg map[string][]Member, pkgs []string) {
 	byPkg = map[string][]Member{}
@@ -190,7 +190,7 @@ func predecessorVersions(published []string, tag, major string) []string {
 // of its prerelease segment is "dev". This recognizes catalog_opm's
 // branch-tag.sh shape v<M>.<m>.<p>-0.dev.<count>.g<sha> and the plain
 // -dev.N form without pinning either; release prereleases use alpha, beta and
-// rc counters and never carry the identifier. 0011:D26 clause 1: a dev build is
+// rc counters and never carry the identifier. Enhancement 0011: a dev build is
 // neither judged by the compat gate nor used as a baseline. It is also the
 // one definition of "development build" the published-module resolver
 // (internal/modref) excludes from a float (enhancement 0016).
@@ -208,8 +208,8 @@ func IsDevTag(tag string) bool {
 }
 
 // isReleasePrerelease reports whether a tag is a release prerelease
-// (-alpha.N, -beta.N, -rc.N): any prerelease that is not a dev build. 0011:D26
-// clause 2 suspends the beta/GA compare while the module line is one; the
+// (-alpha.N, -beta.N, -rc.N): any prerelease that is not a dev build. Enhancement 0011
+// suspends the beta/GA compare while the module line is one; the
 // member-level model (enhancement 0010) is unchanged, only when publish enforces it.
 func isReleasePrerelease(tag string) bool {
 	return semver.Prerelease(tag) != "" && !IsDevTag(tag)
@@ -307,14 +307,14 @@ func hasCUEFile(dir string) bool {
 // interaction failed, and the compat walk has always read such a predecessor
 // as absent. The library's classification takes a registry failure first, so
 // a failed fetch anywhere in the cause never reads as absent. Source:
-// 0021:D8:R12.
+// enhancement 0021 (typed errors).
 func unprovidedImport(err error) bool {
 	var re *liberrors.ResolutionError
 	return errors.As(liberrors.Classify(err), &re) && re.Kind == liberrors.ResolutionImportUnprovided
 }
 
-// findMember locates the member with the given name and apiVersion — 0011:D9's
-// key — in a published package's member list.
+// findMember locates the member with the given name and apiVersion (the key of the predecessor scan,
+// enhancement 0011) in a published package's member list.
 func findMember(members []Member, name, apiVersion string) (Member, bool) {
 	for _, m := range members {
 		if m.Name == name && m.APIVersion == apiVersion {
@@ -324,7 +324,7 @@ func findMember(members []Member, name, apiVersion string) (Member, bool) {
 	return Member{}, false
 }
 
-// provenancePaths is 0010:D30's denylist — the two metadata fields that
+// provenancePaths is the provenance denylist — the two metadata fields that
 // change per catalog release by construction (enhancement 0010) and are therefore exempt
 // from the comparison. Direct children of metadata only, exactly the scope
 // the library's StripProvenance names.
@@ -334,11 +334,11 @@ var provenancePaths = map[string]bool{
 }
 
 // compareMember runs the level-aware comparator with the member's own
-// apiVersion and applies 0010:D30's provenance exemption by dropping violations at
+// apiVersion and applies the provenance exemption (enhancement 0010) by dropping violations at
 // the two denylisted paths. Violations render as refusal 9; a comparator
 // failure (unclassifiable input) is an error, never a verdict.
 //
-// The 0010:D30 exemption is applied as a violation filter rather than through the
+// The provenance exemption is applied as a violation filter rather than through the
 // library's StripProvenance: measured against the real catalog, the strip's
 // InlineImports round-trip cannot rebuild a member typed against core — the
 // emitted syntax references core's hidden #KebabToPascal helper (via
@@ -375,7 +375,7 @@ func compareMember(next, prev Member, repo, predVersion string) (*Refusal, error
 }
 
 // equalModuloProvenance reports whether two member values emit identical
-// syntax once the 0010:D30 provenance fields are scrubbed. Both operands come
+// syntax once the provenance fields are scrubbed. Both operands come
 // from the same source conventions in the same cue.Context, so identical
 // definitions format identically; provenance is scrubbed on the AST — the
 // scrub half of the library strip, without the rebuild that fails on

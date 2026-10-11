@@ -11,13 +11,13 @@ import "github.com/Masterminds/semver/v3"
 //
 // This is the FLOAT selector — "give me the latest released build" — and it
 // is deliberately NOT the compatibility gate's predecessor selection. An
-// earlier revision of this comment claimed it was; 0011:D23, amending
-// 0011:D9, corrected that: the publish gate's predecessor is found by a
+// earlier revision of this comment claimed it was; enhancement 0011 corrected that:
+// the publish gate's predecessor is found by a
 // literal rule — scan published versions strictly below the effective version, same
 // major, prereleases included, newest first — implemented gate-side in
 // internal/publish, because a stable-preferring selector coincides with that
 // rule only on a prerelease-only history and would miss breaks that
-// prerelease pinners (0010:D14-blessed) can see. Selection here is pure —
+// prerelease pinners (blessed by enhancement 0010) can see. Selection here is pure —
 // enumerating and fetching the candidate are the caller's. Moved verbatim
 // from opm/materialize's since-deleted filterVersions path (enhancement 0010). Its
 // only caller is template resolution's version selection

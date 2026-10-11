@@ -917,7 +917,7 @@ func FormatApplySummary(r *kubernetes.ApplyResult) string {
 // resolution path BOTH actors use the reference-identity digest — there is no
 // Flux artifact content digest here. Do not change one side without the
 // other. The empty-reference guard below is CLI-only (omits the status field
-// instead of hashing "@"); 0006:D6 guarantees a non-empty canonical reference on
+// instead of hashing "@"); enhancement 0006 guarantees a non-empty canonical reference on
 // every real apply, so the divergence is unreachable in practice.
 func sourceDigest(modulePath, moduleVersion string) string {
 	if modulePath == "" && moduleVersion == "" {

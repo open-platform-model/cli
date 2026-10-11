@@ -59,7 +59,7 @@ func Leaf(modulePath string) string {
 // fallback on a prerelease-only history ([highestStable], its only caller).
 // Returns the `v`-prefixed tag.
 //
-// Failure modes keep 0011:D25's honesty contract: a transport failure is a
+// Failure modes keep the honesty contract of enhancement 0011: a transport failure is a
 // *publish.ConnectivityError naming the lookup and registry; an empty or
 // non-matching history is a *publish.Refusal naming the expanded path — a
 // shortcut typo 404s inside the reserved segment, never falling back.
@@ -188,7 +188,7 @@ func Run(ctx context.Context, k *kernel.Kernel, registry, newPath string, ref Te
 // newPath's: the cue.mod `module:` line, the identity package's ModulePath
 // and Version (set to the initial version as a plain literal), every literal
 // self-import, and every root-package clause (old leaf → new leaf). This is
-// 0011:D16's statement set plus the package clause, applied wholesale — correct
+// the statement set of enhancement 0011 plus the package clause, applied wholesale — correct
 // exactly because the user owns nothing in the tree yet; repair mode refuses
 // the same rewrite for the opposite reason. Metadata is untouched: it
 // derives (enhancement 0011).
@@ -274,8 +274,8 @@ func copyFetched(ctx context.Context, registry, modulePath, version, dest string
 // initial default. A load failure is an internal error (the writers left an
 // inconsistent tree). A value MISMATCH is a property of the clone source:
 // re-identification rewrote the identity package, so metadata still stating
-// the old values means the source carries literals instead of the 0011:D12
-// derivation — official templates cannot hit this (their derivation is
+// the old values means the source carries literals instead of the
+// derivation (enhancement 0011) — official templates cannot hit this (their derivation is
 // gate-enforced at publish), an arbitrary `--from` donor can, and it earns a
 // refusal naming the donor's defect rather than a blamed-wrong internal
 // error.

@@ -26,15 +26,15 @@ type CatalogGateOutcomes struct {
 	CompatAlpha    int
 	CompatNew      int
 	// CompatPrerelease: beta/GA members exempt because the module line is a
-	// release prerelease (0011:D26 clause 2); always rendered, 0 on a stable line.
+	// release prerelease (enhancement 0011, prerelease-line exemption); always rendered, 0 on a stable line.
 	CompatPrerelease int
 	// CompatDevExempt reports the build is a dev tag (enhancement 0011): the gate ran and
 	// decided not to judge it, and the counts above are all zero.
 	CompatDevExempt bool
 }
 
-// gateMemberFQN is 0011:D22's structural gate (refusal 11): every member of the
-// tree — all four kinds, all levels; 0010:D34's alpha carve-out is compat-only —
+// gateMemberFQN is the structural gate of enhancement 0011 (refusal 11): every member of the
+// tree — all four kinds, all levels; the alpha carve-out (enhancement 0010) is compat-only —
 // is unified against core's #CatalogMemberFQNGate and validated CONCRETELY.
 // The pipeline's incomplete-value filter (conformIdentity) is deliberately
 // not reused: here incompleteness is the finding — a missing
@@ -77,7 +77,7 @@ func fillFromMember(gate cue.Value, m Member, gateField, memberPath string) cue.
 	return gate.FillPath(cue.ParsePath(gateField), v)
 }
 
-// gateTraitOptional is 0011:D22's posture gate: every trait's `optional` FIELD —
+// gateTraitOptional is the posture gate of enhancement 0011: every trait's `optional` FIELD —
 // never the whole member, which would drag its schema `spec` into
 // concreteness — is unified against core's #TraitOptionalGate. An unstated
 // posture is an incomplete value (rule 1, visible only concretely) and a

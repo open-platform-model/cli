@@ -1,5 +1,5 @@
 // Package cueedit performs surgical, position-based rewrites of OPM authoring
-// files. It implements 0011:D8's Version write: locate the field
+// files. It implements the Version write of enhancement 0011: locate the field
 // by its schema-fixed path in identity/identity.cue, splice the new value into
 // the original bytes, and leave every other byte — comments, alignment, field
 // order — exactly as committed. `opm ... publish --version` fills through this
@@ -62,7 +62,7 @@ func CheckVersion(version string) error {
 //
 // Setting the version the file already declares splices to identical bytes:
 // the file is not written — no mtime change, nothing for a pre-commit hook to
-// react to (0011:D3's idempotent no-op) — and changed is false.
+// react to (the idempotent no-op of enhancement 0011) — and changed is false.
 //
 // An absent file, an unparseable file, or a missing Version field is a shape
 // refusal (ErrIdentityShape) — a malformed artifact, not an unfinished one.

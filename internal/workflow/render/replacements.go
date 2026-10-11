@@ -15,7 +15,7 @@ import (
 // module directory's own replacements come back under it too.
 const replacedByInstance = "instance"
 
-// replacementWarnings words the 0010:D19 render warnings from
+// replacementWarnings words the render warnings (enhancement 0010) from
 // data: one line per replacement the kernel honored (rows, already in path
 // order), naming the replaced path, the directory or module its bytes were
 // served from and which input supplied it; then one line per `replaceWith`

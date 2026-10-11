@@ -50,7 +50,7 @@ type RepairPlan struct {
 
 // DetectRepair inspects an existing tree and builds the repair plan: a
 // missing or disagreeing cue.mod `module:` line, a missing identity package,
-// or a disagreeing identity ModulePath (0011:D20's repairable set — deeper
+// or a disagreeing identity ModulePath (the repairable set of enhancement 0011 — deeper
 // conformance stays with `opm module vet`, which the command points at
 // afterwards).
 //

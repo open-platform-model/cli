@@ -16,7 +16,7 @@ import (
 // Owned-domain shapes (enhancement 0011): the namespace rules bind only where OPM
 // owns the domain. Outside opmodel.dev and community.opmodel.dev publish
 // asserts nothing about the path — path ownership is domain ownership.
-// templates/ is 0011:D25's reserved segment: official scaffold templates as
+// templates/ is the reserved segment of enhancement 0011: official scaffold templates as
 // module-kind artifacts, exactly one name deep (no nesting — that is part of
 // what keeps shortcut expansion unambiguous), with no community mirror.
 var (
@@ -78,7 +78,7 @@ func Run(ctx context.Context, opts Options) (*Plan, error) {
 		p.refuse(*r)
 	}
 
-	// Identity states (0011:D4 tristate, defaults are concrete), coordinate
+	// Identity states (enhancement 0011 tristate, defaults are concrete), coordinate
 	// derivation (read and split the declared path — never composed), and
 	// --version assert/fill (enhancement 0011).
 	p.Identity = identityStates(a)
@@ -290,7 +290,7 @@ func gateNamespace(p *Plan) {
 // what is being published — one implementation with two entry points means
 // nothing else stops `opm module publish` landing where consumers look for
 // catalogs. No platforms arm: nothing publishes a platform today (enhancement 0011).
-// templates/ sits in the module arm: 0011:D25 makes the segment module-kind, so a
+// templates/ sits in the module arm: enhancement 0011 makes the segment module-kind, so a
 // template publishes as an ordinary module and a catalog can never land there.
 func gateKindSegment(p *Plan) {
 	repo := p.RegistryRepo
@@ -338,7 +338,7 @@ func expectedSegment(kind Kind, repo string) string {
 	return "modules/"
 }
 
-// gatePackageName is 0011:D1's module package-name rule: the module's root package
+// gatePackageName is the module package-name rule of enhancement 0011: the module's root package
 // must bind to its metadata.name, because a consumer's bare import binds the
 // package name. The catalog entry point skips it — a catalog's importable
 // surface is its subpackages.
@@ -366,7 +366,7 @@ func gatePackageName(p *Plan, a *artifact) {
 	})
 }
 
-// gateOverride is 0011:D6: local overrides are never honored — CUE strips the file
+// gateOverride is the override gate of enhancement 0011: local overrides are never honored — CUE strips the file
 // and the artifact always resolves as published. What is in question is
 // whether what was tested matches what is shipped. The condition is the
 // file's presence; --skip-override-check waives the gate for modules only and

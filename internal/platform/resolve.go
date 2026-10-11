@@ -47,7 +47,7 @@ const (
 )
 
 // Resolution reports where the platform came from — the provenance every
-// render-bearing command surfaces (0006:D21: the fallback warns, it never
+// render-bearing command surfaces (enhancement 0006: the fallback warns, it never
 // silently swaps platforms).
 type Resolution struct {
 	// Source is the precedence step that produced the platform.

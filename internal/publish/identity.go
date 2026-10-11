@@ -27,7 +27,7 @@ func conformIdentity(a *artifact, schema cue.Value) *Refusal {
 
 	// Concrete validation is what makes CUE name a missing required field
 	// ("field is required but not present"). It also flags open fields as
-	// incomplete — but openness is 0011:D4's gate (refusal 1, fillable by
+	// incomplete — but openness is the gate of enhancement 0011 (refusal 1, fillable by
 	// --version), not a conformance failure, so incompleteness errors are
 	// dropped here. One cause, one refusal.
 	//
@@ -50,8 +50,8 @@ func conformIdentity(a *artifact, schema cue.Value) *Refusal {
 	}
 }
 
-// identityStates classifies each schema-fixed identity field per 0011:D4's
-// tristate, evaluating with CUE defaults: a defaulted field is concrete with
+// identityStates classifies each schema-fixed identity field per the
+// tristate of enhancement 0011, evaluating with CUE defaults: a defaulted field is concrete with
 // the default as its value — that is the committed, release-automation-owned
 // declaration.
 func identityStates(a *artifact) []IdentityField {
@@ -72,7 +72,7 @@ func identityStates(a *artifact) []IdentityField {
 	return out
 }
 
-// resolveVersion applies 0011:D3/D12's --version semantics to the Version field
+// resolveVersion applies the --version semantics of enhancement 0011 to the Version field
 // and sets the plan's tag: fill an open field (recording the pending
 // working-tree write), assert a concrete one, never overwrite. One cause,
 // one refusal: an absent field is refusal 10's finding and produces nothing

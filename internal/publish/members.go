@@ -86,7 +86,7 @@ func enumerateMembers(opts Options, dir string) ([]Member, []Refusal) {
 }
 
 // memberPackagePaths lists the member package directories under a catalog
-// root, by the 0010:D49 filing convention: every `<kind>/<apiVersion>` directory
+// root, by the filing convention of enhancement 0010: every `<kind>/<apiVersion>` directory
 // holding .cue files, a kind directory's own flat package when it holds files
 // directly, and the flat `transformers/` package. Takes an fs.FS so the same
 // convention reads a working tree and a fetched published build alike.

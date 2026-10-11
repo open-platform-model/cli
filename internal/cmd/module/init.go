@@ -18,8 +18,8 @@ import (
 )
 
 // NewModuleInitCmd creates the module init command: fetch-based scaffolding
-// from published template modules, and repair of an existing tree (0011:D20,
-// D25; the cli-template-modules change).
+// from published template modules, and repair of an existing tree (enhancement 0011;
+// the cli-template-modules change).
 func NewModuleInitCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var fromFlag, templateFlag, dirFlag string
 	var yesFlag bool
@@ -100,7 +100,7 @@ func runModuleInit(c *cobra.Command, cfg *config.GlobalConfig, args []string, fl
 	}
 
 	// Interactive form: a template named but no module path — ask for one
-	// (0011:D20's "asks for one"); without a terminal there is nothing to ask.
+	// (enhancement 0011 says the command "asks for one"); without a terminal there is nothing to ask.
 	if pathArg == "" && templateRef != "" {
 		pathArg, err = promptModulePath(c)
 		if err != nil {

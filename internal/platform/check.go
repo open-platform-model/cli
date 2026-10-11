@@ -97,7 +97,7 @@ func NewReport(res Resolution, inv *libplatform.ContractInventory) Report {
 // Routable reports whether no provider-fulfilled contract is over-subscribed
 // and no contract key collides.
 // It is one of the two values that decide `opm platform check`'s exit status,
-// [Report.Discriminated] being the other: 0015:D18 makes an
+// [Report.Discriminated] being the other: enhancement 0015 makes an
 // unfulfilled contract a report and never a gate, so a report that is not
 // fulfilled still exits zero.
 func (r Report) Routable() bool { return r.routable }
