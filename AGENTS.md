@@ -262,7 +262,8 @@ export OPM_REGISTRY="$CUE_REGISTRY"
 - `task tidy` - run `go mod tidy`.
 - `task openspec:check` - run `openspec validate --all --strict` over `openspec/` (main specs and active changes); `task openspec:install` installs the pinned openspec CLI once.
 - `task docs:bundle` - build the cli docs bundle of the work tree into `out/cli/` with the pinned `opm-docs` (`task tools:opm-docs` installs it into `.bin/`); `task docs:bundle:check` builds and lints it into a temporary directory, after `task docs:pins:check` (the `publish.yml@` refs agree with `.opm-docs-version`, offline).
-- `task check` - run `fmt`, `vet`, `lint`, `openspec:check`, `docs:bundle:check`, all tests.
+- `task cite-lint` - run the shared comment rule (no decision number, no lone enhancement id in Go and CUE comments) at the tool commit of `.github`'s `cite-lint.yml`; CI calls that workflow from `.github/workflows/cite-lint.yml` with the same exclude (`tests/fixtures/`).
+- `task check` - run `fmt`, `vet`, `lint`, `cite-lint`, `openspec:check`, `docs:bundle:check`, all tests.
 
 ### Tests
 
