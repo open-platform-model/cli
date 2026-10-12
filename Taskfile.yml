@@ -401,8 +401,8 @@ tasks:
     # The tool runs at the commit that .github's cite-lint.yml uses by default
     # (its enh-ref input); move this commit with the .github pin. The excludes
     # equal the exclude input of .github/workflows/cite-lint.yml: change one,
-    # change the other. tests/fixtures/ holds published fixtures that keep old
-    # citations on purpose; they change in the next fixture bump.
+    # change the other. tests/fixtures/ holds fixture modules (most are published) that
+    # keep old citations on purpose; they change in the next fixture bump.
     cmds:
       - go run github.com/open-platform-model/enhancements/tools/enh@e0335b2ec44e659c0191bc3523d79d17f26f8e7d cite-lint --exclude tests/fixtures/ .
 
