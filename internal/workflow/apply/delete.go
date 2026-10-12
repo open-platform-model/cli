@@ -139,7 +139,7 @@ func DeleteRecorded(ctx context.Context, req DeleteRequest) (*kubernetes.DeleteR
 		}
 	}
 
-	// Delete the ModuleInstance CR last (0006:D1), and only when the
+	// Delete the ModuleInstance CR last (enhancement 0006), and only when the
 	// deletion plan's hold verdict releases it: every planned object was
 	// deleted or left in place. A failed object holds it, so a re-run can
 	// retry. Skipped on a dry run. An error the delete reported holds it too,

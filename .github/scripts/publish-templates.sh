@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publish the official template modules (0011:D25) through `opm module
+# Publish the official template modules (enhancement 0011) through `opm module
 # publish`, dogfooding the pipeline. Two phases, so no template publishes
 # unless every template passed every gate in the same run:
 #
@@ -25,7 +25,7 @@
 #              tree's files, because published versions are immutable.
 #   publish  (release only) acts on each template's gate verdict: GO is
 #            published, already published and identical is skipped (the
-#            caller-side filter of 0011:D15; publish itself never skips). GHCR
+#            caller-side filter of enhancement 0011; publish itself never skips). GHCR
 #            is not probed a second time, so a version another run published
 #            in between makes `opm module publish` refuse instead of being
 #            skipped.

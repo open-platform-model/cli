@@ -2,7 +2,7 @@
 
 See proposal.md. After `compat-dev-tag-exemption`, `gateCompat` and `RegistryCheck` already classify the effective tag once (`isDevTag`) before the scan. `eligibleByPackage` (`compat.go`) partitions members: transformers out, unparseable apiVersion out, alpha into `CompatAlpha`, the rest into the walk. `CatalogGateOutcomes` is rendered by `plan.go:renderCatalogGates` and `check.go`.
 
-Constraints: 0011 D26 clause 2. 0010 D34's member-level model is unchanged; the library's `CheckAtLevel` keeps keying on the member's apiVersion and must not learn about module versions (its doc comment says so explicitly; the module version is "an independent axis"). The policy therefore lives in the cli gate, not in `library/opm/compat`.
+Constraints: enhancement 0011 ("The compatibility gate ignores dev builds and stands down while the module line is itself a prerelease") clause 2. The member-level model of enhancement 0010 is unchanged; the library's `CheckAtLevel` keeps keying on the member's apiVersion and must not learn about module versions (its doc comment says so explicitly; the module version is "an independent axis"). The policy therefore lives in the cli gate, not in `library/opm/compat`.
 
 ## Goals / Non-Goals
 
@@ -13,7 +13,7 @@ Constraints: 0011 D26 clause 2. 0010 D34's member-level model is unchanged; the 
 
 **Non-Goals:**
 - Teaching `library/opm/compat` about module versions.
-- Changing which builds are predecessors (D23 stands; dev filtering is the sibling change).
+- Changing which builds are predecessors (enhancement 0011 stands; dev filtering is the sibling change).
 - Comparator noise (library change).
 
 ## Decisions
@@ -39,7 +39,7 @@ func eligibleByPackage(members []Member, lineIsPrerelease bool, g *CatalogGateOu
 
 type CatalogGateOutcomes struct {
     // ...
-    CompatPrerelease int // D26 clause 2: beta/GA members exempt on a prerelease module line
+    CompatPrerelease int // enhancement 0011 clause 2: beta/GA members exempt on a prerelease module line
 }
 ```
 
@@ -65,6 +65,6 @@ Exit codes unchanged.
 
 ## Risks / Trade-offs
 
-- [A real break ships on the alpha line and is only caught at `2.0.0`] → by D26 that is the accepted trade; the first stable tag compares against the newest alpha, so the break surfaces there with the alpha coordinate named, and the author fixes or bumps before the stable ships.
+- [A real break ships on the alpha line and is only caught at `2.0.0`] → by enhancement 0011 that is the accepted trade; the first stable tag compares against the newest alpha, so the break surfaces there with the alpha coordinate named, and the author fixes or bumps before the stable ships.
 - [Exemption masks comparator noise] → sequenced after the library change; task 3.3 asserts that on a stable tag the known-noisy real members (`realtree_test.go`) compare clean, so the stable path is proven before the exemption lands.
 - [Log consumers grep the old four-segment row] → `catalog_opm/ci.yml` greps only `already holds` and `1 refusal`; the row gains a segment, existing segments keep their order.

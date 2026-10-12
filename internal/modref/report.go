@@ -6,7 +6,7 @@ import (
 )
 
 // Report renders a resolution as the lines a command prints on standard
-// error before it renders (0016:D5:R3): one selection line, then one line per
+// error before it renders (enhancement 0016): one selection line, then one line per
 // higher major the walk skipped.
 func Report(r *Resolution) []string {
 	var how string

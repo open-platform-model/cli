@@ -1,12 +1,12 @@
 ## Purpose
 
-Defines the `opm instance` command group (alias `inst`) — a top-level CLI surface for instance lifecycle management. Only `#ModuleInstance` instance files are accepted; bundle handling was removed (enhancement 0002 D15). It provides two classes of commands: render commands (operate on a `.cue` instance file) and cluster-query commands (operate on a deployed instance by name or UUID).
+Defines the `opm instance` command group (alias `inst`) — a top-level CLI surface for instance lifecycle management. Only `#ModuleInstance` instance files are accepted; bundle handling was removed (enhancement 0002, "The `BundleRelease` stub is removed, not renamed (supersedes D7)"). It provides two classes of commands: render commands (operate on a `.cue` instance file) and cluster-query commands (operate on a deployed instance by name or UUID).
 
 ## Requirements
 
 ### Requirement: instance command group exists as a top-level command
 
-The CLI SHALL expose `opm instance` (alias: `inst`) as a top-level command group registered in `internal/cmd/root.go`. The group SHALL contain subcommands for instance lifecycle management. Running `opm instance` without a subcommand SHALL display help. The former `release`/`rel` verb and alias are removed (no back-compat alias — enhancement 0002 D8).
+The CLI SHALL expose `opm instance` (alias: `inst`) as a top-level command group registered in `internal/cmd/root.go`. The group SHALL contain subcommands for instance lifecycle management. Running `opm instance` without a subcommand SHALL display help. The former `release`/`rel` verb and alias are removed (no back-compat alias — enhancement 0002 ("Hard rename, no alias window; `semver: major` (resolves OQ3, OQ4)")).
 
 #### Scenario: instance group registered at root level
 

@@ -2,7 +2,7 @@
 
 ## Context
 
-See `proposal.md` § Why. The decision is `enhancements/0015` D15, completed by the operator; this change is the CLI's matching refusal.
+See `proposal.md` § Why. The decision is in enhancement 0015, completed by the operator; this change is the CLI's matching refusal.
 
 Current state, read 2026-09-19 against cli main (`809ea15`, library `v1.0.0-alpha.32`):
 
@@ -41,7 +41,7 @@ if err := refuseDuplicateIdentities(out); err != nil {
 
 ```go
 // refuseDuplicateIdentities returns the library's duplicate-identity error
-// when two compiled objects share one apply identity (0015:D15), nil
+// when two compiled objects share one apply identity (enhancement 0015), nil
 // otherwise. Pure over the render output, so it is tested without a render.
 func refuseDuplicateIdentities(out *kernel.RenderResult) error {
 	if dups := objectset.Duplicates(out.Compiled); len(dups) > 0 {
@@ -99,7 +99,7 @@ Exit code 2 (`ExitValidationError`), `Printed: true`, as every other render refu
 **Decision**: 2, plus a repo-local e2e fixture that is neither published nor a registration module.
 **Rationale**: the check reads four fields off values the kernel already returned; the two-registration case is expressible exactly, and the same shape proved the operator's refusal. The healthy path is what every existing render test exercises.
 
-What option 1 costs is the fixture *pipeline*: a published module moves the fixture catalog pin and needs a reachable registry to be republished. A third option avoids that entirely — `tests/e2e/testdata/duplicate-identities`, a module on `test.example.com` that nothing publishes, rendered by `opm module build` the way `tests/e2e/testdata/vet-errors` is. It collides two `StatelessWorkload` components on one `metadata.name` rather than two registrations, because the collision the check refuses is a shared apply identity, not a registration: `TransformerRegistration` is the instance D15 was written from, not the class. That keeps the unit tests as the proof of the helper call and the wording, and makes `TestE2E_ModBuild_RefusesDuplicateIdentities` the proof that the refusal reaches a whole command — the exit code, the two streams, and an empty stdout, which no unit test over `renderInstance`'s callee can show.
+What option 1 costs is the fixture *pipeline*: a published module moves the fixture catalog pin and needs a reachable registry to be republished. A third option avoids that entirely — `tests/e2e/testdata/duplicate-identities`, a module on `test.example.com` that nothing publishes, rendered by `opm module build` the way `tests/e2e/testdata/vet-errors` is. It collides two `StatelessWorkload` components on one `metadata.name` rather than two registrations, because the collision the check refuses is a shared apply identity, not a registration: `TransformerRegistration` is the instance enhancement 0015 was written from, not the class. That keeps the unit tests as the proof of the helper call and the wording, and makes `TestE2E_ModBuild_RefusesDuplicateIdentities` the proof that the refusal reaches a whole command — the exit code, the two streams, and an empty stdout, which no unit test over `renderInstance`'s callee can show.
 
 ### The library's wording, split, not rewritten
 

@@ -11,7 +11,7 @@ Revision 3 moved the bump check to GHCR content and ran `publish-templates` befo
 
 ## Why
 
-The official templates are meant to be "vetted, gated, published" modules that fail the cli release instead of failing the user (0011:D25). They are not vetted. `.github/scripts/publish-templates.sh` runs three checks before a push: `opm module tidy --check`, the `opm module publish --dry-run` gates (identity, coordinates, namespace, kernel loader shape), and the already-published filter (`publish-templates.sh:48-83`). None of them renders the template. So `opmodel.dev/templates/advanced` v1.0.2 shipped, first in release v1.0.0-alpha.22, with `debugValues` that do not render: its worker and cache components leave the update-strategy `type` an unresolved disjunction. The published artifact still fails today:
+The official templates are meant to be "vetted, gated, published" modules that fail the cli release instead of failing the user (enhancement 0011, "Official templates are published modules in a reserved `templates` segment"). They are not vetted. `.github/scripts/publish-templates.sh` runs three checks before a push: `opm module tidy --check`, the `opm module publish --dry-run` gates (identity, coordinates, namespace, kernel loader shape), and the already-published filter (`publish-templates.sh:48-83`). None of them renders the template. So `opmodel.dev/templates/advanced` v1.0.2 shipped, first in release v1.0.0-alpha.22, with `debugValues` that do not render: its worker and cache components leave the update-strategy `type` an unresolved disjunction. The published artifact still fails today:
 
 ```
 $ opm module vet .          # GHCR opmodel.dev/templates/advanced v1.0.2, unpacked

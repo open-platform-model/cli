@@ -1,6 +1,6 @@
 # Delta: module-raw-field (cli-kernel-adoption)
 
-The CLI `Module` struct (and its `Raw` field) is deleted with kernel adoption (0006 D9).
+The CLI `Module` struct (and its `Raw` field) is deleted with kernel adoption (enhancement 0006, "The CLI replaces its own render/match pipeline entirely with the `library` kernel").
 
 ## REMOVED Requirements
 

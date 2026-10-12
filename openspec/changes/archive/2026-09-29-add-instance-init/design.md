@@ -1,6 +1,6 @@
 ## Context
 
-See proposal.md for motivation and specs/instance-init/spec.md for the behavior contract. Enhancement 0016 (`enhancements/0016/03-decisions.md`, D1 to D9) is the design intent this change implements; its experiments 01 to 08 back the choices below.
+See proposal.md for motivation and specs/instance-init/spec.md for the behavior contract. Enhancement 0016 is the design intent this change implements; its experiments 01 to 08 back the choices below.
 
 Current state that shapes the approach:
 
@@ -21,9 +21,9 @@ Current state that shapes the approach:
 
 **Non-Goals:**
 
-- Validating the package (0016 D8), upgrading an existing package, and colocated instances inside a module tree.
+- Validating the package (enhancement 0016, "Init does not validate the generated package; it tells the user how to"), upgrading an existing package, and colocated instances inside a module tree.
 - Registry search or discovery (0016 non-goal).
-- Any library change (0016 D7).
+- Any library change (enhancement 0016, "The package renderer lives in the CLI; library ships nothing for this entry").
 
 ## Decisions
 
@@ -106,7 +106,7 @@ opm instance init [name] [module-path] [flags]
  11. report (see Example output)
 ```
 
-Step 9 writes the core pin explicitly at the module's own version, and tidy only completes the closure. That matches 0016 experiment 03, which wrote the module and core pins and tidy added one catalog pin. It also makes D9's "core at the module's major" hold regardless of which core release is newest.
+Step 9 writes the core pin explicitly at the module's own version, and tidy only completes the closure. That matches 0016 experiment 03, which wrote the module and core pins and tidy added one catalog pin. It also makes enhancement 0016's "core at the module's major" hold regardless of which core release is newest.
 
 ### Exit codes and messages
 
@@ -145,7 +145,7 @@ Error: standard input is not a terminal, so the namespace cannot be asked
 
 ### Computing the dependency closure
 
-**Context**: 0016 D9 requires a module file equivalent to a tidied one. The CUE SDK's tidy is internal.
+**Context**: enhancement 0016 ("The generated module file pins the module exactly, carries core at the module's major, and names a local placeholder module path") requires a module file equivalent to a tidied one. The CUE SDK's tidy is internal.
 **Explored**: `add-dependency-tidy` design (options: wrap `cmd/cue/cmd` in-process, fork `internal/mod`, extend `library/opm/helper/platformmodule.Closure`); the platform-module generator's `Closure`; the synth overlay.
 **Options considered**:
 1. `platformmodule.Closure` (MVS over published module files): no pruning, no default-major markers, and it drifts from `cue mod tidy --check`; `add-dependency-tidy` rejected it for the same reason.
@@ -157,8 +157,8 @@ Error: standard input is not a terminal, so the namespace cannot be asked
 
 **Context**: An earlier sketch read `instance.cue` and `values.cue` out of `Kernel.SynthesizeInstance`'s overlay.
 **Options considered**:
-1. Synth overlay bytes: no duplicated template, but synthesis fails on non-concrete values (0016 D4 allows them) and validates the package (0016 D8 says init does not).
-2. CLI-side renderer (0016 D7): the instance-file shape exists in two repos; drift is caught by the e2e test that builds init's output through `opm instance build`.
+1. Synth overlay bytes: no duplicated template, but synthesis fails on non-concrete values (enhancement 0016 ("The field is `initValues?: _`, open and optional, with no schema-side `#config` assertion") allows them) and validates the package (enhancement 0016 ("Init does not validate the generated package; it tells the user how to") says init does not).
+2. CLI-side renderer (enhancement 0016, "The package renderer lives in the CLI; library ships nothing for this entry"): the instance-file shape exists in two repos; drift is caught by the e2e test that builds init's output through `opm instance build`.
 **Decision**: Option 2.
 
 ### The package's own module path
@@ -166,28 +166,28 @@ Error: standard input is not a terminal, so the namespace cannot be asked
 **Context**: The package is a CUE main module that is never published.
 **Options considered**:
 1. A reserved-unpublished `opmodel.dev/instances/<name>@v0`, like `opmodel.dev/platforms/local@v0`: needs a namespace claim and a publish-gate change.
-2. `instance.local/<name>@v0` with `--module-path` (0016 D9): nothing to reserve; experiment 03 showed no registry lookup of it.
+2. `instance.local/<name>@v0` with `--module-path` (enhancement 0016, "The generated module file pins the module exactly, carries core at the module's major, and names a local placeholder module path"): nothing to reserve; experiment 03 showed no registry lookup of it.
 **Decision**: Option 2 (user decision 2026-09-28: 0016 wins where it and the conversation differ).
 
 ### Refusing a target inside a CUE module
 
-**Context**: 0016 D5 refuses only an existing directory. A standalone package nested in another CUE module's tree is legal CUE, but the enclosing module's tooling may walk into it.
-**Decision**: Refuse (user decision 2026-09-28). The enhancement records it as 0016 D10, which amends D5.
+**Context**: enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-free module path, and floats to the highest core-compatible major when no version is given") refuses only an existing directory. A standalone package nested in another CUE module's tree is legal CUE, but the enclosing module's tooling may walk into it.
+**Decision**: Refuse (user decision 2026-09-28). The enhancement records it as enhancement 0016 ("Init refuses a target directory inside an existing CUE module"), which amends enhancement 0016.
 **Rationale**: Relaxing a refusal later is non-breaking; tightening one later is breaking. Colocated instances, which need no `cue.mod` of their own, stay out of scope.
 
 ### What counts as a concrete `debugValues`
 
-**Context**: 0016 D6 sends a `debugValues` that is "not concrete" to `values: {}` without defining the word for a partly concrete struct such as `{image: "nginx:1.27", replicas: int}`. Separately, `module-renders-against-own-deps` gives fixtures `debugValues: {}`, which is concrete but renders an empty file.
+**Context**: enhancement 0016 ("With no usable template source, init writes `values: {}` and warns") sends a `debugValues` that is "not concrete" to `values: {}` without defining the word for a partly concrete struct such as `{image: "nginx:1.27", replicas: int}`. Separately, `module-renders-against-own-deps` gives fixtures `debugValues: {}`, which is concrete but renders an empty file.
 **Options considered**:
-1. Render a partial `debugValues` the way `initValues` renders, sending only `_` or an absent field to empty: keeps the author's values, but narrows D6 and would need an amending decision in 0016.
-2. The whole value must be concrete once defaults apply (chosen): D6 as written. `opm module build` already needs a concrete `debugValues`, so a published module rarely has a partial one.
-**Decision**: Option 2 (user decision 2026-09-29): `debugValues.Validate(cue.Final(), cue.Concrete(true))` decides the rung. A source that renders as an empty struct keeps its name in the report (0016 D2:R2) and also gets the empty-file warning.
+1. Render a partial `debugValues` the way `initValues` renders, sending only `_` or an absent field to empty: keeps the author's values, but narrows enhancement 0016 and would need an amending decision in 0016.
+2. The whole value must be concrete once defaults apply (chosen): enhancement 0016 as written. `opm module build` already needs a concrete `debugValues`, so a published module rarely has a partial one.
+**Decision**: Option 2 (user decision 2026-09-29): `debugValues.Validate(cue.Final(), cue.Concrete(true))` decides the rung. A source that renders as an empty struct keeps its name in the report (enhancement 0016, "`debugValues` is the default template source for the generated `values.cue`") and also gets the empty-file warning.
 
 ### A registry failure during tidy exits 3
 
-**Context**: 0016 D5:R7 gives an unreachable registry exit 3, at any stage. `cuemod.Tidy` returns cmd/cue's error as it came, with no connectivity type, and `opm module tidy` maps every resolution or registry failure to exit 1.
+**Context**: enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-free module path, and floats to the highest core-compatible major when no version is given") gives an unreachable registry exit 3, at any stage. `cuemod.Tidy` returns cmd/cue's error as it came, with no connectivity type, and `opm module tidy` maps every resolution or registry failure to exit 1.
 **Options considered**:
-1. Exit 1 for every tidy failure: matches `opm module tidy`, but breaks D5:R7 when the registry drops between acquire and tidy.
+1. Exit 1 for every tidy failure: matches `opm module tidy`, but breaks the registry-failure requirement of enhancement 0016 when the registry drops between acquire and tidy.
 2. Classify a tidy error as a connectivity failure and return a `*publish.ConnectivityError` (exit 3): `errors.As` to `net.Error` first, cmd/cue's error text as the fallback.
 **Decision**: Option 2 (user decision 2026-09-28). The classifier sits beside `cuemod.Tidy` so `opm module tidy` can adopt it later; this change leaves that command's exit codes as they are.
 **Rationale**: A script that retries on exit 3 then treats a registry outage the same at every stage of init.
@@ -197,11 +197,11 @@ Error: standard input is not a terminal, so the namespace cannot be asked
 - [Assumption: `cuemod.Tidy` keeps the explicit module and core pins and only adds the rest of the closure] -> Proven in section 1 against the podinfo fixture (`TestE2E_InstanceInit_GeneratedPackageTidiesAndLoads`): both pins survive tidy unchanged and tidy adds the catalog pin; the tidied package loads through the kernel, passes a tidy check, and loads from a warm cache with the registry unreachable.
 - [Assumption: tidy keeps the written language version (`v0.17.0`, the seeded platform's)] -> Proven in section 1: tidy leaves it as written.
 - [Staging and rename across filesystems] -> Staging lives in the target's parent, so the rename never crosses a device.
-- [`debugValues` may hold throwaway credentials or hostnames] -> The report warns to review it (0016 D2:R3). `initValues` is the author's fix, landing in section 4.
+- [`debugValues` may hold throwaway credentials or hostnames] -> The report warns to review it (enhancement 0016, "`debugValues` is the default template source for the generated `values.cue`"). `initValues` is the author's fix, landing in section 4.
 - [Assumption: a registry failure inside `cuemod.Tidy` is recognisable as one (`errors.As` to `net.Error`, else cmd/cue's error text)] -> Section 1 found (`TestE2E_InstanceInit_TidyRegistryFailureShape`, empty module cache, registry `127.0.0.1:1`): `errors.As` to `net.Error` does NOT match, because cmd/cue flattens the cause into a plain `*errors.errorString`: `failed to resolve "opmodel.dev/core@v2": cannot fetch opmodel.dev/core@v2.0.0-alpha.6: module opmodel.dev/core@v2.0.0-alpha.6: cannot do HTTP request: Get "http://127.0.0.1:1/...": dial tcp 127.0.0.1:1: connect: connection refused`. The classifier therefore keeps the `net.Error` check for a future unflattened error and matches the text `cannot do HTTP request`, the registry client's wording for a transport failure (refused, DNS, timeout), which an HTTP-status failure (404, 401) does not carry. The test pins the text against the embedded CUE version.
-- [Section 4 waits on a core release] -> Sections 1 to 3 are releasable on their own. If core lags, section 4 splits into its own change rather than holding the PR; that change then claims 0016 D3 and D4 in its `enhancement.yaml`, and they are removed from this one.
+- [Section 4 waits on a core release] -> Sections 1 to 3 are releasable on their own. If core lags, section 4 splits into its own change rather than holding the PR; that change then claims enhancement 0016 ("`#Module` gains an optional field carrying the author-intended init template, taking precedence over `debugValues`" and "The field is `initValues?: _`, open and optional, with no schema-side `#config` assertion") in its `enhancement.yaml`, and they are removed from this one.
 - [Tidy mutates process state (working directory, `CUE_REGISTRY`)] -> Contained and restored inside `cuemod.Tidy`; init makes exactly one call.
-- [0016 D1:R2 names `opm instance apply` too, and `apply --dry-run` is server-side, so it needs a cluster] -> `apply`, `vet` and `diff` load a package through the same `render.FromInstanceFile` as `build`, so the e2e `build` and `vet` of the generated package cover what `apply` loads. Only the cluster write goes untested here, and that step is the same for every instance package.
+- [enhancement 0016 ("A new CLI command scaffolds an on-disk instance package from a published module reference") names `opm instance apply` too, and `apply --dry-run` is server-side, so it needs a cluster] -> `apply`, `vet` and `diff` load a package through the same `render.FromInstanceFile` as `build`, so the e2e `build` and `vet` of the generated package cover what `apply` loads. Only the cluster write goes untested here, and that step is the same for every instance package.
 
 ## Migration Plan
 

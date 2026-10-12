@@ -1,6 +1,6 @@
 // Package modref resolves a published OPM module: a major-free module path
 // plus an optional version selector become one exact published version
-// (0016:D5). Every command that takes a published module resolves through
+// (enhancement 0016). Every command that takes a published module resolves through
 // it, so the CLI has one grammar and one notion of "newest".
 package modref
 
@@ -68,7 +68,7 @@ var pathElement = regexp.MustCompile(`^[a-z0-9._-]+$`)
 // elements, a dot in the first, lowercase letters, digits, ".", "_" and "-"
 // only. A major suffix is refused with the --version spelling it meant, a URL
 // scheme with the reminder that the registry configuration routes paths.
-// Pure, no I/O (0016:D5:R1).
+// Pure, no I/O (enhancement 0016).
 func ParsePath(arg string) (string, error) {
 	if strings.Contains(arg, "://") {
 		return "", refuse(publish.Refusal{
@@ -131,7 +131,7 @@ func exactSelector(s string) bool {
 	return semver.IsValid(v) && semver.Canonical(v) == v
 }
 
-// ParseSelector parses a --version value (0016:D5:R2). Empty is the
+// ParseSelector parses a --version value (enhancement 0016). Empty is the
 // no-selector case. Pure, no I/O.
 func ParseSelector(s string) (Selector, error) {
 	switch {

@@ -22,7 +22,7 @@
 //  3. A thin-editor apply that restates the operator's owner preserves it.
 //  4. A local render stamps the source-provenance annotation and a following
 //     registry render (which omits it) has it pruned by SSA — the fail-closed
-//     provenance signal (0006:D38) that patch_test.go's fake client cannot
+//     provenance signal (enhancement 0006) that patch_test.go's fake client cannot
 //     model.
 //
 // Requires a running kind cluster at context "kind-opm-dev" with the

@@ -1,6 +1,6 @@
 ## Context
 
-The cli reads every registry failure through the library's typed classification (`liberrors.Classify`, read by `internal/cuemod/connectivity.go`). It holds no text match of its own for a registry answer (0021:D8:R12). So a library release that types one more form moves the cli's answer with no code edit; only the tests that pin the old answer fail. Library v1.0.0-beta.8 carries three changes: library#222 (token endpoint refusal), library#223 (public surface, `feat!`) and library#227 (unset required values).
+The cli reads every registry failure through the library's typed classification (`liberrors.Classify`, read by `internal/cuemod/connectivity.go`). It holds no text match of its own for a registry answer (enhancement 0021, "A beta line reaches GA only when its exit criteria hold"). So a library release that types one more form moves the cli's answer with no code edit; only the tests that pin the old answer fail. Library v1.0.0-beta.8 carries three changes: library#222 (token endpoint refusal), library#223 (public surface, `feat!`) and library#227 (unset required values).
 
 ## Goals / Non-Goals
 

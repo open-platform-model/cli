@@ -32,7 +32,7 @@ The CLI carries no count of its own: the only inventory reader is `opm platform 
 **Non-Goals:**
 
 - Any count, fallback or presence check in the CLI. The report prints `Collisions` and `CollidingEntries` as the inventory carries them; `Contracts()` already decodes an absent field as empty.
-- Side-by-side majors (enhancement 0026 D9) and any hint that suggests them. No special hint for a module importing two majors on the platform-less path (0026 OQ18): it gets the generic collision row, because B moves `DefaultSchemaModule` to the fold core.
+- Side-by-side majors (enhancement 0026, "A platform may admit several majors of one catalog; each resolution holds exactly one major per catalog") and any hint that suggests them. No special hint for a module importing two majors on the platform-less path (an open question of enhancement 0026): it gets the generic collision row, because B moves `DefaultSchemaModule` to the fold core.
 - Rewording the `fulfilled` and `discriminated` verdicts. They can read yes under a collision (core's stated limitation); the colliding section's note and the exit status carry the refusal.
 - `hack/platform`, `examples/`, `templates/`: the workspace `task deps:update` owns them and runs only after B's release.
 

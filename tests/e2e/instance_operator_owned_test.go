@@ -294,7 +294,7 @@ func swapFixtureReplicas(t *testing.T, path, old, replacement string) func() {
 	}
 }
 
-// TestE2E_ThinEditor_ValuesRoundTrip covers 0006:D18's thin-editor mode against a
+// TestE2E_ThinEditor_ValuesRoundTrip covers the thin-editor mode of enhancement 0006 against a
 // live operator: the CLI edits spec only, and the operator acts on the edit.
 func TestE2E_ThinEditor_ValuesRoundTrip(t *testing.T) {
 	kubeconfig := requireKindCluster(t)

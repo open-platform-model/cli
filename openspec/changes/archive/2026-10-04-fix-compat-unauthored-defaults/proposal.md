@@ -12,7 +12,7 @@ The same marker sensitivity remains for a written default: `t!: *"a" | string` t
 - Defaults written inside an open list's fixed elements (`[*"a" | string, ...string]`, `[{a: *1 | int}, ...]`) are folded into the implicit default by CUE; they are compared element-wise at `name[i]`, so removing or changing one still reports.
 - Unit tests reproduce the catalog case and the `[...string] & [_, ...]` probe, and pin the negative cases.
 
-SemVer class: PATCH (a gate bug fix; it removes a false refusal and loosens no rule 0010:D27 names). Ships in the next beta.
+SemVer class: PATCH (a gate bug fix; it removes a false refusal and loosens no rule enhancement 0010 ("Inside one API version a contract is additive-only, and both ends enforce it") names). Ships in the next beta.
 
 ## Capabilities
 

@@ -2,7 +2,7 @@
 
 The cli still decides some answers by reading the text of an error. The library types every fetch
 failure (`*FetchError`) and, since `v1.0.0-beta.7`, every author-defect resolution failure
-(`*ResolutionError`), so the cli can stop (0021:D8:R12, owner ruling "Strict: type everything",
+(`*ResolutionError`), so the cli can stop (enhancement 0021 ("A beta line reaches GA only when its exit criteria hold"), owner ruling "Strict: type everything",
 library ADR-013 row d1). The cli already builds on beta.7 (`go.mod:14`), so nothing waits on a
 release.
 
@@ -18,7 +18,7 @@ error:
 | 2 | `internal/config/platform.go:111` `platformBuildHint` | `cannot find package`, `cannot expand module graph` | **Replaced.** "The chain holds a `*FetchError` or a `*ResolutionError`" after `liberrors.Classify`. |
 | 3 | `internal/config/platform.go:113` `platformBuildHint` | `#registry` anywhere in the message | **Replaced.** A CUE error in the chain whose path starts with the `#registry` selector (`cueerrors.Errors(err)`, `Path()`). |
 | 4 | `internal/config/loader.go:255-265` `removedFieldHint` | `providers`, `cacheDir`, `skewPolicy` anywhere in the message | **Replaced.** A CUE error whose path starts with that field. The error is the cli's own config validation, so no library type is involved. |
-| 5 | `internal/cuemod/tidy.go:210` `classify` | `module is not tidy` prefix of `cmd/cue` output | **Stays.** Gap: CUE's `modload.ErrModuleNotTidy` is an internal type and `cmd/cue` prints it; the library has no tidy verb and `Classify` does not read this form. It is not a fetch or resolution failure, so 0021:D8:R12 does not ask for it. Pinned by `internal/cuemod/tidy_test.go`. |
+| 5 | `internal/cuemod/tidy.go:210` `classify` | `module is not tidy` prefix of `cmd/cue` output | **Stays.** Gap: CUE's `modload.ErrModuleNotTidy` is an internal type and `cmd/cue` prints it; the library has no tidy verb and `Classify` does not read this form. It is not a fetch or resolution failure, so enhancement 0021 ("A beta line reaches GA only when its exit criteria hold") does not ask for it. Pinned by `internal/cuemod/tidy_test.go`. |
 | 6 | `internal/publish/identity.go:35` `conformIdentity` | `incomplete value` on each CUE error of the cli's own validation | **Stays.** Gap: the public CUE API gives an incomplete error no type or code. Not a fetch or resolution failure. Pinned by `internal/publish/identity_test.go`. |
 | 7 | `pkg/errors/grouped_errors.go:55` | `errors in empty disjunction` summary lines | **Stays.** A display filter over CUE's summary line, which has no type. It picks no answer and no exit code. |
 | 8 | `internal/workflow/render/validation.go:62` | `strings.Cut` of a `*object.DuplicateIdentitiesError` message at its first newline | **Stays.** The type decides (`errors.As`); the cut only lays out the library's own message. |

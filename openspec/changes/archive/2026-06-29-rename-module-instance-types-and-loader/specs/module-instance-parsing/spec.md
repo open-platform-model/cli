@@ -1,6 +1,6 @@
 ## ADDED Requirements
 
-<!-- Renamed from `module-release-parsing` (enhancement 0002 D10). Spec dir is git mv'd at archive. -->
+<!-- Renamed from `module-release-parsing` (enhancement 0002, "Every `release`-named file and directory is renamed on disk (extends D8 to the filesystem)"). Spec dir is git mv'd at archive. -->
 
 ### Requirement: ParseModuleInstance constructs a fully prepared Instance
 The `pkg/module` package SHALL export a `ParseModuleInstance` function that takes a raw instance spec, a module, and one or more values, and returns a fully prepared `*Instance`.

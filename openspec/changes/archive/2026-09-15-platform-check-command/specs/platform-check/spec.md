@@ -1,6 +1,6 @@
 ## Purpose
 
-Define `opm platform check`: the offline pre-flight that answers whether a platform is usable before any module is deployed against it, reading the contract inventory core derives and library exposes. Covers what it reports, how it picks the platform, and why an unfulfilled contract and an over-subscribed one end in different exit codes (enhancement 0015 D1, D2, D18).
+Define `opm platform check`: the offline pre-flight that answers whether a platform is usable before any module is deployed against it, reading the contract inventory core derives and library exposes. Covers what it reports, how it picks the platform, and why an unfulfilled contract and an over-subscribed one end in different exit codes (enhancement 0015, "`#Catalog` publishes its contracts as members, beside its transformers", "One provider per contract stands; provider classes are rejected in this entry" and "An unfulfilled contract is reported, never refused; only over-subscription refuses platform-package generation").
 
 ## ADDED Requirements
 
@@ -25,7 +25,7 @@ The CLI SHALL provide `opm platform check`, registered under a `platform` comman
 
 ### Requirement: An unfulfilled contract is reported and does not fail the command
 
-A provider-fulfilled contract that no enabled transformer implements SHALL be listed in the report and SHALL NOT change the exit status. Enhancement 0015 D18 makes this a report and never a gate: a platform may legitimately define a contract ahead of the provider that implements it, and the refusal for an unmet demand belongs to the render that demands it.
+A provider-fulfilled contract that no enabled transformer implements SHALL be listed in the report and SHALL NOT change the exit status. Enhancement 0015 ("An unfulfilled contract is reported, never refused; only over-subscription refuses platform-package generation") makes this a report and never a gate: a platform may legitimately define a contract ahead of the provider that implements it, and the refusal for an unmet demand belongs to the render that demands it.
 
 #### Scenario: Unfulfilled contracts exit zero
 

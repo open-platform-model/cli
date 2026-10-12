@@ -92,7 +92,7 @@ gate phase (both modes), for each templates/<t>/; the first failing step fails t
 any failure -> print "gates failed for: <list>; nothing published", exit 1
 --dry-run   -> exit 0
 publish phase (release only), for each template in order, acting on its verdict:
-  skip    -> "already published; skipped" (the caller-side filter of 0011:D15)
+  skip    -> "already published; skipped" (the caller-side filter of enhancement 0011)
   publish -> opm module publish ./<dir>; a failure exits 1
 ```
 
@@ -390,7 +390,7 @@ Excluding comments would need a CUE-aware comparison instead of a byte compariso
 
 ### R7. enhancement.yaml
 
-None. The change fulfils the "vetted" intent of 0011:D25, but 0011 is archived with status `delivered`; the `template-modules` delta cites D25 as its source. No new decision is implemented.
+None. The change fulfils the "vetted" intent of enhancement 0011 ("Official templates are published modules in a reserved `templates` segment"), but 0011 is archived with status `delivered`; the `template-modules` delta cites enhancement 0011 as its source. No new decision is implemented.
 
 ### R8. Which version a template may declare
 

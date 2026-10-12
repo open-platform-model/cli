@@ -57,7 +57,7 @@ type Options struct {
 	// `opm operator install` sets it, for the operator's own instance:
 	// install replaces the operator the Platform reports rather than driving
 	// it, and applies the same MAJOR.MINOR rule to the operator it installs
-	// (0021:D9:R3, 0021:D9:R4). The CRD presence and field-floor gates still
+	// (enhancement 0021). The CRD presence and field-floor gates still
 	// run.
 	SkipOperatorCeiling bool
 
@@ -119,12 +119,12 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 
 	// The library's shared render digest, computed by the render workflow
 	// over the render's single export; it leaves the managed-by value out so
-	// the CLI and the operator digest one render equally (0012:D6).
+	// the CLI and the operator digest one render equally (enhancement 0012).
 	manifestDigest := result.RenderDigest
 	output.Debug("render digest computed", "digest", manifestDigest)
 
 	// Pre-apply gates 1-3 (cluster probes). Skipped entirely on dry-run — they
-	// exist to protect writes, and a dry-run writes nothing (0006:D5).
+	// exist to protect writes, and a dry-run writes nothing (enhancement 0006).
 	if !dryRun {
 		if err := RunClusterGates(ctx, req.K8sClient, req.Options.SkipOperatorCeiling); err != nil {
 			// Not Printed: the gates return bare errors without logging, so
@@ -158,7 +158,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		}
 	}
 
-	// Gate 4: ownership — the single branch point (0006:D18). An operator-owned
+	// Gate 4: ownership — the single branch point (enhancement 0006). An operator-owned
 	// instance takes the thin-editor path and returns; everything below this
 	// point is CLI-executor mode. A dry-run never takes this path: an
 	// operator-owned instance was already previewed above.
@@ -189,7 +189,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	}
 
 	// Gate 6: the ownership guard over every rendered object, on a first
-	// install and on every later apply (0012:D8:R1). Objects in a namespace
+	// install and on every later apply (enhancement 0012). Objects in a namespace
 	// this apply creates cannot exist yet. A dry run asks the same guard with
 	// the same input, so it previews the refusal of the real run and exits
 	// with its code; it only words the result differently.
@@ -217,7 +217,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 	}
 
 	// An object another instance adopted is not this instance's any more: it
-	// is not applied and not recorded, and nothing deletes it (0012:D8:R8).
+	// is not applied and not recorded, and nothing deletes it (enhancement 0012).
 	// The stale set above is computed from the full render, so the prune
 	// never sees it either.
 	applyResources := result.Resources
@@ -711,7 +711,7 @@ func CurrentInventoryEntries(resources []*unstructured.Unstructured) []k8sinvent
 
 // ComputeStaleInventorySet is the library's component-blind stale set: every
 // previous entry that no current entry is the same object as. A component
-// rename or an API version change leaves nothing stale (0012:D7).
+// rename or an API version change leaves nothing stale (enhancement 0012).
 func ComputeStaleInventorySet(prevEntries, currentEntries []k8sinventory.Entry) []k8sinventory.Entry {
 	return k8sinventory.StaleSet(prevEntries, currentEntries)
 }
@@ -917,7 +917,7 @@ func FormatApplySummary(r *kubernetes.ApplyResult) string {
 // resolution path BOTH actors use the reference-identity digest — there is no
 // Flux artifact content digest here. Do not change one side without the
 // other. The empty-reference guard below is CLI-only (omits the status field
-// instead of hashing "@"); 0006:D6 guarantees a non-empty canonical reference on
+// instead of hashing "@"); enhancement 0006 guarantees a non-empty canonical reference on
 // every real apply, so the divergence is unreachable in practice.
 func sourceDigest(modulePath, moduleVersion string) string {
 	if modulePath == "" && moduleVersion == "" {

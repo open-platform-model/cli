@@ -136,7 +136,7 @@ metadata: {
 	assert.Empty(t, p.Refusals, refusalHeadlines(p))
 }
 
-// TestVetChecks_VersionMajorSkew: 0011:D18's evaluable half at vet — the declared
+// TestVetChecks_VersionMajorSkew: the evaluable half (enhancement 0011) at vet — the declared
 // version's major must name the path's.
 func TestVetChecks_VersionMajorSkew(t *testing.T) {
 	files := edit(moduleFiles(), "identity/identity.cue", `package identity

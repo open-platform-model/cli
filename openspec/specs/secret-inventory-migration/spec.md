@@ -1,6 +1,6 @@
 ## Purpose
 
-What the CLI does with the inventory Secret that opm releases up to v1.0.0-alpha.1 wrote: nothing. The migration onto the `ModuleInstance` CR (0006:D8/D14) was removed before v1.0.0; v1.0.0-beta.10 is the last release that performs it. The capability keeps its name for history.
+What the CLI does with the inventory Secret that opm releases up to v1.0.0-alpha.1 wrote: nothing. The migration onto the `ModuleInstance` CR (enhancement 0006, "Migration of existing Secret inventories" and "No backwards-compatibility or deprecation burden; the CUE v0.17-alpha bump is accepted") was removed before v1.0.0; v1.0.0-beta.10 is the last release that performs it. The capability keeps its name for history.
 
 ## Requirements
 

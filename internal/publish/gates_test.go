@@ -178,8 +178,8 @@ metadata: {
 	assert.Contains(t, details, "v2")
 }
 
-// TestGate_Namespace pins the four passing cases from 0011's
-// schemas/target.cue — the constraint 0011:D13 exists to keep from growing until
+// TestGate_Namespace pins the four passing cases from enhancement 0011's
+// schemas/target.cue — the constraint that domain ownership exists to keep from growing until
 // it refuses a third party's own domain — and the measured must-fail shapes.
 func TestGate_Namespace(t *testing.T) {
 	passing := []struct {
@@ -191,7 +191,7 @@ func TestGate_Namespace(t *testing.T) {
 		{"testing domain is a separate domain, not policed", KindModule, "testing.opmodel.dev/modules/web_app@v1"},
 		{"community module with owner segment", KindModule, "community.opmodel.dev/m/acme/media_server@v2"},
 		{"opmodel.dev/core is the fixed path outside the kind pattern", KindCatalog, "opmodel.dev/core@v1"},
-		{"reserved templates segment is module-kind (D25)", KindModule, "opmodel.dev/templates/standard@v1"},
+		{"reserved templates segment is module-kind (enhancement 0011)", KindModule, "opmodel.dev/templates/standard@v1"},
 	}
 	for _, tt := range passing {
 		t.Run(tt.name, func(t *testing.T) {
@@ -212,8 +212,8 @@ func TestGate_Namespace(t *testing.T) {
 		{"nested path under a valid kind segment", KindModule, "opmodel.dev/modules/test/hello_web@v1", "does not fit the namespace"},
 		{"module published to a catalogs path", KindModule, "opmodel.dev/catalogs/opm@v1", "cannot publish under the catalogs/ segment"},
 		{"catalog published to a modules path", KindCatalog, "opmodel.dev/modules/demo@v1", "cannot publish under the modules/ segment"},
-		{"nested path under the templates segment (D25)", KindModule, "opmodel.dev/templates/x/y@v1", "does not fit the namespace"},
-		{"catalog published to a templates path (D25)", KindCatalog, "opmodel.dev/templates/opm@v1", "cannot publish under the templates/ segment"},
+		{"nested path under the templates segment (enhancement 0011)", KindModule, "opmodel.dev/templates/x/y@v1", "does not fit the namespace"},
+		{"catalog published to a templates path (enhancement 0011)", KindCatalog, "opmodel.dev/templates/opm@v1", "cannot publish under the templates/ segment"},
 	}
 	for _, tt := range refused {
 		t.Run(tt.name, func(t *testing.T) {
@@ -266,7 +266,7 @@ metadata: {
 }
 
 // TestGate_Override covers all four presence/flag states for both kinds
-// (0011:D6). The flag waives the gate for modules only, and changes nothing else.
+// (enhancement 0011). The flag waives the gate for modules only, and changes nothing else.
 func TestGate_Override(t *testing.T) {
 	// The override entry names a dep that is pinned but never imported, so
 	// the tree still loads without resolving it.

@@ -1,6 +1,6 @@
 ## ADDED Requirements
 
-<!-- Renamed from `module-release-receiver-methods` (enhancement 0002 D10). Spec dir is git mv'd at archive. -->
+<!-- Renamed from `module-release-receiver-methods` (enhancement 0002, "Every `release`-named file and directory is renamed on disk (extends D8 to the filesystem)"). Spec dir is git mv'd at archive. -->
 
 ### Requirement: ModuleInstance exposes ValidateValues method
 

@@ -11,7 +11,7 @@ import (
 // TestLabelValuesMatchRetiredCopy pins the OPM label keys and managed-by
 // values the cli writes to and reads from a cluster. The literals are the
 // values the cli's own pkg/core carried before the label vocabulary moved to
-// the library's opm/k8s/labels (0012:D1); while both existed, this test
+// the library's opm/k8s/labels (enhancement 0012); while both existed, this test
 // asserted each literal against both. A library release that changes one
 // fails here.
 func TestLabelValuesMatchRetiredCopy(t *testing.T) {

@@ -239,7 +239,7 @@ func writeD19File(t *testing.T, path, content string) {
 }
 
 // The CLI's one render call always opts into the kernel's local replacements
-// (the 0010:D19 spec: every render enables them): a developer's local-module.cue
+// (enhancement 0010: every render enables them): a developer's local-module.cue
 // is honored, never refused, and the kernel's rows are what the warnings
 // are worded from.
 func TestNewRenderInput_EnablesLocalReplacements(t *testing.T) {

@@ -51,7 +51,7 @@ Sibling: `cli-config-platform-module` supplies `config.PlatformDir` and the loca
 
 ### Result surface
 
-**Decision**: drop `MatchPlan` and `Components` (no reader; the verbose test constructs them). `Result.Warnings` = `RenderResult.Warnings` plus the D19 local-replacement warning as today. `Result.Pairs` (from `Diagnostics.Pairs`) is added only if the verbose output keeps printing pairs; otherwise nothing replaces `MatchPlan`. Decided at task 3.4 by reading the verbose printer.
+**Decision**: drop `MatchPlan` and `Components` (no reader; the verbose test constructs them). `Result.Warnings` = `RenderResult.Warnings` plus the enhancement 0010 local-replacement warning as today. `Result.Pairs` (from `Diagnostics.Pairs`) is added only if the verbose output keeps printing pairs; otherwise nothing replaces `MatchPlan`. Decided at task 3.4 by reading the verbose printer.
 
 ### Error mapping
 

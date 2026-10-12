@@ -12,7 +12,7 @@
 
 - [x] 3.1 `render.go` `renderInstance`: set `LocalReplacements: true` on the `RenderInput`; verify a unit test asserting the field is set (the `renderEnv` fake or a recorded input), and that `TestWarnLocalReplacement` still passes.
 - [x] 3.2 New `replacements.go`: `replacementWarnings(rows []kernel.Replacement, moduleRoot string) []string` per design (honoured rows worded with path, target and source; inert module-context entries worded with the platform-file guidance); verify `replacements_test.go` covers: no rows and no file (empty), one honoured platform row, one honoured instance row, one inert module entry, mixed, and stable ordering.
-- [x] 3.3 `render.go` and `module.go`: replace `warnLocalReplacement(bool)` at both entry points with emitting `replacementWarnings(out.Diagnostics.Replacements, moduleRoot)` after the render; keep the `SourceLocal` computation as is; delete `localReplacementWarning`; verify `grep -rn localReplacementWarning internal` is empty and the D19 tests are rewritten against the new builder.
+- [x] 3.3 `render.go` and `module.go`: replace `warnLocalReplacement(bool)` at both entry points with emitting `replacementWarnings(out.Diagnostics.Replacements, moduleRoot)` after the render; keep the `SourceLocal` computation as is; delete `localReplacementWarning`; verify `grep -rn localReplacementWarning internal` is empty and the enhancement 0010 tests are rewritten against the new builder.
 
 ## 4. End-to-end
 

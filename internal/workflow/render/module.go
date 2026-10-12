@@ -25,8 +25,8 @@ import (
 // directory, or a published module acquired from the registry when
 // opts.Published is set) through kernel SynthesizeInstance and renders it
 // through the same render path as
-// FromInstanceFile (0006:D9; retires the CLI's synthetic-wrapper module and
-// the last #ModuleRelease application — 0002 carryover). Values come from
+// FromInstanceFile (enhancement 0006; retires the CLI's synthetic-wrapper module and
+// the last #ModuleRelease application — carried over from enhancement 0002). Values come from
 // `-f` files when supplied, else from the module's `debugValues`.
 func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 	if opts.Config == nil {
@@ -98,7 +98,7 @@ func FromModule(ctx context.Context, opts ModuleOpts) (*Result, error) {
 	env.skipUnprovided = opts.SkipUnprovided
 
 	// A local module directory is the main module, so render provenance is
-	// local (0006:D7), and the directory is the 0010:D19 module context: a
+	// local (enhancement 0006), and the directory is the module context (enhancement 0010): a
 	// replaced dependency in its own cue.mod is worded from the kernel's rows
 	// after the render. A published module's bytes come from the registry: no
 	// local provenance, no module context.
@@ -170,7 +170,7 @@ type acquiredModule struct {
 // Either way the acquire stages the module's source tree, so synthesis builds
 // the instance package inside the module's own root and its cue.mod drives
 // transitive resolution; for a local directory that includes any
-// local-module.cue replaceWith (0006:D37).
+// local-module.cue replaceWith (enhancement 0006).
 func acquireModule(ctx context.Context, k *kernel.Kernel, opts ModuleOpts) (*acquiredModule, error) {
 	if p := opts.Published; p != nil {
 		mod, err := k.AcquireModuleFromRegistry(ctx, p.Import(), p.Version)

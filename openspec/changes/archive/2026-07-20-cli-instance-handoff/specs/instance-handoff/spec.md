@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The `opm instance handoff` command: verified, forward-only transfer of a release from CLI management to operator management. Enhancement 0006 D6 (gate side), D7 as amended by D40, D16, D38 (read side).
+The `opm instance handoff` command: verified, forward-only transfer of a release from CLI management to operator management. Enhancement 0006 ("Spec contents when applying from a local module") (gate side), plus the amended handoff verdict and the read-side annotation gate of the same enhancement.
 
 ## ADDED Requirements
 

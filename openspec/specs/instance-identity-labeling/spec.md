@@ -6,7 +6,7 @@ Defines how the OPM CLI extracts identity UUIDs from CUE evaluation output and i
 
 ### Requirement: Identity fields on build metadata
 
-The build pipeline SHALL extract `metadata.uuid` from both the `#Module` and `#ModuleInstance` CUE evaluation output and populate them on the Go-side metadata structs (`ModuleMetadata` and `InstanceMetadata`). <!-- Was: #ModuleRelease / ReleaseMetadata (0002 D8/D9) -->
+The build pipeline SHALL extract `metadata.uuid` from both the `#Module` and `#ModuleInstance` CUE evaluation output and populate them on the Go-side metadata structs (`ModuleMetadata` and `InstanceMetadata`). <!-- Was: #ModuleRelease / ReleaseMetadata (enhancement 0002: hard rename with no alias window; instance files are `instance.cue`) -->
 
 #### Scenario: Module with uuid field
 
@@ -21,7 +21,7 @@ The build pipeline SHALL extract `metadata.uuid` from both the `#Module` and `#M
 
 ### Requirement: Instance-id label injection
 
-The `mod apply` command SHALL inject a `module-instance.opmodel.dev/uuid` label on every applied resource, set to the instance identity UUID from `InstanceMetadata.UUID`. <!-- Was: module-release.opmodel.dev/uuid / ReleaseMetadata.UUID (0002 D4) -->
+The `mod apply` command SHALL inject a `module-instance.opmodel.dev/uuid` label on every applied resource, set to the instance identity UUID from `InstanceMetadata.UUID`. <!-- Was: module-release.opmodel.dev/uuid / ReleaseMetadata.UUID (enhancement 0002, "The label domain moves to `module-instance.opmodel.dev/*` (resolves OQ2)") -->
 
 #### Scenario: Apply with instance identity available
 

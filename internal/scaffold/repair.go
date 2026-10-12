@@ -16,12 +16,12 @@ import (
 )
 
 // repairLanguageVersion is the CUE language version a created cue.mod
-// declares — structure, not identity, so writing it invents nothing (0011:D20).
+// declares — structure, not identity, so writing it invents nothing (enhancement 0011).
 const repairLanguageVersion = "v0.17.0"
 
 // RepairAction is one file `init` will create or edit, stated so the second
 // confirmation gives the author something to judge: the file, and for an
-// edit, the current value beside its replacement (0011:D20).
+// edit, the current value beside its replacement (enhancement 0011).
 type RepairAction struct {
 	// File is the dir-relative path.
 	File string
@@ -50,7 +50,7 @@ type RepairPlan struct {
 
 // DetectRepair inspects an existing tree and builds the repair plan: a
 // missing or disagreeing cue.mod `module:` line, a missing identity package,
-// or a disagreeing identity ModulePath (0011:D20's repairable set — deeper
+// or a disagreeing identity ModulePath (the repairable set of enhancement 0011 — deeper
 // conformance stays with `opm module vet`, which the command points at
 // afterwards).
 //
@@ -233,7 +233,7 @@ func planIdentity(ctx context.Context, k *kernel.Kernel, p *RepairPlan, idPath s
 
 // statedVersion reads the version the tree itself states (metadata.version),
 // the only source identity creation may use — init does not choose versions
-// (0011:D20).
+// (enhancement 0011).
 func statedVersion(ctx context.Context, k *kernel.Kernel, dir string) (string, error) {
 	refuse := func(why string) error {
 		return &RefusalError{publish.Refusal{
@@ -295,7 +295,7 @@ func (p *RepairPlan) Apply() error {
 
 // Describe renders the plan for the second confirmation: every file to be
 // created or edited, and for an edit the current value beside its
-// replacement — the author must have something to judge (0011:D20).
+// replacement — the author must have something to judge (enhancement 0011).
 func (p *RepairPlan) Describe() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Repair %s to %s:\n\n", p.Dir, p.ModulePath)

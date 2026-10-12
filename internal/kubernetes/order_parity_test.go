@@ -17,7 +17,7 @@ import (
 // weights fails here on the bump PR, so an order change is an edit a cli
 // reviewer reads, never a side effect of a pin bump. The values are the
 // library's since v1.0.0-beta.7, which follow Flux's staged apply order
-// (0012:D5:R1). The table the cli carried in its own pkg/resourceorder
+// (enhancement 0012). The table the cli carried in its own pkg/resourceorder
 // before the move to the library is history and is no longer compared here.
 // A row the library adds is the library's own TestWeightTableGuard, not this
 // test.

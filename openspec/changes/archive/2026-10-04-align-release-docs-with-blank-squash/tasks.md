@@ -11,7 +11,7 @@ This change edits text only. The local test gate is `task test:unit` plus `go te
 ## Follow-ups (SUPERVISOR, outside this change)
 
 - F1 Workspace RELEASING.md "Merge settings" (lines 460-467): add that a `release-as` key takes effect only with a releasable commit since the last release, so the key PR carries a releasable type or lands after a releasable commit (design.md D6), and say the key is removed "before any later release PR merges" instead of "by the next PR" (design.md D4; `.github/workflows/pr-title.yml:12` in each repo has the same phrase). The workspace commit skill (`.claude/skills/commit/SKILL.md:60`) also still names "a non-obvious breaking change" as a reason for a commit body.
-- F2 Enhancements: reconcile `enhancements/0021/policy/01-core-schema.md:8,22,70,74,165,167,169,173-183` with `BLANK` (footer rules out, `release-as` key in, the releasable-commit condition, the prerelease-type flip and the post-GA crossing procedure).
+- F2 Enhancements: reconcile the core-schema policy page of enhancement 0021 (lines 8, 22, 70, 74, 165, 167, 169, 173-183) with `BLANK` (footer rules out, `release-as` key in, the releasable-commit condition, the prerelease-type flip and the post-GA crossing procedure).
 
 ## 1. Contributor documents
 

@@ -1,10 +1,10 @@
 ## ADDED Requirements
 
-<!-- Renamed from `release-inventory` (enhancement 0002 D4/D8/D10). Spec dir is git mv'd at archive. Only the requirements whose normative text changes under the rename (label-domain keys, ReleaseInventoryRecord/ReleaseMetadata type names + fields, the kind: "ModuleRelease" literal, the --release-name flag reference) are restated; unchanged requirements (entry identity, Secret-name convention, digest determinism, etc.) ride the archive spec-sync. -->
+<!-- Renamed from `release-inventory` (enhancement 0002, "The label domain moves to `module-instance.opmodel.dev/*` (resolves OQ2)", "Hard rename, no alias window; `semver: major` (resolves OQ3, OQ4)" and "Every `release`-named file and directory is renamed on disk (extends D8 to the filesystem)"). Spec dir is git mv'd at archive. Only the requirements whose normative text changes under the rename (label-domain keys, ReleaseInventoryRecord/ReleaseMetadata type names + fields, the kind: "ModuleRelease" literal, the --release-name flag reference) are restated; unchanged requirements (entry identity, Secret-name convention, digest determinism, etc.) ride the archive spec-sync. -->
 
 ### Requirement: Inventory Secret labels
 
-The inventory Secret SHALL carry these OPM identity labels, derived from the instance metadata: <!-- Was: module-release.opmodel.dev/* (0002 D4) -->
+The inventory Secret SHALL carry these OPM identity labels, derived from the instance metadata: <!-- Was: module-release.opmodel.dev/* (enhancement 0002, "The label domain moves to `module-instance.opmodel.dev/*` (resolves OQ2)") -->
 
 | Label | Value | Source |
 | --- | --- | --- |
@@ -21,7 +21,7 @@ The inventory Secret SHALL carry these OPM identity labels, derived from the ins
 
 ### Requirement: Inventory Secret serialization roundtrip
 
-`MarshalToSecret` SHALL serialize an `InstanceInventoryRecord` to a typed `corev1.Secret` using a single JSON-encoded document stored under `data.inventory`. `UnmarshalFromSecret` SHALL deserialize a `corev1.Secret` back into an `InstanceInventoryRecord`, handling both `stringData` and `data` (base64-encoded) forms. If the decoded record omits `inventory.entries`, deserialization SHALL normalize that field to an empty list. The `resourceVersion` from the Secret SHALL be preserved as an unexported field for optimistic concurrency. <!-- Was: ReleaseInventoryRecord (0002 D8) -->
+`MarshalToSecret` SHALL serialize an `InstanceInventoryRecord` to a typed `corev1.Secret` using a single JSON-encoded document stored under `data.inventory`. `UnmarshalFromSecret` SHALL deserialize a `corev1.Secret` back into an `InstanceInventoryRecord`, handling both `stringData` and `data` (base64-encoded) forms. If the decoded record omits `inventory.entries`, deserialization SHALL normalize that field to an empty list. The `resourceVersion` from the Secret SHALL be preserved as an unexported field for optimistic concurrency. <!-- Was: ReleaseInventoryRecord (enhancement 0002, "Hard rename, no alias window; `semver: major` (resolves OQ3, OQ4)") -->
 
 #### Scenario: Roundtrip preserves record
 
@@ -31,7 +31,7 @@ The inventory Secret SHALL carry these OPM identity labels, derived from the ins
 
 ### Requirement: Inventory metadata enables future CRD migration
 
-The `InstanceMetadata` SHALL include `kind: "ModuleInstance"` and `apiVersion: "core.opmodel.dev/v1alpha1"` fields. The `ModuleMetadata` SHALL include `kind: "Module"` and `apiVersion: "core.opmodel.dev/v1alpha1"` fields. Both enable future migration from Secrets to CRDs without changing the persisted instance inventory record shape. <!-- Was: ReleaseMetadata, kind: "ModuleRelease" (0002 D8) -->
+The `InstanceMetadata` SHALL include `kind: "ModuleInstance"` and `apiVersion: "core.opmodel.dev/v1alpha1"` fields. The `ModuleMetadata` SHALL include `kind: "Module"` and `apiVersion: "core.opmodel.dev/v1alpha1"` fields. Both enable future migration from Secrets to CRDs without changing the persisted instance inventory record shape. <!-- Was: ReleaseMetadata, kind: "ModuleRelease" (enhancement 0002, "Hard rename, no alias window; `semver: major` (resolves OQ3, OQ4)") -->
 
 #### Scenario: InstanceMetadata kind and apiVersion
 
@@ -41,7 +41,7 @@ The `InstanceMetadata` SHALL include `kind: "ModuleInstance"` and `apiVersion: "
 
 ### Requirement: Instance metadata data key structure
 
-The persisted instance metadata SHALL use these data keys, mapped from the `InstanceMetadata` Go struct: <!-- Was: Release metadata / ReleaseMetadata (0002 D8) -->
+The persisted instance metadata SHALL use these data keys, mapped from the `InstanceMetadata` Go struct: <!-- Was: Release metadata / ReleaseMetadata (enhancement 0002, "Hard rename, no alias window; `semver: major` (resolves OQ3, OQ4)") -->
 
 | Data key | Go field | Value |
 | --- | --- | --- |
@@ -57,7 +57,7 @@ The persisted instance metadata SHALL use these data keys, mapped from the `Inst
 
 ### Requirement: Inventory Secret CRUD operations
 
-`GetInventory` SHALL first attempt a direct GET by constructed Secret name (`opm.<instanceName>.<instanceID>`). If the Secret is not found, it SHALL fall back to listing Secrets with label `module-instance.opmodel.dev/uuid=<instanceID>`. If no inventory is found (first-time apply), it SHALL return `nil, nil`. `WriteInventory` SHALL use full PUT semantics (create or replace) with optimistic concurrency via `resourceVersion`, preserving instance identity metadata and creator provenance from previously read records while updating the ownership inventory and deployed module version. `DeleteInventory` SHALL delete the inventory Secret and treat 404 as success (idempotent). <!-- Was: releaseName/releaseID, module-release.opmodel.dev/uuid (0002 D4/D8) -->
+`GetInventory` SHALL first attempt a direct GET by constructed Secret name (`opm.<instanceName>.<instanceID>`). If the Secret is not found, it SHALL fall back to listing Secrets with label `module-instance.opmodel.dev/uuid=<instanceID>`. If no inventory is found (first-time apply), it SHALL return `nil, nil`. `WriteInventory` SHALL use full PUT semantics (create or replace) with optimistic concurrency via `resourceVersion`, preserving instance identity metadata and creator provenance from previously read records while updating the ownership inventory and deployed module version. `DeleteInventory` SHALL delete the inventory Secret and treat 404 as success (idempotent). <!-- Was: releaseName/releaseID, module-release.opmodel.dev/uuid (enhancement 0002, "The label domain moves to `module-instance.opmodel.dev/*` (resolves OQ2)" and "Hard rename, no alias window; `semver: major` (resolves OQ3, OQ4)") -->
 
 #### Scenario: GetInventory falls back to UUID label
 

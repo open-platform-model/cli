@@ -45,7 +45,7 @@ type initInputs struct {
 	selector                                modref.Selector
 }
 
-// NewInstanceInitCmd creates the instance init command (0016:D5).
+// NewInstanceInitCmd creates the instance init command (enhancement 0016).
 func NewInstanceInitCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var flags initFlags
 
@@ -227,7 +227,7 @@ func checkName(what, value string) error {
 }
 
 // checkTarget refuses a directory that exists, or one that would sit inside
-// another CUE module (0016:D5:R5, 0016:D10:R1).
+// another CUE module (enhancement 0016).
 func checkTarget(dir string) error {
 	if _, err := os.Lstat(dir); err == nil {
 		return cmdutil.Refuse(publish.Refusal{

@@ -19,7 +19,7 @@
                                                               identity Version → *"0.1.0"
                                                               self-imports → new path
                                                               package clauses → new leaf
-                                                          6 metadata: derives (D12) — untouched
+                                                          6 metadata: derives (enhancement 0011) — untouched
 ```
 
 ## Research & Decisions
@@ -32,7 +32,7 @@
 ### Version selection: stable-float via `compat.HighestStable`
 
 **Decision**: shortcut and default-template resolution pick the newest *release* within the major — `compat.HighestStable` over `ModuleVersions` — falling back to the highest prerelease on a prerelease-only history. An exact semver in the ref pins the tag.
-**Rationale**: a scaffold wants the newest released starting point; stale-pin maintenance is the disease this change removes. This is the float selector's one correct home — the predecessor-selection misuse is being struck from D9 in the same enhancements batch, and this caller is what settles the function's disposition (re-document, keep).
+**Rationale**: a scaffold wants the newest released starting point; stale-pin maintenance is the disease this change removes. This is the float selector's one correct home — the predecessor-selection misuse is being struck from enhancement 0011 in the same enhancements batch, and this caller is what settles the function's disposition (re-document, keep).
 
 ### Shortcut expansion: syntactic, airtight, never over paths
 
@@ -41,7 +41,7 @@
 
 ### Re-identification: the writers, applied wholesale
 
-**Decision**: the rewrite set is exactly D16's three statements plus the package clause: `SetCueModModule` (from `cli-authoring-commands`), the identity rewrite (`ModulePath` set to the user's path; `Version` reset to the defaulted `#VersionType | *"0.1.0"` form, keeping the release-automation marker line shape), a new self-import rewriter (every import of the template's own path → the user's path — in a fresh clone this is typically just the `import id ".../identity"` line), and a new package-clause renamer (template leaf → user leaf, all files). Post-rewrite assertion: the tree parses and `metadata` still derives — then init prints the file tree and a pointer to `opm module vet`.
+**Decision**: the rewrite set is exactly enhancement 0011's three statements plus the package clause: `SetCueModModule` (from `cli-authoring-commands`), the identity rewrite (`ModulePath` set to the user's path; `Version` reset to the defaulted `#VersionType | *"0.1.0"` form, keeping the release-automation marker line shape), a new self-import rewriter (every import of the template's own path → the user's path — in a fresh clone this is typically just the `import id ".../identity"` line), and a new package-clause renamer (template leaf → user leaf, all files). Post-rewrite assertion: the tree parses and `metadata` still derives — then init prints the file tree and a pointer to `opm module vet`.
 **Rationale**: repair mode *refuses* to rewrite self-imports because the user owns the tree; init-from-template is the one context where the wholesale rewrite is correct because they don't yet. Same writers, opposite consent situation — which is why both live in one command.
 
 ### Repair mode relocates here unchanged
@@ -54,7 +54,7 @@ The prior `cli-authoring-commands` draft's repair design (detector via the pipel
 
 ### CI publish job: the caller-side filter
 
-**Decision**: the release workflow builds `opm`, then per template: read the declared version (the same grep-free route — `cue eval` the identity package, or the CLI's own plan output), check tag existence via the registry, and invoke `opm module publish ./templates/<name>` only for unpublished versions. Publish itself never skips (D15: already-published is always a refusal); idempotency is the caller's filter, exactly as D15 assigns it. A gate refusal fails the release — that is the feature.
+**Decision**: the release workflow builds `opm`, then per template: read the declared version (the same grep-free route — `cue eval` the identity package, or the CLI's own plan output), check tag existence via the registry, and invoke `opm module publish ./templates/<name>` only for unpublished versions. Publish itself never skips (enhancement 0011: already-published is always a refusal); idempotency is the caller's filter, exactly as enhancement 0011 assigns it. A gate refusal fails the release — that is the feature.
 
 ### Offline stance
 
@@ -67,4 +67,4 @@ No embedded fallback. Init without a reachable registry refuses with the expansi
 - Hermetic e2e: publish `standard` into the in-process registry, `mod init` from it (shortcut expansion pointed at the test registry via the mapping), vet + dry-run the result; assert the template's own identity never leaks into the scaffold.
 - Deletions: `internal/templates/` (embed.go, all `.tmpl`), init's old template rendering, `embed_test.go`; the root `deps:update:templates` task retargets to `cli/templates/*/cue.mod/module.cue` (real files now — simpler than `.tmpl` surgery).
 - `advanced` variant: carried as the third template module — the showcase tree (multiple components, trait attachments, values plumbing), which doubles as the strongest re-identification test subject (most files, most package clauses, most self-import exposure).
-- **Measured during implementation (2026-08-17)**: the plain D12 derivation `version: id.Version` fails the library's registry-fetch shape gate — `cue.Value.IsConcrete` is false on a defaulted disjunction, and `shape.requireConcrete` (library `v1.0.0-alpha.13`) does not resolve defaults — so an acquired module carrying it refuses with "metadata.version is not concrete". The templates therefore derive by interpolation (`version: "\(id.Version)"`), which forces default selection and is concrete; publish's derivation gate compares evaluated strings, so the form passes it identically. Recorded for 0011: either the canonical derivation advice or the library gate should move, since they currently disagree for defaulted identity versions. The staged-source overlay also proved unreadable from the CLI (`load.Source` is opaque), so the copy walks the fetched `SourceLoc` via `modconfig` — same CUE cache, no second fetch — while the kernel acquire stays the trust gate.
+- **Measured during implementation (2026-08-17)**: the plain enhancement 0011 derivation `version: id.Version` fails the library's registry-fetch shape gate — `cue.Value.IsConcrete` is false on a defaulted disjunction, and `shape.requireConcrete` (library `v1.0.0-alpha.13`) does not resolve defaults — so an acquired module carrying it refuses with "metadata.version is not concrete". The templates therefore derive by interpolation (`version: "\(id.Version)"`), which forces default selection and is concrete; publish's derivation gate compares evaluated strings, so the form passes it identically. Recorded for 0011: either the canonical derivation advice or the library gate should move, since they currently disagree for defaulted identity versions. The staged-source overlay also proved unreadable from the CLI (`load.Source` is opaque), so the copy walks the fetched `SourceLoc` via `modconfig` — same CUE cache, no second fetch — while the kernel acquire stays the trust gate.

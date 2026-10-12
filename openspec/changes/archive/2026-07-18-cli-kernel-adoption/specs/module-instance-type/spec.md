@@ -1,6 +1,6 @@
 # Delta: module-instance-type (cli-kernel-adoption)
 
-The CLI-side prepared-instance type is retired; the library kernel's `module.Instance` is the prepared-instance type (0006 D9). `pkg/module` keeps only the decoded metadata shapes.
+The CLI-side prepared-instance type is retired; the library kernel's `module.Instance` is the prepared-instance type (enhancement 0006, "The CLI replaces its own render/match pipeline entirely with the `library` kernel"). `pkg/module` keeps only the decoded metadata shapes.
 
 ## REMOVED Requirements
 

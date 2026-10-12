@@ -152,7 +152,7 @@ type: "kubernetes"
 }
 
 func TestConfigVet_StaleProvidersBlock(t *testing.T) {
-	// A config predating 0006:D39, with a providers block, fails with the migration hint.
+	// A config from before enhancement 0006 removed providers, with a providers block, fails with the migration hint.
 	tmpHome := setTempHome(t)
 	os.Unsetenv("OPM_CONFIG")
 	os.Unsetenv("OPM_REGISTRY")

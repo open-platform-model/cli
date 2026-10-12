@@ -1,12 +1,12 @@
 # Capability: platform-resolution (cli-kernel-adoption)
 
-Platform-source resolution by precedence with visible provenance (enhancement 0006 D11/D12/D17/D21/D22/D39). All sources converge on `synth.PlatformInput` → `SynthesizePlatform` → `Materialize` — the operator's own ingestion path.
+Platform-source resolution by precedence with visible provenance (enhancement 0006, "The CLI's platform source is a precedence: flag, then cluster Platform CR, then local default; handoff forces the CR", "`Platform` carries no owner marker; the operator always owns the singleton; the CLI writes an un-owned `cluster` Platform in solo clusters", "Both a local Platform and an in-cluster Platform CR are first-class; OPM must never require cluster-admin for normal use", "Platform-source flag surface (single `--platform <file>` override + automatic precedence, with source-provenance reporting); resolves OQ14", "Solo-cluster `Platform` write-if-absent uses a plain `Create` that tolerates `AlreadyExists`, not SSA apply; refines D12's mechanism, resolves OQ13" and "`~/.opm` becomes two import-free data files: `config.cue` drops `providers`/`cacheDir`, D21's local default platform is the sibling `~/.opm/platform.cue`; folded into C2"). All sources converge on `synth.PlatformInput` → `SynthesizePlatform` → `Materialize` — the operator's own ingestion path.
 
 ## ADDED Requirements
 
 ### Requirement: Platform source precedence
 
-The CLI SHALL resolve the platform for every render by precedence: `--platform <file>` (highest, explicit local override) > cluster `Platform` CR spec (cluster-facing commands only) > local default `~/.opm/platform.cue`. Every command that renders SHALL report which platform source it resolved. The `--provider` flag SHALL NOT exist (superseded by `--platform`, 0006 D21).
+The CLI SHALL resolve the platform for every render by precedence: `--platform <file>` (highest, explicit local override) > cluster `Platform` CR spec (cluster-facing commands only) > local default `~/.opm/platform.cue`. Every command that renders SHALL report which platform source it resolved. The `--provider` flag SHALL NOT exist (superseded by `--platform`, enhancement 0006 ("Platform-source flag surface (single `--platform <file>` override + automatic precedence, with source-provenance reporting); resolves OQ14")).
 
 #### Scenario: Flag wins
 
@@ -58,7 +58,7 @@ The resolved platform spec SHALL be materialized via kernel `SynthesizePlatform`
 
 ### Requirement: Solo-cluster Platform write-if-absent
 
-On a cluster-facing apply where no `Platform` CR exists and resolution fell back to the local default, the CLI SHALL create the singleton `cluster` Platform from the resolved local spec using a plain create (field manager `opm-cli`), treating `AlreadyExists` as success-noop (0006 D22). The CLI MUST NOT use server-side apply or update for this write, and MUST NOT overwrite an existing Platform. Creation failure (e.g. RBAC) SHALL degrade to a warning — the apply itself proceeds against the local platform (0006 D17).
+On a cluster-facing apply where no `Platform` CR exists and resolution fell back to the local default, the CLI SHALL create the singleton `cluster` Platform from the resolved local spec using a plain create (field manager `opm-cli`), treating `AlreadyExists` as success-noop (enhancement 0006, "Solo-cluster `Platform` write-if-absent uses a plain `Create` that tolerates `AlreadyExists`, not SSA apply; refines D12's mechanism, resolves OQ13"). The CLI MUST NOT use server-side apply or update for this write, and MUST NOT overwrite an existing Platform. Creation failure (e.g. RBAC) SHALL degrade to a warning — the apply itself proceeds against the local platform (enhancement 0006, "Both a local Platform and an in-cluster Platform CR are first-class; OPM must never require cluster-admin for normal use").
 
 #### Scenario: Absent Platform is seeded
 

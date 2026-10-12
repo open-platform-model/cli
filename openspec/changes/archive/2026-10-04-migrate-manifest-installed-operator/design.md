@@ -48,7 +48,7 @@ In the same experiment, an upgrade that rolled the operator pod produced a 28 s 
 
 **Non-Goals:**
 
-- Writing the 0012:D8 adopt annotation. 0012:D8:R6, as amended in enhancements PR #94, says no frontend sets it on the user's behalf and that installing the operator admits the proven objects as if adopted. This change does exactly that, through an admission set, and writes nothing to mark the objects.
+- Writing the adopt annotation of enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override"). That enhancement, as amended in enhancements PR #94, says no frontend sets it on the user's behalf and that installing the operator admits the proven objects as if adopted. This change does exactly that, through an admission set, and writes nothing to mark the objects.
 - Closing the guard's general gap: it admits another instance's OPM-managed object. The migration refuses such an object when it is on the proof list; for other objects the guard is unchanged here.
 - Migrating `poc-controller-*` installs (v0.2.0 to v0.4.4). Releases v0.4.2 to v0.4.4 published a manifest with those names, but they install another operator in another namespace, so they are not on the list.
 - Ownership transfer of the operator's instance, version and downgrade checks, and locating the operator. Other changes own these.
@@ -107,7 +107,7 @@ var LegacyObjects = []LegacyObject{ /* 32 entries */ }
 
 `hack/operator-legacy/` is a `go run` program that is not linked into `opm`. It downloads `install.yaml` from every operator release, a tag matching `v<semver>`, that has that asset. It skips every other tag, the operator module's `opm_operator-vX.Y.Z` releases included: their `install.yaml` is the module's render, whose objects carry the operator instance's identity and so are never foreign. The tag filter is a function with its own offline test and writes `internal/operator/testdata/legacy-manifests.json`, with the kind, namespace, name, labels and selector per release and no specs. It needs the network and runs by hand, only when an earlier release is found to be missing. A unit test checks `LegacyObjects` against that file offline.
 
-The list closes once operator releases stop attaching `install.yaml` (opm-operator's `stop-operator-install-manifest`, gated on this cli). Until then an operator release after v1.0.0-beta.8 still attaches a manifest built from `config/default`; task 2.1 runs the program at implementation time, so the list covers every operator release published by then, and a release cut after that is added by re-running it. The module's own manifests never need an entry: they carry the instance identity and the module's selector, so their objects are this instance's own, not foreign (0021:D4 as amended).
+The list closes once operator releases stop attaching `install.yaml` (opm-operator's `stop-operator-install-manifest`, gated on this cli). Until then an operator release after v1.0.0-beta.8 still attaches a manifest built from `config/default`; task 2.1 runs the program at implementation time, so the list covers every operator release published by then, and a release cut after that is added by re-running it. The module's own manifests never need an entry: they carry the instance identity and the module's selector, so their objects are this instance's own, not foreign (enhancement 0021 ("The classes the policy covers") as amended).
 
 **Options considered:**
 
@@ -147,12 +147,12 @@ type AdmitSet map[K8sIdentity]struct{}
 
 `K8sIdentity` is new (`pkg/inventory/entry.go` has only `K8sIdentityEqual`, which compares two entries); task 4.1 adds it beside that function. An entry in `admit` passes the managed-by test, and only that test: a terminating admitted object is still refused. Every other caller passes `nil`, which keeps today's behaviour. `apply.Request` gains the set, so the instance apply admits the same objects as the check-phase guard. `MigrationPlan.Admit()` is `Adopt`, the Deployment the migration recreates (it still exists when the check-phase guard reads it), and the rendered objects whose identity is this instance's (`Ours`); the latter already pass today, and listing them keeps a resumed run's set complete.
 
-This is the admission 0012:D8:R6 describes, and the one exception 0012:D8:R3 names to the ownership refusals of 0012:D1:R7 and 0012:D4:R2: the proven objects pass as if adopted, and no adopt annotation is written on the user's behalf. The set needs no write, nothing of it outlives the run, and a resumed run recomputes it.
+This is the admission that the apply-guard decision of enhancement 0012 describes, and the one exception it names to the ownership refusals of the Kubernetes-tier decisions of enhancement 0012: the proven objects pass as if adopted, and no adopt annotation is written on the user's behalf. The set needs no write, nothing of it outlives the run, and a resumed run recomputes it.
 
 **Options considered:**
 
 1. **Relabel the proven objects `managed-by=opm-cli` before the apply**, as the install experiment did by hand. That is one more write per object. The label is also the guard's signal for every instance, so a relabel outlives the install.
-2. **Write the 0012:D8 adopt annotation and teach the guard to read it.** Ruled out by 0012:D8:R6: no frontend sets the annotation on the user's behalf.
+2. **Write the adopt annotation of enhancement 0012 and teach the guard to read it.** Ruled out by the apply-guard decision of enhancement 0012: no frontend sets the annotation on the user's behalf.
 3. **An explicit admission set computed from the proof.** It needs no write, nothing outlives the run, and a resumed run recomputes it. Chosen.
 
 ### Field ownership of client-side installs
@@ -173,11 +173,11 @@ The scope is deliberately narrow. Only the `kubectl-client-side-apply` manager m
 
 ### Deployment recreate
 
-The Deployment is deleted only when it is `Proven` and its live `spec.selector.matchLabels` equals the listed selector (0012:D8:R7). The delete uses foreground propagation, then `WaitAbsent` under the install's `--timeout` budget. A Deployment that is `Ours`, or that carries any other selector, is never deleted. An `Unproven` Deployment on the list refuses the install. Its names come from `locate-operator-and-guard-its-instance`'s `internal/operator/names.go` (`OperatorNamespace`, `ControllerDeploymentName`), not from new literals.
+The Deployment is deleted only when it is `Proven` and its live `spec.selector.matchLabels` equals the listed selector (enhancement 0012, "The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override"). The delete uses foreground propagation, then `WaitAbsent` under the install's `--timeout` budget. A Deployment that is `Ours`, or that carries any other selector, is never deleted. An `Unproven` Deployment on the list refuses the install. Its names come from `locate-operator-and-guard-its-instance`'s `internal/operator/names.go` (`OperatorNamespace`, `ControllerDeploymentName`), not from new literals.
 
 ### Binding delete
 
-A superseded binding is deleted only when it is `Proven` (0012:D8:R7) and the render holds a binding of the same kind and namespace whose `roleRef` (API group, kind, name) equals the live binding's `roleRef`. The proof list does not hardcode the replacement names: the catalog's role abstraction decides them, and the render is the only source that cannot drift from it. A proven superseded binding with no replacement in the render refuses the install, naming the binding and its `roleRef`; deleting it would leave the operator without the rights it grants. The report names the replacement it found.
+A superseded binding is deleted only when it is `Proven` (enhancement 0012, "The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override") and the render holds a binding of the same kind and namespace whose `roleRef` (API group, kind, name) equals the live binding's `roleRef`. The proof list does not hardcode the replacement names: the catalog's role abstraction decides them, and the render is the only source that cannot drift from it. A proven superseded binding with no replacement in the render refuses the install, naming the binding and its `roleRef`; deleting it would leave the operator without the rights it grants. The report names the replacement it found.
 
 The controller is down from the delete until the new pod holds the leader lease. The owner accepted this one-time outage when choosing the catalog-shaped module. The managed workloads keep running throughout. Only reconciliation pauses.
 
@@ -278,6 +278,6 @@ See Decisions, "Admission through the current guard".
 1. The user annotates each object, and install prints the commands. That is nineteen hand-made edits, which most users would get wrong or skip.
 2. A separate migration subcommand. That adds a second command for a step every first module install needs, and install would still have to refuse and point at it.
 3. Uninstall, then install fresh. The uninstall refuses while any instance carries the cleanup finalizer, so a cluster in use cannot take that path without orphaning its instances.
-4. A command-wide force flag. It takes objects the user did not mean to take; 0012:D8 rejected it.
+4. A command-wide force flag. It takes objects the user did not mean to take; enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override") rejected it.
 5. Install's own migration, limited to proven objects. Chosen.
 **Rationale**: A migration that recreated CRDs would delete every instance on the cluster. Leaving the CRDs, the Namespace and the managed workloads untouched is the requirement that matters most. The controller's own Deployment is replaceable. Limiting adoption to objects proven to come from an earlier release keeps the guard whole, so nothing a user created is adopted by accident.

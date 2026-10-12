@@ -6,7 +6,7 @@ Defines the behavior of the `opm module apply` (alias `opm mod apply`) subcomman
 
 ### Requirement: `opm module apply` deploys a module package via the synthetic instance flow
 
-The CLI SHALL provide a `module apply` subcommand (with alias `mod apply`) under the `module` command group that accepts an optional positional argument (the module-package directory, defaulting to `"."`) and deploys the synthesized `#ModuleInstance` to a Kubernetes cluster. The subcommand SHALL accept only directory inputs. <!-- Was: synthetic release flow / #ModuleRelease (0002 D8) -->
+The CLI SHALL provide a `module apply` subcommand (with alias `mod apply`) under the `module` command group that accepts an optional positional argument (the module-package directory, defaulting to `"."`) and deploys the synthesized `#ModuleInstance` to a Kubernetes cluster. The subcommand SHALL accept only directory inputs. <!-- Was: synthetic release flow / #ModuleRelease (enhancement 0002, "Hard rename, no alias window; `semver: major` (resolves OQ3, OQ4)") -->
 
 The subcommand SHALL produce the same cluster-side effects as `opm instance apply` after the render stage: server-side apply of all rendered resources, inventory record read/write keyed on the instance UUID, stale-resource pruning, ownership checks, and dry-run support. <!-- Was: opm release apply, release UUID -->
 
@@ -106,7 +106,7 @@ The `module apply` subcommand SHALL accept the following flags with the listed b
 
 ### Requirement: Instance identity is derived in CUE, not the CLI
 
-The synthetic instance's `metadata.uuid` SHALL be computed by the catalog's CUE schema (`SHA1(OPMNamespace, "<moduleUUID>:<name>:<namespace>")`) and SHALL NOT be generated, randomized, or persisted by the CLI itself. The CLI SHALL read the computed UUID from the rendered `ModuleInstance` and use it as the `instanceID` passed to the apply workflow. <!-- Was: synthetic release, ModuleRelease, releaseID (0002 D8/D9) -->
+The synthetic instance's `metadata.uuid` SHALL be computed by the catalog's CUE schema (`SHA1(OPMNamespace, "<moduleUUID>:<name>:<namespace>")`) and SHALL NOT be generated, randomized, or persisted by the CLI itself. The CLI SHALL read the computed UUID from the rendered `ModuleInstance` and use it as the `instanceID` passed to the apply workflow. <!-- Was: synthetic release, ModuleRelease, releaseID (enhancement 0002: hard rename with no alias window; instance files are `instance.cue`) -->
 
 #### Scenario: Stable UUID across runs
 
@@ -130,7 +130,7 @@ When the subcommand writes an inventory record, the embedded `ChangeDescriptor` 
 
 ### Requirement: Apply log surfaces the synthetic instance name
 
-The subcommand SHALL log the resolved synthetic instance name (including the default `<module>-debug` suffix when applicable) prominently in the apply summary so the operator can recognise a synthetic-instance deployment in command-line scrollback or CI logs. <!-- Was: synthetic release name (0002 D9) -->
+The subcommand SHALL log the resolved synthetic instance name (including the default `<module>-debug` suffix when applicable) prominently in the apply summary so the operator can recognise a synthetic-instance deployment in command-line scrollback or CI logs. <!-- Was: synthetic release name (enhancement 0002, "The instance-file naming convention moves: `release.cue` → `instance.cue`") -->
 
 #### Scenario: Synthetic instance name in apply log
 
@@ -139,7 +139,7 @@ The subcommand SHALL log the resolved synthetic instance name (including the def
 
 ### Requirement: Failures surface validation errors before any cluster contact
 
-The subcommand SHALL validate and synthesize the `#ModuleInstance` before opening any connection to the Kubernetes cluster. Render-time errors SHALL exit with the validation-error exit code and SHALL NOT contact the apiserver. <!-- Was: #ModuleRelease (0002 D8) -->
+The subcommand SHALL validate and synthesize the `#ModuleInstance` before opening any connection to the Kubernetes cluster. Render-time errors SHALL exit with the validation-error exit code and SHALL NOT contact the apiserver. <!-- Was: #ModuleRelease (enhancement 0002, "Hard rename, no alias window; `semver: major` (resolves OQ3, OQ4)") -->
 
 #### Scenario: Synthesis failure exits before cluster contact
 

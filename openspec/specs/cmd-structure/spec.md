@@ -57,7 +57,7 @@ The `internal/cmd/` package SHALL be split into sub-packages that mirror the cob
 
 ### Requirement: Instance command group registered at root level
 
-The root command SHALL register `opm instance` (alias: `inst`) as a top-level command group via `cmdinstance.NewInstanceCmd(&cfg)`. This SHALL follow the same dependency injection pattern as `mod` and `config` groups. The former `cmdrelease.NewReleaseCmd` registration is removed (no back-compat alias — enhancement 0002 D8).
+The root command SHALL register `opm instance` (alias: `inst`) as a top-level command group via `cmdinstance.NewInstanceCmd(&cfg)`. This SHALL follow the same dependency injection pattern as `mod` and `config` groups. The former `cmdrelease.NewReleaseCmd` registration is removed (no back-compat alias — enhancement 0002 ("Hard rename, no alias window; `semver: major` (resolves OQ3, OQ4)")).
 
 #### Scenario: Root command registers instance group
 
@@ -67,7 +67,7 @@ The root command SHALL register `opm instance` (alias: `inst`) as a top-level co
 
 ### Requirement: Operator command group registered at root level
 
-The root command SHALL register `opm operator` as a top-level command group via `cmdoperator.NewOperatorCmd(&cfg)`, following the same `GlobalConfig` dependency-injection pattern as the `module`, `instance`, and `config` groups. The group is noun-first (enhancement 0006 D32): there are no `opm install` or `opm uninstall` verb groups at root level.
+The root command SHALL register `opm operator` as a top-level command group via `cmdoperator.NewOperatorCmd(&cfg)`, following the same `GlobalConfig` dependency-injection pattern as the `module`, `instance`, and `config` groups. The group is noun-first (enhancement 0006, "Noun-first `opm operator` command group (`opm operator install [--crds-only]` / `opm operator uninstall`); supersedes D28"): there are no `opm install` or `opm uninstall` verb groups at root level.
 
 #### Scenario: Root command registers operator group
 

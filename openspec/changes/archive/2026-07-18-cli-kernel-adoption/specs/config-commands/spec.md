@@ -1,6 +1,6 @@
 # Delta: config-commands (cli-kernel-adoption)
 
-`opm config init` writes two import-free data files and no CUE module; `opm config vet` validates both (enhancement 0006 D39).
+`opm config init` writes two import-free data files and no CUE module; `opm config vet` validates both (enhancement 0006, "`~/.opm` becomes two import-free data files: `config.cue` drops `providers`/`cacheDir`, D21's local default platform is the sibling `~/.opm/platform.cue`; folded into C2").
 
 ## MODIFIED Requirements
 
@@ -97,15 +97,15 @@ A missing `platform.cue` SHALL NOT fail vet (the file is optional until a render
 
 ### Requirement: Config init template includes provider import
 
-**Reason**: `providers` no longer exists; `~/.opm/config.cue` is import-free scalar data (0006 D39).
+**Reason**: `providers` no longer exists; `~/.opm/config.cue` is import-free scalar data (enhancement 0006, "`~/.opm` becomes two import-free data files: `config.cue` drops `providers`/`cacheDir`, D21's local default platform is the sibling `~/.opm/platform.cue`; folded into C2").
 **Migration**: Platform/catalog selection moves to `~/.opm/platform.cue` subscriptions (see `platform-resolution`).
 
 ### Requirement: Config init module template enables imports
 
-**Reason**: `~/.opm` is no longer a CUE module; there is no `cue.mod/module.cue` to template (0006 D39).
+**Reason**: `~/.opm` is no longer a CUE module; there is no `cue.mod/module.cue` to template (enhancement 0006, "`~/.opm` becomes two import-free data files: `config.cue` drops `providers`/`cacheDir`, D21's local default platform is the sibling `~/.opm/platform.cue`; folded into C2").
 **Migration**: None — delete any existing `~/.opm/cue.mod/`.
 
 ### Requirement: Config vet uses registry for import resolution
 
-**Reason**: The config file has no imports to resolve; vet is pure local evaluation against embedded schemas (0006 D39).
+**Reason**: The config file has no imports to resolve; vet is pure local evaluation against embedded schemas (enhancement 0006, "`~/.opm` becomes two import-free data files: `config.cue` drops `providers`/`cacheDir`, D21's local default platform is the sibling `~/.opm/platform.cue`; folded into C2").
 **Migration**: Registry resolution remains for module/instance operations, unchanged.

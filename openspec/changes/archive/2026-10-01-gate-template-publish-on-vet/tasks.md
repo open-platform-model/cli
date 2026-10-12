@@ -2,8 +2,8 @@
 
 Revision 4, 2026-10-01, after review 3:
 
-- Section 1 now also requires the tree to equal its module zip for every template (design.md D6), checks the module path against the directory, reads the identity inside `gate`, anchors the refusal match, and publishes on the gate's verdict instead of a second GHCR probe (D2). Both workflows install the cue that `go.mod` requires.
-- Section 2 adds the version order of D7: stable only, GO above the highest published stable version, a published version equal to it.
+- Section 1 now also requires the tree to equal its module zip for every template (design.md D6), checks the module path against the directory, reads the identity inside `gate`, anchors the refusal match, and publishes on the gate's verdict instead of a second GHCR probe (enhancement 0011). Both workflows install the cue that `go.mod` requires.
+- Section 2 adds the version order of enhancement 0011: stable only, GO above the highest published stable version, a published version equal to it.
 - The harness removes `origin` from every scratch clone, installs cue the way the workflows do, and gains the `race`, `tags` and `tags-high` faults. Task 2.9 runs `/bin/bash` under `env -i`.
 - New cases: S1, S2, M, V, the race, NM, HG and FIFO (section 1), and P, RB and LOW (section 2).
 
@@ -81,18 +81,18 @@ A local run zips whatever is on disk. Before running on this worktree, `git clea
 
 ## 1. Vet gate, tree equals zip, gate every template before publishing any (publish-templates.sh, workflows)
 
-- [x] 1.1 `.github/scripts/publish-templates.sh`: restructure it into the two phases of design.md D2, with the D6 checks.
+- [x] 1.1 `.github/scripts/publish-templates.sh`: restructure it into the two phases of design.md D2, with the enhancement 0011 checks.
   - Preflight: fail with `==> missing tool: <name>` unless `cue` (checked first), `curl`, `jq`, `unzip`, `sha256sum`, `diff`, `find`, `sort`, `grep`, `sed`, `head`, `tail`, `cut`, `mktemp`, `cp`, `rm` and `basename` are on `PATH`. Export `LC_ALL=C`. A `work` temp directory is removed on `EXIT`.
   - A `gate <template> <dir>` function, called as an `if` condition, so every step checks its own status. In order:
-    - Read `Version` and `ModulePath` with `cue eval ./identity --out text -e ...` inside `gate`; a failure prints the D4 line and fails only this template.
+    - Read `Version` and `ModulePath` with `cue eval ./identity --out text -e ...` inside `gate`; a failure prints the enhancement 0011 line and fails only this template.
     - `ModulePath` must equal `opmodel.dev/templates/<dir>@v<major of Version>`.
-    - `layout`: no symbolic link (`find -type l`), no special file (`find ! -type d ! -type f`), no nested `cue.mod` (`find -mindepth 2 -iname cue.mod`); each prints the D4 line and the paths.
+    - `layout`: no symbolic link (`find -type l`), no special file (`find ! -type d ! -type f`), no nested `cue.mod` (`find -mindepth 2 -iname cue.mod`); each prints the enhancement 0011 line and the paths.
     - `opm module tidy --check` and `opm module vet "./$dir"`.
     - `tree_zip`: `cue mod publish v<version> --out`, then `index.json`, its single manifest and its single `application/zip` layer (`zip_layer`).
     - `zip_holds_tree`: `find "$dir" ! -type d -printf '%P\n' | sort` equals `unzip -Z1 <tree zip> | sort`; a difference prints `only in the tree: <path>` lines, and a `diff` error fails too.
     - `opm module publish --dry-run "./$dir"`: GO sets the verdict `publish`. An output whose summary matches `grep -Eq ' 1 refusal$'` and whose headline holds `opmodel.dev/templates/<t>@v<major> already holds v<version>` sets the verdict `skip` (section 2 narrows this). Anything else fails.
   - The gate loop records each failing template and continues. After it, any failure prints `==> gates failed for: <list>; nothing published` and exits 1. `--dry-run` exits 0 after the gate loop.
-  - The publish phase walks the recorded verdicts in template order: `skip` prints `already published; skipped`; `publish` prints `publishing v<version>` and runs `opm module publish "./templates/<t>/"`, and a failure prints the D4 line and exits 1. Remove `published()`: nothing probes GHCR a second time.
+  - The publish phase walks the recorded verdicts in template order: `skip` prints `already published; skipped`; `publish` prints `publishing v<version>` and runs `opm module publish "./templates/<t>/"`, and a failure prints the enhancement 0011 line and exits 1. Remove `published()`: nothing probes GHCR a second time.
   - Keep the `CUE_REGISTRY`/`OPM_REGISTRY` export block and its comment.
   - Update the header comment: the gate list, the two phases, the verdict, and that vet renders `debugValues` against the template's own pins, and why the tree must equal its zip.
 
@@ -115,14 +115,14 @@ A local run zips whatever is on disk. Before running on this worktree, `git clea
   - run `$S/bin/opm-real module version set 1.0.4 templates/minimal`, then commit.
 
   Run `$S/run.sh $S/clone`. Verify: exit 0. The log holds exactly one `WOULD PUBLISH` line, `WOULD PUBLISH ./templates/minimal/`, preceded by `==> minimal: publishing v1.0.4`. Advanced and standard print "already published; skipped".
-- [x] 1.7 What vet reads is what publishes (D6). Each case is a branch from the clone's HEAD, run in both modes unless stated. Verify exit 1, no `WOULD PUBLISH`, and the named line:
+- [x] 1.7 What vet reads is what publishes (enhancement 0011). Each case is a branch from the clone's HEAD, run in both modes unless stated. Verify exit 1, no `WOULD PUBLISH`, and the named line:
   - (S1) Add `hack/tplshared/extra.cue`, a second `package minimal` component, and commit `templates/minimal/extra.cue` as a symlink to it (`ln -s ../../hack/tplshared/extra.cue`), with no bump: `symbolic links never publish`, naming `extra.cue`. Vet alone passes it (2 resources); revision 3 called it identical to the published v1.0.3.
   - (S2) Move minimal's `debugValues` block out of `templates/minimal/module.cue` into `hack/tplshared/debug.cue`, commit `templates/minimal/debug.cue` as a symlink to it, and `version set 1.0.4`: the same line, naming `debug.cue`. Revision 3 said GO and published a zip without `debugValues`.
   - S1 and S2 again, dry-run, with `SCRIPT` pointing at a scratch copy of the script whose `layout` call is removed: exit 1 from the listing check alone, `only in the tree: extra.cue` and `only in the tree: debug.cue`.
   - (NM) `templates/minimal/sub/cue.mod/module.cue` (a nested module) and `sub/x.cue`, no bump, dry-run: `a nested cue.mod makes a nested module`, naming `sub/cue.mod`.
   - (HG) `templates/minimal/.hg_archival.txt`, no bump, dry-run: `the module zip does not hold exactly the tree's files`, `only in the tree: .hg_archival.txt`.
   - (FIFO) Uncommitted, on the clone's HEAD: `mkfifo templates/minimal/pipe`, dry-run: `special files never publish`, naming `pipe`. Remove it afterwards.
-- [x] 1.8 Identity and verdict (D2). Verify:
+- [x] 1.8 Identity and verdict (enhancement 0011). Verify:
   - (M) A branch renaming minimal's module path to `opmodel.dev/templates/minimalx@v1` in `cue.mod/module.cue`, the identity `ModulePath`, the package clause and the identity import, version kept, both modes: exit 1, `ModulePath is opmodel.dev/templates/minimalx@v1; the template in templates/minimal/ at v1.0.3 must be opmodel.dev/templates/minimal@v1`. Revision 3 exited 0 in publish mode, its second probe skipping the renamed template.
   - (V, identity part) A branch with a syntax error in `templates/minimal/identity/identity.cue` (`Version: 1.0.3 +`), dry-run: exit 1, cue's error, `cannot read Version and ModulePath from ./templates/minimal/identity`, and standard and advanced still run their gates. Revision 3 aborted at minimal.
   - (race) `FAULT=race` on `case-D`, publish mode: exit 1, `==> minimal: publishing v1.0.4`, then `publishing v1.0.4 failed`, and no `minimal: ... skipped` line.
@@ -138,7 +138,7 @@ A local run zips whatever is on disk. Before running on this worktree, `git clea
   - After the dry-run, with `H` the highest of `stable_versions`:
     - GO: `Version` is not among the versions, and is above `H` when there is one. Verdict `publish`.
     - "already holds": `Version` is among the versions and equals `H`, then `same_as_published`. Verdict `skip`.
-  - Every step checks its own status and prints the D4 line for its failure.
+  - Every step checks its own status and prints the enhancement 0011 line for its failure.
   - Header comment: the content check, the version order, and why files and not zip bytes are compared.
   - Do not edit `hack/fixtures.sh`.
 

@@ -35,5 +35,5 @@ The CLI SHALL synthesize a concrete instance from a module CUE package directory
 
 ### Requirement: User module must declare a catalog dep
 
-**Reason**: The catalog-dep pin existed to version-match the deleted synthetic wrapper; kernel synthesis binds the schema through the kernel's own resolution (0006 D9, 0002 carryover).
+**Reason**: The catalog-dep pin existed to version-match the deleted synthetic wrapper; kernel synthesis binds the schema through the kernel's own resolution (enhancement 0006 ("The CLI replaces its own render/match pipeline entirely with the `library` kernel"), 0002 carryover).
 **Migration**: Modules keep whatever deps they genuinely import; no wrapper-driven pin requirement remains. Version-binding errors surface from the kernel with the module's declared language/schema versions.

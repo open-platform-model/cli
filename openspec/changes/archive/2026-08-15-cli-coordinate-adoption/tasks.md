@@ -6,7 +6,7 @@
 
 - [x] 1.1 `pkg/module`: rewrite `CanonicalModuleRef` to `(m.ModulePath, ensureVPrefix(m.Version))`; delete `majorVersionTag` + snake fallback; drop `NameSnakeCase`/`DefaultNamespace` fields; rewrite the unit table (verbatim path; bare→prefixed; empty-version cases). NOTE: callers unchanged; `internal/inventory/gates.go`'s private `ensureVPrefix` untouched.
 - [x] 1.2 Digest peer pin: unit test on `internal/workflow/apply` `sourceDigest` golden (`sha256("path@version")` for a fixed pair), comment naming `opm-operator/internal/status.ModuleSourceDigest` as the byte-identical peer.
-- [x] 1.3 D19 warning: instance path — `output.Warn` when `SourceLocal` (render.go, boolean already computed); module path — `HasLocalModuleReplacement(loader.ModuleRootFrom(absPath))` in `FromModule`. One warning string, tested on both entries (present with a replaceWith, absent without).
+- [x] 1.3 enhancement 0010 warning: instance path — `output.Warn` when `SourceLocal` (render.go, boolean already computed); module path — `HasLocalModuleReplacement(loader.ModuleRootFrom(absPath))` in `FromModule`. One warning string, tested on both entries (present with a replaceWith, absent without).
 - [x] 1.4 Riders: `version.CUESDKVersion` → `v0.17.1` (+ test update); delete `testing/test/`.
 - [x] 1.5 `task check:fast` green.
 
@@ -21,7 +21,7 @@
 - [x] 3.3 `internal/config/schema/platform.cue`: `#SubscriptionFilter` deleted; `version!: string`; registry keys constrained to `=~"@v[0-9]+$"` paths.
 - [x] 3.4 `internal/config/templates.go`: platform template → single subscription `"opmodel.dev/catalogs/opm@v2": {version: "2.0.0-alpha.3"}`; doc comments rewritten (pin is load-bearing; peers: `hack/platform.cue`, operator sample). `hack/platform.cue` same commit.
 - [x] 3.5 CR seam: `DecodeCRSpec` ignores `filter`, passes empty version through; materialize call site wraps `ErrSubscriptionMissingVersion` with the legacy-CR hint. `EnsureClusterPlatform` refuses writes while the vendored CRD lacks `version` (checked against embedded `install.yaml`), error naming `operator-library-retarget`.
-- [x] 3.6 Fixture crossing, all 17 files: cue.mod pins (core `v2.0.0-alpha.4`, catalogs `v2.0.0-alpha.3`), imports (`core@v2`, D49 `…/v1beta1` packages), metadata to v2 identity (snake name == leaf, full `@vN` modulePath). Registry-pulling pins → `podinfo v0.1.4` (`render-parity`, e2e handoff cue.mod, `ssa-ownership` string, `examples/`); `examples/` podinfo-only (hello-web instance removed, README note pointing at `hello_web` for later).
+- [x] 3.6 Fixture crossing, all 17 files: cue.mod pins (core `v2.0.0-alpha.4`, catalogs `v2.0.0-alpha.3`), imports (`core@v2`, enhancement 0010 `…/v1beta1` packages), metadata to v2 identity (snake name == leaf, full `@vN` modulePath). Registry-pulling pins → `podinfo v0.1.4` (`render-parity`, e2e handoff cue.mod, `ssa-ownership` string, `examples/`); `examples/` podinfo-only (hello-web instance removed, README note pointing at `hello_web` for later).
 - [x] 3.7 Test updates: `spec_test.go` (filter tests → version tests incl. empty-version refusal via synth), `platform_test.go` (new invalid-shape subject), `config/init_test.go` (single subscription, `version:` literal), `vet_test.go` comments/skip text, `platform-materialize/main.go` comments.
 - [x] 3.8 `task check` green; `test:integration` suites that run against GHCR green; pulling tests confirmed still gated (no CI change).
 
@@ -40,8 +40,8 @@
 
 ## 7. Record
 
-- [x] 7.1 `enhancements/0010/`: slice → `done`, `openspec_ref: "cli/cli-coordinate-adoption"`, history event; record the declared-coordinate deviation (02-design:213 reinterpretation) and the D19 predicate refinement.
-- [x] 7.2 `enhancements/0011/plan.yaml`: add the `cli-publish-pipeline → 0010:cli-coordinate-adoption` compile-dependency edge (with the enhancement-slicing skill loaded).
+- [x] 7.1 enhancement 0010: slice → `done`, `openspec_ref: "cli/cli-coordinate-adoption"`, history event; record the declared-coordinate deviation (02-design:213 reinterpretation) and the enhancement 0010 predicate refinement.
+- [x] 7.2 the plan of enhancement 0011: add the `cli-publish-pipeline → cli-coordinate-adoption` (enhancement 0010) compile-dependency edge (with the enhancement-slicing skill loaded).
 
 ## 8. Blocked on operator release `v1.0.0-alpha.9` (final tail)
 

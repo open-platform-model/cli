@@ -1,5 +1,5 @@
 // Package identity is the single source of this module's path and version
-// (core #IdentityPackage, 0010:D2, 0011:D12).
+// (core #IdentityPackage, enhancements 0010 and 0011).
 package identity
 
 // ModulePath is the module's complete CUE module path, major suffix included

@@ -16,7 +16,7 @@ func staleEntry(group, kind, name, component string) k8sinventory.Entry {
 // The apply's stale set keeps every prune decision the CLI made before it
 // adopted the library's component-blind stale set: the cases of its earlier
 // stale-set rule and of the component-rename filter that followed it, each
-// with the expected set it asserted (0012:D7:R1).
+// with the expected set it asserted (enhancement 0012).
 func TestComputeStaleInventorySet(t *testing.T) {
 	cases := []struct {
 		name     string

@@ -88,8 +88,8 @@ Examples:
 
 // runPlatformCheck resolves the platform, builds it, and prints the contract
 // inventory report. Routability and discrimination decide the exit status —
-// the two conditions platform-package generation refuses on (0015:D5,
-// 0010:D37); an unfulfilled contract never does (0015:D18). A colliding
+// the two conditions platform-package generation refuses on (enhancements 0015 and 0010);
+// an unfulfilled contract never does (enhancement 0015). A colliding
 // contract key makes the platform not routable, so it fails the command
 // through the same verdict.
 func runPlatformCheck(ctx context.Context, args []string, cfg *config.GlobalConfig, platformFlag string, kf cmdutil.K8sFlags) error {

@@ -1,6 +1,6 @@
 ## Context
 
-Library v1.0.0-beta.9 holds one change, library#228 (library ADR-016 and the closing note of ADR-015). A file-by-file comparison of the two releases in the Go module cache shows these production edits and no other: the `Admit` field and its helpers leave `opm/k8s/ownership`; `IdentityError` gets a pointer receiver and loses its `As` method; the alias `catalog.Source` goes; comments and one citation (`0012:D8:R6` to `0012:D8:R3`) change. The cli stopped setting `Admit` in cli#357 and never used the other names.
+Library v1.0.0-beta.9 holds one change, library#228 (library ADR-016 and the closing note of ADR-015). A file-by-file comparison of the two releases in the Go module cache shows these production edits and no other: the `Admit` field and its helpers leave `opm/k8s/ownership`; `IdentityError` gets a pointer receiver and loses its `As` method; the alias `catalog.Source` goes; comments and one citation (a `Source:` line moved from the migration requirement to the adoption exception of the apply-guard decision of enhancement 0012) change. The cli stopped setting `Admit` in cli#357 and never used the other names.
 
 ## Goals / Non-Goals
 

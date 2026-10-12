@@ -67,7 +67,7 @@ while IFS= read -r file; do
   fail "${file}: tracked local-module.cue (git rm --cached it; it redirects a module to a local path)"
 done < <(git ls-files '*cue.mod/local-module.cue')
 
-# 5. The operator module pin is served and consistent (0021:D11:R6): the
+# 5. The operator module pin is served and consistent (enhancement 0021): the
 # registry serves PinnedModuleVersion, and PinnedOperatorVersion is the
 # operator release that module's operator package states. hack/operator-pin
 # reads it without a render; a lookup that fails is a failure, not a pass.

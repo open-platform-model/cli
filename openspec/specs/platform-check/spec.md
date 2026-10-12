@@ -1,6 +1,6 @@
 ## Purpose
 
-Define `opm platform check`: the offline pre-flight that answers whether a platform is usable before any module is deployed against it, reading the contract inventory core derives and library exposes. Covers what it reports, how it picks the platform, and why an unfulfilled contract ends in a different exit code from the two conditions platform-package generation refuses on — an over-subscribed contract and a comparable transformer pair (enhancement 0015 D1, D2, D5, D18).
+Define `opm platform check`: the offline pre-flight that answers whether a platform is usable before any module is deployed against it, reading the contract inventory core derives and library exposes. Covers what it reports, how it picks the platform, and why an unfulfilled contract ends in a different exit code from the two conditions platform-package generation refuses on — an over-subscribed contract and a comparable transformer pair (enhancement 0015, "`#Catalog` publishes its contracts as members, beside its transformers", "One provider per contract stands; provider classes are rejected in this entry", "Comparable predicates within one catalog-fulfilled bucket are refused, not arbitrated" and "An unfulfilled contract is reported, never refused; only over-subscription refuses platform-package generation").
 
 ## Requirements
 
@@ -40,7 +40,7 @@ The CLI SHALL provide `opm platform check`, registered under a `platform` comman
 
 ### Requirement: An unfulfilled contract is reported and does not fail the command
 
-A provider-fulfilled contract that no enabled transformer implements SHALL be listed in the report and SHALL NOT change the exit status. Enhancement 0015 D18 makes this a report and never a gate: a platform may legitimately define a contract ahead of the provider that implements it, and the refusal for an unmet demand belongs to the render that demands it.
+A provider-fulfilled contract that no enabled transformer implements SHALL be listed in the report and SHALL NOT change the exit status. Enhancement 0015 ("An unfulfilled contract is reported, never refused; only over-subscription refuses platform-package generation") makes this a report and never a gate: a platform may legitimately define a contract ahead of the provider that implements it, and the refusal for an unmet demand belongs to the render that demands it.
 
 #### Scenario: Unfulfilled contracts exit zero
 
@@ -78,7 +78,7 @@ A provider-fulfilled contract required by transformers of more than one enabled 
 
 ### Requirement: An undiscriminated platform fails the command
 
-A pair of enabled transformers whose match predicates are comparable over a shared catalog-fulfilled contract SHALL be reported with both transformers and the shared contracts named, and the command SHALL exit with the validation error code (enhancement 0015 D5). This mirrors where the refusal lives in the system: `Discriminated: false` is a condition platform-package generation refuses on, exactly as `Routable: false` is, so a pre-flight that exits 0 on it would bless a platform the operator rejects. No arbitration between the two transformers SHALL be applied or suggested. Transformers with incomparable predicates over a shared contract (a differing required label value, or a required trait the other lacks) SHALL be reported as implementations and SHALL NOT change the exit status.
+A pair of enabled transformers whose match predicates are comparable over a shared catalog-fulfilled contract SHALL be reported with both transformers and the shared contracts named, and the command SHALL exit with the validation error code (enhancement 0015, "Comparable predicates within one catalog-fulfilled bucket are refused, not arbitrated"). This mirrors where the refusal lives in the system: `Discriminated: false` is a condition platform-package generation refuses on, exactly as `Routable: false` is, so a pre-flight that exits 0 on it would bless a platform the operator rejects. No arbitration between the two transformers SHALL be applied or suggested. Transformers with incomparable predicates over a shared contract (a differing required label value, or a required trait the other lacks) SHALL be reported as implementations and SHALL NOT change the exit status.
 
 #### Scenario: A comparable pair exits non-zero
 
@@ -150,7 +150,7 @@ If the resolved platform does not build, the command SHALL report the build fail
 
 ### Requirement: A colliding contract key fails the command
 
-A contract key that more than one enabled registry entry's catalog lists SHALL be reported under its own heading with every defining registry key named (catalog path plus major, sorted), ahead of the over-subscribed contracts, and the command SHALL exit with the validation error code. The heading SHALL state that a colliding key is left out of the defined, required, unfulfilled and comparable sections, and SHALL tell the reader to keep one of its defining entries enabled (the entries may be two majors of one catalog or two different catalogs listing the same key). The routable verdict SHALL name the colliding count beside the over-subscribed count, and the command's error SHALL name the colliding, over-subscribed and comparable counts. A disabled entry never defines a key. The command reads the collisions the platform's core derives and the render refuses on, and SHALL NOT compute its own. Because a colliding key is absent from the defined contracts, the `fulfilled` and `discriminated` verdicts MAY read yes on a colliding platform; the colliding heading and the exit status carry the refusal. Source: 0026 OQ17 (interim safety net until side-by-side majors).
+A contract key that more than one enabled registry entry's catalog lists SHALL be reported under its own heading with every defining registry key named (catalog path plus major, sorted), ahead of the over-subscribed contracts, and the command SHALL exit with the validation error code. The heading SHALL state that a colliding key is left out of the defined, required, unfulfilled and comparable sections, and SHALL tell the reader to keep one of its defining entries enabled (the entries may be two majors of one catalog or two different catalogs listing the same key). The routable verdict SHALL name the colliding count beside the over-subscribed count, and the command's error SHALL name the colliding, over-subscribed and comparable counts. A disabled entry never defines a key. The command reads the collisions the platform's core derives and the render refuses on, and SHALL NOT compute its own. Because a colliding key is absent from the defined contracts, the `fulfilled` and `discriminated` verdicts MAY read yes on a colliding platform; the colliding heading and the exit status carry the refusal. Source: enhancement 0026 (interim safety net until side-by-side majors).
 
 #### Scenario: Two majors sharing keys exit non-zero and name the entries
 

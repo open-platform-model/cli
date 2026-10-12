@@ -50,18 +50,18 @@ Options considered:
 1. Keep the strict compare and have the supervisor enforce ordering (freeze operator main from G5 to G6, follow every operator release with a cli release). Fragile: operator `docs` commits cut releases, and counters restart at `beta.1` in both repos, so headroom is 0 to +1.
 2. Give the cli a higher first beta counter (for example `beta.6`) as headroom. Buys time, fixes nothing, and makes the counters meaningless.
 3. Compare MAJOR.MINOR.PATCH, ignoring only the prerelease. Still refuses operator patch releases the cli has not matched.
-4. **Compare MAJOR.MINOR (chosen).** Owner decision 3; matches the 0021 OQ14 position that cli and operator share MAJOR.MINOR and release patches independently.
+4. **Compare MAJOR.MINOR (chosen).** Owner decision 3; matches the position of enhancement 0021 that cli and operator share MAJOR.MINOR and release patches independently.
 
 Exit code and message: unchanged (non-zero, "your CLI (X) is older than the cluster operator (Y) — upgrade the CLI ..."). The refusal now fires only across a minor boundary.
 
 **What this does during beta.** release-please's prerelease strategy on `1.0.0-beta.N` turns `fix`, `feat` and `feat!` alike into `1.0.0-beta.N+1` (the release-workflow delta's "Next release stays on the beta line" scenario). Neither repo reaches a new minor before GA unless a commit forces one. So from this change until GA every cli and every operator release is MAJOR.MINOR `1.0`, and the ceiling refuses nothing between them. That includes a cli `1.0.0-beta.2` against an operator `1.0.0-beta.9` that carries a `feat!` CRD change (the beta promise allows operator breaks as `feat!`, and the CRD API stays `v1alpha1`). The gate is inert through beta; it is not a safety net for beta skew.
 
-This revises enhancement 0006 D24, which the gate implements as a full-semver ceiling (the "CLI-at-least-cluster" invariant, cited by `internal/workflow/apply/thineditor.go` as the reason an old CLI writing spec for a newer operator is the unsafe direction). After this change the invariant holds only per MAJOR.MINOR. During beta, skew safety rests on:
+This revises enhancement 0006 ("CRD/operator version skew: CLI-≥-cluster invariant, gate-only (CRD field-presence floor + operator-version ceiling via `Platform.status`); resolves OQ4"), which the gate implements as a full-semver ceiling (the "CLI-at-least-cluster" invariant, cited by `internal/workflow/apply/thineditor.go` as the reason an old CLI writing spec for a newer operator is the unsafe direction). After this change the invariant holds only per MAJOR.MINOR. During beta, skew safety rests on:
 
 - the CRD field floor (`GateCRDFieldFloor`, `spec.owner` and `status.inventory`), which catches only a CRD missing those fields; and
 - a process rule for the supervisor and operator authors: an operator `feat!` that the released cli cannot drive merges only after the cli release that can drive it. There is never a `Release-As: 1.1.0-beta.1` or any other minor or major hop during beta. opm-operator records the same rule on its side.
 
-The owner accepted an inert gate for the whole beta, and with it this revision of D24, when choosing the MAJOR.MINOR ceiling (owner decision 3). Final ceiling semantics are the canon GA-exit item "ceiling gate semantics final (OQ14)". The live spec Purpose line citing D24 is left as a pointer to the origin; the requirement text in the delta states the MAJOR.MINOR rule. Section 1 also rewrites the `thineditor.go` comment and the `gates.go` doc so neither claims full-version semantics.
+The owner accepted an inert gate for the whole beta, and with it this revision of enhancement 0006, when choosing the MAJOR.MINOR ceiling (owner decision 3). Final ceiling semantics are the canon GA-exit item "ceiling gate semantics final (OQ14)". The live spec Purpose line citing enhancement 0006 is left as a pointer to the origin; the requirement text in the delta states the MAJOR.MINOR rule. Section 1 also rewrites the `thineditor.go` comment and the `gates.go` doc so neither claims full-version semantics.
 
 ### D2. The version line moves by a squash-message footer, never by config
 

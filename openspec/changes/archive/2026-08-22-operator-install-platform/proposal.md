@@ -24,7 +24,7 @@ the subscription should be resolved and written.
 
 - **`opm operator install` creates the singleton `cluster` Platform** after the readiness wait,
   subscribing it to the newest **released** build of `opmodel.dev/catalogs/opm@v2` resolved from the
-  registry. The write is the existing create-only, write-if-absent contract (0006 D22): plain create
+  registry. The write is the existing create-only, write-if-absent contract (enhancement 0006, "Solo-cluster `Platform` write-if-absent uses a plain `Create` that tolerates `AlreadyExists`, not SSA apply; refines D12's mechanism, resolves OQ13"): plain create
   with field manager `opm-cli`, `AlreadyExists` is a success-noop, `Forbidden` degrades to a warning.
   An existing Platform is never rewritten.
 - **New flag `--catalog-prerelease`** (default `false`): subscribe to the newest catalog prerelease

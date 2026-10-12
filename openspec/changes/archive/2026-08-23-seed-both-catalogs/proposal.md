@@ -11,7 +11,7 @@ author reaches for when an abstraction does not fit is simply absent from the de
 
 A platform subscribes to each catalog it wants, and the seeded default should name both. This
 restores the pre-consolidation shape: the CLI default seeded two catalogs before enhancement 0010
-D47 merged the catalogs into one.
+enhancement 0010 merged the catalogs into one.
 
 ## What Changes
 

@@ -107,6 +107,6 @@ Vet SHALL NOT build, load or require any platform module. When a `platform/` dir
 
 #### Scenario: Stale providers block fails with migration hint
 
-- **WHEN** `opm config vet` is run against a pre-D39 config.cue containing `providers:` or a `~/.opm/cue.mod/`
+- **WHEN** `opm config vet` is run against an old config.cue containing `providers:` or a `~/.opm/cue.mod/`
 - **THEN** validation SHALL fail naming the removed field
 - **AND** the hint SHALL say to re-run `opm config init` (or remove the field and `cue.mod/`)

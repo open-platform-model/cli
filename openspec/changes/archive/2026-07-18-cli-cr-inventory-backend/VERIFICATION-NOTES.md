@@ -98,7 +98,7 @@ mechanism are unit-tested, but **no live test exercises the annotation**:
   not set `SourceLocal`, so the annotation is never stamped in these runs.
 - The only path that stamps it is a real `opm instance apply` / `opm module
   apply` of a locally-replaced module — which is blocked by §2.1.
-- Therefore the D7 scenarios "local render stamps the annotation" and "registry
+- Therefore the enhancement 0006 scenarios "local render stamps the annotation" and "registry
   re-apply clears it (SSA field-ownership removal)" have **not** been confirmed
   end-to-end on a cluster. This is the one behavior in the change with only
   unit-level coverage.
@@ -144,9 +144,9 @@ Nothing blocks the code, but before archive:
    help strings; the generated site pages are downstream).
 8. **Archive this change** (`openspec archive`): on archive, record the
    `history` event's `slice: cli/<archive-date>-cli-cr-inventory-backend` in
-   `enhancements/0006/config.yaml` (the event body is already appended; only the
+   the config of enhancement 0006 (the event body is already appended; only the
    archive-date slice ref is pending), and flip
-   `enhancements/0006` implementation status if appropriate.
+   enhancement 0006 implementation status if appropriate.
 9. **Commit the branch** `feat/cli-cr-inventory-backend` — nothing is committed
    yet.
 

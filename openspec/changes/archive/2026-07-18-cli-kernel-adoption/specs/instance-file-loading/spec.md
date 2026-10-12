@@ -1,6 +1,6 @@
 # Delta: instance-file-loading (cli-kernel-adoption)
 
-`LoadInstanceFile` survives for instance-argument metadata extraction; the parse/process orchestration it fed is deleted (0006 D9).
+`LoadInstanceFile` survives for instance-argument metadata extraction; the parse/process orchestration it fed is deleted (enhancement 0006, "The CLI replaces its own render/match pipeline entirely with the `library` kernel").
 
 ## REMOVED Requirements
 

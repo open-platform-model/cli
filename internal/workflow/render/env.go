@@ -46,7 +46,7 @@ type renderEnv struct {
 //
 // Acquisition is the build: a bad pin, a key-to-import mismatch or an
 // unpublished catalog fails here naming the entry or dependency, identically
-// for every source (0019:D5).
+// for every source (enhancement 0019).
 func resolvePlatformEnv(ctx context.Context, k *kernel.Kernel, cfg *config.GlobalConfig, sel platform.ResolveOptions) (*renderEnv, error) {
 	sel.ConfigPath = cfg.ConfigPath
 	sel.Registry = cfg.Registry
@@ -72,7 +72,7 @@ func resolvePlatformEnv(ctx context.Context, k *kernel.Kernel, cfg *config.Globa
 // (the operator's SkewPolicyRefuse); anything else, including unset, warns.
 const clusterSkewRefuse = "Refuse"
 
-// skewPolicyFor chooses the kernel's skew policy (0019:D7/D18): when the
+// skewPolicyFor chooses the kernel's skew policy (enhancement 0019): when the
 // cluster Platform CR is the source its spec.skewPolicy wins, so CLI and
 // operator judge the same platform the same way; otherwise the config file's
 // skewPolicy applies. Absent means warn on both. The returned note is

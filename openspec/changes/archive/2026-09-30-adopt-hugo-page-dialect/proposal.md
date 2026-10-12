@@ -20,7 +20,7 @@ On `origin/main` (2026-09-30), that lint reports five findings in cli's `docs/si
 
 **Not in this change:**
 - Prose edits and new pages.
-- A source-repo CI lint. That is a 0018:D13 follow-up.
+- A source-repo CI lint. That is a enhancement 0018 ("Every writing rule names what checks it, and machine checks run in the owning repository's pull requests") follow-up.
 - `docs/STYLE.md:46`. It is cli's rule for `> **Note:**` in repo-local docs. The site page rules live in the workspace `STYLE.md`.
 - How the prose in `registry-namespaces.md` cites enhancement decisions. It writes the id and the decision with a space, not in the colon form.
 - Any Go code, command or test.
@@ -49,8 +49,8 @@ None. This change edits `docs/site` pages and one RFC banner only, so no spec-le
   - A reads cli's pages from the supervisor's `site-src` worktree once S1-S6 have merged, and renders them in its section 2.
   - Between this merge and A's merge, the Astro build on opmodel.dev `main` ignores `weight`, so cli's pages lose their sidebar order there. The site is not live, so this is accepted (`orchestration.md` section 2, "Known consequences").
 - **Related 0018 decisions.**
-  - 0018:D7: a page declares a title, a one-line description and a type, and nothing else is required.
-  - 0018:D7:R1: the four types.
+  - Enhancement 0018 ("Every page declares one type, a title and a one-line description"): a page declares a title, a one-line description and a type, and nothing else is required.
+  - Enhancement 0018 ("Every page declares one type, a title and a one-line description"): the four types.
   - `weight` is also the order key of `#Page` in 0018's contracts.
 
   The change sets no delivery claim (`orchestration.md` section 1).

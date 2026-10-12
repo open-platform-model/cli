@@ -1,6 +1,6 @@
 ## Context
 
-X1 is the foundation slice of the CLI half of enhancement [0002](../../../../enhancements/0002/) (Release → Instance). The upstream `core@v1` wire contract (`kind: "ModuleInstance"`, `module-instance.opmodel.dev/*` labels) is published and the operator already consumes it. The CLI is a **parallel Go implementation** — it has no Go dependency on the `library` kernel (that adoption is enhancement 0006). So X1's only upstream gate is the published `core@v1` tag, and its job is purely to rename the CLI's own module-instance type + loader surface and adopt the `instance.cue` file convention.
+X1 is the foundation slice of the CLI half of enhancement 0002 (Release → Instance). The upstream `core@v1` wire contract (`kind: "ModuleInstance"`, `module-instance.opmodel.dev/*` labels) is published and the operator already consumes it. The CLI is a **parallel Go implementation** — it has no Go dependency on the `library` kernel (that adoption is enhancement 0006). So X1's only upstream gate is the published `core@v1` tag, and its job is purely to rename the CLI's own module-instance type + loader surface and adopt the `instance.cue` file convention.
 
 The whole CLI rename (X1–X4) lands as **one atomic per-repo PR, bulk-archived** — a pure rename has no mergeable intermediate state because the type web doesn't compile half-renamed. X1 is authored as a standalone, self-contained OpenSpec change for small-batch spec hygiene (CLI CONSTITUTION §VIII), but it is *implemented* alongside X2/X3/X4 and is not expected to produce a green full test suite on its own.
 
@@ -10,7 +10,7 @@ The whole CLI rename (X1–X4) lands as **one atomic per-repo PR, bulk-archived*
 
 - Rename the prepared module-instance Go type and its loader/kind-detection surface to `Instance` vocabulary.
 - Flip the **module** wire kind string to `"ModuleInstance"` (core@v1 compatibility).
-- Adopt the D9 instance-file convention (`instance.cue`), hard-replacing `release.cue`.
+- Adopt the enhancement 0002 instance-file convention (`instance.cue`), hard-replacing `release.cue`.
 - Leave a clean X1/X2 seam so the bundle rename is a separable, additive follow-up within the same PR.
 
 **Non-Goals**
@@ -28,13 +28,13 @@ The detection switch becomes `case "ModuleInstance", "BundleRelease":`. The cons
 
 **Why now and not deferred:** nothing in today's ecosystem emits `"ModuleInstance"` *until* a consumer pins `core@v1`; the `modules/`+`releases/` re-pin is separately tracked. But the CLI must be ready the moment they do, and the wire string is intrinsic to the kind-detection capability X1 owns — splitting it out would leave a second rename pass over the same switch. It rides with X1.
 
-### D-X1.2 — Instance-file convention is a hard flip (D9): `instance.cue` only, no `release.cue` fallback
+### D-X1.2 — Instance-file convention is a hard flip (enhancement 0002): `instance.cue` only, no `release.cue` fallback
 
-Inside a package directory the loader resolves `instance.cue`; if absent it errors (`… does not contain instance.cue`). `release.cue` is **not** accepted as a fallback. Justification: D8's hard-rename / no-alias conclusion plus the CLI having no external users (no compatibility owed). A dual-detect alias would be dead complexity (CLI CONSTITUTION §VII, YAGNI). The mirror of the operator's already-shipped `InstanceFileNotFound` behavior.
+Inside a package directory the loader resolves `instance.cue`; if absent it errors (`… does not contain instance.cue`). `release.cue` is **not** accepted as a fallback. Justification: enhancement 0002's hard-rename / no-alias conclusion plus the CLI having no external users (no compatibility owed). A dual-detect alias would be dead complexity (CLI CONSTITUTION §VII, YAGNI). The mirror of the operator's already-shipped `InstanceFileNotFound` behavior.
 
 ### D-X1.3 — `releasefile` → `instancefile` package rename keeps the bundle branches intact (X1/X2 seam)
 
-`internal/releasefile/` is renamed to `internal/instancefile/` and `GetReleaseFile` → `GetInstanceFile` in X1, because the package name carries the `release` token (D10) and its module branch is X1's. But the package also dispatches `BundleRelease` and returns `*bundle.Release` / `*bundle.ReleaseMetadata`. Those bundle symbols are **left unchanged** — X1 renames the *container* and the *module* path; X2 renames the *bundle* path. The result is a transitional file where an `instancefile` package still references `bundle.Release`; this is intentional and reconciled when X2 lands in the same PR. A `// Was: …` / `// TODO(X2): …` breadcrumb marks each deferred bundle site so the seam is explicit, not accidental drift.
+`internal/releasefile/` is renamed to `internal/instancefile/` and `GetReleaseFile` → `GetInstanceFile` in X1, because the package name carries the `release` token (enhancement 0002: every `release`-named file and directory is renamed) and its module branch is X1's. But the package also dispatches `BundleRelease` and returns `*bundle.Release` / `*bundle.ReleaseMetadata`. Those bundle symbols are **left unchanged** — X1 renames the *container* and the *module* path; X2 renames the *bundle* path. The result is a transitional file where an `instancefile` package still references `bundle.Release`; this is intentional and reconciled when X2 lands in the same PR. A `// Was: …` / `// TODO(X2): …` breadcrumb marks each deferred bundle site so the seam is explicit, not accidental drift.
 
 ### D-X1.4 — The type-rename compile web is updated in place, reference-only, even in X3/X4-owned packages
 
@@ -42,7 +42,7 @@ Inside a package directory the loader resolves `instance.cue`; if absent it erro
 
 ### D-X1.5 — Capability-dir renames use the operator's archive mechanic
 
-Each renamed capability is authored as a delta under the **new** dir name with `## ADDED Requirements` containing the full updated (instance-vocab) requirement blocks, prefixed by a `<!-- Renamed from \`old-name\` (0002 D10) -->` breadcrumb. The old spec dir is removed via `git mv`at archive time. This mirrors the opm-operator X-wave (`release-*` → `modulepackage-*`) so the two repos' archives read consistently.`loader-api` and `validation-gates` keep their names (no `release` token) and use `## MODIFIED Requirements` with full updated content.
+Each renamed capability is authored as a delta under the **new** dir name with `## ADDED Requirements` containing the full updated (instance-vocab) requirement blocks, prefixed by a `<!-- Renamed from \`old-name\` (enhancement 0002) -->` breadcrumb. The old spec dir is removed via `git mv`at archive time. This mirrors the opm-operator X-wave (`release-*` → `modulepackage-*`) so the two repos' archives read consistently.`loader-api` and `validation-gates` keep their names (no `release` token) and use `## MODIFIED Requirements` with full updated content.
 
 ## Risks / Trade-offs
 

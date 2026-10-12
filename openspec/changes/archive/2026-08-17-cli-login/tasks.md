@@ -23,4 +23,4 @@
 - [x] 4.1 Hermetic inversion test: login against the in-process registry's basic auth, then the pipeline's authenticated push succeeds using only the written file.
 - [x] 4.2 New spec `registry-login`; `CLAUDE.md` command map.
 - [x] 4.3 `task fmt vet lint test` green.
-- [x] 4.4 Record in `enhancements/0011/`: slice → done + `openspec_ref` + history event (mechanism decision: docker config as D11's named default; device flow / logins.json / credential flags recorded as non-choices with their evidence).
+- [x] 4.4 Record in enhancement 0011: slice → done + `openspec_ref` + history event (mechanism decision: docker config as enhancement 0011's named default; device flow / logins.json / credential flags recorded as non-choices with their evidence).

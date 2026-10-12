@@ -1,6 +1,6 @@
 ## Context
 
-The CLI's Go module is `github.com/opmodel/cli`. `library` and `opm-operator` already live under `github.com/open-platform-model/*`. Enhancement 0006 (D15) requires this rename to land before any slice adds a `library` import, so the cross-repo edge is written once, under the final name.
+The CLI's Go module is `github.com/opmodel/cli`. `library` and `opm-operator` already live under `github.com/open-platform-model/*`. Enhancement 0006 ("Rename the CLI Go module from `github.com/opmodel/cli` to `github.com/open-platform-model/cli`") requires this rename to land before any slice adds a `library` import, so the cross-repo edge is written once, under the final name.
 
 The rename touches four distinct surfaces with different risk profiles:
 

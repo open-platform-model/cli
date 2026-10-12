@@ -8,11 +8,11 @@ See `proposal.md` for the motivation. This change builds on `adopt-kubernetes-ow
 
 Constraints:
 
-- The library verdict is pure; the cli reads the live object and hands it in. The contract is 0012:D4:R2 and 0012:D8:R1 to R8, with the "annotation only" rule of 0012:D8:R8.
+- The library verdict is pure; the cli reads the live object and hands it in. The contract is enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply" and "The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override") to R8, with the "annotation only" rule of enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override").
 - The fail-safe rules stay: an unreadable record or object stops the apply (cli#332), a refusal before the first write changes nothing (cli#334), reads resolve kinds by discovery (cli#342), errors are told apart by type (cli#346).
 - No command syntax changes. No flag is added, removed or renamed.
 
-Reversibility: costly two-way. What users see (which applies are refused, the adopt annotation) is the contract of 0012:D8, already accepted by the owner; this change does not decide it.
+Reversibility: costly two-way. What users see (which applies are refused, the adopt annotation) is the contract of enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override"), already accepted by the owner; this change does not decide it.
 
 ## Goals / Non-Goals
 
@@ -26,7 +26,7 @@ Reversibility: costly two-way. What users see (which applies are refused, the ad
 **Non-Goals:**
 
 - The delete side and the deletion protocol.
-- A command or flag that sets the adopt annotation (0012:D8:R6 excludes it).
+- A command or flag that sets the adopt annotation (enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override") excludes it).
 - A change to what a dry run refuses.
 - Ownership of the `--rbac` objects of `opm operator install`. They carry no OPM label and are in no inventory. They stay outside the guard, as the one named exception, until a follow-up decides how they are labelled or recorded.
 - Create-only writes: the namespace of `--create-namespace` and the Platform seed. A create cannot take an existing object over.
@@ -39,7 +39,7 @@ Reversibility: costly two-way. What users see (which applies are refused, the ad
 | --- | --- | --- | --- |
 | Apply guard (`instance apply`, `module apply`) | `CanApply{Object, Live, InInventory, InstanceUUID, Admit}` for every rendered object. `InstanceUUID` is the render's. `InInventory` is true when the previous record lists the same object (group, kind, namespace, name). | allowed | Apply. |
 | | | `terminating`, `foreign-object`, `other-instance` | Refuse the apply before its first write, exit 1. Report every refused object, one line each, with the library's message. |
-| | | `adopted-elsewhere` | Do not apply the object. One warning line with the library's message. Leave it out of the record. The apply goes on and this alone does not change the exit code (0012:D8:R8). |
+| | | `adopted-elsewhere` | Do not apply the object. One warning line with the library's message. Leave it out of the record. The apply goes on and this alone does not change the exit code (enhancement 0012, "The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override"). |
 | | | (no verdict) read error other than NotFound and other than "kind not served" | Refuse the apply before its first write, with the exit code of the read error, as cli#332 set for the first install. |
 | `operator install`, check phase | The same guard over every object the plan applies, on every install, with or without a record; `Admit` is true for the objects of the migration's admit set | `terminating`, `foreign-object`, `other-instance`, `adopted-elsewhere`, or a failed read | `GuardError`, exit 2, nothing written. `adopted-elsewhere` refuses here, unlike in any other apply. |
 | `operator install`, CRD step and `MoveOwnership` | none of their own | | They run after the check phase passed, on objects the guard allowed. Because the guard refuses on `adopted-elsewhere`, the plan holds no object that was let go, so neither step can write to one. |
@@ -91,9 +91,9 @@ A test in `internal/kubernetes` lists the allowed call sites of `ApplyOne` and o
 
 #### Where the apply verdict runs
 
-**Context**: 0012:D8:R1 needs the verdict on every apply. The cli must also keep "a refusal changes nothing" (cli#334).
+**Context**: enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override") needs the verdict on every apply. The cli must also keep "a refusal changes nothing" (cli#334).
 **Options considered**:
-1. Status quo: first install only. Leaves the takeover on later applies; contradicts 0012:D8:R1.
+1. Status quo: first install only. Leaves the takeover on later applies; contradicts enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override").
 2. One pass before the first write, over every rendered object. All-or-nothing refusal; one extra GET per object on later applies.
 3. Judge inside `applyOne` on its own read. No extra GET and the smallest window between read and write, but a refusal arrives after earlier objects were applied.
 **Decision**: Option 2.
@@ -101,12 +101,12 @@ A test in `internal/kubernetes` lists the allowed call sites of `ApplyOne` and o
 
 #### What a hand-over does to the inventory and the prune
 
-**Context**: 0012:D8:R8 says the instance drops the object and never deletes it. 0012:D7:R1 describes this as "in the stale set, and the deletion plan skips it"; its end state binds, not its mechanism.
+**Context**: enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override") says the instance drops the object and never deletes it. Enhancement 0012 ("The stale set is component-blind, and the inventory digest hashes a canonical field encoding") describes this as "in the stale set, and the deletion plan skips it"; its end state binds, not its mechanism.
 **Options considered**:
 1. Remove the object from the rendered set before the stale set is computed, so prune sees it as stale and the delete verdict skips it.
 2. Keep it out of the apply and out of the record, and compute the stale set from the full render, so prune never sees it.
 **Decision**: Option 2.
-**Rationale**: The end state is the one 0012:D7:R1 binds: the object is not recorded and not deleted, and the stale set is exactly what the instance recorded and no longer renders. There is no path on which a delete of that object is attempted. The one visible difference from option 1 is the line printed: the apply's warning in place of a `left behind` line. If the annotation goes away later, the next apply judges the object as one outside the inventory.
+**Rationale**: The end state is the one enhancement 0012 ("The stale set is component-blind, and the inventory digest hashes a canonical field encoding") binds: the object is not recorded and not deleted, and the stale set is exactly what the instance recorded and no longer renders. There is no path on which a delete of that object is attempted. The one visible difference from option 1 is the line printed: the apply's warning in place of a `left behind` line. If the annotation goes away later, the next apply judges the object as one outside the inventory.
 
 #### `opm operator install` refuses where another apply lets go
 
@@ -116,7 +116,7 @@ A test in `internal/kubernetes` lists the allowed call sites of `ApplyOne` and o
 2. Refuse only for a CRD, the Namespace and the controller Deployment.
 3. Refuse, in the check phase, for every object the plan applies.
 **Decision**: Option 3, exit 2, naming the object and the instance that owns or adopts it (owner decision of 2026-10-08: when `opm operator install` meets an object it needs that another instance owns, it refuses with exit 2 before changing anything).
-**Rationale**: The operator module renders nothing optional: its roles, bindings and service account are needed as much as the three kinds the decision names, so the rule is stated for every rendered object. Refusing in the check phase also settles the managedFields patch: no write of the install reaches an object that was let go, because no object is let go. This departs from the letter of 0012:D8:R8 ("does not stop the apply"), for this one command; the enhancement needs a revision note.
+**Rationale**: The operator module renders nothing optional: its roles, bindings and service account are needed as much as the three kinds the decision names, so the rule is stated for every rendered object. Refusing in the check phase also settles the managedFields patch: no write of the install reaches an object that was let go, because no object is let go. This departs from the letter of enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override") ("does not stop the apply"), for this one command; the enhancement needs a revision note.
 
 #### The first install that meets its own objects
 
@@ -135,15 +135,15 @@ Codes: 0 success, 1 general, 2 validation, 3 connectivity, 4 permission denied, 
 
 | # | Case | Before | After | Reason |
 | --- | --- | --- | --- | --- |
-| 1 | First apply; a rendered object exists and OPM does not manage it | exit 1; "already exists and is not managed by OPM ... remove or rename it" | exit 1; the library's `foreign-object` message, which names the adopt annotation | Same code. The remedy changes because an override now exists (0012:D8:R3). |
-| 2 | First apply; a rendered object exists, OPM-managed, UUID label of another instance | exit 0; applied over, counted in the cli#333 warning | exit 1; `other-instance`, plus the cli's line on an earlier identity | 0012:D8:R1. |
-| 3 | Later apply; an object new to the inventory exists and OPM does not manage it, or it carries another instance's UUID | exit 0; applied over | exit 1; `foreign-object` or `other-instance` | 0012:D8:R1: the guard runs on every apply. |
-| 4 | Later apply; a rendered object is terminating | exit 0; the patch is accepted | exit 1; `terminating`, before any write | 0012:D8:R5. |
+| 1 | First apply; a rendered object exists and OPM does not manage it | exit 1; "already exists and is not managed by OPM ... remove or rename it" | exit 1; the library's `foreign-object` message, which names the adopt annotation | Same code. The remedy changes because an override now exists (enhancement 0012, "The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override"). |
+| 2 | First apply; a rendered object exists, OPM-managed, UUID label of another instance | exit 0; applied over, counted in the cli#333 warning | exit 1; `other-instance`, plus the cli's line on an earlier identity | enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override"). |
+| 3 | Later apply; an object new to the inventory exists and OPM does not manage it, or it carries another instance's UUID | exit 0; applied over | exit 1; `foreign-object` or `other-instance` | enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override"): the guard runs on every apply. |
+| 4 | Later apply; a rendered object is terminating | exit 0; the patch is accepted | exit 1; `terminating`, before any write | enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override"). |
 | 5 | Later apply; the read of a rendered object fails with an error other than NotFound | `applyOne` read the object and ignored the error; the apply went on and the patch decided | exit 4, 3 or 1 by the read error, before any write | The rule of cli#332 for the first install now holds on every apply. |
-| 6 | Any apply; an existing object carries the adopt annotation with this instance's UUID | exit 1 on a first apply when OPM does not manage it | exit 0; applied and recorded | 0012:D8:R2. |
-| 7 | Any apply but `operator install`; an object's adopt annotation names another instance (in the inventory, or outside it when OPM manages it) | exit 0; applied over | exit 0; not applied, one warning, not recorded | 0012:D8:R8. No code change. |
-| 8 | `operator install`, no record; a rendered object exists, OPM-managed, UUID label of another instance | exit 0; applied over. For an object on the proof list of an earlier operator manifest (the CRDs, the Namespace, the controller Deployment and others) the migration proof already refused it, exit 2 | exit 2; guard refusal, nothing written; the proof-list objects are still refused by the migration proof first, with its message | 0012:D8:R1; exit 2 is the code install's guard has today. |
-| 9 | `operator install` with a record; a rendered object new to the inventory exists and is foreign or another instance's | exit 0; no guard ran, applied over | exit 2; guard refusal, nothing written | 0012:D8:R1. |
+| 6 | Any apply; an existing object carries the adopt annotation with this instance's UUID | exit 1 on a first apply when OPM does not manage it | exit 0; applied and recorded | enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override"). |
+| 7 | Any apply but `operator install`; an object's adopt annotation names another instance (in the inventory, or outside it when OPM manages it) | exit 0; applied over | exit 0; not applied, one warning, not recorded | enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override"). No code change. |
+| 8 | `operator install`, no record; a rendered object exists, OPM-managed, UUID label of another instance | exit 0; applied over. For an object on the proof list of an earlier operator manifest (the CRDs, the Namespace, the controller Deployment and others) the migration proof already refused it, exit 2 | exit 2; guard refusal, nothing written; the proof-list objects are still refused by the migration proof first, with its message | enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override"); exit 2 is the code install's guard has today. |
+| 9 | `operator install` with a record; a rendered object new to the inventory exists and is foreign or another instance's | exit 0; no guard ran, applied over | exit 2; guard refusal, nothing written | enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override"). |
 | 10 | `operator install` with a record; the guard's read of a rendered object fails | no guard ran | exit 2, nothing written | The rule the guard has today without a record, now with one. |
 | 11 | `operator install`; a rendered object's adopt annotation names another instance | exit 0; applied over | exit 2; guard refusal naming the object and the instance, nothing written | Owner decision of 2026-10-08. |
 
@@ -167,14 +167,14 @@ Each object line of a refusal, and the warning of row 7, is the library's text a
 
 - Assets: objects in the cluster that this instance did not create, and their data.
 - Trust boundary: the cluster API. Live labels and annotations are input that any principal with patch rights on the object can set.
-- Threats and mitigations: taking over a foreign object on apply (the guard on every apply, before the first write); deciding on a read that failed (fails closed). Baseline: the contract of 0012:D8 and the library's verdict tests.
+- Threats and mitigations: taking over a foreign object on apply (the guard on every apply, before the first write); deciding on a read that failed (fails closed). Baseline: the contract of enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override") and the library's verdict tests.
 - Residual risk, owner: the cli maintainers. A principal with patch rights on an object can set the adopt annotation. With this instance's UUID, the object is taken over by the instance on its next apply. With another UUID, the instance stops applying the object, so it no longer receives the module's updates, and `opm operator install` is blocked while one of its objects carries such an annotation. Patch rights do not include delete rights, so for some principals this is more than they could do before.
 - Detection: every let-go prints a warning on every apply that names the object and the instance in the annotation; every refusal names the object and the owner.
 - Refusal messages carry object names and instance UUIDs. Neither is a secret.
 
 ## Risks / Trade-offs
 
-Refusals that hit a user's own objects. Each follows 0012:D8:R1 or R5; each is in the migration note and the docs page with its remedy.
+Refusals that hit a user's own objects. Each follows enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override") or R5; each is in the migration note and the docs page with its remedy.
 
 - [Leftover CRDs and Namespaces] `instance delete` and `operator uninstall` never delete them and leave their labels. A reinstall under another instance name, namespace or module path meets objects of an instance that no longer exists and is refused as `other-instance` (exit 1; 2 in `operator install`). Today it passes with a warning. -> Remedy: annotate each leftover with `opmodel.dev/adopt=<new UUID>`, as the refusal prints, or delete the leftovers when nothing else uses them.
 - [No record and a changed identity] The record was deleted, or the instance was last recorded in a legacy Secret, and its module path changed. Every object is refused as `other-instance`. -> Remedy: annotate each object; nothing has to be removed. The cli's extra line says so.

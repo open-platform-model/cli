@@ -1,6 +1,6 @@
 //go:build ignore
 
-// Render-digest parity check (0006:D30 gate).
+// Render-digest parity check (enhancement 0006 gate).
 //
 // Renders the SAME module two ways and requires byte-identical render digests:
 //
@@ -14,10 +14,10 @@
 // Both paths render through Kernel.Render against the same platform module
 // directory (hack/platform/, passed to path A as --platform) with
 // RuntimeName "opm-cli". The shared render digest leaves the runtime's
-// app.kubernetes.io/managed-by value out (0012:D6), so the runtime name
+// app.kubernetes.io/managed-by value out (enhancement 0012), so the runtime name
 // would not move it; it is held constant anyway so the two paths differ in
 // nothing but how they load the module. Load-path equivalence is what this
-// check proves (local staging ≡ registry acquisition; 0006:D37/D6).
+// check proves (local staging ≡ registry acquisition; enhancement 0006).
 //
 // Requires: registry serving testing.opmodel.dev/modules/cli/podinfo@v0 at the
 // fixture's version, the catalogs, and core — SKIPs otherwise unless

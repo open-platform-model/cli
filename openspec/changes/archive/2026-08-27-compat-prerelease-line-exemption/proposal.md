@@ -1,6 +1,6 @@
 ## Why
 
-Enhancement 0011 D9 keys the compatibility promise to a member's own `apiVersion` (0010 D34), so a `v1beta1` member on the `2.0.0-alpha.N` module line is already bound to additive-only evolution. `catalog_opm`'s constitution permits `feat!:` to tighten a published constraint while the line is alpha, and enhancement 0019 lands three such slices (`catalog-name-constraints`, D15 removal, D19 carve-outs). PR 51 is refused today on `#ExposeTrait.spec.expose.name` (cli issue 165). 0011 D26 clause 2 resolves the collision: while the module's own version is a prerelease, beta/GA members are exempt, visibly, and the gate arms at the first stable tag of the major.
+Enhancement 0011 ("`opm catalog publish` refuses a build that breaks a contract it already published") keys the compatibility promise to a member's own `apiVersion` (enhancement 0010, "Contract API versions follow the Kubernetes ladder, and the promise is keyed to the level"), so a `v1beta1` member on the `2.0.0-alpha.N` module line is already bound to additive-only evolution. `catalog_opm`'s constitution permits `feat!:` to tighten a published constraint while the line is alpha, and enhancement 0019 lands three such slices (`catalog-name-constraints`, the removal and carve-out decisions of enhancement 0019). PR 51 is refused today on `#ExposeTrait.spec.expose.name` (cli issue 165). Enhancement 0011 ("The compatibility gate ignores dev builds and stands down while the module line is itself a prerelease") clause 2 resolves the collision: while the module's own version is a prerelease, beta/GA members are exempt, visibly, and the gate arms at the first stable tag of the major.
 
 Ordering: this change lands after `compat-dev-tag-exemption` and after the library change fixing the comparator's nested-provenance and matchN false positives; without the latter the exemption would hide comparator defects that will refuse legitimately additive changes on a stable line.
 
@@ -26,4 +26,4 @@ Ordering: this change lands after `compat-dev-tag-exemption` and after the libra
 
 - `internal/publish/compat.go` (`gateCompat`, `eligibleByPackage` or a wrapper, `CatalogGateOutcomes.CompatPrerelease`), `plan.go`, `check.go`, tests.
 - Downstream: `catalog_opm` `ci.yml` dry-run on PR 51 passes with `2 prerelease-exempt`; `catalog_opm` bumps its pinned `opm` afterwards (delivery).
-- Implements enhancement 0011 D26 (clause 2); see `enhancement.yaml`.
+- Implements enhancement 0011 ("The compatibility gate ignores dev builds and stands down while the module line is itself a prerelease") (clause 2); see `enhancement.yaml`.

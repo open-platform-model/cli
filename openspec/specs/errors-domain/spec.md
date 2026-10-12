@@ -28,7 +28,7 @@ All error types SHALL be defined in `pkg/errors/`. The package SHALL export `Det
 
 The cli SHALL decide what a registry fetch failure or a dependency resolution failure means (an
 exit code, a retry, "absent", a hint) from the typed error the library gives it, and SHALL NOT
-decide it from the text of the error message. Source: 0021:D8:R12.
+decide it from the text of the error message. Source: enhancement 0021 ("A beta line reaches GA only when its exit criteria hold").
 
 Where the cause is a CUE evaluation error, the cli SHALL read the error's path, never its text.
 
