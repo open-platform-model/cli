@@ -5,5 +5,5 @@ The Open Platform Model (OPM) quickstart is one page, kept in the `opm` repo and
 What that page needs from this repo is here:
 
 - To install `opm`, see [Install the CLI](docs/site/start/install-the-cli.md)
-- To build and test `opm` from this checkout, see "Build And Dev Commands" in [`AGENTS.md`](AGENTS.md)
+- To build and test `opm` from this checkout, see the Commands table in [`AGENTS.md`](AGENTS.md)
 - For the commands and how they fit together, see [`README.md`](README.md)
