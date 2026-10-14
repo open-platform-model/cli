@@ -2,7 +2,7 @@
 
 Covers how the cascade and release workflows hold the App keys, which permissions they declare, the
 five `.github` SHA pins, and the wiring check that enforces them. The task itself is in
-the receiver workflow and the deps task. The `.github` README section "The wiring check" owns the check's design.
+the receiver workflow and the deps task. The `.github` README owns the check's design.
 
 ## Contents
 
@@ -36,9 +36,9 @@ A `.github` change reaches the cli only through a PR titled `ci(deps): pin the c
 
 ## The wiring check
 
-`.tasks/cascade/wiring-check.sh` is a byte-identical copy of `.github`'s
-`.github/scripts/cascade/wiring-check.sh` at the pinned SHA. Only the pin PR replaces it. Never edit
-the copy; change it in `.github`. The cli's values are in `.tasks/cascade/wiring-check.yaml`.
+The wiring-check script in `.tasks/cascade/` is a byte-identical copy of the one in `.github`
+(`.github/scripts/cascade/`) at the pinned SHA. Only the pin PR replaces it. Never edit
+the copy; change it in `.github`. The cli's values are in a config file beside it.
 
 It refuses a PR that breaks any of this by mistake:
 
@@ -46,7 +46,7 @@ It refuses a PR that breaks any of this by mistake:
 - an Actions cache in `release.yml`, `publish-fixtures.yml` or `docs.yml`;
 - workflow-level `env` in `release.yml`.
 
-`pr.yml`'s required `Lint` job runs `bash .tasks/cascade/wiring-check.sh --pin-on-main` with the
+`pr.yml`'s required `Lint` job runs the wiring-check script with `--pin-on-main` with the
 job's token. That run also asks the GitHub API two things: that the SHA is on `.github`'s `main`, and
 that the copy has exactly the bytes of the file at that SHA. So only SHA-pinned actions may come
 before that step, and the workflow and job `env` may name only `CUE_*`, `OPM_*`, `REGISTRY` or
@@ -67,7 +67,7 @@ before that step, and the workflow and job `env` may name only `CUE_*`, `OPM_*`,
 
 ## Pitfalls
 
-- Editing `wiring-check.sh` in the cli: the byte comparison fails. Change `.github` and send a pin PR.
+- Editing the wiring-check copy in the cli: the byte comparison fails. Change `.github` and send a pin PR.
 - Moving only some of the five SHA references: the check fails.
 - Adding a workflow-level `env` to `release.yml`: refused.
 - Adding an Actions cache to a publishing workflow: refused.

@@ -26,7 +26,7 @@ opmodel.dev consumes it, and how to recover a release that has none. The design 
 - in its manifest, the library, core and opm-operator versions the cli pins.
 
 `hack/docskit-dump` is not linked into `opm`. Its test keeps the pins equal to `go.mod`, the library's
-`opm/schema/loader.go` and `internal/operator/pin.go`.
+the library's schema loader and the operator pin file in `internal/operator/`.
 
 ## Workflows
 
@@ -69,7 +69,7 @@ after opmodel.dev runs that release. Dependabot ignores both, and the
   `.opm-docs-version`.
 - The release-pin gate (`task deps:release-check`, run on release PRs) refuses a release whose docs
   pins lack a bundle in `ghcr.io/open-platform-model/docs`. The lookup is
-  `.github/scripts/docs-pins-check.sh`.
+  a script in `.github/scripts/`.
 - `pr.yml`'s `Lint` job also runs that script as a warning (`--warn --moved-from <base>`) on every PR
   that moves the library or `PinnedOperatorVersion`, the cascade PR included, so a missing bundle
   shows up before the release PR.

@@ -52,7 +52,7 @@ repairing the operator never depends on the Platform it serves (enhancement 0021
 | `instance diff`, `instance apply`, `module apply` | Yes | Fall back to the deps only when the cluster has no readable Platform; an unreachable cluster fails them |
 
 `opm instance` commands take only instance packages and decide by package kind. A module package is
-refused, naming the matching `opm module` command (`cmdutil.ModulePackageError`).
+refused, naming the matching `opm module` command (a shared helper in `internal/cmdutil/`).
 
 ## The deps platform and the cache
 
@@ -71,12 +71,12 @@ checked. The provenance line names the source (`module deps` or `instance deps` 
 - Catalog version skew follows the config file's `skewPolicy` (`warn` by default, or `refuse`) for
   `--platform` directories. The cluster CR's `spec.skewPolicy` wins when the CR is the source.
 - A `--platform` module that pins a core older than a field the kernel reads is refused before the
-  render, with the library's message plus a hint (`refusalHint`) naming the directory and the
+  render, with the library's message plus a hint naming the directory and the
   `cue mod get` re-pin command.
 - There is no local default platform. `opm config init` writes `~/.opm/config.cue` only, and no
   command reads a platform from the OPM home. `opm config vet` warns about a platform directory an
   older release left there. The repo's maintained platform module is `hack/platform/`, passed with
-  `--platform` by the offline tests. `hack/kind-platform.yaml` mirrors its pins in the same commit,
+  `--platform` by the offline tests. the kind Platform manifest in `hack/` mirrors its pins in the same commit,
   and `task -x deps:cascade` moves both.
 
 ## Module path arguments
@@ -84,7 +84,7 @@ checked. The provenance line names the source (`module deps` or `instance deps` 
 `opm module build` and `opm module apply` (not `vet`) also take a published module path
 (`internal/modref`). The module is acquired with `AcquireModuleFromRegistry` and synthesized exactly
 as a directory module, with no local module context: no replacements and no local render provenance.
-`cmdutil.ResolveModuleArg` classifies the positional argument.
+A helper in `internal/cmdutil/` classifies the positional argument.
 
 ## `--skip-unprovided`
 
@@ -95,8 +95,8 @@ a skipped resource drops the whole component. Which demands are skippable is the
 
 The cli only:
 
-- words the `Diagnostics.Skipped` rows (`render.formatSkipped`, as warnings on the log stream);
-- on a refusal with a row marked `Unprovided`, adds a hint (`refusalHint`) naming the three ways out
+- words the `Diagnostics.Skipped` rows (as warnings on the log stream);
+- on a refusal with a row marked `Unprovided`, adds a hint naming the three ways out
   for every platform source;
 - records skips on the ModuleInstance in `instance apply` and `module apply`, as the annotation
   `module-instance.opmodel.dev/skipped-contracts` (sorted `<component>=<fqn>` pairs; omitted, and so
@@ -106,7 +106,7 @@ The cli only:
 
 A platform whose enabled registry entries share a contract key is refused by the kernel, whatever the
 instance and whatever `--skip-unprovided` says. The cli prints the kernel's collision rows first
-(`render.formatRenderDiagnostics`) and adds no hint.
+(in `internal/workflow/render/`) and adds no hint.
 
 ## Pitfalls
 

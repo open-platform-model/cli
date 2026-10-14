@@ -46,7 +46,7 @@ failed the required `Lint` job twice on 2026-10-08. The committed schema is unde
 
 ## The offline check
 
-`task lint:config` runs `.github/scripts/lint-config-check.sh`. CI's `Lint` jobs run the same script.
+`task lint:config` runs a script in `.github/scripts/`. CI's `Lint` jobs run the same script.
 It checks, with no network, that:
 
 - `.golangci-lint-version`, the committed schema and the workflows' use of the golangci-lint action

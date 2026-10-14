@@ -24,29 +24,26 @@ The remote has no `v1` or `release/*` branch (checked 2026-10-14).
   `opm/k8s/object`, `opm/k8s/labels` (import as `opmlabels`), `opm/k8s/inventory` (import as
   `k8sinventory`) and `opm/k8s/health` (import as `health`). A `depguard` rule in `.golangci.yml`
   refuses the retired `pkg/core`, `pkg/resourceorder` and `pkg/inventory` paths, and
-  `TestNoLocalHealthEvaluator` (`internal/kubernetes/health_refusal_test.go`) refuses a local
-  readiness evaluator.
+  a refusal test in `internal/kubernetes/` fails on a local readiness evaluator.
 - Read no error text. Read a registry fetch or dependency answer from the library's typed errors
   (`liberrors.Classify`, `*FetchError`, `*ResolutionError`), and a CUE failure from its error path
-  (`internal/config` `cueErrorUnder`). `TestNoErrorTextMatch`
-  (`pkg/errors/textmatch_refusal_test.go`) refuses a new text match in non-test code and lists the
+  (the error-path helper in `internal/config/`). A refusal test in `pkg/errors/` refuses a new text match in non-test code and lists the
   four that stay, each with the typed cause that is missing. It reads syntax, not types: it misses a
   message built by formatting the error (`fmt.Sprint(err)`) or passed on as a string. Pass the error,
   never its text.
-- Only `RunDeletion` (`internal/kubernetes/deletion.go`) deletes an object of an instance.
-  `TestDeleteCallSites` (`internal/kubernetes/deletesites_test.go`) lists the only functions that may
-  send a DELETE.
+- One deletion function in `internal/kubernetes/` deletes the objects of an instance, following the
+  library's deletion plan. A test in that folder lists the only functions that may send a DELETE.
 - `internal/cuemod` is the only site of `os.Chdir` and `os.Setenv`. `cmd/cue` reads the module root
   from the working directory and the registry from `CUE_REGISTRY`, so `Tidy` sets both under a
   package mutex and restores them on every return path.
-- The only writer of `internal/operator/pin.go` is `hack/operator-pin` (`task operator:pin
-  VERSION=<module version>`). Do not hand-edit the file.
-- Ship changes as mergeable sections, each ending green with its own commit (`CONSTITUTION.md`
-  section VIII). Prefer updating an existing package over a new abstraction, unless duplication or
+- The operator pin file in `internal/operator/` is written only by `hack/operator-pin` (`task
+  operator:pin VERSION=<module version>`). Do not hand-edit it.
+- Ship changes as sections that each merge green with their own commit (`CONSTITUTION.md` has the
+  principle). Prefer updating an existing package over a new abstraction, unless duplication or
   coupling justifies it.
 - A comment names an enhancement only where the rationale lives there. In CUE the reference goes in a
-  `// WHY` block, one blank line below the doc comment, because `cue lsp` hover, `Value.Doc()` and
-  `cue def` replay a doc comment verbatim. Never cite an enhancement in scaffold templates,
+  `// WHY` block, one blank line below the doc comment, because `cue lsp` hover, the doc-comment
+  accessor of the CUE API and `cue def` replay a doc comment verbatim. Never cite an enhancement in scaffold templates,
   generated files, fixtures a user copies or CLI output strings: their readers have no access to the
   enhancements store. `task cite-lint` checks comments.
 
@@ -67,10 +64,10 @@ internal/dockercfg/        read-modify-write of the docker credential file (`reg
 internal/exit/             exit codes: 0 ok, 1 general, 2 validation, 3 connectivity, 4 permission, 5 not found
 internal/instinit/         the `opm instance init` package generator
 internal/inventory/        instance inventory records, ownership, discovery and prune gates
-internal/kubernetes/       cluster ops: status, apply, delete (`RunDeletion`), events
+internal/kubernetes/       cluster ops: status, apply, delete, events
 internal/modref/           published-module resolution: path grammar, `--version` selector, core-compatible walk;
                            apart from `scaffold` because their template grammar and selector differ on purpose
-internal/operator/         `opm operator install` and `uninstall`; `pin.go` is written by `hack/operator-pin`
+internal/operator/         `opm operator install` and `uninstall`; its pin file is written by `hack/operator-pin`
 internal/output/           terminal formatting, log output, tables, manifests
 internal/platform/         platform-source resolution and the Platform seed for `operator install`
 internal/publish/          identity-driven publish pipeline: gates, refusals, plan, registry push
@@ -78,10 +75,10 @@ internal/scaffold/         fetch-based `module init` engine: template refs, re-i
 internal/version/          build version values
 internal/workflow/         render, apply and query orchestration; `render` makes the one `Kernel.Render` call
 pkg/errors/                shared structured errors; import as `oerrors`
-pkg/loader/                local-replacement provenance (module root, `cue.mod/local-module.cue`)
+pkg/loader/                local-replacement provenance (module root, local-module replacements)
 templates/                 official template modules (`minimal`, `standard`, `advanced`)
 hack/docskit-dump/         program docs-kit runs for the command reference; not linked into `opm`
-hack/operator-pin/         writes `internal/operator/pin.go`; not linked into `opm`
+hack/operator-pin/         writes the operator pin file; not linked into `opm`
 hack/platform/             maintained platform module for offline tests
 tests/fixtures/            fixture modules on `testing.opmodel.dev`; `tests/e2e/` end-to-end Go tests
 tests/integration/         integration programs run with `go run`
@@ -108,7 +105,7 @@ openspec/                  specs, active changes and archive
 | `task cluster:create` / `cluster:operator` / `cluster:delete` | Make, prepare, remove the `opm-dev` kind cluster | Cluster tests |
 | `task docs:bundle` / `docs:bundle:check` | Build / check the docs bundle | After a help or docs page change |
 | `task cascade:wiring:check` | Offline cascade wiring check | After a workflow change |
-| `task operator:pin VERSION=...` | Rewrite `internal/operator/pin.go` | Move the operator pin |
+| `task operator:pin VERSION=...` | Rewrite the operator pin file | Move the operator pin |
 | `task -x deps:cascade` (`:title`, `:body`, `:test`) | Move upstream pins in the working tree; `-x` is required | Cascade work |
 | `task check` | `fmt`, `vet`, `lint`, `cite-lint`, `openspec:check`, `docs:bundle:check`, all tests | Before you finish |
 

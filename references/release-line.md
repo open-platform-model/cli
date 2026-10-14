@@ -27,8 +27,8 @@ The key takes effect only once a releasable (visible-type) commit has landed sin
 A hidden-type key PR alone opens no release PR. So the key PR is itself of a releasable type, or it
 lands after a releasable commit since the last release.
 
-A `Release-As:` footer never reaches `main` under the `BLANK` squash message (`RELEASING.md`, section
-"Owner settings").
+A `Release-As:` footer never reaches `main` under the `BLANK` squash message (see `RELEASING.md`, owner
+settings).
 
 ## Beta promise and breaking changes
 
@@ -38,8 +38,7 @@ to GA.
 - A break is allowed in beta only as a `!` in the PR title (`feat!:`). That title is the squash
   commit title and the CHANGELOG entry.
 - Merge by squash only, and give a one-commit PR's commit subject the same `!`. Reason: a merge
-  commit would carry no `!` title. The owner merge settings are in `RELEASING.md`, section "Owner
-  settings".
+  commit would carry no `!` title. The owner merge settings are in `RELEASING.md`.
 - The migration note goes in the PR body, and in the user docs when users need it to upgrade.
 - Whoever merges the release PR edits its `CHANGELOG.md` by hand to carry the note, as the last step
   before merging. Redo the edit if anything landed on `main` since: release-please rebuilds the
@@ -67,7 +66,7 @@ operator ceiling gate compares MAJOR.MINOR only and refuses nothing inside the `
 - The release-pin gate also refuses a release whose docs pins lack a bundle in
   `ghcr.io/open-platform-model/docs`: a cli release must not merge before core, the library and
   opm-operator have bundles for every version it pins.
-- See `RELEASING.md`, section "Gates".
+- `RELEASING.md` describes the gates.
 
 A broken release is fixed by the next release, with a Go `retract` when the broken version must not be
 selected. A published GitHub Release is never deleted. A draft release is finished with the release

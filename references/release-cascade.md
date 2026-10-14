@@ -2,8 +2,8 @@
 
 Covers `task -x deps:cascade`, the `deps/cascade` PR, the receiver workflow, the downstream notify and
 the cascade gates. The design (release
-order, pin classes, gates G1 to G3) is in `RELEASING.md` at the workspace root, sections "The
-cascade", "Pinning the cascade code", "Moving the cascade pin" and "Stop switches".
+order, pin classes, gates G1 to G3) is in `RELEASING.md` at the workspace root, which covers the cascade, the
+code pin and the stop switches.
 
 ## Contents
 
@@ -24,7 +24,7 @@ published versions, in the working tree only:
 - the operator module pin, through `hack/operator-pin`: the newest `opmodel.dev/modules/opm_operator`
   release whose operator `MAJOR.MINOR` is not above the cli's (`hack/operator-pin select` reads each
   candidate, so the lane needs Go and anonymous GHCR read);
-- the opm catalog and core in `templates/`, `hack/platform`, `hack/kind-platform.yaml`, `examples/`,
+- the opm catalog and core in `templates/`, `hack/platform`, the kind Platform manifest in `hack/`, `examples/`,
   the podinfo fixture and the test trees.
 
 It exits 0 on a change and 3 on nothing to do. It runs no code from a moved dependency. The only Go

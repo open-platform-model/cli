@@ -27,8 +27,8 @@ Covers the local `kind` cluster tasks, what `task cluster:operator` prepares, an
 `task cluster:operator` is the complete path to a reconciling operator on `kind-opm-dev`:
 
 1. It installs the pinned operator module with `--skip-platform`.
-2. It applies `hack/kind-platform.yaml` as the cluster Platform.
-3. It applies the dev-only applier grant `hack/kind-operator-rbac.yaml`.
+2. It applies the kind Platform manifest in `hack/` as the cluster Platform.
+3. It applies the dev-only applier grant the RBAC manifest in `hack/`.
 
 `opm operator install` alone does neither step 2 nor step 3. The operator-owned e2e tests then fail at their
 applier precondition (`operator applier ... may not patch services`) and name `task cluster:operator`
@@ -46,12 +46,12 @@ and `Stalled` conditions.
 runs the e2e suite against a real cluster and the pinned operator module. The check keeps its old name
 because the `main` ruleset requires it.
 
-It runs on every pull request, but does the work only when `.github/scripts/e2e-cluster-applies.sh`
+It runs on every pull request, but does the work only when a script in `.github/scripts/`
 says it applies to an open pull request:
 
 - a change under `internal/operator/`, `internal/cmd/operator/`, `templates/` or `hack/platform/`;
-- a change to the job's own inputs: the workflow and that script, `Taskfile.yml`, `hack/fixtures.sh`,
-  `hack/kind-{config,platform,operator-rbac}.yaml`, `hack/opm-config.cue`, a Go file directly under
+- a change to the job's own inputs: the workflow and that script, `Taskfile.yml`, the fixtures script
+  and the kind and config files in `hack/`, a Go file directly under
   `tests/e2e/`, `tests/e2e/testdata/operator-owned/`;
 - the cascade branch `deps/cascade` or the label `deps-cascade`;
 - a release-please pull request;
@@ -74,7 +74,7 @@ No local registry is required for the kind flow. `task cluster:operator` install
 module from GHCR and relies on the operator's built-in `--registry` default, which routes both domains
 to GHCR. It passes the mapping as the operator instance's `registry` value (a values file, recorded on
 the instance). It never patches the Deployment. The shipped CLI default
-(`internal/config/templates.go`) matches.
+(in `internal/config/`) matches.
 
 It requires the `opm-registry` container only when `KIND_CUE_REGISTRY` is set, which is the opt-in
 path for iterating on a locally published module. Use the in-cluster spelling (see the comment in
@@ -86,8 +86,8 @@ path for iterating on a locally published module. Use the in-cluster spelling (s
 - Reading `status.operatorVersion` as ready: wait for `observedGeneration` to match.
 - Running the suite on a shared cluster: the lifecycle test removes the operator.
 - A stale `OPM_CONFIG` in your shell: run the suite with `env -u OPM_CONFIG`. The e2e helper passes the
-  full parent environment (`tests/e2e/mod_build_test.go:44`), and `OPM_CONFIG` wins over the seeded
-  home (`internal/config/resolver.go:105-123`).
+  full parent environment (the e2e command helper in `tests/e2e/`), and `OPM_CONFIG` wins over the seeded
+  home (the config path resolver in `internal/config/`).
 - Skipped e2e tests read as a pass: set `OPM_E2E_REQUIRE_CLUSTER=1`.
 - Renaming the CI check: the `main` ruleset requires the current name.
 - Setting `KIND_CUE_REGISTRY` by habit: it adds a local registry dependency.

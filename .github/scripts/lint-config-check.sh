@@ -28,7 +28,7 @@
 # The schema is jsonschema/golangci.jsonschema.json of
 # github.com/golangci/golangci-lint at the tag the version file names (the
 # file golangci-lint.run serves as golangci.vX.Y.jsonschema.json). To move
-# the linter: references/lint-config.md, "Moving the version".
+# the linter: references/lint-config.md.
 #
 # Usage: lint-config-check.sh [--root DIR]
 #
