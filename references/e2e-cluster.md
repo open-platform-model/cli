@@ -30,7 +30,7 @@ Covers the local `kind` cluster tasks, what `task cluster:operator` prepares, an
 2. It applies `hack/kind-platform.yaml` as the cluster Platform.
 3. It applies the dev-only applier grant `hack/kind-operator-rbac.yaml`.
 
-`opm operator install` alone does steps 2 and 3 never. The operator-owned e2e tests then fail at their
+`opm operator install` alone does neither step 2 nor step 3. The operator-owned e2e tests then fail at their
 applier precondition (`operator applier ... may not patch services`) and name `task cluster:operator`
 as the remedy.
 
@@ -85,6 +85,9 @@ path for iterating on a locally published module. Use the in-cluster spelling (s
 - Running `opm operator install` and the operator-owned e2e tests: run `task cluster:operator`.
 - Reading `status.operatorVersion` as ready: wait for `observedGeneration` to match.
 - Running the suite on a shared cluster: the lifecycle test removes the operator.
+- A stale `OPM_CONFIG` in your shell: run the suite with `env -u OPM_CONFIG`. The e2e helper passes the
+  full parent environment (`tests/e2e/mod_build_test.go:44`), and `OPM_CONFIG` wins over the seeded
+  home (`internal/config/resolver.go:105-123`).
 - Skipped e2e tests read as a pass: set `OPM_E2E_REQUIRE_CLUSTER=1`.
 - Renaming the CI check: the `main` ruleset requires the current name.
 - Setting `KIND_CUE_REGISTRY` by habit: it adds a local registry dependency.

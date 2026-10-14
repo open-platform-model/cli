@@ -6,6 +6,7 @@ kernel's matching rules; those are the library's.
 
 ## Contents
 
+- Schema line
 - Platform source precedence
 - Per command behavior
 - The deps platform and the cache
@@ -14,6 +15,14 @@ kernel's matching rules; those are the library's.
 - `--skip-unprovided`
 - Pitfalls
 - Check before you finish
+
+## Schema line
+
+The cli embeds the library on the core v2 line. The cluster Platform CR surface is scalar
+subscriptions (`{enable?, version!}`, registry keys carry the catalog's major suffix), and module
+identity is read verbatim from core-v2 metadata (`metadata.modulePath` is the complete registry
+address). CUE fixtures lag the shipped pins until the next `task -x deps:cascade` run moves them, so
+read a fixture's own `cue.mod` for its versions.
 
 ## Platform source precedence
 

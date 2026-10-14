@@ -21,7 +21,7 @@ without breaking the offline config check. It does not cover Go style; that is i
 - `gocyclo` threshold is 15. Refactor before complexity grows.
 - Tests relax `dupl`, `errcheck`, `goconst` and `gosec`.
 - `.golangci.yml` excludes `examples` from lint and format. It also lists `third_party`, `builtin` and
-  `experiments` patterns; none of those directories exists in the tree today.
+  `experiments` patterns; none of those directories existed on 2026-10-14.
 
 ## Where the version lives
 

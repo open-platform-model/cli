@@ -73,9 +73,6 @@ A brand-new template needs one manual step. After its first publish the owner ma
 (`opmodel.dev/templates/<name>`) public in the package settings, because `opm module init` and the
 gate both read it anonymously. Until then every release fails for that template.
 
-Never type a `templates/` edit as `docs`. Pins in `templates/*` are shipped, so a bump is
-`fix(deps)`. Bumps of `examples/*`, `tests/fixtures/*` and `hack/platform/` are `test(fixtures)`.
-
 ## Pitfalls
 
 - A fixture under `opmodel.dev/*`: move it to `testing.opmodel.dev/*`.
@@ -89,4 +86,3 @@ Never type a `templates/` edit as `docs`. Pins in `templates/*` are shipped, so 
 - [ ] The fixture or template version moved with `opm module version set`.
 - [ ] `task test:fixtures` passes for a fixture change.
 - [ ] The workspace `task fixtures:lint` passes after an edit to a shared copy.
-- [ ] The commit type matches the pin class.

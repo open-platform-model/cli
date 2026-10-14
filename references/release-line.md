@@ -1,8 +1,7 @@
 # Release line: beta, breaking changes and release PRs
 
 Covers the cli's `1.0.0-beta.N` line, how to change it, how a break is typed during beta, and the
-gates a release PR passes. The cascade that moves pins is in `release-cascade.md`. Tag and recovery
-rules are in the workspace `references/releases.md`; the design is in `RELEASING.md` at the workspace
+gates a release PR passes. The design is in `RELEASING.md` at the workspace
 root.
 
 ## Contents
@@ -18,13 +17,6 @@ root.
 ## The line
 
 The cli releases on the `1.0.0-beta.N` line (`prerelease-type: beta` in `release-please-config.json`).
-The cli embeds the library on the core v2 line. The cluster Platform CR surface is scalar
-subscriptions (`{enable?, version!}`, registry keys carry the catalog's major suffix), and module
-identity is read verbatim from core-v2 metadata (`metadata.modulePath` is the complete registry
-address).
-
-release-please hides `chore`, `test`, `ci`, `build` and `docs`. It releases `feat`, `fix`, `perf`,
-`revert`, `deps` and `refactor`.
 
 ## Changing the line
 
@@ -45,8 +37,9 @@ to GA.
 
 - A break is allowed in beta only as a `!` in the PR title (`feat!:`). That title is the squash
   commit title and the CHANGELOG entry.
-- Until the owner merge settings land, merge by squash only, and give a one-commit PR's commit subject
-  the same `!`.
+- Merge by squash only, and give a one-commit PR's commit subject the same `!`. Reason: a merge
+  commit would carry no `!` title. The owner merge settings are in `RELEASING.md`, section "Owner
+  settings".
 - The migration note goes in the PR body, and in the user docs when users need it to upgrade.
 - Whoever merges the release PR edits its `CHANGELOG.md` by hand to carry the note, as the last step
   before merging. Redo the edit if anything landed on `main` since: release-please rebuilds the
@@ -70,8 +63,10 @@ operator ceiling gate compares MAJOR.MINOR only and refuses nothing inside the `
   operator module must be published and `PinnedOperatorVersion` must be the operator release it
   states.
 - The required check `E2E (kind, embedded operator)` runs the cluster-backed e2e suite on every
-  release PR (`e2e-cluster.md`).
-- The release-pin gate also refuses a release whose docs pins lack a bundle (`docs-bundles.md`).
+  release PR, even when no path filter matches.
+- The release-pin gate also refuses a release whose docs pins lack a bundle in
+  `ghcr.io/open-platform-model/docs`: a cli release must not merge before core, the library and
+  opm-operator have bundles for every version it pins.
 - See `RELEASING.md`, section "Gates".
 
 A broken release is fixed by the next release, with a Go `retract` when the broken version must not be

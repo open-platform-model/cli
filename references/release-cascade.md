@@ -1,7 +1,7 @@
 # Release cascade: the deps task and its receivers
 
 Covers `task -x deps:cascade`, the `deps/cascade` PR, the receiver workflow, the downstream notify and
-the cascade gates. Secrets, permissions and the SHA pin are in `cascade-wiring.md`. The design (release
+the cascade gates. The design (release
 order, pin classes, gates G1 to G3) is in `RELEASING.md` at the workspace root, sections "The
 cascade", "Pinning the cascade code", "Moving the cascade pin" and "Stop switches".
 
@@ -43,7 +43,8 @@ docs-bundle check lives in the PR's CI, not in the task.
   or set `CASCADE_RESOLVER`.
 - `.cascade-frozen` and `.cascade-hold` steer it.
 - Do not run the workspace root `deps:update`, `deps:update:templates` or `deps:pins:*` against the
-  cli. They move core past the catalog's pin and ignore those files, until Phase 5 rewires them.
+  cli. They move core past the catalog's pin and ignore those files; as of 2026-10-14 they are not
+  rewired for the cli (Phase 5 of the cascade design).
 
 ## The receiver workflow
 
@@ -71,10 +72,6 @@ action. It dispatches to catalog_opm and opm-operator, which pin the cli as thei
 `.github/workflows/cascade-gates.yml` posts `cascade/freshness` and `cascade/settled` on PRs into
 `main`, as warnings set by `CASCADE_G2_MODE` and `CASCADE_G3_MODE`.
 
-Bump typing for the PR: the workspace `references/cascade.md`. In the cli, a shipped pin in
-`templates/*` is `fix(deps)`. Bumps of `examples/*`, `tests/fixtures/*` and `hack/platform/` are
-`test(fixtures)`.
-
 ## Pitfalls
 
 - Running `task deps:cascade` without `-x`: a nothing-to-do exit shows as 201.
@@ -87,5 +84,4 @@ Bump typing for the PR: the workspace `references/cascade.md`. In the cli, a shi
 
 - [ ] The task ran with `-x`, and exit 0 or 3 was read as change or nothing to do.
 - [ ] The resolver was available (`.github` beside this repo, or `CASCADE_RESOLVER`).
-- [ ] The PR type matches the pin class.
 - [ ] The release-pin and docs-pin gates are green before the release PR merges.
