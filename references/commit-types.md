@@ -42,7 +42,6 @@ and the change also bumps the template version with `opm module version set`.
 
 - `docs:` on a template edit: the template never publishes.
 - A break during beta is a `!` in the PR title: `feat!:`. With a scope, `feat(scope)!:`.
-- `feat!(scope):`: the `!` goes after the scope, `feat(scope)!:`, or release-please misses the break.
 - Lowering a cascade PR type to make it pass.
 
 ## Check before you finish
