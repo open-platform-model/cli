@@ -2,7 +2,7 @@
 
 Covers how the cascade and release workflows hold the App keys, which permissions they declare, the
 five `.github` SHA pins, and the wiring check that enforces them. The task itself is in
-the receiver workflow and the deps task. The `.github` README owns the check's design.
+the receiver workflow and the deps task. The `.github` `references/cascade-wiring-check.md` owns the check's design.
 
 ## Contents
 
