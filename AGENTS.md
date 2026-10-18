@@ -10,7 +10,7 @@ principles; `docs/STYLE.md` extends the workspace prose style.
 
 | Branch | What lands |
 | --- | --- |
-| `main` | All work, by PR. Releases are `1.0.0-beta.N` (`prerelease-type: beta` in `release-please-config.json`). |
+| `main` | All work, by PR. Releases are beta pre-releases (`prerelease-type: beta` in `release-please-config.json`; see `references/`). |
 
 The remote has no `v1` or `release/*` branch (checked 2026-10-14).
 
