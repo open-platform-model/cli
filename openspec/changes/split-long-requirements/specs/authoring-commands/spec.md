@@ -2,7 +2,7 @@
 
 ### Requirement: version set writes in place, idempotently, offline
 **Reason**: Split into requirements that each state one behavior.
-**Migration**: See "version set rewrites the identity Version in place", "Setting the already-declared version writes nothing", "version set performs no registry I/O", "An identity file of the wrong shape is refused with the path and a pointer to the conformance check", "The writer tolerates every authored form of the Version field and preserves the form it finds", "Every identity file the CLI emits uses the plain-literal form".
+**Migration**: See "version set rewrites the identity Version in place", "Setting the already-declared version writes nothing", "version set performs no registry I/O and refuses an identity file of the wrong shape", "The writer tolerates every authored form of the Version field and preserves the form it finds", "Every identity file the CLI emits uses the plain-literal form".
 
 ## ADDED Requirements
 
@@ -29,17 +29,9 @@ Setting the already-declared version SHALL write nothing — no file modificatio
 - **WHEN** `version set 1.3.0` runs against an identity already declaring `1.3.0`
 - **THEN** the file is not written and the command reports "already 1.3.0" with exit 0
 
-### Requirement: version set performs no registry I/O
+### Requirement: version set performs no registry I/O and refuses an identity file of the wrong shape
 
-The command SHALL perform no registry I/O.
-
-#### Scenario: No registry access
-- **WHEN** `opm module version set` or `opm catalog version set` runs
-- **THEN** the command SHALL perform no registry I/O
-
-### Requirement: An identity file of the wrong shape is refused with the path and a pointer to the conformance check
-
-An identity file that does not structurally match the schema-fixed shape SHALL be refused with the path it failed to find and a pointer to the kind's own full-conformance check — `opm module vet` for modules, `opm catalog publish --dry-run` for catalogs (no catalog vet exists, per `cli-catalog-gates`' recorded scope call).
+`opm module version set <semver> [path]` and `opm catalog version set <semver> [path]` SHALL perform no registry I/O; an identity file that does not structurally match the schema-fixed shape SHALL be refused with the path it failed to find and a pointer to the kind's own full-conformance check — `opm module vet` for modules, `opm catalog publish --dry-run` for catalogs (no catalog vet exists, per `cli-catalog-gates`' recorded scope call).
 
 #### Scenario: Structural refusal
 
@@ -50,6 +42,10 @@ An identity file that does not structurally match the schema-fixed shape SHALL b
 
 - **WHEN** `opm catalog version set` refuses a structurally non-conformant identity file
 - **THEN** the pointer names `opm catalog publish --dry-run`, never `opm module vet`
+
+#### Scenario: No registry access
+- **WHEN** `opm module version set` or `opm catalog version set` runs
+- **THEN** the command SHALL perform no registry I/O
 
 ### Requirement: The writer tolerates every authored form of the Version field and preserves the form it finds
 

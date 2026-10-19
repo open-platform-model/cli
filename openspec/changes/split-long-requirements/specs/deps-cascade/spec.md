@@ -2,7 +2,7 @@
 
 ### Requirement: The cascade task moves the cli's upstream pins to published versions
 **Reason**: Split into requirements that each state one behavior.
-**Migration**: See "The cascade task moves pins in the working tree only", "The library pin moves to the newest version the Go proxy serves in its major", "The operator module pin moves only through hack/operator-pin", "The operator module target is the newest release whose operator version is not above the cli's own", "The catalog and core pins cover a fixed set of cue.mod/module.cue files", "The catalog pin moves to the newest published catalog in its major", "The core pin moves to the core that the file's resulting catalog pins", "The kind platform catalog is raised to hack/platform's catalog", "No pin moves backwards, past a hold, or holds a catalog back by a lower core hold", "No pin moves to a version that is tagged but not yet published", "A pin listed in .cascade-frozen does not change", "cue mod get names only the moved keys and runs only where a pin moved", "Third-party pins are not named and a raised one is reported as a warning", "The task uses its own registry mapping", "The pin rules take their source from workspace RELEASING.md".
+**Migration**: See "The cascade task moves pins in the working tree only", "The library pin moves to the newest version the Go proxy serves in its major", "The operator module pin moves only through hack/operator-pin", "The operator module target is the newest release whose operator version is not above the cli's own", "The catalog and core pins cover a fixed set of cue.mod/module.cue files", "The catalog pin moves to the newest published catalog in its major", "The core pin moves to the core that the file's resulting catalog pins", "The kind platform catalog is raised to hack/platform's catalog", "No pin moves backwards, past a hold, or holds a catalog back by a lower core hold", "No pin moves to a version that is tagged but not yet published", "A pin listed in .cascade-frozen does not change", "cue mod get names only the moved keys and runs only where a pin moved", "Third-party pins are not named and a raised one is reported as a warning", "The task uses its own registry mapping".
 
 ### Requirement: The cascade task resolves before it edits and reports by exit code
 **Reason**: Split into requirements that each state one behavior.
@@ -28,7 +28,7 @@
 
 ### Requirement: The cascade task moves pins in the working tree only
 
-`task -x deps:cascade` SHALL move the following pins in the working tree only. It SHALL NOT commit, branch or push.
+`task -x deps:cascade` SHALL move the following pins in the working tree only. It SHALL NOT commit, branch or push. The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves".
 
 #### Scenario: Older pins move to the published set
 
@@ -43,7 +43,7 @@
 
 ### Requirement: The library pin moves to the newest version the Go proxy serves in its major
 
-`task -x deps:cascade` SHALL move the following pins in the working tree only. **library.** `github.com/open-platform-model/library` in `go.mod` SHALL move to the newest version the Go proxy serves in its major, through `go get <module>@<exact version>` followed by `go mod tidy`.
+`task -x deps:cascade` SHALL move the following pins in the working tree only. **library.** `github.com/open-platform-model/library` in `go.mod` SHALL move to the newest version the Go proxy serves in its major, through `go get <module>@<exact version>` followed by `go mod tidy`. The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves".
 
 #### Scenario: The library pin moves
 - **WHEN** the Go proxy serves a newer library version in its major
@@ -51,7 +51,7 @@
 
 ### Requirement: The operator module pin moves only through hack/operator-pin
 
-`task -x deps:cascade` SHALL move the following pins in the working tree only. **opm-operator module.** The operator module pin in `internal/operator/pin.go` (`PinnedModuleVersion` and `PinnedOperatorVersion`) SHALL move only through `hack/operator-pin <v>`, the program behind `task operator:pin VERSION=<v>`, built from the merge base like `opm`.
+`task -x deps:cascade` SHALL move the following pins in the working tree only. **opm-operator module.** The operator module pin in `internal/operator/pin.go` (`PinnedModuleVersion` and `PinnedOperatorVersion`) SHALL move only through `hack/operator-pin <v>`, the program behind `task operator:pin VERSION=<v>`, built from the merge base like `opm`. The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves".
 
 #### Scenario: The operator pin moves through the program
 - **WHEN** the operator module pin moves
@@ -59,7 +59,7 @@
 
 ### Requirement: The operator module target is the newest release whose operator version is not above the cli's own
 
-`task -x deps:cascade` SHALL move the following pins in the working tree only. **opm-operator module.** The target is the newest published release of `opmodel.dev/modules/opm_operator` in the pinned major whose stated operator version, read from the module's source without a render, has a `MAJOR.MINOR` not above the cli's own, the same rule install applies to a target module version.
+`task -x deps:cascade` SHALL move the following pins in the working tree only. **opm-operator module.** The target is the newest published release of `opmodel.dev/modules/opm_operator` in the pinned major whose stated operator version, read from the module's source without a render, has a `MAJOR.MINOR` not above the cli's own, the same rule install applies to a target module version. The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves".
 
 #### Scenario: The target stays within the cli MAJOR.MINOR
 - **WHEN** the operator module pin moves
@@ -67,7 +67,7 @@
 
 ### Requirement: The catalog and core pins cover a fixed set of cue.mod/module.cue files
 
-**Catalog and core as a consistent set.** This SHALL cover the `cue.mod/module.cue` files of the three templates, `hack/platform`, `examples`, `tests/fixtures/modules/podinfo`, `tests/e2e/testdata/operator-owned`, `internal/instinit/testdata/initvalues`, `internal/workflow/render/testdata/skip-unprovided`, `tests/e2e/testdata/duplicate-identities`, `tests/integration/module-apply/testdata`, `tests/fixtures/valid/simple-module` and `tests/fixtures/valid/module-with-debug-values`.
+**Catalog and core as a consistent set.** The consistent set SHALL cover the `cue.mod/module.cue` files of the three templates, `hack/platform`, `examples`, `tests/fixtures/modules/podinfo`, `tests/e2e/testdata/operator-owned`, `internal/instinit/testdata/initvalues`, `internal/workflow/render/testdata/skip-unprovided`, `tests/e2e/testdata/duplicate-identities`, `tests/integration/module-apply/testdata`, `tests/fixtures/valid/simple-module` and `tests/fixtures/valid/module-with-debug-values`.
 
 #### Scenario: The set of files
 - **WHEN** the task moves the catalog and core as a consistent set
@@ -75,7 +75,7 @@
 
 ### Requirement: The catalog pin moves to the newest published catalog in its major
 
-`task -x deps:cascade` SHALL move the following pins in the working tree only. **Catalog and core as a consistent set.** `opmodel.dev/catalogs/opm@v4` SHALL move to the newest published catalog in its major, resolved against `templates/minimal`'s catalog.
+`task -x deps:cascade` SHALL move the following pins in the working tree only. **Catalog and core as a consistent set.** `opmodel.dev/catalogs/opm@v4` SHALL move to the newest published catalog in its major, resolved against `templates/minimal`'s catalog. The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves".
 
 #### Scenario: The catalog pin moves
 - **WHEN** a newer catalog is published in its major
@@ -83,7 +83,7 @@
 
 ### Requirement: The core pin moves to the core that the file's resulting catalog pins
 
-`task -x deps:cascade` SHALL move the following pins in the working tree only. **Catalog and core as a consistent set.** `opmodel.dev/core@v2` SHALL move to the core version that the file's resulting catalog pins. A file without a catalog SHALL use `templates/minimal`'s resulting catalog.
+`task -x deps:cascade` SHALL move the following pins in the working tree only. **Catalog and core as a consistent set.** `opmodel.dev/core@v2` SHALL move to the core version that the file's resulting catalog pins. A file without a catalog SHALL use `templates/minimal`'s resulting catalog. The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves".
 
 #### Scenario: Core already ahead of the catalog's pin stays
 
@@ -92,7 +92,7 @@
 
 ### Requirement: The kind platform catalog is raised to hack/platform's catalog
 
-`task -x deps:cascade` SHALL move the following pins in the working tree only. **Kind Platform.** The bare `version:` under `opmodel.dev/catalogs/opm@v4:` in `hack/kind-platform.yaml` SHALL be raised to `hack/platform`'s catalog after the move when it is lower. A version above it SHALL stay, with a warning, since no pin moves backwards.
+`task -x deps:cascade` SHALL move the following pins in the working tree only. **Kind Platform.** The bare `version:` under `opmodel.dev/catalogs/opm@v4:` in `hack/kind-platform.yaml` SHALL be raised to `hack/platform`'s catalog after the move when it is lower. A version above it SHALL stay, with a warning, since no pin moves backwards. The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves".
 
 #### Scenario: A kind catalog ahead of hack/platform stays
 
@@ -101,7 +101,7 @@
 
 ### Requirement: No pin moves backwards, past a hold, or holds a catalog back by a lower core hold
 
-How every move behaves: No pin SHALL move backwards. No pin SHALL move past an in-date `.cascade-hold` `max`. When a hold on core is below the core a newer catalog pins, the catalog SHALL stay too, with a warning.
+How every move behaves: No pin SHALL move backwards. No pin SHALL move past an in-date `.cascade-hold` `max`. When a hold on core is below the core a newer catalog pins, the catalog SHALL stay too, with a warning. The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves".
 
 #### Scenario: A hold on core holds the catalog
 
@@ -110,7 +110,7 @@ How every move behaves: No pin SHALL move backwards. No pin SHALL move past an i
 
 ### Requirement: No pin moves to a version that is tagged but not yet published
 
-No pin SHALL move to a version that is tagged but not yet published.
+No pin SHALL move to a version that is tagged but not yet published. The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves".
 
 #### Scenario: An unpublished newest tag leaves the pin
 
@@ -119,7 +119,7 @@ No pin SHALL move to a version that is tagged but not yet published.
 
 ### Requirement: A pin listed in .cascade-frozen does not change
 
-No pin listed for a file in `.cascade-frozen` SHALL change in that file. If `cue mod tidy` raises such a pin, the task SHALL fail, naming the file and the key.
+No pin listed for a file in `.cascade-frozen` SHALL change in that file. If `cue mod tidy` raises such a pin, the task SHALL fail, naming the file and the key. The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves".
 
 #### Scenario: A frozen file is left byte-unchanged
 
@@ -128,7 +128,7 @@ No pin listed for a file in `.cascade-frozen` SHALL change in that file. If `cue
 
 ### Requirement: cue mod get names only the moved keys and runs only where a pin moved
 
-`cue mod get` SHALL name only the moved `opmodel.dev` keys, at exact versions. It and `cue mod tidy` SHALL run only in a module where a pin moved.
+`cue mod get` SHALL name only the moved `opmodel.dev` keys, at exact versions. It and `cue mod tidy` SHALL run only in a module where a pin moved. The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves".
 
 #### Scenario: cue mod get and tidy run only where a pin moved
 - **WHEN** a pin moved in one module
@@ -136,7 +136,7 @@ No pin listed for a file in `.cascade-frozen` SHALL change in that file. If `cue
 
 ### Requirement: Third-party pins are not named and a raised one is reported as a warning
 
-Third-party pins, including `cue.dev/x/k8s.io@v0`, SHALL NOT be named. A third-party pin that `tidy` or `go mod tidy` raised SHALL be reported as a warning.
+Third-party pins, including `cue.dev/x/k8s.io@v0`, SHALL NOT be named. A third-party pin that `tidy` or `go mod tidy` raised SHALL be reported as a warning. The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves".
 
 #### Scenario: The third-party k8s pin is never named
 
@@ -145,19 +145,11 @@ Third-party pins, including `cue.dev/x/k8s.io@v0`, SHALL NOT be named. A third-p
 
 ### Requirement: The task uses its own registry mapping
 
-The task SHALL use its own registry mapping, `testing.opmodel.dev=ghcr.io/open-platform-model,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works`, for both `CUE_REGISTRY` and `OPM_REGISTRY`, whatever the environment sets.
+The task SHALL use its own registry mapping, `testing.opmodel.dev=ghcr.io/open-platform-model,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works`, for both `CUE_REGISTRY` and `OPM_REGISTRY`, whatever the environment sets. The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves".
 
 #### Scenario: The mapping holds whatever the environment sets
 - **WHEN** the environment sets `CUE_REGISTRY` or `OPM_REGISTRY`
 - **THEN** the task SHALL use its own registry mapping, `testing.opmodel.dev=ghcr.io/open-platform-model,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works`, for both
-
-### Requirement: The pin rules take their source from workspace RELEASING.md
-
-The source SHALL be workspace RELEASING.md, sections "The cascade" and "What each repo's task moves".
-
-#### Scenario: The source of the rules
-- **WHEN** the pin rules of the task are read
-- **THEN** the source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves"
 
 ### Requirement: A dirty working tree is refused with exit 1
 
@@ -170,7 +162,7 @@ The source SHALL be workspace RELEASING.md, sections "The cascade" and "What eac
 
 ### Requirement: The frozen and hold files are validated before anything else
 
-It SHALL validate `.cascade-frozen` and `.cascade-hold` through the resolver's `check-files` before anything else. Source: workspace RELEASING.md, section "The cascade", "The receiver".
+`task -x deps:cascade` SHALL validate `.cascade-frozen` and `.cascade-hold` through the resolver's `check-files` before anything else. Source: workspace RELEASING.md, section "The cascade", "The receiver".
 
 #### Scenario: The files are validated first
 - **WHEN** `task -x deps:cascade` runs

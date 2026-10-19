@@ -82,7 +82,7 @@ The refusal of requirement "A shared apply identity is refused as a validation f
 
 ### Requirement: The CLI words the advisory facts of the kernel as warnings
 
-The kernel SHALL report advisory facts as structured rows and attaches no message strings to a render result. The CLI SHALL word them itself and surface them to the user as warnings, never dropping one: an unhandled optional trait is read from the render diagnostics' unhandled-trait table, and a module requiring a newer OPM-namespace build than the platform carries is read from the resolved-versions row marked newer.
+The kernel SHALL report advisory facts as structured rows and SHALL attach no message strings to a render result. The CLI SHALL word them itself and surface them to the user as warnings, never dropping one: an unhandled optional trait is read from the render diagnostics' unhandled-trait table, and a module requiring a newer OPM-namespace build than the platform carries is read from the resolved-versions row marked newer.
 
 #### Scenario: Render warnings reach the user
 
@@ -247,7 +247,7 @@ For each `replaceWith` in the module context's own `cue.mod/local-module.cue` th
 
 ### Requirement: The warnings do not block the render and a context without the file produces none
 
-The warnings SHALL NOT block the render or alter its output. A context without the file SHALL produce no such warning. Source: enhancement 0010 (a moved-ahead dev checkout is accepted and warned about).
+The local-replacement warnings SHALL NOT block the render or alter its output. A context without the `cue.mod/local-module.cue` file SHALL produce no such warning. Source: enhancement 0010 (a moved-ahead dev checkout is accepted and warned about).
 
 #### Scenario: Clean context stays silent
 
@@ -348,7 +348,7 @@ When the kernel refuses a render because the platform module pins a core release
 
 ### Requirement: A --platform directory with an older core gets a hint with the re-pin command
 
-When the platform is a directory the user named with `--platform`, the command SHALL add a hint naming that directory and the exact `cue mod get opmodel.dev/core@<version>` command to run in it, where `<version>` is the core release the kernel was verified against (which satisfies every such floor, not only the one that fired).
+In the refusal of requirement "A platform pinning an older core fails as a validation failure with the library message", when the platform is a directory the user named with `--platform`, the command SHALL add a hint naming that directory and the exact `cue mod get opmodel.dev/core@<version>` command to run in it, where `<version>` is the core release the kernel was verified against (which satisfies every such floor, not only the one that fired).
 
 #### Scenario: An older-core --platform directory is refused with the re-pin command
 
@@ -357,7 +357,7 @@ When the platform is a directory the user named with `--platform`, the command S
 
 ### Requirement: The CLI does not fall back or retry after an older-core refusal
 
-The CLI SHALL NOT fall back to another platform source, retry against a generated platform, or render with a count of its own.
+In the refusal of requirement "A platform pinning an older core fails as a validation failure with the library message", the CLI SHALL NOT fall back to another platform source, retry against a generated platform, or render with a count of its own.
 
 #### Scenario: No fallback after the refusal
 - **WHEN** the kernel refuses a render for an older core
@@ -365,7 +365,7 @@ The CLI SHALL NOT fall back to another platform source, retry against a generate
 
 ### Requirement: A platform the CLI generates is never refused for its core
 
-A platform the CLI generates (from the cluster Platform or from the render's own dependency pins) SHALL pin the kernel's verified core, so it is never refused this way.
+A platform the CLI generates (from the cluster Platform or from the render's own dependency pins) SHALL pin the kernel's verified core, so it is never refused the way of requirement "A platform pinning an older core fails as a validation failure with the library message".
 
 #### Scenario: A generated platform is never refused for its core
 

@@ -213,7 +213,7 @@ Before deleting each tracked resource, `opm instance delete` SHALL read the live
 
 ### Requirement: An object with no UUID label is judged without the UUID comparison
 
-Before deleting each tracked resource, `opm instance delete` SHALL read the live object again. An object with no UUID label SHALL be judged without the UUID comparison, and so SHALL every object when the instance has no recorded UUID. Source: enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override").
+Before deleting each tracked resource, `opm instance delete` SHALL delete the resource only as listed in requirement "A tracked resource is deleted only when its live labels and annotation show the instance owns it". An object with no UUID label SHALL be judged without the UUID comparison, and so SHALL every object when the instance has no recorded UUID. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
 
 #### Scenario: No UUID comparison without a UUID
 

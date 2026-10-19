@@ -108,7 +108,7 @@ Goreleaser SHALL build `opm` for linux/amd64, linux/arm64, darwin/amd64, darwin/
 
 ### Requirement: Goreleaser groups the changelog by commit type
 
-Its changelog SHALL group commits into Features, Bug Fixes, Performance, Refactoring and Other, excluding subjects starting with `docs:`, `test:`, `ci:` or `chore:`. Source: enhancement 0021 ("Release tags are immutable").
+The changelog of Goreleaser SHALL group commits into Features, Bug Fixes, Performance, Refactoring and Other, excluding subjects starting with `docs:`, `test:`, `ci:` or `chore:`. Source: enhancement 0021 ("Release tags are immutable").
 
 #### Scenario: Changelog grouped by type
 - **WHEN** goreleaser generates its changelog
@@ -244,7 +244,7 @@ On a push, the `release-please` job SHALL run first, authenticated as the opm-re
 
 ### Requirement: The release-please configuration sets draft and force-tag-creation
 
-The configuration SHALL set `draft: true` and `force-tag-creation: true`, so release-please creates the git tag at the release commit itself and leaves the GitHub Release as a draft for goreleaser to fill and publish. Source: enhancement 0021 ("Release tags are immutable").
+The configuration of `release-please-config.json` SHALL set `draft: true` and `force-tag-creation: true`, so release-please creates the git tag at the release commit itself and leaves the GitHub Release as a draft for goreleaser to fill and publish. Source: enhancement 0021 ("Release tags are immutable").
 
 #### Scenario: Release-please on a merged release PR
 - **WHEN** the release PR merges to main
@@ -276,7 +276,7 @@ A forced version, such as a move to a new version line (for example `1.0.0-alpha
 
 ### Requirement: The release-as key takes effect only with a releasable commit
 
-The key SHALL take effect only together with a releasable commit (a visible type: `feat`, `fix`, `perf`, `revert`, `deps` or `refactor`) on `main` since the last release, because release-please opens no release PR for hidden-type commits alone, whatever the key says; so the key pull request SHALL itself carry a releasable type, or land after a releasable commit since the last release. Source: workspace RELEASING.md, section "Owner settings" (owner decision 2026-10-02).
+The `release-as` key SHALL take effect only together with a releasable commit (a visible type: `feat`, `fix`, `perf`, `revert`, `deps` or `refactor`) on `main` since the last release, because release-please opens no release PR for hidden-type commits alone, whatever the key says; so the key pull request SHALL itself carry a releasable type, or land after a releasable commit since the last release. Source: workspace RELEASING.md, section "Owner settings" (owner decision 2026-10-02).
 
 #### Scenario: A key pull request of a hidden type alone opens no release PR
 - **WHEN** the only commit on main since the last release is a `chore(...)`, `build(...)` or `ci(...)` pull request that sets `release-as`
@@ -284,7 +284,7 @@ The key SHALL take effect only together with a releasable commit (a visible type
 
 ### Requirement: The release-as key is removed before any later release PR merges
 
-Because release-please re-applies a configured `release-as` on every run, the key SHALL be removed before any later release PR merges. Outside the span from the key pull request to the pull request that removes it, the configuration SHALL carry no `release-as` value. Source: workspace RELEASING.md, section "Owner settings" (owner decision 2026-10-02).
+Because release-please re-applies a configured `release-as` on every run, the `release-as` key SHALL be removed before any later release PR merges. Outside the span from the key pull request to the pull request that removes it, the configuration SHALL carry no `release-as` value. Source: workspace RELEASING.md, section "Owner settings" (owner decision 2026-10-02).
 
 #### Scenario: The key is removed once its release is cut
 - **WHEN** the release PR for the `release-as` version has merged and that version is tagged
@@ -332,7 +332,7 @@ The migration note of a breaking change SHALL go in the pull request body, and i
 
 ### Requirement: The release pull request CHANGELOG is edited by hand and the edit is redone
 
-The release pull request's `CHANGELOG.md` SHALL be edited by hand to carry the migration note as the last step before that release pull request merges The edit SHALL be redone if anything landed on `main` since, because release-please rebuilds the release pull request on every push to `main` and drops a hand edit. Source: workspace RELEASING.md, section "Owner settings" (owner decision 2026-10-02).
+The release pull request's `CHANGELOG.md` SHALL be edited by hand to carry the migration note as the last step before that release pull request merges. The edit SHALL be redone if anything landed on `main` since, because release-please rebuilds the release pull request on every push to `main` and drops a hand edit. Source: workspace RELEASING.md, section "Owner settings" (owner decision 2026-10-02).
 
 #### Scenario: A hand edit of the release pull request's changelog
 - **WHEN** a breaking change is merged to `main`
@@ -392,7 +392,7 @@ The `notify-downstream` job SHALL run on a release run and on a manual recovery 
 
 ### Requirement: The notify job is caller-owned with a fixed runner, Environment, timeout and permission
 
-It is a caller-owned job: it SHALL run on `ubuntu-latest`, declare `environment: cascade`, have a 20-minute timeout, grant only `contents: read`. Source: workspace RELEASING.md, sections "Notify after publish" and "Stop switches"; Phase 3 wiring contract (version 3.1) §4.5 and §4.6.
+The `notify-downstream` job is a caller-owned job: it SHALL run on `ubuntu-latest`, declare `environment: cascade`, have a 20-minute timeout, grant only `contents: read`. Source: workspace RELEASING.md, sections "Notify after publish" and "Stop switches"; Phase 3 wiring contract (version 3.1) §4.5 and §4.6.
 
 #### Scenario: The notify job is caller-owned
 - **WHEN** the `notify-downstream` job is declared
@@ -400,7 +400,7 @@ It is a caller-owned job: it SHALL run on `ubuntu-latest`, declare `environment:
 
 ### Requirement: The notify job has exactly one step, the shared cascade-notify action
 
-The caller-owned job SHALL have exactly one step, the shared `open-platform-model/.github` `cascade-notify` action at the repository's pinned `.github` commit, with the inputs `tag` (`tag_name` from release-please, or the `tag` input on a manual run), `client-id: ${{ vars.CASCADE_APP_CLIENT_ID }}` and `private-key: ${{ secrets.CASCADE_APP_PRIVATE_KEY }}`. Source: workspace RELEASING.md, sections "Notify after publish" and "Stop switches"; Phase 3 wiring contract (version 3.1) §4.5 and §4.6.
+The notify-downstream job SHALL have exactly one step, the shared `open-platform-model/.github` `cascade-notify` action at the repository's pinned `.github` commit, with the inputs `tag` (`tag_name` from release-please, or the `tag` input on a manual run), `client-id: ${{ vars.CASCADE_APP_CLIENT_ID }}` and `private-key: ${{ secrets.CASCADE_APP_PRIVATE_KEY }}`. Source: workspace RELEASING.md, sections "Notify after publish" and "Stop switches"; Phase 3 wiring contract (version 3.1) §4.5 and §4.6.
 
 #### Scenario: The notify job has one step
 - **WHEN** the `notify-downstream` job is declared
@@ -408,7 +408,7 @@ The caller-owned job SHALL have exactly one step, the shared `open-platform-mode
 
 ### Requirement: The cascade-notify action mints the dispatch token and chooses the targets
 
-The action SHALL mint the dispatch token and choose the targets: catalog_opm and opm-operator, as release-tool edges. Source: workspace RELEASING.md, sections "Notify after publish" and "Stop switches"; Phase 3 wiring contract (version 3.1) §4.5 and §4.6.
+The `cascade-notify` action SHALL mint the dispatch token and choose the targets: catalog_opm and opm-operator, as release-tool edges. Source: workspace RELEASING.md, sections "Notify after publish" and "Stop switches"; Phase 3 wiring contract (version 3.1) §4.5 and §4.6.
 
 #### Scenario: The action chooses the targets
 - **WHEN** the `cascade-notify` action runs

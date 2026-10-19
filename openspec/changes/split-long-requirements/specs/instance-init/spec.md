@@ -172,7 +172,7 @@ A prompted value SHALL pass the same checks as the flag or positional it replace
 
 ### Requirement: No debugValues content reaches the package
 
-`values.cue` SHALL be filled from the first applicable source in this order: The module's `initValues`, when the module declares it. No `debugValues` content SHALL reach the package. Source: enhancement 0016 ("`#Module` gains an optional field carrying the author-intended init template, taking precedence over `debugValues`").
+`values.cue` SHALL be filled from the first applicable source in this order: The module's `initValues`, when the module declares it. No `debugValues` content SHALL reach the package. Source: enhancement 0016 ("`#Module` gains an optional field carrying the author-intended init template, taking precedence over `debugValues`" and "The field is `initValues?: _`, open and optional, with no schema-side `#config` assertion").
 
 #### Scenario: initValues takes precedence
 
@@ -260,7 +260,7 @@ The package SHALL be written completely or not at all: on any failure after writ
 
 ### Requirement: Init does not evaluate the generated package against the module config
 
-Init SHALL NOT evaluate the generated package against the module's `#config`. Source: enhancement 0016 ("Init does not validate the generated package; it tells the user how to").
+Init SHALL NOT evaluate the generated package against the module's `#config`. Source: enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-free module path, and floats to the highest core-compatible major when no version is given", "The generated module file pins the module exactly, carries core at the module's major, and names a local placeholder module path" and "Init does not validate the generated package; it tells the user how to").
 
 #### Scenario: Values that violate the contract still initialize
 
@@ -269,7 +269,7 @@ Init SHALL NOT evaluate the generated package against the module's `#config`. So
 
 ### Requirement: On success init reports the resolution, the values source, the files and a closing vet line
 
-On success it SHALL report: the resolution (module path, selected major and version, and how it was chosen, with every skipped higher major and its reason); the values source and any warning; the files written; and a closing line naming `opm instance vet <dir>/instance.cue`. Source: enhancement 0016 ("Init does not validate the generated package; it tells the user how to").
+On success `opm instance init` SHALL report: the resolution (module path, selected major and version, and how it was chosen, with every skipped higher major and its reason); the values source and any warning; the files written; and a closing line naming `opm instance vet <dir>/instance.cue`. Source: enhancement 0016 ("Init does not validate the generated package; it tells the user how to").
 
 #### Scenario: Success report
 
@@ -278,7 +278,7 @@ On success it SHALL report: the resolution (module path, selected major and vers
 
 ### Requirement: The pinned version appears in the report
 
-The pinned version SHALL appear in the report; pins never float. Source: enhancement 0016 ("The generated module file pins the module exactly, carries core at the module's major, and names a local placeholder module path").
+The pinned version SHALL appear in the report; pins never float. Source: enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-free module path, and floats to the highest core-compatible major when no version is given", "The generated module file pins the module exactly, carries core at the module's major, and names a local placeholder module path" and "Init does not validate the generated package; it tells the user how to").
 
 #### Scenario: The pinned version is reported
 - **WHEN** `opm instance init` succeeds
