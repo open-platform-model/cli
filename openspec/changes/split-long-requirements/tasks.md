@@ -21,10 +21,10 @@
 
 ## 4. cli-B4: instance-inventory (6), mod-status (6), release-cascade-wiring (6), cmdutil (5), platform-check (5), 28 requirements
 
-- [ ] 4.1 List the 28 long requirements of the five specs and confirm the count
-- [ ] 4.2 Write the delta files for the five specs and append their ledger subsections
-- [ ] 4.3 Grep for old headers; run the byte check per rewritten requirement
-- [ ] 4.4 Run the gate with N=112 and the per-spec validation; `task lint` and `task test` green, then commit `docs(openspec): split the long requirements of instance-inventory, mod-status, release-cascade-wiring, cmdutil and platform-check`
+- [x] 4.1 List the 28 long requirements of the five specs and confirm the count (unit 4a, `instance-inventory` 6 and `mod-status` 6: 12 long requirements)
+- [x] 4.2 Write the delta files for the five specs and append their ledger subsections (unit 4a, `instance-inventory` and `mod-status` only)
+- [x] 4.3 Grep for old headers; run the byte check per rewritten requirement (unit 4a, `instance-inventory` and `mod-status` only)
+- [x] 4.4 Run the gate with N=112 and the per-spec validation; `task lint` and `task test` green, then commit `docs(openspec): split the long requirements of instance-inventory, mod-status, release-cascade-wiring, cmdutil and platform-check` (unit 4a: gate with N=96, per-spec validation of `instance-inventory` and `mod-status`, `task lint` and `task test:unit` ran; the commit is `docs(openspec): split the long requirements of instance-inventory and mod-status`; N=112 and the other three specs follow in the second half)
 
 ## 5. cli-B5: test-fixture-lineage (5), cmd-structure (4), e2e-cluster-preconditions (4), inst-commands (4), kind-cluster-tasks (4), mod-vet (4), catalog-compatibility (3), 28 requirements
 

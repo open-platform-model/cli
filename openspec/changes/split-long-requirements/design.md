@@ -2582,3 +2582,338 @@ Plain sentences that carry an RFC 2119 keyword in the new text and had none in t
 | With one positional, a value containing `/` or `.` is the module path, and anything else is the instance name. | "With one positional a value with a slash or a dot is the module path" | "is" reads "SHALL be" twice |
 | A prompted value passes the same checks as the flag or positional it replaces, before any registry access. | "A prompted value passes the same checks as the flag it replaces" | "passes" reads "SHALL pass" |
 | Reading the module's own module file, between resolution and acquire, stays exit 3 for every failure. | "Reading the module's own module file stays exit 3 for every failure" | "stays" reads "SHALL stay" |
+
+## Ledger entries of cli-B4, unit 4a (instance-inventory, mod-status)
+
+One subsection per rewritten requirement, 12 in all: `instance-inventory` 6 and `mod-status` 6. The other three specs of cli-B4 (`release-cascade-wiring`, `cmdutil`, `platform-check`) follow in the second half. Every new body is built from whole sentences of the old body, copied unchanged, or from parts of one sentence cut at a list boundary with the subject repeated. A clause row names where a clause of the old body appears; the list "Words changed or added" under a requirement names each substitution, as the rulings allow: a pronoun ("It", "it") read as the subject copied from the same old requirement, a closing period where a list marker or a semicolon stood, an em-dash read as a colon or a comma, and an RFC 2119 keyword where the old sentence had none (also listed in the strength table). All 12 are form c2, because the old scenarios of each requirement belong to different new behaviors. Old scenario names are all kept; the byte check ran once per rewritten requirement and printed no `DIFF` and no `LOST`. One cite changes: the body "The inventory digest in the status is the library inventory digest" names the requirement "The CLI computes the inventory digest with the library and no digest of its own" where the old body named "Deterministic inventory digest"; `grep -rn --exclude-dir=archive` over the repo found no other reference to an old header of this unit.
+
+### Ledger: instance-inventory, CLI writes a strict status subset via the status subresource
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The CLI writes only its own fields through the status subresource", "The last applied render digest is the library shared render digest", "The inventory digest in the status is the library inventory digest", "The last applied source digest is the operator module source digest", "The last applied config digest follows the operator canonical-JSON semantics".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Status subset after successful apply | "The CLI writes only its own fields through the status subresource", "Status subset after successful apply" | No (byte equal, checked) |
+| Revision increments across applies | "The CLI writes only its own fields through the status subresource", "Revision increments across applies" | No (byte equal, checked) |
+| Source digest matches the operator's computation | "The last applied source digest is the operator module source digest", "Source digest matches the operator's computation" | No (byte equal, checked) |
+| Render digest matches the operator's algorithm | "The last applied render digest is the library shared render digest", "Render digest matches the operator's algorithm" | No (byte equal, checked) |
+| Stored digests change once on upgrade | "The inventory digest in the status is the library inventory digest", "Stored digests change once on upgrade" | No (byte equal, checked) |
+| (new) | "The last applied config digest follows the operator canonical-JSON semantics", "Config digest of an empty config" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| After resources are applied and pruned, the CLI SHALL write, via the s... | body of "The CLI writes only its own fields through the status subresource", verbatim |
+| The CLI MUST NOT write `status.conditions`, `status.observedGeneration... | body of "The CLI writes only its own fields through the status subresource", verbatim |
+| The digest fields SHALL be operator-parity: `lastAppliedRenderDigest` ... | body of "The last applied render digest is the library shared render digest", verbatim, with the closing semicolon read as a period |
+| `status.inventory.digest` SHALL be the library's `inventory.Digest` of... | body of "The inventory digest in the status is the library inventory digest", with the opening clause of the sentence copied in and the cite of the split requirement read as its new header |
+| `lastAppliedSourceDigest` SHALL be computed as the operator's `ModuleS... | body of "The last applied source digest is the operator module source digest", with the opening clause of the sentence copied in and the em-dash read as a colon |
+| `lastAppliedConfigDigest` SHALL match the operator's `ConfigDigest` ca... | body of "The last applied config digest follows the operator canonical-JSON semantics", with the opening clause of the sentence copied in |
+| The digest fields SHALL be operator-parity: | opening clause, copied into the bodies of the render digest, inventory digest, source digest and config digest blocks |
+
+Words changed or added:
+- "The last applied render digest is the library shared render digest": "The digest fields SHALL be operator-parity: `lastAppliedRenderDigest` SHALL be the library..." reads "The digest fields SHALL be operator-parity: `lastAppliedRenderDigest` SHALL be the library..." (the closing semicolon reads a period)
+- "The inventory digest in the status is the library inventory digest": "`status.inventory.digest` SHALL be the library's `inventory.Digest` of the written entries..." reads "The digest fields SHALL be operator-parity: `status.inventory.digest` SHALL be the library..." ("The digest fields SHALL be operator-parity:" copied from the first sentence of the same paragraph; the cite of the split requirement reads its new header "The CLI computes the inventory digest with the library and no digest of its own"; the closing semicolon reads a period)
+- "The last applied source digest is the operator module source digest": "`lastAppliedSourceDigest` SHALL be computed as the operator's `ModuleSourceDigest` (SHA-25..." reads "The digest fields SHALL be operator-parity: `lastAppliedSourceDigest` SHALL be computed as..." ("The digest fields SHALL be operator-parity:" copied from the first sentence of the same paragraph; the em-dash reads a colon; the closing comma and "and" read a period)
+- "The last applied config digest follows the operator canonical-JSON semantics": "`lastAppliedConfigDigest` SHALL match the operator's `ConfigDigest` canonical-JSON semanti..." reads "The digest fields SHALL be operator-parity: `lastAppliedConfigDigest` SHALL match the oper..." ("The digest fields SHALL be operator-parity:" copied from the first sentence of the same paragraph)
+
+Lengths (old, new): old 1384; new "The CLI writes only its own fields through the status subresource" 492; "The last applied render digest is the library shared render digest" 434; "The inventory digest in the status is the library inventory digest" 223; "The last applied source digest is the operator module source digest" 223; "The last applied config digest follows the operator canonical-JSON semantics" 184.
+
+### Ledger: instance-inventory, Spec write contents
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The CLI sets the owner of the ModuleInstance spec to cli", "The CLI writes the module identity verbatim from core-v2 metadata", "The spec values are the single unified values blob", "The module identity pair applies to local resolution and the CR holds no filesystem path", "The declared module identity pair is verified where it meets a registry".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Local-path apply writes the declared reference | "The module identity pair applies to local resolution and the CR holds no filesystem path", "Local-path apply writes the declared reference" | No (byte equal, checked) |
+| No address arithmetic | "The CLI writes the module identity verbatim from core-v2 metadata", "No address arithmetic" | No (byte equal, checked) |
+| Values are the unified blob | "The spec values are the single unified values blob", "Values are the unified blob" | No (byte equal, checked) |
+| (new) | "The CLI sets the owner of the ModuleInstance spec to cli", "CLI-executor apply sets the owner" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The declared module identity pair is verified where it meets a registry", "Declared pair verified at the registry" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| On apply in CLI-executor mode, the CLI SHALL server-side-apply the CR ... | opening clause, copied into the bodies of "The CLI sets the owner of the ModuleInstance spec to cli", "The CLI writes the module identity verbatim from core-v2 metadata" and "The spec values are the single unified values blob" |
+| `spec.owner: cli` | body of "The CLI sets the owner of the ModuleInstance spec to cli", with the opening clause and a closing period |
+| `spec.module.path` and `spec.module.version` set to the module's decla... | body of "The CLI writes the module identity verbatim from core-v2 metadata", with the opening clause, the em-dash read as a colon and a closing period |
+| `spec.values` set to the single unified values blob that the render co... | body of "The spec values are the single unified values blob", with the opening clause; the "and" that joined the item to the list is dropped |
+| The pair applies for local-directory and locally-replaced module resol... | body of "The module identity pair applies to local resolution and the CR holds no filesystem path", with the pair named in the subject |
+| The declared pair is verified against fetched coordinates wherever it ... | body of "The declared module identity pair is verified where it meets a registry", with the pair named in the subject and "is verified" read as "SHALL be verified" |
+
+Words changed or added:
+- "The CLI sets the owner of the ModuleInstance spec to cli": "`spec.owner: cli`" reads "On apply in CLI-executor mode, the CLI SHALL server-side-apply the CR spec with field mana..." (the opening clause "On apply in CLI-executor mode, ... containing:" copied from the same sentence; a closing period)
+- "The CLI writes the module identity verbatim from core-v2 metadata": "`spec.module.path` and `spec.module.version` set to the module's declared identity **read ..." reads "On apply in CLI-executor mode, the CLI SHALL server-side-apply the CR spec with field mana..." (the opening clause "On apply in CLI-executor mode, ... containing:" copied from the same sentence; the em-dash reads a colon; a closing period)
+- "The spec values are the single unified values blob": "`spec.values` set to the single unified values blob that the render consumed." reads "On apply in CLI-executor mode, the CLI SHALL server-side-apply the CR spec with field mana..." (the opening clause "On apply in CLI-executor mode, ... containing:" copied from the same sentence)
+- "The module identity pair applies to local resolution and the CR holds no filesystem path": "The pair applies for local-directory and locally-replaced module resolution as well; the C..." reads "The pair (`spec.module.path` and `spec.module.version`) applies for local-directory and lo..." ("The pair" reads "The pair (`spec.module.path` and `spec.module.version`)", copied from the first sentence)
+- "The declared module identity pair is verified where it meets a registry": "The declared pair is verified against fetched coordinates wherever it later meets a regist..." reads "The declared pair (`spec.module.path` and `spec.module.version`) SHALL be verified against..." ("The declared pair" reads "The declared pair (`spec.module.path` and `spec.module.version`)", copied from the first sentence; "is verified" reads "SHALL be verified")
+
+Lengths (old, new): old 878; new "The CLI sets the owner of the ModuleInstance spec to cli" 135; "The CLI writes the module identity verbatim from core-v2 metadata" 484; "The spec values are the single unified values blob" 194; "The module identity pair applies to local resolution and the CR holds no filesystem path" 174; "The declared module identity pair is verified where it meets a registry" 215.
+
+### Ledger: instance-inventory, Render provenance annotation
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The CLI stamps the source local annotation when render bytes did not come from pure registry resolution", "The source local annotation is a fail-closed provenance signal that no gate reads as an authority".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Local render stamps the annotation | "The CLI stamps the source local annotation when render bytes did not come from pure registry resolution", "Local render stamps the annotation" | No (byte equal, checked) |
+| Replacement in effect stamps the annotation | "The CLI stamps the source local annotation when render bytes did not come from pure registry resolution", "Replacement in effect stamps the annotation" | No (byte equal, checked) |
+| Registry apply clears the annotation | "The CLI stamps the source local annotation when render bytes did not come from pure registry resolution", "Registry apply clears the annotation" | No (byte equal, checked) |
+| (new) | "The source local annotation is a fail-closed provenance signal that no gate reads as an authority", "No gate reads the annotation as an authority" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| When the applied render's module bytes did not come from pure registry... | body of "The CLI stamps the source local annotation when render bytes did not come from pure registry resolution", the part of this sentence it holds, verbatim or as the words changed below say |
+| When a later apply resolves fully from registries, the CLI SHALL omit ... | body of "The CLI stamps the source local annotation when render bytes did not come from pure registry resolution", verbatim |
+| The annotation is a fail-closed provenance signal: the thin-editor app... | body of "The source local annotation is a fail-closed provenance signal that no gate reads as an authority", the part of this sentence it holds, verbatim or as the words changed below say |
+
+Words changed or added:
+- "The CLI stamps the source local annotation when render bytes did not come from pure registry resolution": "When the applied render's module bytes did not come from pure registry resolution [em-dash] the ma..." reads "When the applied render's module bytes did not come from pure registry resolution: the mai..." (the first em-dash reads a colon, the second a comma)
+- "The source local annotation is a fail-closed provenance signal that no gate reads as an authority": "The annotation is a fail-closed provenance signal: the thin-editor apply path refuses a mo..." reads "The annotation `module-instance.opmodel.dev/source: local` is a fail-closed provenance sig..." ("The annotation" reads "The annotation `module-instance.opmodel.dev/source: local`", copied from the first sentence)
+
+Lengths (old, new): old 695; new "The CLI stamps the source local annotation when render bytes did not come from pure registry resolution" 425; "The source local annotation is a fail-closed provenance signal that no gate reads as an authority" 311.
+
+### Ledger: instance-inventory, Deterministic inventory digest
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The CLI computes the inventory digest with the library and no digest of its own", "The inventory digest depends only on the field values of the entries", "The release that first records the library digest carries a migration note".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Same entries in different order produce same digest | "The inventory digest depends only on the field values of the entries", "Same entries in different order produce same digest" | No (byte equal, checked) |
+| Added or removed resource changes digest | "The inventory digest depends only on the field values of the entries", "Added or removed resource changes digest" | No (byte equal, checked) |
+| Component rename changes digest | "The inventory digest depends only on the field values of the entries", "Component rename changes digest" | No (byte equal, checked) |
+| The stored digest is the library's | "The CLI computes the inventory digest with the library and no digest of its own", "The stored digest is the library's" | No (byte equal, checked) |
+| (new) | "The release that first records the library digest carries a migration note", "Migration note for the first release" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| The CLI SHALL compute the inventory digest with the library's `opm/k8s... | body of "The CLI computes the inventory digest with the library and no digest of its own", verbatim |
+| The digest SHALL depend only on the entries' field values, never on th... | body of "The inventory digest depends only on the field values of the entries", verbatim |
+| The CLI SHALL NOT compute an inventory digest of its own. | body of "The CLI computes the inventory digest with the library and no digest of its own", verbatim |
+| Source: enhancement 0012 ("The stale set is component-blind, and the i... | body of "The CLI computes the inventory digest with the library and no digest of its own", verbatim; body of "The inventory digest depends only on the field values of the entries", verbatim; body of "The release that first records the library digest carries a migration note", verbatim |
+| The release that first records this digest SHALL carry a migration not... | body of "The release that first records the library digest carries a migration note", the part of this sentence it holds, verbatim or as the words changed below say |
+| Source: enhancement 0012 ("The stale set is component-blind, and the i... | body of "The CLI computes the inventory digest with the library and no digest of its own", verbatim; body of "The inventory digest depends only on the field values of the entries", verbatim; body of "The release that first records the library digest carries a migration note", verbatim |
+
+Words changed or added:
+- "The release that first records the library digest carries a migration note": "The release that first records this digest SHALL carry a migration note naming the one-tim..." reads "The release that first records this inventory digest SHALL carry a migration note naming t..." ("this digest" reads "this inventory digest" ("inventory" copied from the first sentence))
+
+Lengths (old, new): old 814; new "The CLI computes the inventory digest with the library and no digest of its own" 335; "The inventory digest depends only on the field values of the entries" 358; "The release that first records the library digest carries a migration note" 252.
+
+### Ledger: instance-inventory, Skipped contracts annotation
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A skipping apply records the skipped demands in the skipped-contracts annotation", "A later apply that skips nothing omits the skipped-contracts annotation", "The skipped-contracts annotation is information and no gate reads it as an authority".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| A skipping apply records its skips | "A skipping apply records the skipped demands in the skipped-contracts annotation", "A skipping apply records its skips" | No (byte equal, checked) |
+| A complete apply clears the record | "A later apply that skips nothing omits the skipped-contracts annotation", "A complete apply clears the record" | No (byte equal, checked) |
+| A flag that skipped nothing writes nothing | "A skipping apply records the skipped demands in the skipped-contracts annotation", "A flag that skipped nothing writes nothing" | No (byte equal, checked) |
+| (new) | "The skipped-contracts annotation is information and no gate reads it as an authority", "No gate reads the annotation as an authority" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| When an apply rendered with `--skip-unprovided` and the kernel skipped... | body of "A skipping apply records the skipped demands in the skipped-contracts annotation", verbatim |
+| Its value SHALL be the skipped demands as `<component>=<contract fqn>`... | body of "A skipping apply records the skipped demands in the skipped-contracts annotation", verbatim |
+| When a later apply skips nothing, with or without the flag, the CLI SH... | body of "A later apply that skips nothing omits the skipped-contracts annotation", the part of this sentence it holds, verbatim or as the words changed below say |
+| The annotation is information for whoever inspects the instance: no CL... | body of "The skipped-contracts annotation is information and no gate reads it as an authority", the part of this sentence it holds, verbatim or as the words changed below say |
+
+Words changed or added:
+- "A later apply that skips nothing omits the skipped-contracts annotation": "When a later apply skips nothing, with or without the flag, the CLI SHALL omit the annotat..." reads "When a later apply skips nothing, with or without the flag `--skip-unprovided`, the CLI SH..." ("the flag" reads "the flag `--skip-unprovided`" and "the annotation" reads "the annotation `module-instance.opmodel.dev/skipped-contracts`", both copied from the first sentence)
+- "The skipped-contracts annotation is information and no gate reads it as an authority": "The annotation is information for whoever inspects the instance: no CLI gate SHALL read it..." reads "The annotation `module-instance.opmodel.dev/skipped-contracts` is information for whoever ..." ("The annotation" reads "The annotation `module-instance.opmodel.dev/skipped-contracts`", copied from the first sentence)
+
+Lengths (old, new): old 553; new "A skipping apply records the skipped demands in the skipped-contracts annotation" 318; "A later apply that skips nothing omits the skipped-contracts annotation" 194; "The skipped-contracts annotation is information and no gate reads it as an authority" 155.
+
+### Ledger: instance-inventory, Inventory entries are the library's component-blind entries
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The CLI represents owned resources as the library's inventory entries", "Two entries are the same object when group, kind, namespace and name agree".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Same object at a different API version | "Two entries are the same object when group, kind, namespace and name agree", "Same object at a different API version" | No (byte equal, checked) |
+| Same object under a different component | "Two entries are the same object when group, kind, namespace and name agree", "Same object under a different component" | No (byte equal, checked) |
+| Different objects | "Two entries are the same object when group, kind, namespace and name agree", "Different objects" | No (byte equal, checked) |
+| (new) | "The CLI represents owned resources as the library's inventory entries", "The CLI declares no entry type of its own" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| The CLI SHALL represent each currently owned Kubernetes resource as th... | body of "The CLI represents owned resources as the library's inventory entries", verbatim |
+| Two entries SHALL be the same object when their group, kind, namespace... | body of "Two entries are the same object when group, kind, namespace and name agree", verbatim |
+| Source: enhancement 0012 ("The stale set is component-blind, and the i... | body of "The CLI represents owned resources as the library's inventory entries", verbatim; body of "Two entries are the same object when group, kind, namespace and name agree", verbatim |
+
+Lengths (old, new): old 616; new "The CLI represents owned resources as the library's inventory entries" 334; "Two entries are the same object when group, kind, namespace and name agree" 404.
+
+### Ledger: mod-status, Status discovers resources via ownership inventory
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "Status reads the persisted instance inventory record to discover the tracked resources", "A UUID argument resolves by listing the CRs and a name argument by a direct GET", "Status performs one targeted GET per tracked entry once the record is found", "Status requires no module source or re-rendering and uses no cluster-wide label-scan".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Discover by instance UUID | "A UUID argument resolves by listing the CRs and a name argument by a direct GET", "Discover by instance UUID" | No (byte equal, checked) |
+| Discover by instance name | "A UUID argument resolves by listing the CRs and a name argument by a direct GET", "Discover by instance name" | No (byte equal, checked) |
+| (new) | "Status reads the persisted instance inventory record to discover the tracked resources", "Status reads the inventory record" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "Status performs one targeted GET per tracked entry once the record is found", "One targeted GET per tracked entry" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "Status requires no module source or re-rendering and uses no cluster-wide label-scan", "No module source and no label-scan" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| The `opm instance status` command SHALL read the persisted instance in... | body of "Status reads the persisted instance inventory record to discover the tracked resources", verbatim |
+| A UUID argument SHALL resolve via `inventory.FindRecordByInstanceUUID`... | body of "A UUID argument resolves by listing the CRs and a name argument by a direct GET", with the argument named in the subject |
+| Once the record is found, it SHALL perform one targeted GET per tracke... | body of "Status performs one targeted GET per tracked entry once the record is found", with "it" read as the command |
+| It MUST NOT require module source or re-rendering. | body of "Status requires no module source or re-rendering and uses no cluster-wide label-scan", with "It" read as the command |
+| It MUST NOT use a cluster-wide label-scan to discover workload resourc... | body of "Status requires no module source or re-rendering and uses no cluster-wide label-scan", verbatim |
+| <!-- Was: release inventory record, --release-id/--instance-name (enha... | body of "Status reads the persisted instance inventory record to discover the tracked resources", verbatim |
+
+Words changed or added:
+- "A UUID argument resolves by listing the CRs and a name argument by a direct GET": "A UUID argument SHALL resolve via `inventory.FindRecordByInstanceUUID` (list the CRs in th..." reads "A UUID argument of the `opm instance status` command SHALL resolve via `inventory.FindReco..." ("A UUID argument" reads "A UUID argument of the `opm instance status` command", copied from the first sentence)
+- "Status performs one targeted GET per tracked entry once the record is found": "Once the record is found, it SHALL perform one targeted GET per tracked entry via `invento..." reads "Once the record is found, the `opm instance status` command SHALL perform one targeted GET..." ("it" reads "the `opm instance status` command", copied from the first sentence)
+- "Status requires no module source or re-rendering and uses no cluster-wide label-scan": "It MUST NOT require module source or re-rendering." reads "The `opm instance status` command MUST NOT require module source or re-rendering." ("It" reads "The `opm instance status` command", copied from the first sentence)
+
+Lengths (old, new): old 834; new "Status reads the persisted instance inventory record to discover the tracked resources" 372; "A UUID argument resolves by listing the CRs and a name argument by a direct GET" 247; "Status performs one targeted GET per tracked entry once the record is found" 156; "Status requires no module source or re-rendering and uses no cluster-wide label-scan" 155.
+
+### Ledger: mod-status, Status evaluates health per resource category
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A workload is healthy only when its rollout has finished", "A Deployment is healthy when its replica counters match and no old replicas remain", "A StatefulSet is healthy when its replica counters and revisions match", "A DaemonSet is healthy when its scheduled and available counters match", "A Job is healthy when its Complete condition is True", "A CronJob is reported as Applied", "Passive kinds are reported as Applied and custom resources are healthy on a True Ready condition".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Deployment not yet ready | "A Deployment is healthy when its replica counters match and no old replicas remain", "Deployment not yet ready" | No (byte equal, checked) |
+| Deployment upgrade stuck behind an available old ReplicaSet | "A Deployment is healthy when its replica counters match and no old replicas remain", "Deployment upgrade stuck behind an available old ReplicaSet" | No (byte equal, checked) |
+| Job completed | "A Job is healthy when its Complete condition is True", "Job completed" | No (byte equal, checked) |
+| ConfigMap always healthy | "Passive kinds are reported as Applied and custom resources are healthy on a True Ready condition", "ConfigMap always healthy" | No (byte equal, checked) |
+| Custom resource with Ready condition | "Passive kinds are reported as Applied and custom resources are healthy on a True Ready condition", "Custom resource with Ready condition" | No (byte equal, checked) |
+| Custom resource without Ready condition | "Passive kinds are reported as Applied and custom resources are healthy on a True Ready condition", "Custom resource without Ready condition" | No (byte equal, checked) |
+| (new) | "A workload is healthy only when its rollout has finished", "Workload generation not observed" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "A StatefulSet is healthy when its replica counters and revisions match", "StatefulSet with OnDelete" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "A DaemonSet is healthy when its scheduled and available counters match", "DaemonSet counters" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "A CronJob is reported as Applied", "CronJob reported as Applied" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| The command SHALL evaluate resource health using category-specific cri... | opening clause, in the bodies of all seven blocks of this requirement, with "The command" read as "The `opm instance status` command" |
+| **Workloads** (Deployment, StatefulSet, DaemonSet): healthy only when ... | body of "A workload is healthy only when its rollout has finished" and the bodies of the Deployment, StatefulSet and DaemonSet blocks, verbatim |
+| The controller SHALL have observed the current generation (`status.obs... | body of "A workload is healthy only when its rollout has finished", with the closing colon read as a period |
+| Deployment: `updatedReplicas` and `availableReplicas` equal `spec.repl... | body of "A Deployment is healthy when its replica counters match and no old replicas remain", with a closing period |
+| StatefulSet: `readyReplicas` and `updatedReplicas` equal `spec.replica... | body of "A StatefulSet is healthy when its replica counters and revisions match", with a closing period |
+| DaemonSet: `updatedNumberScheduled` and `numberAvailable` equal `desir... | body of "A DaemonSet is healthy when its scheduled and available counters match", with a closing period |
+| **Jobs** (Job): healthy when `Complete` condition is True | body of "A Job is healthy when its Complete condition is True", with a closing period |
+| **CronJobs**: reported as `Applied` (scheduled, no readiness phase) | body of "A CronJob is reported as Applied", with a closing period |
+| **Passive** (ConfigMap, Secret, Service, ServiceAccount, RBAC kinds, a... | body of "Passive kinds are reported as Applied and custom resources are healthy on a True Ready condition", with a closing period |
+| **Custom** (CRD instances): healthy if `Ready` condition is present an... | body of "Passive kinds are reported as Applied and custom resources are healthy on a True Ready condition", with a closing period |
+
+Words changed or added:
+- "A workload is healthy only when its rollout has finished": "The command SHALL evaluate resource health using category-specific criteria: **Workloads**..." reads "The `opm instance status` command SHALL evaluate resource health using category-specific c..." ("The command" reads "The `opm instance status` command" (the command named in the scenarios of the same requirement))
+- "A workload is healthy only when its rollout has finished": "The controller SHALL have observed the current generation (`status.observedGeneration >= m..." reads "The controller SHALL have observed the current generation (`status.observedGeneration >= m..." (the closing colon reads a period)
+- "A Deployment is healthy when its replica counters match and no old replicas remain": "The command SHALL evaluate resource health using category-specific criteria: **Workloads**..." reads "The `opm instance status` command SHALL evaluate resource health using category-specific c..." ("The command" reads "The `opm instance status` command" (the command named in the scenarios of the same requirement))
+- "A Deployment is healthy when its replica counters match and no old replicas remain": "Deployment: `updatedReplicas` and `availableReplicas` equal `spec.replicas`, no old replic..." reads "Deployment: `updatedReplicas` and `availableReplicas` equal `spec.replicas`, no old replic..." (a closing period where a list marker stood)
+- "A StatefulSet is healthy when its replica counters and revisions match": "The command SHALL evaluate resource health using category-specific criteria: **Workloads**..." reads "The `opm instance status` command SHALL evaluate resource health using category-specific c..." ("The command" reads "The `opm instance status` command" (the command named in the scenarios of the same requirement))
+- "A StatefulSet is healthy when its replica counters and revisions match": "StatefulSet: `readyReplicas` and `updatedReplicas` equal `spec.replicas` and `updateRevisi..." reads "StatefulSet: `readyReplicas` and `updatedReplicas` equal `spec.replicas` and `updateRevisi..." (a closing period where a list marker stood)
+- "A DaemonSet is healthy when its scheduled and available counters match": "The command SHALL evaluate resource health using category-specific criteria: **Workloads**..." reads "The `opm instance status` command SHALL evaluate resource health using category-specific c..." ("The command" reads "The `opm instance status` command" (the command named in the scenarios of the same requirement))
+- "A DaemonSet is healthy when its scheduled and available counters match": "DaemonSet: `updatedNumberScheduled` and `numberAvailable` equal `desiredNumberScheduled`" reads "DaemonSet: `updatedNumberScheduled` and `numberAvailable` equal `desiredNumberScheduled`." (a closing period where a list marker stood)
+- "A Job is healthy when its Complete condition is True": "The command SHALL evaluate resource health using category-specific criteria:" reads "The `opm instance status` command SHALL evaluate resource health using category-specific c..." ("The command" reads "The `opm instance status` command" (the command named in the scenarios of the same requirement))
+- "A Job is healthy when its Complete condition is True": "**Jobs** (Job): healthy when `Complete` condition is True" reads "**Jobs** (Job): healthy when `Complete` condition is True." (a closing period where a list marker stood)
+- "A CronJob is reported as Applied": "The command SHALL evaluate resource health using category-specific criteria:" reads "The `opm instance status` command SHALL evaluate resource health using category-specific c..." ("The command" reads "The `opm instance status` command" (the command named in the scenarios of the same requirement))
+- "A CronJob is reported as Applied": "**CronJobs**: reported as `Applied` (scheduled, no readiness phase)" reads "**CronJobs**: reported as `Applied` (scheduled, no readiness phase)." (a closing period where a list marker stood)
+- "Passive kinds are reported as Applied and custom resources are healthy on a True Ready condition": "The command SHALL evaluate resource health using category-specific criteria:" reads "The `opm instance status` command SHALL evaluate resource health using category-specific c..." ("The command" reads "The `opm instance status` command" (the command named in the scenarios of the same requirement))
+- "Passive kinds are reported as Applied and custom resources are healthy on a True Ready condition": "**Passive** (ConfigMap, Secret, Service, ServiceAccount, RBAC kinds, and similar kinds wit..." reads "**Passive** (ConfigMap, Secret, Service, ServiceAccount, RBAC kinds, and similar kinds wit..." (a closing period where a list marker stood)
+- "Passive kinds are reported as Applied and custom resources are healthy on a True Ready condition": "**Custom** (CRD instances): healthy if `Ready` condition is present and True, otherwise tr..." reads "**Custom** (CRD instances): healthy if `Ready` condition is present and True, otherwise tr..." (a closing period where a list marker stood)
+
+Lengths (old, new): old 1324; new "A workload is healthy only when its rollout has finished" 399; "A Deployment is healthy when its replica counters match and no old replicas remain" 399; "A StatefulSet is healthy when its replica counters and revisions match" 453; "A DaemonSet is healthy when its scheduled and available counters match" 312; "A Job is healthy when its Complete condition is True" 157; "A CronJob is reported as Applied" 167; "Passive kinds are reported as Applied and custom resources are healthy on a True Ready condition" 410.
+
+### Ledger: mod-status, Status supports table output format
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The default status output is a table with plain space-padded columns", "The output flag accepts wide and wide renders additional columns".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Default table output includes component column | "The default status output is a table with plain space-padded columns", "Default table output includes component column" | No (byte equal, checked) |
+| Resource without component | "The default status output is a table with plain space-padded columns", "Resource without component" | No (byte equal, checked) |
+| Wide format accepted as output value | "The output flag accepts wide and wide renders additional columns", "Wide format accepted as output value" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The default output format SHALL be a table showing: resource kind, nam... | body of "The default status output is a table with plain space-padded columns", the part of this sentence it holds, verbatim or as the words changed below say |
+| The COMPONENT column SHALL be populated from the inventory entry for e... | body of "The default status output is a table with plain space-padded columns", verbatim |
+| Resources without a component SHALL display `-` in the COMPONENT colum... | body of "The default status output is a table with plain space-padded columns", verbatim |
+| Columns SHALL be aligned and human-readable. | body of "The default status output is a table with plain space-padded columns", verbatim |
+| The table SHALL render as plain, space-padded columns with no border c... | body of "The default status output is a table with plain space-padded columns", verbatim |
+| The `--output`/`-o` flag SHALL accept `wide` as a valid value in addit... | body of "The output flag accepts wide and wide renders additional columns", the part of this sentence it holds, verbatim or as the words changed below say |
+| When `-o wide` is specified, the command SHALL render a table format w... | body of "The output flag accepts wide and wide renders additional columns", the part of this sentence it holds, verbatim or as the words changed below say |
+
+Words changed or added:
+- "The default status output is a table with plain space-padded columns": "The default output format SHALL be a table showing: resource kind, name, namespace, compon..." reads "The default output format of `opm instance status` SHALL be a table showing: resource kind..." ("The default output format" reads "The default output format of `opm instance status`" (the command named in the scenarios of the same requirement))
+- "The output flag accepts wide and wide renders additional columns": "The `--output`/`-o` flag SHALL accept `wide` as a valid value in addition to `table`, `yam..." reads "The `--output`/`-o` flag of `opm instance status` SHALL accept `wide` as a valid value in ..." ("The `--output`/`-o` flag" reads "The `--output`/`-o` flag of `opm instance status`" (the command named in the scenarios of the same requirement))
+- "The output flag accepts wide and wide renders additional columns": "When `-o wide` is specified, the command SHALL render a table format with additional colum..." reads "When `-o wide` is specified, the `opm instance status` command SHALL render a table format..." ("the command" reads "the `opm instance status` command" (named in the scenarios of the same requirement))
+
+Lengths (old, new): old 645; new "The default status output is a table with plain space-padded columns" 470; "The output flag accepts wide and wide renders additional columns" 246.
+
+### Ledger: mod-status, Status header does not depend on inventory change history
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The status header shows the instance name, namespace, health and summary from the persisted inventory record", "The status header requires no inventory change history, module source or re-rendering".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Header sourced from persisted inventory | "The status header shows the instance name, namespace, health and summary from the persisted inventory record", "Header sourced from persisted inventory" | No (byte equal, checked) |
+| (new) | "The status header requires no inventory change history, module source or re-rendering", "Header needs no change history" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| The status output SHALL display a metadata header above the resource t... | body of "The status header shows the instance name, namespace, health and summary from the persisted inventory record", verbatim |
+| Module version and ownership metadata SHALL come from the persisted in... | body of "The status header shows the instance name, namespace, health and summary from the persisted inventory record", verbatim |
+| <!-- Was: release name, release inventory record, releaseMetadata (enh... | body of "The status header shows the instance name, namespace, health and summary from the persisted inventory record", verbatim |
+| The command SHALL NOT require inventory change-history metadata such a... | body of "The status header requires no inventory change history, module source or re-rendering", with "The command" read as "The `opm instance status` command" |
+
+Words changed or added:
+- "The status header requires no inventory change history, module source or re-rendering": "The command SHALL NOT require inventory change-history metadata such as source version, ra..." reads "The `opm instance status` command SHALL NOT require inventory change-history metadata such..." ("The command" reads "The `opm instance status` command" (named in the scenario of the same requirement))
+
+Lengths (old, new): old 659; new "The status header shows the instance name, namespace, health and summary from the persisted inventory record" 478; "The status header requires no inventory change history, module source or re-rendering" 202.
+
+### Ledger: mod-status, Status output uses color
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The status table and header are color-coded on a TTY and plain otherwise", "The color mapping of the status output".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Color output on TTY | "The status table and header are color-coded on a TTY and plain otherwise", "Color output on TTY" | No (byte equal, checked) |
+| Color disabled on pipe | "The status table and header are color-coded on a TTY and plain otherwise", "Color disabled on pipe" | No (byte equal, checked) |
+| Color disabled by NO_COLOR | "The status table and header are color-coded on a TTY and plain otherwise", "Color disabled by NO_COLOR" | No (byte equal, checked) |
+| (new) | "The color mapping of the status output", "Unknown renders yellow" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| The status table and header SHALL use color-coded output when stdout i... | body of "The status table and header are color-coded on a TTY and plain otherwise", verbatim |
+| Color SHALL be disabled when stdout is not a TTY or when the `NO_COLOR... | body of "The status table and header are color-coded on a TTY and plain otherwise", verbatim |
+| The color mapping SHALL be: Health status `Ready` and `Complete`: gree... | body of "The color mapping of the status output", verbatim as a list, with the subject extended by the table and header |
+
+Words changed or added:
+- "The color mapping of the status output": "The color mapping SHALL be:
+- Health status `Ready` and `Complete`: green
+- Health status ..." reads "The color mapping of the status table and header SHALL be:
+- Health status `Ready` and `Co..." ("The color mapping" reads "The color mapping of the status table and header", copied from the first sentence of the same requirement)
+
+Lengths (old, new): old 508; new "The status table and header are color-coded on a TTY and plain otherwise" 179; "The color mapping of the status output" 359.
+
+### Ledger: mod-status, Status lists unreadable tracked resources as Unknown
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "An unreadable tracked resource is warned about and listed as Unknown", "An Unknown resource makes the instance NotReady and the command exit 2".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Forbidden resource makes the instance not ready | "An unreadable tracked resource is warned about and listed as Unknown", "Forbidden resource makes the instance not ready" | No (byte equal, checked) |
+| Every read fails | "An Unknown resource makes the instance NotReady and the command exit 2", "Every read fails" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| When a tracked resource cannot be read (its GET fails with an error ot... | body of "An unreadable tracked resource is warned about and listed as Unknown", verbatim |
+| An `Unknown` resource is not healthy: the instance's aggregate status ... | body of "An Unknown resource makes the instance NotReady and the command exit 2", the part of this sentence it holds, verbatim or as the words changed below say |
+| An instance whose tracked resources all failed to read SHALL be report... | body of "An Unknown resource makes the instance NotReady and the command exit 2", verbatim |
+
+Words changed or added:
+- "An Unknown resource makes the instance NotReady and the command exit 2": "An `Unknown` resource is not healthy: the instance's aggregate status SHALL be `NotReady`,..." reads "An `Unknown` resource is not healthy: the instance's aggregate status SHALL be `NotReady`,..." ("the command" reads "the `opm instance status` command", copied from the first sentence of the same requirement)
+
+Lengths (old, new): old 514; new "An unreadable tracked resource is warned about and listed as Unknown" 251; "An Unknown resource makes the instance NotReady and the command exit 2" 284.
+
+### Strength table of cli-B4 unit 4a
+
+Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text:
+
+| Old sentence | New body | Word added |
+| --- | --- | --- |
+| The declared pair is verified against fetched coordinates wherever it later meets a registry (operator acquire... | "The declared module identity pair is verified where it meets a registry" | "The declared pair" reads "The declared pair (`spec.module.path` and `spec.module.version`)", copied from the first sentence; "is verified" reads "SHALL be verified" |
