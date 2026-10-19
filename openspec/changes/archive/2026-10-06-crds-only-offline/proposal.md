@@ -55,5 +55,8 @@ None.
   registry for that step.
 - Delivers the cli side of 0021:D11:R1/R7 (revised 2026-10-06): the CLI carries no controller manifest beyond the CRDs
   of its pinned module version, and the CRDs-only form applies them without a registry or the controller's instance.
-  `enhancement.yaml` declares 0021 with no decisions, since D11 was claimed by install-operator-from-module. The
-  change depends on the revised 0021:D11 reaching enhancements main.
+  The change depends on the revised 0021:D11 reaching enhancements main.
+
+## Enhancement
+
+None.

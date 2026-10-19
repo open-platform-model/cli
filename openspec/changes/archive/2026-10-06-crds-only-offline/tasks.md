@@ -1,5 +1,5 @@
 Ships inside the controller rename's PR (`refactor!: rename the operator command and package to the controller`),
-after the rename's own archive. Implements 0021:D11:R1/R7 (revised 2026-10-06); `enhancement.yaml` claims no decision.
+after the rename's own archive. Implements 0021:D11:R1/R7 (revised 2026-10-06).
 
 ## 1. Share the controller render
 

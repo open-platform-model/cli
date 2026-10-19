@@ -28,3 +28,7 @@ Release class: MAJOR after GA (a renamed command, a changed `spec.owner` value);
 ## Impact
 
 - Needs, before merge: the controller's first release under the new name (`v1.0.0-beta.9`, image `ghcr.io/open-platform-model/opm-controller`) and the module `opm_controller` `0.1.0`, so `task controller:pin VERSION=0.1.0` can write the pin; the renamed fixtures published.
+
+## Enhancement
+
+None.
