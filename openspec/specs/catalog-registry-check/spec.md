@@ -79,8 +79,6 @@ A failure that asks no registry (a registry mapping that does not parse) exits 1
 
 **Source**: enhancement 0011 ("A published catalog can be verified out of band").
 
-**Source**: enhancement 0021 ("A beta line reaches GA only when its exit criteria hold").
-
 #### Scenario: Version not published
 
 - **WHEN** the check names a version the registry does not hold

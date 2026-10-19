@@ -262,7 +262,7 @@ When no published version satisfies the active mode, resolution SHALL refuse rat
 
 ### Requirement: Resolution infers nothing
 
-Resolution SHALL NOT infer maturity, widen the major, or fall back to a hand-pinned literal.
+Resolution SHALL NOT infer maturity, widen the major, or fall back to a hand-pinned literal. (Requirement: The CLI resolves a catalog subscription version from the registry within one major)
 
 #### Scenario: No inference of maturity, major or literal
 
@@ -307,7 +307,7 @@ A cluster `Platform` CR SHALL be turned into a platform module exactly as the op
 
 ### Requirement: The CLI does not publish or write the generated module
 
-The CLI MUST NOT publish the generated module, write it to the cluster, or treat it as user-editable; it is derived state and may be deleted at any time.
+The CLI MUST NOT publish the generated module, write it to the cluster, or treat it as user-editable; it is derived state and may be deleted at any time. (Requirement: A generated platform module lives in the OPM home cache under its content hash)
 
 #### Scenario: The generated module is derived state
 

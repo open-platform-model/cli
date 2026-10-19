@@ -38,7 +38,7 @@
 
 ### Requirement: Instance delete confirmation names the claims that delete-data deletes
 **Reason**: Split into requirements that each state one behavior.
-**Migration**: See "Instance delete reads the instance record before it asks for confirmation", "The prompt names the claims that delete-data deletes", "Without delete-data the prompt says PersistentVolumeClaims are kept", "The prompt for an operator-managed instance says so and says what the operator does", "The prompt for an operator-managed instance without prune says the operator leaves the tracked resources running", "The prompt for an operator-managed instance with prune set and no claim says nothing about claims", "With prune set and a tracked claim the prompt says one of four things decided by the CRD", "The prompt says the operator deletes the claims and their data when the CRD has no policy field or the policy is Delete", "The prompt says the operator keeps the claims when the CRD has the field and the policy is Keep, absent or another value", "The prompt does not say whether claims are kept when the CRD has no readable schema", "The prompt shows the value of spec.dataPolicy as it is", "Every check that can refuse the delete runs before the prompt".
+**Migration**: See "Instance delete reads the instance record before it asks for confirmation", "The prompt names the claims that delete-data deletes", "Without delete-data the prompt says PersistentVolumeClaims are kept", "The prompt for an operator-managed instance says so and says what the operator does", "The prompt for an operator-managed instance without prune says the operator leaves the tracked resources running", "The prompt for an operator-managed instance with prune set and no claim says nothing about claims", "With prune set and a tracked claim the prompt says one of four things decided by the CRD", "The dry run and the run with --yes state the same outcome for PersistentVolumeClaims", "The prompt says the operator deletes the claims and their data when the CRD has no policy field or the policy is Delete", "The prompt says the operator keeps the claims when the CRD has the field and the policy is Keep, absent or another value", "The prompt does not say whether claims are kept when the CRD has no readable schema", "The prompt shows the value of spec.dataPolicy as it is", "Every check that can refuse the delete runs before the prompt".
 
 ### Requirement: Instance delete reports a resource as deleted when its delete is accepted
 **Reason**: Split into requirements that each state one behavior.
@@ -854,17 +854,21 @@ For an operator-managed instance the prompt SHALL be the same with or without `-
 
 ### Requirement: With prune set and a tracked claim the prompt says one of four things decided by the CRD
 
-When `spec.prune` is set and the inventory tracks at least one PersistentVolumeClaim, the prompt SHALL say one of four things, decided by whether the installed `ModuleInstance` CRD has `spec.dataPolicy`. The command SHALL take that from the CRD its operator-readiness check reads and SHALL NOT read the CRD a second time for it. The dry run, and the run with `--yes`, SHALL state the same outcome for PersistentVolumeClaims in their output.
-
-#### Scenario: Same outcome in a dry run and with --yes
-
-- **WHEN** the dry run or the run with `--yes` outputs the outcome for PersistentVolumeClaims
-- **THEN** it SHALL state the same outcome for PersistentVolumeClaims in their output
+When `spec.prune` is set and the inventory tracks at least one PersistentVolumeClaim, the prompt SHALL say one of four things, decided by whether the installed `ModuleInstance` CRD has `spec.dataPolicy`. The command SHALL take that from the CRD its operator-readiness check reads and SHALL NOT read the CRD a second time for it.
 
 #### Scenario: The prompt depends on the CRD
 
 - **WHEN** `spec.prune` is set and the inventory tracks at least one PersistentVolumeClaim
 - **THEN** the prompt SHALL say one of four things, decided by whether the installed `ModuleInstance` CRD has `spec.dataPolicy`, and the command SHALL take that from the CRD its operator-readiness check reads
+
+### Requirement: The dry run and the run with --yes state the same outcome for PersistentVolumeClaims
+
+The dry run, and the run with `--yes`, SHALL state the same outcome for PersistentVolumeClaims in their output.
+
+#### Scenario: Same outcome in a dry run and with --yes
+
+- **WHEN** the dry run or the run with `--yes` outputs the outcome for PersistentVolumeClaims
+- **THEN** it SHALL state the same outcome for PersistentVolumeClaims in their output
 
 ### Requirement: The prompt says the operator deletes the claims and their data when the CRD has no policy field or the policy is Delete
 
@@ -909,7 +913,7 @@ When `spec.prune` is set and the inventory tracks at least one PersistentVolumeC
 
 ### Requirement: The prompt shows the value of spec.dataPolicy as it is
 
-The prompt SHALL show the value of `spec.dataPolicy` as it is, or say that it is not set; a value other than `Keep` and `Delete` SHALL be shown quoted and named as read as `Keep`.
+The prompt SHALL show the value of `spec.dataPolicy` as it is, or say that it is not set; a value other than `Keep` and `Delete` SHALL be shown quoted and named as read as `Keep`. (Requirement: Instance delete reads the instance record before it asks for confirmation)
 
 #### Scenario: Prompt for an unknown data policy
 
@@ -1035,7 +1039,7 @@ With `--wait`, on a real run of a CLI-owned instance in which no tracked resourc
 
 ### Requirement: A resource is gone when its read returns NotFound or its UID differs
 
-A resource is gone when its read returns NotFound, or when the live object under its name has a UID other than the one of the object that was deleted. A read that fails with another error SHALL NOT count as gone.
+With `--wait`, on a real run of a CLI-owned instance in which no tracked resource failed, a resource is gone when its read returns NotFound, or when the live object under its name has a UID other than the one of the object that was deleted. A read that fails with another error SHALL NOT count as gone.
 
 #### Scenario: Name taken by a new object
 

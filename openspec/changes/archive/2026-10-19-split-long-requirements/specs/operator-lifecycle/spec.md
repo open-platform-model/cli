@@ -97,7 +97,7 @@ When `opm operator uninstall` deleted every recorded object and the delete of th
 
 ### Requirement: Install runs every refusing check before its first write
 **Reason**: Split into requirements that each state one behavior.
-**Migration**: See "Install runs every check that can refuse it before it writes", "Install writes in a fixed order after every check passed", "The apply guard runs on every install", "Install passes the guard no admission set and no proof of origin", "The guard judges an object the record lists as recorded", "The guard judges an existing object the record does not list", "Install refuses an object adopted by another instance", "Every refusal of the guard exits 2 and names the object, the instance and the annotation", "Install waits out terminating objects before the guard runs", "A failed read refuses the install in the check that made it", "A failed read in the wait for terminating objects exits by the read error".
+**Migration**: See "Install runs every check that can refuse it before it writes", "Install runs its status-subresource permission check and the apply guard before it writes", "Install writes in a fixed order after every check passed", "The apply guard runs on every install", "Install passes the guard no admission set and no proof of origin", "The guard judges an object the record lists as recorded", "The guard judges an existing object the record does not list", "Install refuses an object adopted by another instance", "Every refusal of the guard exits 2 and names the object, the instance and the annotation", "Install waits out terminating objects before the guard runs", "A failed read refuses the install in the check that made it", "A failed read in the wait for terminating objects exits by the read error".
 
 ### Requirement: Install resolves another module version as the registry serves it
 **Reason**: Split into requirements that each state one behavior.
@@ -105,7 +105,7 @@ When `opm operator uninstall` deleted every recorded object and the delete of th
 
 ### Requirement: The running-operator check finds the operator by its fixed names alone
 **Reason**: Split into requirements that each state one behavior.
-**Migration**: See "The running-operator check locates the operator by its fixed names", "The running-operator check reads no Namespace and reports a missing CRD as not ready", "The operator counts as running only on a positive finding".
+**Migration**: See "The running-operator check locates the operator by its fixed names", "The running-operator check reads no Namespace and reports a missing CRD as not ready", "The operator counts as running only on a positive finding", "A failed read counts the object as not ready".
 
 ## ADDED Requirements
 
@@ -166,7 +166,7 @@ With `--remove-finalizers`, `opm operator uninstall` SHALL attempt to remove exa
 
 ### Requirement: Catalog resolution failures map to the standard exit codes
 
-Catalog resolution failures SHALL map to the CLI's standard exit codes: a catalog major with no selectable version is a validation refusal (exit 2) that names the flag which would select a prerelease, and an unreachable or unreadable registry is a connectivity failure (exit 3).
+When `opm operator install` will seed a Platform, resolution failures SHALL map to the CLI's standard exit codes: a catalog major with no selectable version is a validation refusal (exit 2) that names the flag which would select a prerelease, and an unreachable or unreadable registry is a connectivity failure (exit 3).
 
 #### Scenario: Unreadable registry is a connectivity failure
 
@@ -379,7 +379,7 @@ Neither the Platform nor the `opm-cli-user` role of `--rbac` SHALL be part of th
 
 ### Requirement: A full install records the CRDs a CRDs-only install applied
 
-A later full install of the same module version SHALL record those CRDs without recreating them. Source: enhancement 0021 ("The operator's install artifact is a registry module on its own version train").
+A later full install of the same module version SHALL record those CRDs without recreating them. (Requirement: CRDs-only install applies exactly the rendered CRDs) Source: enhancement 0021 ("The operator's install artifact is a registry module on its own version train").
 
 #### Scenario: Full install after CRDs-only
 
@@ -449,7 +449,7 @@ Re-running `opm operator uninstall` after the cause of a failed read is fixed SH
 
 ### Requirement: A failed record delete exits by the cause of the failure
 
-When the delete of the operator's instance record fails with an error other than NotFound, the exit code SHALL be 4 when the API server denied the delete (Forbidden or Unauthorized), 3 when it answered with a server timeout or service unavailable, and 1 for any other failure.
+When `opm operator uninstall` deleted every recorded object and the delete of the operator's instance record then fails with an error other than NotFound, the exit code SHALL be 4 when the API server denied the delete (Forbidden or Unauthorized), 3 when it answered with a server timeout or service unavailable, and 1 for any other failure.
 
 #### Scenario: Record delete times out
 
@@ -493,7 +493,16 @@ The finalizer guard and the no-record refusal of `opm operator uninstall` SHALL 
 
 ### Requirement: Install runs every check that can refuse it before it writes
 
-Install SHALL run, before it writes any object, every check that can refuse it: resolving the module and reading the operator version it deploys, rendering it, the check of the values against the target version's `#config`, the target rules of install, the status-subresource permission check, and the apply guard. An install that refuses SHALL change no object in the cluster.
+Install SHALL run, before it writes any object, every check that can refuse it: resolving the module and reading the operator version it deploys, rendering it, the check of the values against the target version's `#config`, the target rules of install (the operator version against the CLI's, the rendered image against the module's stated operator version, and the rendered ModuleInstance CRD against the CLI's floor).
+
+#### Scenario: The module, render, values and target rules are checked before the first write
+
+- **WHEN** install runs
+- **THEN** it SHALL run the resolving of the module, the rendering, the check of the values against the target version's `#config` and the target rules of install before it writes any object
+
+### Requirement: Install runs its status-subresource permission check and the apply guard before it writes
+
+Install SHALL run, before it writes any object, every check that can refuse it: the status-subresource permission check, and the apply guard over every object the render names (capability `apply-pruning`, "Ownership guard judges every apply and dry run"). An install that refuses SHALL change no object in the cluster.
 
 #### Scenario: A refused install leaves the CRDs untouched
 
@@ -530,7 +539,7 @@ Install SHALL pass the guard no admission set and SHALL run no proof of where an
 
 ### Requirement: The guard judges an object the record lists as recorded
 
-An object the record lists is judged as recorded and SHALL pass whatever its UUID label says.
+An object the record lists is judged as recorded and SHALL pass whatever its UUID label says. (Requirement: The apply guard runs on every install)
 
 #### Scenario: Reinstall over its own recorded objects passes the guard
 
@@ -684,9 +693,18 @@ The `Namespace` is checked only as the namespace of the `Deployment` `opm-operat
 
 ### Requirement: The operator counts as running only on a positive finding
 
-The operator SHALL count as running only when every one of its four fixed `CustomResourceDefinition`s reports `Established=True` and the `Deployment` has completed its rollout. Otherwise the check SHALL report the operator as not ready, name each object that failed, and point at `opm operator install`. A read of any of the fixed-name objects that fails SHALL count that object as not ready, so the command proceeds only on a positive finding.
+The operator SHALL count as running only when every one of these `CustomResourceDefinition`s reports `Established=True` and the `Deployment` has completed its rollout. (Requirement: The running-operator check locates the operator by its fixed names) Otherwise the check SHALL report the operator as not ready, name each object that failed, and point at `opm operator install`.
 
 #### Scenario: No operator at all
 
 - **WHEN** the cluster holds none of the four CRDs and no `opm-operator-controller-manager` Deployment
 - **THEN** the running-operator check SHALL report the operator as not ready, naming the missing objects, and point at `opm operator install`
+
+### Requirement: A failed read counts the object as not ready
+
+A read of any of these objects that fails SHALL count that object as not ready, so the command proceeds only on a positive finding. (Requirement: The running-operator check locates the operator by its fixed names)
+
+#### Scenario: A failed read counts the object as not ready
+
+- **WHEN** a read of any of the fixed-name objects of the running-operator check fails
+- **THEN** the check SHALL count that object as not ready, so the command proceeds only on a positive finding

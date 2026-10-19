@@ -60,7 +60,7 @@ When no GitHub Release exists for the tag the `goreleaser` job SHALL fail with a
 
 ### Requirement: A failed draft lookup is no published release
 
-Before building, the `goreleaser` job SHALL read the draft state of the GitHub Release for the tag. When the lookup itself fails for any other reason the `goreleaser` job SHALL fail with that error and SHALL NOT report the release as published. Source: enhancement 0021 ("Release tags are immutable").
+Before building, the `goreleaser` job SHALL read the draft state of the GitHub Release for the tag. When the lookup itself fails for any other reason the `goreleaser` job SHALL fail with that error and SHALL NOT report the release as published. (Requirement: The goreleaser job fails without a release for the tag) Source: enhancement 0021 ("Release tags are immutable").
 
 #### Scenario: A failed lookup is not reported as published
 - **WHEN** the lookup itself fails for any other reason

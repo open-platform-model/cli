@@ -293,8 +293,7 @@ Internal Go identifiers (function names, type names, field names, variable names
 
 ### Requirement: The identifier rule applies to internal packages only
 
-This requirement SHALL apply to internal packages only. User-facing terminal output (success messages, log prefixes, command descriptions) is governed by the UX principle that users think in terms of modules and is explicitly excluded.
-(Requirement: Module and ModuleInstance identifiers are distinct)
+The requirement "Module and ModuleInstance identifiers are distinct" SHALL apply to internal packages only. User-facing terminal output (success messages, log prefixes, command descriptions) is governed by the UX principle that users think in terms of modules and is explicitly excluded.
 
 #### Scenario: User-facing terminal output is excluded
 

@@ -155,7 +155,7 @@ When the read of the instance's `ModuleInstance` record fails with any error oth
 
 ### Requirement: A failed record read names its cause
 
-When the read of the instance's `ModuleInstance` record fails with any error other than NotFound, the error SHALL name the instance and its namespace, carry the cause of the failed read, and tell the user to check access to the record and run the command again.
+When the read of the instance's `ModuleInstance` record fails with any error other than NotFound, `opm instance apply` and `opm module apply` SHALL stop with an error. The error SHALL name the instance and its namespace, carry the cause of the failed read, and tell the user to check access to the record and run the command again.
 
 #### Scenario: A failed record read names the instance and its cause
 
@@ -164,7 +164,7 @@ When the read of the instance's `ModuleInstance` record fails with any error oth
 
 ### Requirement: A failed record read exits by the answer of the API server
 
-When the read of the instance's `ModuleInstance` record fails with any error other than NotFound, the exit code SHALL be 4 when the API server denied the read (Forbidden or Unauthorized), 3 when it answered with a server timeout or service unavailable, and 1 for any other failure. A NotFound answer SHALL still mean that no record exists.
+When the read of the instance's `ModuleInstance` record fails with any error other than NotFound, `opm instance apply` and `opm module apply` SHALL stop with an error. The exit code SHALL be 4 when the API server denied the read (Forbidden or Unauthorized), 3 when it answered with a server timeout or service unavailable, and 1 for any other failure. A NotFound answer SHALL still mean that no record exists.
 
 #### Scenario: Read denied
 
@@ -212,7 +212,7 @@ When the delete of a stale resource fails with any error other than NotFound, th
 
 ### Requirement: A failed stale delete is reported and pruned again on the next apply
 
-The output SHALL name each stale resource whose delete failed by kind, namespace and name with its delete error, and SHALL say that the next apply retries the prune. On the next apply a kept entry SHALL be stale again and SHALL be pruned again.
+When the delete of a stale resource fails with any error other than NotFound, the output SHALL name each such resource by kind, namespace and name with its delete error, and SHALL say that the next apply retries the prune. On the next apply a kept entry SHALL be stale again and SHALL be pruned again.
 
 #### Scenario: Next apply retries the prune
 
@@ -336,7 +336,7 @@ In a dry run, a stale resource that is already gone SHALL be listed on no line. 
 
 ### Requirement: `--no-prune` turns the dry-run prune preview off
 
-With `--no-prune`, none of the lists SHALL be printed and no stale resource SHALL be read for a verdict.
+With `--no-prune`, none of the lists SHALL be printed and no stale resource SHALL be read for a verdict. (Requirements: The dry-run preview lists the resources a real prune would delete or leave behind; The dry-run preview lists a PersistentVolumeClaim a real prune would keep; The dry-run preview lists a resource the verdict leaves in place on its own line; The dry-run preview lists no resource that is gone and flags one it cannot read)
 
 #### Scenario: No-prune dry run lists nothing
 
@@ -357,7 +357,7 @@ On a first-time apply (no `ModuleInstance` record), when one or more rendered re
 
 ### Requirement: The first-install warning says what the apply does and does not stop it
 
-The warning SHALL say that the instance has no `ModuleInstance` record, that an apply updates those resources in place and records them, and that it prunes nothing. The warning SHALL NOT change the exit code and SHALL NOT stop the apply.
+The warning SHALL say that the instance has no `ModuleInstance` record, that an apply updates those resources in place and records them, and that it prunes nothing. The warning SHALL NOT change the exit code and SHALL NOT stop the apply. (Requirement: A first install over OPM-managed resources prints one warning)
 
 #### Scenario: First-install warning content and effect
 
@@ -367,7 +367,7 @@ The warning SHALL say that the instance has no `ModuleInstance` record, that an 
 
 ### Requirement: The warning of a dry run names the release to apply with first
 
-A dry run SHALL print the warning too, when its ownership guard refuses nothing ("A dry run previews each refusal of the guard"): a dry run that previews a refusal stops there, as the real run does, and prints no such warning. The dry-run warning SHALL name the release to apply with first (`v1.0.0-beta.10`) when an older release recorded the instance in a Secret.
+A dry run SHALL print the warning too, when its ownership guard refuses nothing ("A dry run previews each refusal of the guard"): a dry run that previews a refusal stops there, as the real run does, and prints no such warning. The dry-run warning SHALL name the release to apply with first (`v1.0.0-beta.10`) when an older release recorded the instance in a Secret. (Requirement: A first install over OPM-managed resources prints one warning)
 
 #### Scenario: Dry run warns before anything is written
 
@@ -384,7 +384,7 @@ A dry run SHALL print the warning too, when its ownership guard refuses nothing 
 
 ### Requirement: The warning of a real run names the Secret and not an older release
 
-The warning of a real run SHALL NOT send the user to the release to apply with first (`v1.0.0-beta.10`), because the run writes the record and that release then deletes the Secret without reading it. It SHALL name the Secret (`opm.<name>.<id>`), SHALL say to keep it and not to apply with an older release, and SHALL name the docs page that describes the cleanup.
+The warning of a real run SHALL NOT send the user to the release to apply with first (`v1.0.0-beta.10`), because the run writes the record and that release then deletes the Secret without reading it. It SHALL name the Secret (`opm.<name>.<id>`), SHALL say to keep it and not to apply with an older release, and SHALL name the docs page that describes the cleanup. (Requirement: A first install over OPM-managed resources prints one warning)
 
 #### Scenario: Real-run warning names the Secret
 
@@ -393,7 +393,7 @@ The warning of a real run SHALL NOT send the user to the release to apply with f
 
 ### Requirement: The first-install warning is not printed when it does not apply
 
-The apply SHALL print no such warning when no rendered resource exists yet, or when the instance has a record. `opm operator install` SHALL NOT print it: install applies the render's CustomResourceDefinitions itself before the instance apply, so a fresh install always finds them.
+The apply SHALL print no such warning when no rendered resource exists yet, or when the instance has a record. `opm operator install` SHALL NOT print it: install applies the render's CustomResourceDefinitions itself before the instance apply, so a fresh install always finds them. (Requirement: A first install over OPM-managed resources prints one warning)
 
 #### Scenario: Operator install prints no warning
 
@@ -554,7 +554,7 @@ Each delete SHALL carry a precondition on the UID of the object that was read, s
 
 ### Requirement: A failed live read counts as a failed delete
 
-A live read that fails with any error other than NotFound SHALL count as a failed delete of that resource ("A failed stale delete is kept in the record and fails the command").
+A live read that fails with any error other than NotFound SHALL count as a failed delete of that resource ("A failed stale delete is kept in the record and fails the command"). (Requirement: Prune takes the delete decision from the ownership verdict)
 
 #### Scenario: Live read denied
 
@@ -603,7 +603,7 @@ For a resource let go, the apply SHALL print one warning that names the resource
 
 ### Requirement: A dry run skips a resource adopted by another instance
 
-When the instance's UUID is known and the live `opmodel.dev/adopt` annotation of a rendered resource names another instance, a dry run SHALL NOT send such a resource (the scope of "A resource adopted by another instance is not applied and does not fail the apply") to the server either: in place of the warning it SHALL print one line that names the resource with the status `would skip` and the same text, and it SHALL NOT fail because of it.
+A dry run SHALL NOT send such a resource to the server either: in place of the warning it SHALL print one line that names the resource with the status `would skip` and the same text, and it SHALL NOT fail because of it. (Requirements: A resource adopted by another instance is not applied and does not fail the apply; The apply warns about a resource let go and writes the inventory without it)
 
 #### Scenario: Dry run skips an adopted resource
 
@@ -626,7 +626,7 @@ When every rendered resource is let go, so that the apply applies nothing, the r
 
 ### Requirement: A dry run where every rendered resource is let go says that nothing would be applied
 
-A dry run in which every rendered resource is let go SHALL print one closing line that says that nothing would be applied, for the same reason.
+A dry run in the same state SHALL print one closing line that says that nothing would be applied, for the same reason. (Requirement: A real apply that lets go of every rendered resource says that nothing was applied)
 
 #### Scenario: Dry run where every rendered resource is adopted elsewhere
 
@@ -685,7 +685,7 @@ A resource whose read or delete fails SHALL NOT stop the plan, except that after
 
 ### Requirement: A stale resource counts as pruned when its delete is accepted
 
-A stale resource SHALL count as pruned when the API server accepts its delete request. Which entries stay in the written inventory, the output lines and the exit codes SHALL stay as the other requirements of this capability state them. The dry-run prune preview SHALL NOT be affected.
+A stale resource SHALL count as pruned when the API server accepts its delete request. Which entries stay in the written inventory, the output lines and the exit codes SHALL stay as the other requirements of this capability state them. The dry-run prune preview SHALL NOT be affected. (Requirement: The prune takes every action from the deletion plan shared with the operator)
 
 #### Scenario: Stale resource held by a finalizer
 
@@ -779,7 +779,7 @@ The one override SHALL be the adopt annotation: an existing resource whose `opmo
 
 ### Requirement: The CLI sets no adopt annotation and offers no flag to bypass the guard
 
-The CLI SHALL NOT set the annotation and SHALL offer no flag that sets it or that bypasses the guard. Every ownership refusal SHALL name the annotation and the UUID to set, and SHALL NOT name a flag.
+The CLI SHALL NOT set the annotation and SHALL offer no flag that sets it or that bypasses the guard. Every ownership refusal SHALL name the annotation and the UUID to set, and SHALL NOT name a flag. (Requirements: The adopt annotation of this instance lets a resource pass the ownership refusals; The ownership guard judges every apply)
 
 #### Scenario: Foreign resource refused on a first apply
 

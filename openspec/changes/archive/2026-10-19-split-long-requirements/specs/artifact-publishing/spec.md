@@ -95,7 +95,7 @@ One cause SHALL yield one refusal.
 
 ### Requirement: Publish evaluates the gates of the gate list
 
-The gates SHALL be those listed in scenario "The ten gates of the gate list".
+The gates SHALL be those listed in scenario "The gates of the gate list".
 
 #### Scenario: Already published is always a refusal
 
@@ -108,7 +108,7 @@ The gates SHALL be those listed in scenario "The ten gates of the gate list".
 - **WHEN** a third-party artifact under its own domain is published
 - **THEN** no namespace or kind-segment gate refuses it
 
-#### Scenario: The ten gates of the gate list
+#### Scenario: The gates of the gate list
 
 - **WHEN** publish evaluates its gates
 - **THEN** The gates SHALL be: kernel loadability (modules only: the kernel's module loader accepts the tree; its refusal is surfaced verbatim and is the only refusal that cause yields); identity concreteness (a defaulted field counts as concrete at its default for tag derivation; an absent field or file is never publishable); `metadata` ↔ identity-package derivation; `cue.mod` `module:` ↔ declared path agreement (no `cue.mod` at all refuses, pointing at `opm mod init` — publish never creates or edits `cue.mod`); `source: {kind: "self"}` presence; tag equals the effective declared version and the tag major equals the path major; the module package name equals `metadata.name`; namespace and kind-segment checks on owned domains only; local-override presence; already-published tag.
@@ -226,7 +226,7 @@ When the core-schema fetch fails and no registry is configured (no `--registry` 
 
 ### Requirement: A violation refuses as refusal 9
 
-Violations SHALL refuse as refusal 9: a header naming the member, its apiVersion, and the compared-against coordinate, followed by path-located violation lines.
+Violations SHALL refuse as refusal 9: a header naming the member, its apiVersion, and the compared-against coordinate, followed by path-located violation lines. (Requirement: Catalog publish compares each beta and GA member under the additive-only rule)
 
 #### Scenario: Field removal refused against the true predecessor
 
@@ -235,7 +235,7 @@ Violations SHALL refuse as refusal 9: a header naming the member, its apiVersion
 
 ### Requirement: A beta or GA name and apiVersion key is a permanent claim
 
-The gate makes a beta-or-GA name-and-apiVersion key a permanent claim on its own history: an incompatible re-introduction after a removal SHALL be refused identically.
+The gate makes a beta-or-GA name-and-apiVersion key a permanent claim on its own history: an incompatible re-introduction after a removal SHALL be refused identically. (Requirements: Catalog publish compares each beta and GA member under the additive-only rule; A violation refuses as refusal 9)
 
 #### Scenario: Remove-then-readd refused
 

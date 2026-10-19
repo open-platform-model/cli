@@ -2,7 +2,7 @@
 
 ### Requirement: Loader validates consumer values and produces a concrete ModuleInstance
 **Reason**: Split into requirements that each state one behavior.
-**Migration**: See "The CLI produces validated, concrete instances exclusively through the library kernel", "The module-directory path acquires a directory with kernel AcquireModuleFromDir and SynthesizeInstance", "The published-module path acquires a module with kernel AcquireModuleFromRegistry and SynthesizeInstance", "The instance-package path acquires an instance package directory with kernel AcquireInstanceFromDir".
+**Migration**: See "The CLI produces validated, concrete instances exclusively through the library kernel", "Every synthesis path lets CUE derive the uuid, components, auto-secrets and standard labels", "Every path runs the kernel's shape gate and concreteness enforcement", "The module-directory path acquires a directory with kernel AcquireModuleFromDir and SynthesizeInstance", "The published-module path acquires a module with kernel AcquireModuleFromRegistry and SynthesizeInstance", "The instance-package path acquires an instance package directory with kernel AcquireInstanceFromDir".
 
 ### Requirement: Value selection falls back to module defaults when no files are given
 **Reason**: Split into requirements that each state one behavior.
@@ -12,12 +12,30 @@
 
 ### Requirement: The CLI produces validated, concrete instances exclusively through the library kernel
 
-The CLI SHALL produce validated, concrete instances exclusively through the `library` kernel. In every synthesis path the kernel unifies inputs against the resolved `#ModuleInstance` schema and lets CUE derive uuid, components, auto-secrets, and standard labels. All paths run the kernel's shape gate and concreteness enforcement, producing a `*module.Instance`. The CLI SHALL NOT carry its own `LoadModuleInstanceFromValue` pipeline and SHALL NOT reach for a raw-value loading tier.
+The CLI SHALL produce validated, concrete instances exclusively through the `library` kernel. The CLI SHALL NOT carry its own `LoadModuleInstanceFromValue` pipeline and SHALL NOT reach for a raw-value loading tier.
 
 #### Scenario: Module Gate catches type mismatch
 
 - **WHEN** consumer values contain a field with the wrong type
 - **THEN** the kernel validation SHALL surface a structured config error identifying the offending field
+
+### Requirement: Every synthesis path lets CUE derive the uuid, components, auto-secrets and standard labels
+
+In every synthesis path the kernel SHALL unify inputs against the resolved `#ModuleInstance` schema and let CUE derive uuid, components, auto-secrets, and standard labels. (Requirements: The module-directory path acquires a directory with kernel AcquireModuleFromDir and SynthesizeInstance; The published-module path acquires a module with kernel AcquireModuleFromRegistry and SynthesizeInstance; The instance-package path acquires an instance package directory with kernel AcquireInstanceFromDir)
+
+#### Scenario: Synthesis derives uuid, components, auto-secrets and standard labels
+
+- **WHEN** a synthesis path runs
+- **THEN** the kernel SHALL unify inputs against the resolved `#ModuleInstance` schema and let CUE derive uuid, components, auto-secrets, and standard labels
+
+### Requirement: Every path runs the kernel's shape gate and concreteness enforcement
+
+All paths SHALL run the kernel's shape gate and concreteness enforcement, producing a `*module.Instance`. (Requirements: The module-directory path acquires a directory with kernel AcquireModuleFromDir and SynthesizeInstance; The published-module path acquires a module with kernel AcquireModuleFromRegistry and SynthesizeInstance; The instance-package path acquires an instance package directory with kernel AcquireInstanceFromDir)
+
+#### Scenario: Every path runs the shape gate and concreteness enforcement
+
+- **WHEN** any loading path produces an instance
+- **THEN** the kernel SHALL run its shape gate and concreteness enforcement and produce a `*module.Instance`
 
 ### Requirement: The module-directory path acquires a directory with kernel AcquireModuleFromDir and SynthesizeInstance
 

@@ -174,7 +174,7 @@ A failure after the first edit (a tool, or a resolver call that decides no targe
 
 ### Requirement: Exit 0 means the working tree changed and exit 3 means it did not
 
-Exit codes SHALL be: 0 when the working tree changed; 3 when it did not; any other code on error. Source: workspace RELEASING.md, section "The cascade", "The receiver".
+Exit codes of `task -x deps:cascade` SHALL be: 0 when the working tree changed; 3 when it did not; any other code on error. Source: workspace RELEASING.md, section "The cascade", "The receiver".
 
 #### Scenario: Nothing to move
 
@@ -209,7 +209,7 @@ The new version of the three templates (`opmodel.dev/templates/<name>@v1`) and t
 
 ### Requirement: A second run in the same pull request advances no version again
 
-A second run in the same pull request SHALL NOT advance any version again. Source: workspace RELEASING.md, section "The cascade", "The receiver" ("Version advances happen once per PR").
+A second run in the same pull request SHALL NOT advance any version again. (Requirement: Templates and the podinfo fixture get a new version when their tree differs from the merge base) Source: workspace RELEASING.md, section "The cascade", "The receiver" ("Version advances happen once per PR").
 
 #### Scenario: Second run does not advance again
 
@@ -218,7 +218,7 @@ A second run in the same pull request SHALL NOT advance any version again. Sourc
 
 ### Requirement: A version is written only when it is greater than the file version
 
-The task (`task -x deps:cascade`) SHALL write a version only when it is greater than the file's. A file version above the target SHALL stay, with a warning. Source: workspace RELEASING.md, section "The cascade", "The receiver" ("Version advances happen once per PR").
+The task (`task -x deps:cascade`) SHALL write a version only when it is greater than the file's. A file version above the target SHALL stay, with a warning. (Requirement: Templates and the podinfo fixture get a new version when their tree differs from the merge base) Source: workspace RELEASING.md, section "The cascade", "The receiver" ("Version advances happen once per PR").
 
 #### Scenario: A higher file version stays
 - **WHEN** a file version is above the target
