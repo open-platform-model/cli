@@ -56,15 +56,15 @@
 
 ## 9. Restore --strict
 
-- [ ] 9.1 In `Taskfile.yml`, make `openspec:check` run `openspec validate --all --strict --no-interactive` and drop the "--strict is off" text from its `desc`
-- [ ] 9.2 In `AGENTS.md`, drop "`--strict` is off until the long-requirement rewrite lands" from the `task openspec:check` row and show `--strict` in its command
-- [ ] 9.3 In `openspec/config.yaml`, drop the same text from Validation Gates line 4
-- [ ] 9.4 Confirm `ci.yml` and `pr.yml` call `task openspec:check` and need no edit; confirm no other file in the repo says that `--strict` is off (grep outside `openspec/changes/archive/`)
-- [ ] 9.5 `task openspec:check`, `task lint` and `task test` green, then commit `ci(openspec): validate with --strict again`
+- [x] 9.1 In `Taskfile.yml`, make `openspec:check` run `openspec validate --all --strict --no-interactive` and drop the "--strict is off" text from its `desc`
+- [x] 9.2 In `AGENTS.md`, drop "`--strict` is off until the long-requirement rewrite lands" from the `task openspec:check` row and show `--strict` in its command
+- [x] 9.3 In `openspec/config.yaml`, drop the same text from Validation Gates line 4
+- [x] 9.4 Confirm `ci.yml` and `pr.yml` call `task openspec:check` and need no edit; confirm no other file in the repo says that `--strict` is off (grep outside `openspec/changes/archive/`)
+- [x] 9.5 `task openspec:check`, `task lint` and `task test` green, then commit `ci(openspec): validate with --strict again`
 
 ## 10. Final gate
 
-- [ ] 10.1 Run the gate of `design.md` with `LAST=1` in a scratch copy: change validates strict, `validate --specs --strict` exits 0 after archive, no "Archive would refuse" line, no new ERROR item
-- [ ] 10.2 Run `task check` in the worktree and read that `openspec:check` runs with `--strict` and exits 0
-- [ ] 10.3 Check the scenario ledger of `design.md` against the 215 requirements: one subsection per rewritten requirement, no old scenario name missing
-- [ ] 10.4 Commit any fix the gate found as `docs(openspec): fix <what the gate found>`; with a clean tree this task is ticked with no commit
+- [x] 10.1 Run the gate of `design.md` with `LAST=1` in a scratch copy: change validates strict, `validate --specs --strict` exits 0 after archive, no "Archive would refuse" line, no new ERROR item
+- [x] 10.2 Run `task check` in the worktree and read that `openspec:check` runs with `--strict` and exits 0
+- [x] 10.3 Check the scenario ledger of `design.md` against the 215 requirements: one subsection per rewritten requirement, no old scenario name missing
+- [x] 10.4 Commit any fix the gate found as `docs(openspec): fix <what the gate found>`; with a clean tree this task is ticked with no commit
