@@ -179,10 +179,10 @@ The digest SHALL depend only on the entries' field values, never on their order 
 
 ### Requirement: The release that first records the library digest carries a migration note
 
-The release that first records this inventory digest SHALL carry a migration note naming the one-time change of the stored value. Source: enhancement 0012 ("The stale set is component-blind, and the inventory digest hashes a canonical field encoding").
+The release that first records this inventory digest computed with the library's `opm/k8s/inventory.Digest` SHALL carry a migration note naming the one-time change of the stored value. Source: enhancement 0012 ("The stale set is component-blind, and the inventory digest hashes a canonical field encoding").
 
 #### Scenario: Migration note for the first release
-- **WHEN** a release first records this inventory digest
+- **WHEN** a release first records the inventory digest computed with the library's `opm/k8s/inventory.Digest`
 - **THEN** it SHALL carry a migration note naming the one-time change of the stored value
 
 ### Requirement: A skipping apply records the skipped demands in the skipped-contracts annotation
@@ -212,7 +212,7 @@ When a later apply skips nothing, with or without the flag `--skip-unprovided`, 
 
 The annotation `module-instance.opmodel.dev/skipped-contracts` is information for whoever inspects the instance: no CLI gate SHALL read it as an authority.
 
-#### Scenario: No gate reads the annotation as an authority
+#### Scenario: No gate reads the skipped-contracts annotation as an authority
 - **WHEN** a CLI gate runs on an instance that carries the annotation
 - **THEN** no CLI gate SHALL read it as an authority
 

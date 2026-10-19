@@ -52,7 +52,7 @@ A UUID argument of the `opm instance status` command SHALL resolve via `inventor
 
 ### Requirement: Status performs one targeted GET per tracked entry once the record is found
 
-Once the record is found, the `opm instance status` command SHALL perform one targeted GET per tracked entry via `inventory.DiscoverResourcesFromInventory`.
+Once the persisted instance inventory record is found, the `opm instance status` command SHALL perform one targeted GET per tracked entry via `inventory.DiscoverResourcesFromInventory`.
 
 #### Scenario: One targeted GET per tracked entry
 - **WHEN** the record is found
@@ -77,7 +77,7 @@ The `opm instance status` command SHALL evaluate resource health using category-
 
 ### Requirement: A Deployment is healthy when its replica counters match and no old replicas remain
 
-The `opm instance status` command SHALL evaluate resource health using category-specific criteria: **Workloads** (Deployment, StatefulSet, DaemonSet): healthy only when the rollout has finished, never on a condition alone. Deployment: `updatedReplicas` and `availableReplicas` equal `spec.replicas`, no old replicas remain, and the `Progressing` condition does not report `ProgressDeadlineExceeded`.
+The `opm instance status` command SHALL evaluate resource health using category-specific criteria: Deployment: `updatedReplicas` and `availableReplicas` equal `spec.replicas`, no old replicas remain, and the `Progressing` condition does not report `ProgressDeadlineExceeded`. See the requirement "A workload is healthy only when its rollout has finished".
 
 #### Scenario: Deployment not yet ready
 
@@ -91,7 +91,7 @@ The `opm instance status` command SHALL evaluate resource health using category-
 
 ### Requirement: A StatefulSet is healthy when its replica counters and revisions match
 
-The `opm instance status` command SHALL evaluate resource health using category-specific criteria: **Workloads** (Deployment, StatefulSet, DaemonSet): healthy only when the rollout has finished, never on a condition alone. StatefulSet: `readyReplicas` and `updatedReplicas` equal `spec.replicas` and `updateRevision` equals `currentRevision` (revision and `updatedReplicas` checks relax for a partitioned `RollingUpdate` and are skipped for `OnDelete`).
+The `opm instance status` command SHALL evaluate resource health using category-specific criteria: StatefulSet: `readyReplicas` and `updatedReplicas` equal `spec.replicas` and `updateRevision` equals `currentRevision` (revision and `updatedReplicas` checks relax for a partitioned `RollingUpdate` and are skipped for `OnDelete`). See the requirement "A workload is healthy only when its rollout has finished".
 
 #### Scenario: StatefulSet with OnDelete
 - **WHEN** a StatefulSet uses `OnDelete`
@@ -99,7 +99,7 @@ The `opm instance status` command SHALL evaluate resource health using category-
 
 ### Requirement: A DaemonSet is healthy when its scheduled and available counters match
 
-The `opm instance status` command SHALL evaluate resource health using category-specific criteria: **Workloads** (Deployment, StatefulSet, DaemonSet): healthy only when the rollout has finished, never on a condition alone. DaemonSet: `updatedNumberScheduled` and `numberAvailable` equal `desiredNumberScheduled`.
+The `opm instance status` command SHALL evaluate resource health using category-specific criteria: DaemonSet: `updatedNumberScheduled` and `numberAvailable` equal `desiredNumberScheduled`. See the requirement "A workload is healthy only when its rollout has finished".
 
 #### Scenario: DaemonSet counters
 - **WHEN** the `updatedNumberScheduled` and `numberAvailable` of a DaemonSet equal its `desiredNumberScheduled`
