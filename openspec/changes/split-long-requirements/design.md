@@ -1,12 +1,12 @@
 ## Context
 
-The cli has 215 long requirements in 59 main specs. The rules below follow the swarm guide for this rewrite (design/T2.1.md of the swarm folder, approved 2026-10-19). The numbers in brackets point to that guide's sections. Nothing here changes the meaning of a requirement or scenario, and no code changes.
+The cli has 215 long requirements in 59 main specs. The rules below set out how each requirement is rewritten and checked. Nothing here changes the meaning of a requirement or scenario, and no code changes.
 
 ## Research & Decisions
 
 ### Which form rewrites a requirement
-**Context**: A requirement over 500 characters can be shortened in four safe ways, and several unsafe ones pass the validator without keeping the rules (guide section 3).
-**Explored**: Archive output of each form in scratch copies (guide sections 3 and 5).
+**Context**: A requirement over 500 characters can be shortened in four safe ways, and several unsafe ones pass the validator without keeping the rules (see the table below).
+**Explored**: Archive output of each form in scratch copies (see the table below).
 **Options considered**:
 1. Form a, MODIFIED with a shorter body and more scenarios: keeps the header and every scenario name. Fits examples, lists and formats around one behavior.
 2. Form b, MODIFIED plus ADDED: the parent keeps its header and all scenarios, split-off behaviors become ADDED requirements with new scenarios. A live scenario never moves to an ADDED block (OpenSpec refuses it).
@@ -33,8 +33,8 @@ The cli has 215 long requirements in 59 main specs. The rules below follow the s
 **Options considered**:
 1. One change in ten sections (eight batches, the gate extras, the final gate): one archive, one history, one ledger. Exceeds the "about five".
 2. Several changes: breaks the single-ledger view, and each change must archive in turn on the same specs.
-**Decision**: Option 1. The owner chose one change per repo and several units in sequence on one branch (swarm DECISIONS.md 2026-10-19 09:50).
-**Rationale**: Each section still satisfies both invariants of Principle VIII: it ends green under `task openspec:check` (non-strict until the gate section) and closes with its own commit. The sections are uniform batches, not ten different designs. The proposal gate confirms this deviation from the "about five" wording.
+**Decision**: Option 1. One change per repo, with several units in sequence on one branch.
+**Rationale**: Each section still satisfies both invariants of Principle VIII: it ends green under `task openspec:check` (non-strict until the gate section) and closes with its own commit. The sections are uniform batches, not ten different designs. The ten sections deviate from the "about five" wording of the repo rules.
 
 ## Sections
 
@@ -67,28 +67,28 @@ Other ledger rules for this repo:
 - RFC 2119 keywords stay in every body, with the same strength.
 - Citations (an enhancement id beside a reason in words, a `Source:` line) stay in the body of the block that carries the rule they support, never in the header. The repo rule is that an enhancement id never stands alone and is never a decision number; a rewrite copies the old wording and adds no new citation. A `Source:` line counts toward 500; `**Source**:` does not, and is a loophole.
 - Before a rename, split or c2, grep the repo for the old header text outside `openspec/changes/archive/`. A stale reference is fixed in the same unit.
-- Every new ADDED requirement has at least one scenario with a body and states SHALL or MUST. `openspec/config.yaml` asks scenarios to show observable behavior and user-facing outcomes; a scenario added for a new requirement uses only words and values of the old text. A scenario that adds a case absent from the old text is a question for the human, not a rewrite.
+- Every new ADDED requirement has at least one scenario with a body and states SHALL or MUST. `openspec/config.yaml` asks scenarios to show observable behavior and user-facing outcomes; a scenario added for a new requirement uses only words and values of the old text. A scenario that adds a case absent from the old text is not a rewrite and needs a decision.
 - No spec has a placeholder Purpose today (checked on `origin/main`), so no unit writes Purpose text. A c2 or b rewrite does not create a spec, so none appears.
 
 ## The gate
 
-Every unit runs the gate in a scratch copy of the folder `openspec/`, never in the worktree. The worktree path is `<repo>/agent-swarm/openspec-requirement-split/worktrees/cli-split-long-requirements`. The pinned CLI is 1.14.1 (`Taskfile.yml` `openspec:install`). The gate block is guide section 6, run in one shell call: archive `main` and the working copy into `$S/base` and `$S/openspec`; count WARNING lines of `validate --all --strict` before; `validate split-long-requirements --strict`; `archive split-long-requirements --yes`; `validate --all --strict` after; fail on any "Archive would refuse" line, on any ERROR item that `main` does not have (compared as a set of type, id and path, needs `jq`), and, for an earlier unit, when the WARNING count did not fall by N. N is the total of requirements rewritten so far by all units, 28 after section 1 and so on (the table above). Exit 0 only after `GATE PASS`.
+Every unit runs the gate in a scratch copy of the folder `openspec/`, never in the worktree. The pinned CLI is 1.14.1 (`Taskfile.yml` `openspec:install`). The gate block runs in one shell call: archive `main` and the working copy into `$S/base` and `$S/openspec`; count WARNING lines of `validate --all --strict` before; `validate split-long-requirements --strict`; `archive split-long-requirements --yes`; `validate --all --strict` after; fail on any "Archive would refuse" line, on any ERROR item that `main` does not have (compared as a set of type, id and path, needs `jq`), and, for an earlier unit, when the WARNING count did not fall by N. N is the total of requirements rewritten so far by all units, 28 after section 1 and so on (the table above). Exit 0 only after `GATE PASS`.
 
 - Each unit also runs `openspec validate <spec> --type spec --strict --json 2>&1` for its specs and reads that no rewritten requirement has a WARNING or an ERROR.
-- Each unit checks every moved or kept scenario byte for byte against `main` with the guide's checklist item 3 script, run in the worktree root once per rewritten requirement. A `DIFF` or `LOST` line is a failure.
+- Each unit checks every moved or kept scenario byte for byte against `main` with a script that prints `same`, `new`, `DIFF` or `LOST` for each scenario (old text from `origin/main`, new text from the delta), run in the repo root once per rewritten requirement. A `DIFF` or `LOST` line is a failure.
 - Section 10 is the last unit (`LAST=1`): `validate split-long-requirements --strict` exits 0, `validate --specs --strict` exits 0 after archive in the scratch copy, no "Archive would refuse" line, no new ERROR item. Then, with the extras of section 9 in place, `task openspec:check` runs in the worktree and must exit 0. In the cli no other change is open, so `validate --all --strict` also exits 0 at that point.
 - This is the same check that CI runs after section 9 (`validate --all --strict` through `task openspec:check`, jobs "OpenSpec Specs (strict)").
 
 ## Risks and trade-offs
 
-- A rewrite can drop a clause without any tool error (form c2 and moved clauses). The mitigations are the ledger, the byte check and the review checklist of the guide, run per unit by the reviewer.
+- A rewrite can drop a clause without any tool error (form c2 and moved clauses). The mitigations are the ledger, the byte check and the review checklist, run per unit by a reviewer.
 - A long MODIFIED passes `validate <change> --strict` and fails only after archive. The gate catches it; a pre-archive check alone does not.
 - A stale reference to a removed header is invisible to OpenSpec. The grep rule above is the only guard.
-- Another change that lands on a spec of a later batch before that batch runs would make its MODIFIED blocks stale. A unit re-reads the spec from `main` of its worktree first; the supervisor merges `main` into the branch before a unit if `main` moved.
+- Another change that lands on a spec of a later batch before that batch runs would make its MODIFIED blocks stale. A unit re-reads the spec from `origin/main` first; `main` is merged into the branch before a unit if `main` moved.
 
 ## Open questions
 
-- Confirm at the proposal gate that ten sections in one change are accepted, as the owner ruled on 2026-10-19 09:50, although the repo wording says "about five".
+None.
 
 ## Ledger entries of cli-B1 (operator-lifecycle, apply-pruning)
 
@@ -472,7 +472,7 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "The running-operat
 | The operator's objects SHALL be its fixed names, which every install o... | body of "The running-operator check locates the operator by its fixed names", verbatim |
 | The `Namespace` is checked only as the `Deployment`'s namespace; the c... | body of "The running-operator check reads no Namespace and reports a missing CRD as not ready"; "the `Deployment`'s namespace" reads "the namespace of the `Deployment` `opm-operator-controller-manager`", the name from the old second sentence |
 | Otherwise the check SHALL report the operator as not ready, name each ... | body of "The operator counts as running only on a positive finding", verbatim |
-| An operator that lacks one of these CRDs SHALL be reported as not read... | body of "The running-operator check reads no Namespace and reports a missing CRD as not ready", old words "these CRDs"; the parenthesis names the sibling requirement that lists the CRDs (16:55 ruling) |
+| An operator that lacks one of these CRDs SHALL be reported as not read... | body of "The running-operator check reads no Namespace and reports a missing CRD as not ready", old words "these CRDs"; the parenthesis names the sibling requirement that lists the CRDs |
 | The operator SHALL count as running only when every one of these `Cust... | reworded, nearest body: "The operator counts as running only on a positive finding"; the subject or a condition is restated so that the body reads alone, no rule changed |
 | A read of any of these objects that fails SHALL count that object as n... | reworded, nearest body: "The operator counts as running only on a positive finding"; the subject or a condition is restated so that the body reads alone, no rule changed |
 
@@ -520,7 +520,7 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "A failed read of t
 | When the read of the instance's `ModuleInstance` record fails with any... | reworded, nearest body: "A failed read of the instance record stops the apply before any change"; the subject or a condition is restated so that the body reads alone, no rule changed |
 | The system SHALL NOT treat the failed read as a first install: it SHAL... | reworded, nearest body: "A failed read of the instance record stops the apply before any change"; the subject or a condition is restated so that the body reads alone, no rule changed |
 | This SHALL hold for a dry run too, which SHALL NOT print a preview bui... | reworded, nearest body: "A failed read of the instance record stops the apply before any change"; the subject or a condition is restated so that the body reads alone, no rule changed |
-| The error SHALL name the instance and its namespace, carry the cause o... | body of "A failed record read names its cause", verbatim, led by the condition "When the read of the instance's `ModuleInstance` record fails with any error other than NotFound," copied from the first old sentence; its scenario "A failed record read names the instance and its cause" restates the clause (14:48 ruling, no new case) |
+| The error SHALL name the instance and its namespace, carry the cause o... | body of "A failed record read names its cause", verbatim, led by the condition "When the read of the instance's `ModuleInstance` record fails with any error other than NotFound," copied from the first old sentence; its scenario "A failed record read names the instance and its cause" restates the clause (no new case) |
 | The error of `opm instance apply` and `opm module apply` SHALL say tha... | reworded, nearest body: "A failed read of the instance record stops the apply before any change"; the subject or a condition is restated so that the body reads alone, no rule changed |
 | (detail) Stop with an error; do not treat the failed read as a first install; apply, prune and write nothing | body of "A failed read of the instance record stops the apply before any change"; two sentences joined, "it SHALL NOT apply any resource, SHALL NOT prune, and SHALL NOT write the record" reads "they SHALL NOT apply any resource, prune, or write the record" |
 | (detail) This holds for a dry run, which prints no preview built without the record | same body, "built" reads "made" |
@@ -559,10 +559,10 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "The apply flow rea
 | Old clause | New place |
 | --- | --- |
 | The apply flow SHALL follow this sequence: | body of "The apply flow reads, checks and applies before it prunes", verbatim |
-| No step SHALL filter the stale set after it is computed: the stale set... | body of "No step of the apply flow filters the stale set", verbatim; its scenario restates the clause (14:48 ruling) |
+| No step SHALL filter the stale set after it is computed: the stale set... | body of "No step of the apply flow filters the stale set", verbatim; its scenario restates the clause |
 | (1) render resources, (2) compute manifest digest, (3) compute change ... | reworded, nearest body: "The apply flow reads, checks and applies before it prunes"; the subject or a condition is restated so that the body reads alone, no rule changed |
 | (detail) Steps (1) to (6) of the sequence | body of "The apply flow reads, checks and applies before it prunes", step text verbatim |
-| (detail) Steps (7a), (7b) and (9) | body of "The apply flow prunes only after every apply succeeded"; the old sentence "The apply flow SHALL follow this sequence" supplies the keyword and the subject, step numbers and "step 4", "step 7a" as in the old text; the parenthesis "(steps 1 to 6 as listed in requirement ...)" names the sibling that holds steps 1 to 6 (16:55 ruling) |
+| (detail) Steps (7a), (7b) and (9) | body of "The apply flow prunes only after every apply succeeded"; the old sentence "The apply flow SHALL follow this sequence" supplies the keyword and the subject, step numbers and "step 4", "step 7a" as in the old text; the parenthesis "(steps 1 to 6 as listed in requirement ...)" names the sibling that holds steps 1 to 6 |
 | (detail) Step (8) | body of "The apply flow writes the record last"; "SHALL" added in front of the verb because every ADDED body needs one (the old sequence was one SHALL sentence) |; "step (7a)" reads "step 7a" as in the old text
 
 ### Ledger: apply-pruning, Dry-run prune preview lists left-behind resources
@@ -814,33 +814,25 @@ New scenarios (each uses only words and values of the old body of this requireme
 | (detail) A NotFound answer or an unserved kind means the resource does not exist | body of "The ownership guard judges every apply", same sentence |
 ### Cross-unit reference left for unit cli-B2
 
-The requirement "Ownership guard judges every apply and dry run" of `apply-pruning` is removed in unit cli-B1 (form c2, split into fourteen requirements). `openspec/specs/deploy/spec.md` cited it in the requirement "Create-namespace creates the namespace only after every check passed", in the words `(capability apply-pruning, "Ownership guard judges every apply and dry run")`. Unit cli-B2 resolved this: the first new requirement of that split, "Create-namespace creates a missing namespace only after every check that can refuse the apply passed", cites `(capability `apply-pruning`, "The ownership guard judges every apply")` (swarm DECISIONS.md 2026-10-19 15:05). Checked with `grep -rn --exclude-dir=archive` on 2026-10-19: no other reference outside the rewritten requirements.
-
-### Strength table of cli-B1
-
-Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text:
-
-| Old sentence | New body | Word added |
-| --- | --- | --- |
-| `opm operator install` is the exception: it refuses on such a resource | "Operator install refuses a resource adopted by another instance" | "it refuses" reads "it SHALL refuse" |
+The requirement "Ownership guard judges every apply and dry run" of `apply-pruning` is removed in unit cli-B1 (form c2, split into fourteen requirements). `openspec/specs/deploy/spec.md` cited it in the requirement "Create-namespace creates the namespace only after every check passed", in the words `(capability apply-pruning, "Ownership guard judges every apply and dry run")`. Unit cli-B2 resolved this: the first new requirement of that split, "Create-namespace creates a missing namespace only after every check that can refuse the apply passed", cites `(capability `apply-pruning`, "The ownership guard judges every apply")`. Checked with `grep -rn --exclude-dir=archive` on 2026-10-19: no other reference outside the rewritten requirements.
 
 ## Ledger entries of cli-B2 (deploy, platform-resolution, artifact-publishing)
 
-One subsection per rewritten requirement, 28 in all. Every new body is built from whole sentences of the old body, copied unchanged (swarm DECISIONS.md 2026-10-19 15:50). A clause row says "verbatim" for a sentence that appears unchanged. A row that names a substitution lists each changed word pair; a lowered first letter after a copied condition is named as such. A list marker `- ` of an old bullet is dropped where its sentence opens a body or follows a sentence that does not end in a colon. Old scenario names are all kept; the byte check ran once per rewritten requirement and printed no `DIFF` and no `LOST`.
+One subsection per rewritten requirement, 28 in all. Every new body is built from whole sentences of the old body, copied unchanged. A clause row says "verbatim" for a sentence that appears unchanged. A row that names a substitution lists each changed word pair; a lowered first letter after a copied condition is named as such. A list marker `- ` of an old bullet is dropped where its sentence opens a body or follows a sentence that does not end in a colon. Old scenario names are all kept; the byte check ran once per rewritten requirement and printed no `DIFF` and no `LOST`.
 
 Form per requirement: the names below are cited by other requirements, so they keep their header as form b parents (MODIFIED, all old scenarios in place, split-offs ADDED with restatement scenarios): in `platform-resolution` "Acquisition mirrors the operator", "The cluster arm reads the effective registry", "Module commands render against the module's deps", "Platform source precedence by command", "Renders fall back to their own deps"; in `deploy` "Instance delete re-checks live ownership before each delete" and "Instance delete follows the shared deletion plan" (both cited by `operator-lifecycle`). The other 21 are form c2.
 
 Exceptions to the one-sentence rule, all with every word copied from the old requirement:
 
-- Three old sentences are longer than 500 characters and are cut inside the sentence, each part verbatim, the subject repeated: `artifact-publishing` "One pipeline, two entry points" (562) and "The compatibility gate" (531); `deploy` "Instance delete keeps PersistentVolumeClaims unless delete-data is set" (610). The gate list of "Gates and refusal catalog" (769) stays whole as the THEN line of the scenario "The ten gates of the gate list" (DECISIONS.md 2026-10-19 15:15), and the body names that scenario.
-- A condition or subject copied from the same old requirement leads a body where the old sentence relied on a sibling (rows "the part from ... on"). Where the old content cannot fit, a body names a sibling by its exact header (the 16:55 extension): "These, as listed in requirement ...", "one of the checks listed in requirement ...", "no such field (the field of requirement ...)", "In every other case than the one of requirement ...".
+- Three old sentences are longer than 500 characters and are cut inside the sentence, each part verbatim, the subject repeated: `artifact-publishing` "One pipeline, two entry points" (562) and "The compatibility gate" (531); `deploy` "Instance delete keeps PersistentVolumeClaims unless delete-data is set" (610). The gate list of "Gates and refusal catalog" (769) stays whole as the THEN line of the scenario "The ten gates of the gate list", and the body names that scenario.
+- A condition or subject copied from the same old requirement leads a body where the old sentence relied on a sibling (rows "the part from ... on"). Where the old content cannot fit, a body names a sibling by its exact header (the named-sibling extension): "These, as listed in requirement ...", "one of the checks listed in requirement ...", "no such field (the field of requirement ...)", "In every other case than the one of requirement ...".
 - Cites of renamed requirements are updated to the new header: "Instance delete keeps PersistentVolumeClaims unless delete-data is set" and "Instance delete waits for the deleted resources when wait is set" in `deploy`, "Ownership guard judges every apply and dry run" (see the section above).
-- A `Source:` line is repeated whole on each split block where it fits within 500 characters. Where it did not fit, unit cli-B2 first carried a short line `Source: enhancement 0012.` or `Source: enhancement 0021.`. Unit cli-B3 put the supporting title back on the four blocks that had it (DECISIONS.md 2026-10-19 20:45): `deploy` "An object with no UUID label is judged without the UUID comparison", "A resource that fails the ownership check is left behind and does not fail the delete" and the new "The closing line of a delete gives the number of resources left behind" (the deletion sequence title), "A recorded resource that the command did not find is not in the deletion plan" (the deletion sequence title); `platform-resolution` "The operator render narrows the platform-source precedence for the operator's own instance only" (the install artifact title). The three `deploy` bodies were cut so that they fit with the title, as the ledgers below say. "Instance delete re-checks live ownership before each delete" keeps one quote in the parent and the other in the ownership block. No split block is left without a `Source:` line where its old requirement had one.
+- A `Source:` line is repeated whole on each split block where it fits within 500 characters. Where it did not fit, unit cli-B2 first carried a short line `Source: enhancement 0012.` or `Source: enhancement 0021.`. Unit cli-B3 put the supporting title back on the four blocks that had it: `deploy` "An object with no UUID label is judged without the UUID comparison", "A resource that fails the ownership check is left behind and does not fail the delete" and the new "The closing line of a delete gives the number of resources left behind" (the deletion sequence title), "A recorded resource that the command did not find is not in the deletion plan" (the deletion sequence title); `platform-resolution` "The operator render narrows the platform-source precedence for the operator's own instance only" (the install artifact title). The three `deploy` bodies were cut so that they fit with the title, as the ledgers below say. "Instance delete re-checks live ownership before each delete" keeps one quote in the parent and the other in the ownership block. No split block is left without a `Source:` line where its old requirement had one.
 - A subject copied from the same old requirement stands beside "the command" in twelve `deploy` bodies that name no command otherwise: "the command (`opm instance apply` and `opm module apply`)" in "After the first stage the apply waits until the CustomResourceDefinitions are established" and "A wait that does not complete fails the apply"; "the command (`opm instance delete`)" in the bodies of the guard and `--wait` blocks and in "--delete-data on an operator-managed instance warns and changes nothing". No word is dropped.
-- "A resource that fails the ownership check is left behind and does not fail the delete" and "The closing line of a delete gives the number of resources left behind" name the conditions by their requirement ("only as listed in requirement ...", 16:55), because the three conditions and the sentence do not fit 500 characters with the `Source:` line. The old sentence "A resource that fails the check SHALL be left behind and listed with the reason, and SHALL NOT count as a failure; the closing line SHALL give the number of resources left behind." is cut at its semicolon into two requirements, with the full `Source:` line on each; the second part starts with a capital letter ("The closing line").
-- "An object with no UUID label is judged without the UUID comparison" opens with the pointer sentence of its sibling "A resource that fails the ownership check is left behind and does not fail the delete" (16:55) and carries the deletion sequence title, because the guard title does not fit with the pointer.
+- "A resource that fails the ownership check is left behind and does not fail the delete" and "The closing line of a delete gives the number of resources left behind" name the conditions by their requirement ("only as listed in requirement ..."), because the three conditions and the sentence do not fit 500 characters with the `Source:` line. The old sentence "A resource that fails the check SHALL be left behind and listed with the reason, and SHALL NOT count as a failure; the closing line SHALL give the number of resources left behind." is cut at its semicolon into two requirements, with the full `Source:` line on each; the second part starts with a capital letter ("The closing line").
+- "An object with no UUID label is judged without the UUID comparison" opens with the pointer sentence of its sibling "A resource that fails the ownership check is left behind and does not fail the delete" and carries the deletion sequence title, because the guard title does not fit with the pointer.
 - "The closure reads a directory-replaced module's requirements from that directory" (new, `platform-resolution`) holds the old sentence "The closure SHALL read a directory-replaced module's requirements ..." with the copied condition and names the closure requirement; "The dependency list of the generated platform is the closure of the pins" names the requirement that lists the generated platform and its pins, because its subject "Its" and "those pins" came from the bullets before.
-- "Any other failure answer reads registry operation failed" names the two requirements whose answers "any other" excludes (16:55).
+- "Any other failure answer reads registry operation failed" names the two requirements whose answers "any other" excludes.
 
 ### Ledger: deploy, Instance delete never deletes CRDs or Namespaces
 
@@ -888,7 +880,7 @@ Form: b (MODIFIED parent with its header and all scenarios, ADDED splits). New r
 
 | Old clause | New place |
 | --- | --- |
-| Before deleting each tracked resource, `opm instance delete` SHALL rea... | body of "Instance delete re-checks live ownership before each delete", verbatim; body of "An object with no UUID label is judged without the UUID comparison", the first sentence replaced by "Before deleting each tracked resource, `opm instance delete` SHALL delete the resource only as listed in requirement ..." (16:55); body of "A resource that fails the ownership check is left behind and does not fail the delete" and of "The closing line of a delete gives the number of resources left behind", the first sentence replaced by "Before deleting each tracked resource, `opm instance delete` SHALL delete the resource only as listed in requirement ..." (16:55); body of "Each delete carries a precondition on the UID of the object that was read", the part from "Before deleting each tracked r..." on, verbatim; body of "A resource that is already gone is no failure and any other read error is", the part from "Before deleting each tracked r..." on, verbatim |
+| Before deleting each tracked resource, `opm instance delete` SHALL rea... | body of "Instance delete re-checks live ownership before each delete", verbatim; body of "An object with no UUID label is judged without the UUID comparison", the first sentence replaced by "Before deleting each tracked resource, `opm instance delete` SHALL delete the resource only as listed in requirement ..."; body of "A resource that fails the ownership check is left behind and does not fail the delete" and of "The closing line of a delete gives the number of resources left behind", the first sentence replaced by "Before deleting each tracked resource, `opm instance delete` SHALL delete the resource only as listed in requirement ..."; body of "Each delete carries a precondition on the UID of the object that was read", the part from "Before deleting each tracked r..." on, verbatim; body of "A resource that is already gone is no failure and any other read error is", the part from "Before deleting each tracked r..." on, verbatim |
 | It SHALL delete the resource only when the live `app.kubernetes.io/man... | body of "A tracked resource is deleted only when its live labels and annotation show the instance owns it", with "It SHALL delete the resource" reads "`opm instance delete` SHALL delete each tracked resource"; body of "An object with no UUID label is judged without the UUID comparison", with "It SHALL" reads "SHALL" |
 | An object with no UUID label SHALL be judged without the UUID comparis... | body of "An object with no UUID label is judged without the UUID comparison", verbatim |
 | A resource that fails the check SHALL be left behind and listed with t... | body of "A resource that fails the ownership check is left behind and does not fail the delete", verbatim as far as "SHALL NOT count as a failure", with the semicolon replaced by a period; body of "The closing line of a delete gives the number of resources left behind", the part after the semicolon, "the closing line" reads "The closing line" |
@@ -1056,7 +1048,7 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "Create-namespace c
 | A failure of the create SHALL stop the apply with the exit code of its... | body of "A failed read or create of the namespace stops the apply with the exit code of its cause", verbatim |
 | When the namespace turns out to exist at the create although the first... | body of "A namespace that exists at the create stops the apply with exit code 1", verbatim |
 | A dry run SHALL create nothing and SHALL report first that the namespa... | body of "A dry run creates no namespace and reports that it would", verbatim |
-| (note) | "Create-namespace creates a missing namespace only after every check that can refuse the apply passed": The cite of the removed name of apply-pruning is updated as DECISIONS.md 2026-10-19 15:05 rules. |
+| (note) | "Create-namespace creates a missing namespace only after every check that can refuse the apply passed": The cite of the removed name of apply-pruning is updated. |
 
 Lengths (old, new): old 1663; new "Create-namespace creates a missing namespace only after every check that can refuse the apply passed" 472; "A check that refuses the apply leaves the cluster unchanged and creates no namespace" 234; "While the namespace is missing the apply sends no read into it" 484; "The status-permission check runs unchanged with a missing namespace" 242; "A failed read or create of the namespace stops the apply with the exit code of its cause" 381; "A namespace that exists at the create stops the apply with exit code 1" 377; "A dry run creates no namespace and reports that it would" 217.
 
@@ -1368,7 +1360,7 @@ Form: b (MODIFIED parent with its header and all scenarios, ADDED splits). New r
 | - The generated platform SHALL carry one enabled `#registry` entry per... | body of "The generated platform carries one enabled registry entry per catalog dependency", first letter lowered after the condition, otherwise verbatim |
 | - Its dependency list SHALL be the minimum-version-selection closure o... | body of "The dependency list of the generated platform is the closure of the pins", first letter lowered after the condition, otherwise verbatim |
 | - Each `replaceWith` in the module's `cue.mod/local-module.cue` whose ... | body of "The generated platform carries the module's replacements", first letter lowered after the condition, otherwise verbatim |
-| The closure SHALL read a directory-replaced module's requirements from... | body of "The closure reads a directory-replaced module's requirements from that directory", with the condition "When `opm module build` or `opm module vet` runs without `--platform`," copied in and "The closure" lowered; the sentence "The closure is that of requirement ..." names the closure requirement (16:55) |
+| The closure SHALL read a directory-replaced module's requirements from... | body of "The closure reads a directory-replaced module's requirements from that directory", with the condition "When `opm module build` or `opm module vet` runs without `--platform`," copied in and "The closure" lowered; the sentence "The closure is that of requirement ..." names the closure requirement |
 | - The deps SHALL be read from the module's acquired source, so a modul... | body of "The deps are read from the module's acquired source", first letter lowered after the condition, otherwise verbatim |
 | A published module has no local module context, so nothing is carried ... | body of "The deps are read from the module's acquired source", verbatim |
 | - The generated module SHALL be cached under `cache/platforms/` beside... | body of "The generated platform is cached under its content hash", first letter lowered after the condition, otherwise verbatim |
@@ -1379,7 +1371,7 @@ Form: b (MODIFIED parent with its header and all scenarios, ADDED splits). New r
 | - When a render against this source is refused for unresolved demands,... | body of "A refusal for unresolved demands adds a hint that names the platform flag", verbatim |
 | - The same generator serves the deps fallback of every other render (s... | body of "The same generator serves every other render", with "serves" reads "SHALL serve" |
 
-Lengths (old, new): old 2420; new "Module commands render against the module's deps" 206; "The generated platform carries one enabled registry entry per catalog dependency" 441; "The dependency list of the generated platform is the closure of the pins" 437 (its sentence "The generated platform and its pins are as listed in requirement ..." names the pins, 16:55); "The closure reads a directory-replaced module's requirements from that directory" 338; "The generated platform carries the module's replacements" 324; "The deps are read from the module's acquired source" 334; "The generated platform is cached under its content hash" 269; "The provenance line names the module's deps" 196; "The skew policy is neither named nor applied to the module's deps" 203; "A module with no catalog dependency renders against an empty registry" 367; "A pin that is not published fails at generation" 182; "A refusal for unresolved demands adds a hint that names the platform flag" 388; "The same generator serves every other render" 322.
+Lengths (old, new): old 2420; new "Module commands render against the module's deps" 206; "The generated platform carries one enabled registry entry per catalog dependency" 441; "The dependency list of the generated platform is the closure of the pins" 437 (its sentence "The generated platform and its pins are as listed in requirement ..." names the pins); "The closure reads a directory-replaced module's requirements from that directory" 338; "The generated platform carries the module's replacements" 324; "The deps are read from the module's acquired source" 334; "The generated platform is cached under its content hash" 269; "The provenance line names the module's deps" 196; "The skew policy is neither named nor applied to the module's deps" 203; "A module with no catalog dependency renders against an empty registry" 367; "A pin that is not published fails at generation" 182; "A refusal for unresolved demands adds a hint that names the platform flag" 388; "The same generator serves every other render" 322.
 
 ### Ledger: platform-resolution, Platform source precedence by command
 
@@ -1495,7 +1487,7 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "Operator install r
 
 | Old clause | New place |
 | --- | --- |
-| `opm operator install`, the CRDs-only form included, SHALL render the ... | body of "Operator install renders the operator module against a platform of its own pins", verbatim; body of "Operator install renders the same objects whatever the cluster Platform holds", the part from "`opm operator install`, the CR..." on, verbatim; body of "Operator install names the module's deps as the provenance source", the part from "`opm operator install`, the CR..." on, verbatim; body of "The operator render narrows the platform-source precedence for the operator's own instance only", the first clause "`opm operator install`, the CRDs-only form included, SHALL render the operator module" followed by "as listed in requirement "Operator install renders the operator module against a platform of its own pins"" (16:55) |
+| `opm operator install`, the CRDs-only form included, SHALL render the ... | body of "Operator install renders the operator module against a platform of its own pins", verbatim; body of "Operator install renders the same objects whatever the cluster Platform holds", the part from "`opm operator install`, the CR..." on, verbatim; body of "Operator install names the module's deps as the provenance source", the part from "`opm operator install`, the CR..." on, verbatim; body of "The operator render narrows the platform-source precedence for the operator's own instance only", the first clause "`opm operator install`, the CRDs-only form included, SHALL render the operator module" followed by "as listed in requirement "Operator install renders the operator module against a platform of its own pins"" |
 | Every other command keeps its precedence under "Platform source preced... | body of "Operator install renders the operator module against a platform of its own pins", verbatim |
 | The same module version and values SHALL render the same objects wheth... | body of "Operator install renders the same objects whatever the cluster Platform holds", verbatim |
 | The provenance line SHALL name the module's deps as the source. | body of "Operator install names the module's deps as the provenance source", verbatim |
@@ -1545,7 +1537,7 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "Publish accumulate
 | Each refusal SHALL follow the fixed shape condition → evidence → conse... | body of "Each refusal follows one fixed shape", verbatim |
 | One cause SHALL yield one refusal. | body of "One cause yields one refusal", verbatim |
 | The gates: kernel loadability (modules only: the kernel's module loade... |  |
-| (added words) | in "Publish evaluates the gates of the gate list": "The gates SHALL be those listed in scenario "The ten gates of the gate list".". The gate list is one sentence of 769 characters. It stays whole as the THEN line of a scenario (DECISIONS.md 2026-10-19 15:15); the body names that scenario. The sentence reads "The gates SHALL be:" there, with the keyword added. |
+| (added words) | in "Publish evaluates the gates of the gate list": "The gates SHALL be those listed in scenario "The ten gates of the gate list".". The gate list is one sentence of 769 characters. It stays whole as the THEN line of a scenario; the body names that scenario. The sentence reads "The gates SHALL be:" there, with the keyword added. |
 
 Lengths (old, new): old 1175; new "Publish accumulates every refusal and refuses with exit code 2" 132; "Each refusal follows one fixed shape" 237; "One cause yields one refusal" 34; "Publish evaluates the gates of the gate list" 77.
 
@@ -1634,25 +1626,9 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "A transport failur
 
 Lengths (old, new): old 876; new "A transport failure or a missing dependency aborts the walk as a connectivity error" 390; "A package absent at a published version is the scan's negative signal" 331; "The CLI takes fetch decisions from the library's typed classification" 441.
 
-### Strength table of cli-B2
-
-Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text:
-
-| Old sentence | New body | Word added |
-| --- | --- | --- |
-| An instance deploys the operator when any one of these holds, read from its record without rendering: it is na... | "An instance deploys the operator when one of three signals holds" | "any one of these holds" reads "any one of these SHALL hold" |
-| With `--wait` the command also waits, bounded, for the deleted resources to disappear ("Instance delete waits ... | "With --wait the command also waits for the deleted resources to disappear" | "the command also waits" reads "the command SHALL also wait" |
-| Two selection modes exist, and the caller chooses between them explicitly: | "Release and prerelease are the two selection modes" | "exist," reads "SHALL exist," |
-| The write-if-absent seeding of a missing Platform is unchanged: it happens only when no CR exists, and it seed... | "The write-if-absent seeding of a missing Platform is unchanged" | "is unchanged:" reads "SHALL be unchanged:" |
-| - The same generator serves the deps fallback of every other render (see "Renders fall back to their own deps"... | "The same generator serves every other render" | "serves" reads "SHALL serve" |
-| Every source resolves to a platform module directory the kernel acquires; the CR source is generated into one ... | "Every platform source resolves to a platform module directory" | "Every source resolves to" reads "Every source SHALL resolve to" |
-| - `opm instance diff`, `opm instance apply` and `opm module apply` keep failing on an unreachable cluster: the... | "Instance diff, instance apply and module apply keep failing on an unreachable cluster" | "keep failing" reads "SHALL keep failing" |
-| A registry that hands out bearer tokens and whose token endpoint refuses the caller is a refused credential li... | "A refusing token endpoint is a refused credential" | "is a refused credential" reads "SHALL be a refused credential" |
-| The gates: kernel loadability (modules only: ...) ... already-published tag. | "Publish evaluates the gates of the gate list (THEN line of the scenario "The ten gates of the gate list")" | "The gates:" reads "The gates SHALL be:"; the body sentence "The gates SHALL be those listed in scenario ..." is added |
-
 ## Ledger entries of cli-B3 (release-workflow, kernel-render, deps-cascade, instance-init, authoring-commands)
 
-One subsection per rewritten requirement, 28 in all. Every new body is built from whole sentences of the old body, copied unchanged. A clause row names where a sentence of the old body appears; the list "Words changed or added" under a requirement names each substitution, as the rulings allow: a pronoun ("It", "That job", "Its") read as the subject copied from the same old requirement, a lowered or raised first letter, a closing period where a list marker or a semicolon stood, and an RFC 2119 keyword where the old sentence had none (also listed in the strength table). All 28 are form c2, because the old scenarios of each requirement belong to different new behaviors; no other change of the repo cites an old header (checked with `grep -rn --exclude-dir=archive` over the repo on 2026-10-19), except where this section says so. Old scenario names are all kept; the byte check ran once per rewritten requirement and printed no `DIFF` and no `LOST`.
+One subsection per rewritten requirement, 28 in all. Every new body is built from whole sentences of the old body, copied unchanged. A clause row names where a sentence of the old body appears; the list "Words changed or added" under a requirement names each substitution, as the rewrite rules allow: a pronoun ("It", "That job", "Its") read as the subject copied from the same old requirement, a lowered or raised first letter, a closing period where a list marker or a semicolon stood, and an RFC 2119 keyword where the old sentence had none (also listed in the strength table). All 28 are form c2, because the old scenarios of each requirement belong to different new behaviors; no other change of the repo cites an old header (checked with `grep -rn --exclude-dir=archive` over the repo on 2026-10-19), except where this section says so. Old scenario names are all kept; the byte check ran once per rewritten requirement and printed no `DIFF` and no `LOST`.
 
 Rules applied beyond unit cli-B2:
 
@@ -2557,35 +2533,9 @@ Words changed or added:
 
 Lengths (old, new): old 1161; new "version set rewrites the identity Version in place" 313; "Setting the already-declared version writes nothing" 131; "version set performs no registry I/O and refuses an identity file of the wrong shape" 442; "The writer tolerates every authored form of the Version field and preserves the form it finds" 158; "Every identity file the CLI emits uses the plain-literal form" 188.
 
-### Strength table of cli-B3
-
-Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text:
-
-| Old sentence | New body | Word added |
-| --- | --- | --- |
-| A release with no template changed publishes nothing and succeeds, and a re-run after a partial publish skips ... | "A release with no template changed publishes nothing" | "publishes" reads "SHALL publish", "succeeds" reads "succeed", "skips" reads "SHALL skip" |
-| A `BREAKING CHANGE:` footer in a pull request body or a branch commit message SHALL NOT be relied on, because ... | "The migration note goes in the pull request body" | "the migration note goes" reads "The migration note of a breaking change SHALL go"; the trailing comma reads a period |
-| The action mints the dispatch token and chooses the targets: catalog_opm and opm-operator, as release-tool edg... | "The cascade-notify action mints the dispatch token and chooses the targets" | "The action" reads "The `cascade-notify` action"; "mints" reads "SHALL mint", "chooses" reads "choose" |
-| The kernel reports advisory facts as structured rows and attaches no message strings to a render result. | "The CLI words the advisory facts of the kernel as warnings" | "reports" reads "SHALL report", "attaches" reads "SHALL attach" |
-| The digest leaves the value of the `app.kubernetes.io/managed-by` label out, so the CLI (`opm-cli`) and the op... | "The digest leaves out the value of the managed-by label" | "The digest leaves" reads "`status.lastAppliedRenderDigest` SHALL leave" |
-| Evaluator-version skew reporting applies to a future cross-binary comparison, where the CLI and operator binar... | "Evaluator-version skew applies to a future cross-binary comparison" | "applies" reads "SHALL apply" |
-| When the platform is generated from the render's own deps (`opm module build` and `opm module vet` without `--... | "A platform generated from the render's own deps carries the module's replacements" | "are carried" reads "SHALL be carried" |
-| The provenance signal (`SourceLocal`, the `module-instance.opmodel.dev/source: local` annotation) keeps its fi... | "The provenance signal keeps its file-presence rule" | "keeps" reads "SHALL keep" |
-| The switch is the only thing the flag does: which demands are skippable, and what a skip does to the rendered ... | "Render-bearing commands accept --skip-unprovided and pass it to the kernel" | "is" reads "SHALL be" |
-| A platform the CLI generates (from the cluster Platform or from the render's own dependency pins) pins the ker... | "A platform the CLI generates is never refused for its core" | "pins" reads "SHALL pin"; "this way" reads the quoted refusal |
-| **Catalog and core as a consistent set.** This covers the `cue.mod/module.cue` files of the three templates, `... | "The catalog and core pins cover a fixed set of cue.mod/module.cue files" | "This covers" reads "The consistent set SHALL cover" |
-| **Catalog and core as a consistent set.** This covers the `cue.mod/module.cue` files of the three templates, `... | "The catalog and core pins also cover the remaining cue.mod/module.cue files of the fixed set" | "This covers" reads "The consistent set SHALL cover" |
-| Exit codes: 0 when the working tree changed; 3 when it did not; any other code on error. | "Exit 0 means the working tree changed and exit 3 means it did not" | "Exit codes:" reads "Exit codes SHALL be:" |
-| `cue.mod/module.cue` declares the package's own module path, a language version, and dependencies: the deploye... | "The cue.mod/module.cue file declares the package's module path, language version and dependencies" | "declares" reads "SHALL declare" |
-| `instance.cue` declares `package instance`, imports core at the module's core major and the module at its majo... | "The instance.cue file declares the package, the imports and the module instance" | "declares" reads "SHALL declare" |
-| `values.cue` declares `package instance` and one `values` field, filled as "Values start from the author's int... | "The values.cue file declares one values field" | "declares" reads "SHALL declare"; the cite of the renamed requirement reads its new header "values.cue is filled from the first applicable source and the report names it" |
-| With one positional, a value containing `/` or `.` is the module path, and anything else is the instance name. | "With one positional a value with a slash or a dot is the module path" | "is" reads "SHALL be" twice |
-| A prompted value passes the same checks as the flag or positional it replaces, before any registry access. | "A prompted value passes the same checks as the flag it replaces" | "passes" reads "SHALL pass" |
-| Reading the module's own module file, between resolution and acquire, stays exit 3 for every failure. | "Reading the module's own module file stays exit 3 for every failure" | "stays" reads "SHALL stay" |
-
 ## Ledger entries of cli-B4, unit 4a (instance-inventory, mod-status)
 
-One subsection per rewritten requirement, 12 in all: `instance-inventory` 6 and `mod-status` 6. The other three specs of cli-B4 (`release-cascade-wiring`, `cmdutil`, `platform-check`) follow in the second half. Every new body is built from whole sentences of the old body, copied unchanged, or from parts of one sentence cut at a list boundary with the subject repeated. A clause row names where a clause of the old body appears; the list "Words changed or added" under a requirement names each substitution, as the rulings allow: a pronoun ("It", "it") read as the subject copied from the same old requirement, a closing period where a list marker or a semicolon stood, the exact header of a sibling requirement of the same spec where the old content cannot fit (the three workload kind blocks of "Status evaluates health per resource category"), an em-dash read as a colon or a comma, and an RFC 2119 keyword where the old sentence had none (also listed in the strength table). All 12 are form c2, because the old scenarios of each requirement belong to different new behaviors. Old scenario names are all kept; the byte check ran once per rewritten requirement and printed no `DIFF` and no `LOST`. One cite changes: the body "The inventory digest in the status is the library inventory digest" names the requirement "The CLI computes the inventory digest with the library and no digest of its own" where the old body named "Deterministic inventory digest"; `grep -rn --exclude-dir=archive` over the repo found no other reference to an old header of this unit.
+One subsection per rewritten requirement, 12 in all: `instance-inventory` 6 and `mod-status` 6. The other three specs of cli-B4 (`release-cascade-wiring`, `cmdutil`, `platform-check`) follow in the second half. Every new body is built from whole sentences of the old body, copied unchanged, or from parts of one sentence cut at a list boundary with the subject repeated. A clause row names where a clause of the old body appears; the list "Words changed or added" under a requirement names each substitution, as the rewrite rules allow: a pronoun ("It", "it") read as the subject copied from the same old requirement, a closing period where a list marker or a semicolon stood, the exact header of a sibling requirement of the same spec where the old content cannot fit (the three workload kind blocks of "Status evaluates health per resource category"), an em-dash read as a colon or a comma, and an RFC 2119 keyword where the old sentence had none (also listed in the strength table). All 12 are form c2, because the old scenarios of each requirement belong to different new behaviors. Old scenario names are all kept; the byte check ran once per rewritten requirement and printed no `DIFF` and no `LOST`. One cite changes: the body "The inventory digest in the status is the library inventory digest" names the requirement "The CLI computes the inventory digest with the library and no digest of its own" where the old body named "Deterministic inventory digest"; `grep -rn --exclude-dir=archive` over the repo found no other reference to an old header of this unit.
 
 ### Ledger: instance-inventory, CLI writes a strict status subset via the status subresource
 
@@ -2909,14 +2859,6 @@ Words changed or added:
 - "An Unknown resource makes the instance NotReady and the command exit 2": "An `Unknown` resource is not healthy: the instance's aggregate status SHALL be `NotReady`,..." reads "An `Unknown` resource is not healthy: the instance's aggregate status SHALL be `NotReady`,..." ("the command" reads "the `opm instance status` command", copied from the first sentence of the same requirement)
 
 Lengths (old, new): old 514; new "An unreadable tracked resource is warned about and listed as Unknown" 251; "An Unknown resource makes the instance NotReady and the command exit 2" 284.
-
-### Strength table of cli-B4 unit 4a
-
-Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text:
-
-| Old sentence | New body | Word added |
-| --- | --- | --- |
-| The declared pair is verified against fetched coordinates wherever it later meets a registry (operator acquire... | "The declared module identity pair is verified where it meets a registry" | "The declared pair" reads "The declared pair (`spec.module.path` and `spec.module.version`)", copied from the first sentence; "is verified" reads "SHALL be verified" |
 
 ## Ledger entries of cli-B4, unit 4b (release-cascade-wiring, cmdutil, platform-check)
 
@@ -3380,32 +3322,6 @@ Words changed or added:
 
 Lengths (old, new): old 1181; new "A colliding contract key is reported under its own heading and fails the command" 478; "The colliding heading states what is left out and tells the reader to keep one defining entry enabled" 418; "The command computes no collision of its own and the fulfilled and discriminated verdicts may read yes on a colliding platform" 333.
 
-### Strength table of cli-B4 unit 4b
-
-Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text:
-
-| Old sentence | New body | Word added |
-| --- | --- | --- |
-| This mirrors where the refusal lives in the system: `Discriminated: false` is a condition platform-package gener... | "The undiscriminated exit mirrors where platform-package generation refuses" | "This mirrors" reads "This SHALL mirror" |
-
-Plain sentences copied unchanged, with no keyword, into a body that carries a keyword in another sentence:
-
-| Old sentence | New body |
-| --- | --- |
-| The receiver computes the cascade diff with this repository's `task -x deps:cascade`. | "The cascade receiver runs on a dispatch, a daily sweep and a manual run" |
-| A run from any ref other than `main` is always a dry run. | "The caller passes dry-run so that the receiver is live only when CASCADE_DRY_RUN is exactly false" |
-| In a dry run the receiver computes the diff, title, body and labels and writes them to the job summary, and push... | "The dry-run switch is enforced in three places and a dry run pushes nothing" |
-| The release-PR gate statuses are still posted. | "The dry-run switch is enforced in three places and a dry run pushes nothing" |
-| Two cases are excepted: a release pull request whose gates-only evaluation fails before it writes its result in... | "Gate statuses are posted on every pull request into main except in two cases" |
-| This change does not make either status a required check. | "Gate statuses are posted on every pull request into main except in two cases" |
-| In `warn` mode a problem is posted as a success whose description starts `WARN:`. | "A same-repository release pull request gets its gate statuses from a gates-only receiver run" |
-| The `cascade` Environment deploys from `main` only. | "No other job declares the cascade Environment, release.yml sets no workflow-level env key and the Environment deploys from main only" |
-| Typed kernel refusals (unresolved demands) and `ValidationError` values with details keep their dedicated format... | "PrintValidationError groups CUE positions on any error" |
-| The warnings are worded by the CLI from the kernel's advisory diagnostic rows (unhandled optional traits, and re... | "ShowRenderOutput logs the render warnings via the module-scoped logger" |
-| This mirrors where the refusal lives in the system: `Routable: false` is the condition a platform-package gener... | "An over-subscribed contract is reported with its providing registry keys and fails the command" |
-| Two majors of one catalog are two registry entries and so two providers; two transformers of one entry are one ... | "Providers are counted per enabled registry entry and the command computes no count of its own" |
-| A disabled entry never defines a key. | "The colliding heading states what is left out and tells the reader to keep one defining entry enabled" |
-
 ## Ledger entries of cli-B5, unit 5a (test-fixture-lineage, cmd-structure, e2e-cluster-preconditions)
 
 Unit 5a rewrites 13 long requirements (test-fixture-lineage 5, cmd-structure 4, e2e-cluster-preconditions 4), all by form c2. Unit 5b rewrites the other 15 of section 5 (inst-commands, kind-cluster-tasks, mod-vet, catalog-compatibility). The running N after unit 5a is 125.
@@ -3827,36 +3743,6 @@ Words changed or added:
 
 Lengths (old, new): old 1221; new "A cluster-required run fails every precondition that would skip" 446; "The failure of a cluster-required run starts with OPM_E2E_REQUIRE_CLUSTER=1: and names the cause" 388; "Precondition messages read correctly as either a skip or a failure" 185; "OPM_E2E_REQUIRE_CLUSTER changes no test that does not use the cluster and takes precedence over the skip clause of the grant check" 457.
 
-### Strength table of cli-B5 unit 5a
-
-Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text:
-
-| Old sentence | New body | Word added |
-| --- | --- | --- |
-| A catalog pin's target is the newest published release in its major. | "The targets of a catalog pin and a core pin follow the release cascade" | "is" reads "SHALL be" |
-| A core pin already newer than that target stays. | "A core pin already newer than the cascade target stays" | "stays" reads "SHALL stay" |
-| Each entry names the repo-relative file or directory, the module paths frozen there, and a one-sentence reason saying why the pin must stay old. | "A `.cascade-frozen` entry names the file or directory, the frozen module paths and a one-sentence reason" | "Each entry names" reads "Each entry SHALL name" |
-| A pin is frozen only when the test depends on that exact old version. | "A pin is frozen only when the test depends on that exact old version" | "A pin is frozen" reads "A pin SHALL be frozen" |
-| A pin that is old only because a tree was copied from an older tree, or because an upstream release moved on, is not frozen. | "A pin that is old only because a tree was copied or an upstream release moved on is not frozen" | "is not frozen" reads "SHALL NOT be frozen" |
-| The effective applier identity is the ServiceAccount named by the controller Deployment's `--default-service-account` argument, ... | "The effective applier identity is the ServiceAccount named by --default-service-account when that argument is present" | "is" reads "SHALL be" |
-| ... the existing cluster-reachability precondition applies and the test skips as it does today, ... | "An applier check that could not be performed skips the test" | "the test skips" reads "the test SHALL skip" |
-
-Plain sentences copied unchanged, with no keyword, into a body that carries a keyword in another sentence:
-
-| Old sentence | New body |
-| --- | --- |
-| When a catalog member or contract type a fixture exercises is removed from the published catalog, the fixture is removed with it rather than kept unvetted; a replacement fixture is added when the replacement mechanism exists. | "A fixture does not depend on a catalog mechanism the catalog has withdrawn" |
-| The rule is mechanical, not stylistic: CUE resolves modules by longest-prefix match on the module path, ... | "A test fixture module declares its path under the testing domain" |
-| CUE keeps a dependency the consumer already lists at its listed version, so a consumer re-pinned to a new fixture version but left on an older core still passes `cue mod tidy --check` ... | "A consumer that names a fixture version pins every shared dependency as CUE resolves it" |
-| A core pin's target is the core version that the input's catalog pins, ... The source is workspace RELEASING.md, section "The cascade", "Consistent set". | "The targets of a catalog pin and a core pin follow the release cascade" |
-| A `cue.mod` file moves by `cue mod get` then `cue mod tidy`, ... A Go literal moves by editing the literal. | "A `cue.mod` pin moves by `cue mod get` then `cue mod tidy` and is never bumped by a hand edit" |
-| Test inputs include a test module's `cue.mod/module.cue` and a module file a test writes from a Go literal. | "A test pin is moved to the release cascade's target unless `.cascade-frozen` lists it with a reason" |
-| The file uses the format in workspace RELEASING.md, section "Cascade files". | "A `.cascade-frozen` entry names the file or directory, the frozen module paths and a one-sentence reason" |
-| Between an upstream release and the release cascade that follows it, a pin is behind but not in breach. | "A pin that is old only because a tree was copied or an upstream release moved on is not frozen" |
-| The directory may be a standalone CUE module or a package inside another CUE module, such as an instance directory within a module tree. | "`opm instance build` takes one positional argument naming an instance" |
-| 2. Otherwise, an argument whose first element contains a dot is a published module path. (and list items 1 and 3) | "`opm module build` classifies its argument as a local directory or a published module path before any registry access" |
-| This covers a missing kubeconfig, an unreachable `kind-opm-dev` context, and an applier-grant check that could not be performed. | "A cluster-required run fails every precondition that would skip" |
-
 ### Ledger: inst-commands, instance cluster-query commands accept an instance identifier as positional argument
 
 Form: c2 (REMOVED, ADDED under new names). New requirements: "Instance cluster-query commands take one instance identifier, detected as a path, a UUID or a name from its shape", "A path identifier is acquired through the library kernel and the `--namespace` flag overrides the namespace in the file", "A path identifier whose package is not a valid instance is refused with exit code 1".
@@ -4261,34 +4147,6 @@ Words changed or added: the em-dash of "Selection SHALL be pure" reads ":"; the 
 
 Lengths (old, new): old 1504; new "The CLI provides a stable-preferring version selector over a published-version list that is pure" 435; "The stable-preferring version selector is not exported and is not the compatibility gate's predecessor selection" 305; "The publish gate's predecessor is found by the literal backward scan of the published history" 473; "The literal predecessor rule is implemented in `internal/publish` over the registry's version enumeration" 350; "The documentation of the selector states how it differs from the predecessor selection of the publish gate" 437.
 
-### Strength table of cli-B5 unit 5b
-
-Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text:
-
-| Old sentence | New body | Word added |
-| --- | --- | --- |
-| The module commands (`opm module build`, `apply`, `vet`) are unaffected: they synthesize the instance in the override namespace, so the override and `metadata.namespace` agree. | "The module commands are unaffected by the namespace refusal of the instance render commands" | "are unaffected" reads "SHALL be unaffected" |
-| Setting either as a pod environment variable has no effect. | "The operator's registry is a command-line flag rendered from the registry value, not an environment variable" | "has no effect" reads "SHALL have no effect" |
-| An open list's value domain is still judged at the leaf, so narrowing it keeps reporting `domain narrowed`. | "An open list's value domain is still judged at the leaf" | "is still judged" reads "SHALL still be judged" |
-| Enhancement 0011 (...) settled that the publish gate's predecessor is found by the literal rule ... | "The publish gate's predecessor is found by the literal backward scan of the published history" | "is found" reads "SHALL be found" |
-| Enhancement 0011 (...) settled that the publish gate's predecessor is found by the literal rule ... implemented in `internal/publish` over the registry's version enumeration | "The literal predecessor rule is implemented in `internal/publish` over the registry's version enumeration" | "is found" reads "SHALL be found" |
-
-Plain sentences copied unchanged, with no keyword, into a body that carries a keyword in another sentence:
-
-| Old sentence | New body |
-| --- | --- |
-| The instance file owns its namespace: `metadata.namespace` is part of the instance's identity. | "`opm instance apply`, `build`, `diff` and `vet` refuse a namespace override that differs from the instance's `metadata.namespace`" |
-| A tracked resource that orphan detection could not read stays a warning that does not change the exit code. | "`opm instance diff` keeps NotFound as a new resource, behaves as before with no failure and warns on an unreadable tracked resource" |
-| Everything the flow resolves: core, the catalogs, and this repository's fixture modules, is published on GHCR, and the pinned operator's built-in `--registry` default routes both `opmodel.dev/*` and `testing.opmodel.dev/*` there. | "The `cluster:operator` task installs the pinned operator without requiring a local registry container" |
-| The operator's registry is a command-line flag the module renders from that value, not an environment variable: `--registry` wins over `OPM_REGISTRY`, which is read only when the flag is empty, and the operator overwrites `CUE_REGISTRY` in its own process environment. | "The operator's registry is a command-line flag rendered from the registry value, not an environment variable" |
-| Its purpose is a pass/fail verdict with clear diagnostics for module authors: identity, values, and whether the module's components render with the catalogs it declares. | "`opm mod vet` validates values against `#config` and renders the synthesized instance without outputting manifests" |
-| All four affect the verdict: `-f` selects the values, `-n` and `--name` set the synthesized instance's namespace and name for the render, and `--platform` renders against that platform module instead of the module-deps platform. | "`opm mod vet` accepts an optional module path argument and exposes `-f`/`--values`, `-n`/`--namespace`, `--name` and `--platform`" |
-| A field is "required" for this rule when it carries the required constraint (`!`) or is a regular field with no default. | "A field that was optional and is required in the new definition reports `field made required`" |
-| A defaulted field that loses its default is the default rule's finding (`default removed`), not this one's. | "A defaulted field that loses its default and the reverse transition do not report `field made required`" |
-| A default is compared only where an author wrote one: a value whose disjunction marks a default with `*`. | "A default is compared only where an author wrote one, and the implicit default of a plain open list is not compared" |
-| A stable-preferring selector coincides with that rule only on a prerelease-only history and would miss breaks that prerelease pinners (blessed by enhancement 0010: a subscription names exactly one catalog build) can see. | "The documentation of the selector states how it differs from the predecessor selection of the publish gate" |
-
-
 ## Ledger entries of cli-B6, unit 6a (published-module-resolution, template-modules, dependency-tidy, e2e-cluster-workflow)
 
 ### Ledger: published-module-resolution, A published module is named by a major-free module path
@@ -4681,42 +4539,6 @@ Words changed or added: the body ends with "(Requirement: The job installs kind,
 
 Lengths (old, new): old 975; new "The job installs kind, creates the `opm-dev` cluster with `task cluster:create` and prepares it with `task cluster:operator`" 469; "The job does not restate the kind installation, cluster creation and operator preparation steps in the workflow" 194; "The job runs a registry container seeded with `hack/fixtures.sh seed` from which the CLI and the operator resolve `testing.opmodel.dev`" 450.
 
-### Strength table of cli-B6 unit 6a
-
-Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text:
-
-| Old sentence | New body | Word added |
-| --- | --- | --- |
-| The newest release within a major is the newest stable version; when the major has no stable version, the newest prerelease that is not a development build (for... | "The newest release within a major is the newest stable version, else the newest prerelease that is not a development build" | "SHALL be" |
-| A major is skipped when it holds no selectable release, declares no `opmodel.dev/core` dependency, or declares a different core major. | "A major with no selectable release, no core dependency or a different core major is skipped, and the command exits 2 when every major is skipped" | "SHALL be" |
-| The segment is module-kind and cli-CI-published only. | "The `templates` segment is module-kind and cli-CI-published only and no gate reserves a name within it" | "SHALL be" |
-| No gate reserves a name within it: the publish gates admit any single-segment name made of lowercase letters, digits, dots, underscores and hyphens, `index` inc... | "The `templates` segment is module-kind and cli-CI-published only and no gate reserves a name within it" | "SHALL reserve" |
-| The cli's PR check and release job refuse a template that breaks any of these rules. | "The cli's PR check and release job refuse a template that breaks a publish gate, the vet, the tree, bump, `Version` or module path rule" | "SHALL refuse" |
-| Init with no template, on a directory that already holds a module tree, repairs that tree instead of scaffolding. | "Init with no template on a directory that already holds a module tree repairs that tree and adopts the version the tree states" | "SHALL repair" |
-| Repair leaves the `Version` of an identity file that exists untouched. | "Init with no template on a directory that already holds a module tree repairs that tree and adopts the version the tree states" | "SHALL leave" |
-| An `@vN` suffix selects the newest release within that major (stable preferred, prerelease fallback); a full semver selects the exact tag | "An `@vN` suffix floats within a major and a full semver pins a tag" | "SHALL select" |
-| no suffix selects the default major of the official template the bare word names, and no other reference has a default major: an unknown bare word and a literal... | "No suffix selects a default major for an official template only" | "SHALL select" |
-| `--from` accepts the same forms explicitly and any published module as a clone source; `-t/--template` is an alias. | "`--from` accepts the same forms explicitly and any published module as a clone source, and `-t/--template` is an alias" | "SHALL accept"; "SHALL be" |
-| The official templates use `module.cue` and `components.cue` by convention, and every root `.cue` file carries the same `package` clause. | "A module tree contains `cue.mod/module.cue` and `identity/identity.cue`, the module body is a single CUE package at the tree root and every root `.cue` file carries the same `package` clause" | "SHALL carry"; "SHALL use" |
-| That means every dependency an import in the module needs, at the version minimum version selection picks; a dependency imported for the first time at its lates... | "The exact content `cue mod tidy` produces holds every needed dependency at the version minimum version selection picks and no other" | "SHALL mean" |
-| Exit codes: 0 tidied, already tidy, or check passed; 1 dependency resolution or registry failure; 2 not tidy under `--check`, or the target is not a module root... | "Tidy exit codes are 0 tidied, already tidy or check passed, 1 resolution or registry failure and 2 not tidy or not a module root" | "SHALL be" |
-
-Plain sentences copied unchanged, with no keyword, into a body that carries a keyword in another sentence:
-
-| Old sentence | New body |
-| --- | --- |
-| the exact content `cue mod tidy` of the CUE version the CLI embeds produces for the same tree and registry | "The exact content `cue mod tidy` produces holds every needed dependency at the version minimum version selection picks and no other" |
-| The refusal names the absolute path it checked; for `opm module tidy` on an existing directory without `cue.mod`, it also points at `opm module init` (no catalo... | "Tidy refuses a path that is not a module root with exit 2 before any registry access" |
-| - the run was started by `workflow_dispatch`; - the pull request's head branch starts with `release-please--`; - the pull request's head branch is the cascade b... | "The job applies on `workflow_dispatch`, on `release-please--` and `deps/cascade` head branches and on the `deps-cascade` label" |
-| - the pull request changes a file under `internal/operator/`, `internal/cmd/operator/`, `templates/` or `hack/platform/`; | "The job applies when a pull request changes a file under `internal/operator/`, `internal/cmd/operator/`, `templates/` or `hack/platform/`" |
-| the pull request changes one of the job's own inputs: the workflow file itself, its decision script `.github/scripts/e2e-cluster-applies.sh`, `Taskfile.yml` (wh... | "The job applies when a pull request changes the workflow file, its decision script, `Taskfile.yml` or `hack/fixtures.sh`" |
-| the pull request changes one of the job's own inputs: | "The job applies when a pull request changes `hack/kind-config.yaml`, `hack/kind-platform.yaml`, `hack/kind-operator-rbac.yaml` or `hack/opm-config.cue`" |
-| `hack/kind-config.yaml`, `hack/kind-platform.yaml`, `hack/kind-operator-rbac.yaml`, `hack/opm-config.cue` | "The job applies when a pull request changes `hack/kind-config.yaml`, `hack/kind-platform.yaml`, `hack/kind-operator-rbac.yaml` or `hack/opm-config.cue`" |
-| the pull request changes one of the job's own inputs: | "The job applies when a pull request changes a Go file directly under `tests/e2e/` or anything under `tests/e2e/testdata/operator-owned/`" |
-| any Go file directly under `tests/e2e/` (the cluster-backed tests and the suite's shared helpers such as `TestMain` and `runOPMWithEnv`), or anything under `tes... | "The job applies when a pull request changes a Go file directly under `tests/e2e/` or anything under `tests/e2e/testdata/operator-owned/`" |
-| Later tests (the operator lifecycle test tears the operator, CRDs and every ModuleInstance down and reinstalls) leave nothing of that state for a step after the... | "An operator-owned test that fails logs its ModuleInstance, the cluster Platform and the operator's logs before its cleanup deletes the evidence" |
-| When an operator-owned test fails, | "When an operator-owned test fails, a test that times out waiting for the operator to reconcile names the ModuleInstance's `Ready` condition in its failure message" |
-
 ## Ledger entries of cli-B6, unit 6b (errors-domain, flag-conventions, inventory-ownership, log-output-style, apply-preflight-gates)
 
 ### Ledger: errors-domain, Error types package location
@@ -5041,29 +4863,6 @@ Lengths (old, new): old 639; new "The gates run in a fixed order, all before the
 - `apply-preflight-gates`, "Every other apply keeps the operator-version ceiling check and the operator's instance still runs the CRD gates": "keeps" became "SHALL keep" and "still run" became "SHALL still run" (keyword, see the strength table).
 - The `**Source**` metadata lines carry the whole old `Source:` line (enhancement 0021, both quotes), on every split of "Fetch and resolution answers are decided by error type" and of "Operator-version ceiling".
 - Every other body is built from whole old sentences, unchanged.
-
-### Strength table of cli-B6 unit 6b
-
-Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text:
-
-| Old sentence | New body | Word added |
-| --- | --- | --- |
-| The test reads the source, not its types: it sees a string or pattern predicate, ... | "The error-text test reads the source and not its types" | "SHALL read" |
-| Every other apply keeps the check, and the CRD-presence and CRD field-floor gates still run for the operator's instance. | "Every other apply keeps the operator-version ceiling check and the operator's instance still runs the CRD gates" | "SHALL keep"; "SHALL still run" |
-
-Plain sentences copied unchanged, with no keyword, into a body that carries a keyword in another sentence or in a SHALL bullet intro:
-
-| Old sentence | New body |
-| --- | --- |
-| Types that no code in the tree or its consumers constructs (`ConfigError`, `TransformError`, `FieldError`) are removed rather than preserved. | "Types that no code constructs are removed and every exported type keeps its `.Error()` string and `Unwrap()` behavior across moves" |
-| It does not see a message made by formatting the error, or a message handed to another function as a string. | "The error-text test reads the source and not its types" |
-| The version-skew ceiling gate still applies. | "`opm instance apply` against an operator-owned instance acts as a spec editor only" |
-| Omitting it does not leave ownership untouched: it releases this field manager's claim, and the API server prunes the operator's ownership marker. | "A thin-editor apply carries the live `spec.owner` value and never changes it" |
-| CLI-executor mode (absent CR or `spec.owner: cli`) drives the direct render/apply/prune/status path; operator-owned mode drives the thin-editor apply and finalizer-delegating delete paths. | "Ownership mode resolution is implemented in exactly one function that all mutating commands consume" |
-| Whether the operator removes the workloads is governed by `spec.prune`, which has no CRD default and which the CLI does not write: absent it, the operator removes the CR and deliberately orphans the workloads. | "`opm instance delete` of an operator-owned instance reports the outcome that actually occurred and never claims a prune it has not established" |
-| The CR's disappearance therefore proves the finalizer completed, not that anything was pruned. | the same body |
-| The four bullets and the six bullets of the lists (`errors-domain` allowed cases, `log-output-style` palette and semantic styles, `errors-domain` hint causes) | the body whose intro line carries the keyword |
-
 
 ## Ledger entries of cli-B7, unit 7a (pr-workflow, catalog-registry-check, ci-workflow, config, config-commands, config-types, docs-bundle)
 
@@ -5463,27 +5262,6 @@ Lengths (old, new): old 783; new "`go run ./hack/docskit-dump` prints the comman
 - `config-types`, "The `skewPolicy` value governs how a render responds to a module that requires a newer build than the platform pins": a `**Source**` line carries the whole citation of the old first sentence (enhancement 0019, with its quote), because the old sentence tied that citation to the whole key, including this rule.
 - Every other body is built from whole old sentences, unchanged.
 
-### Strength table of cli-B7 unit 7a
-
-Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text: none. This unit adds no keyword.
-
-Plain sentences copied unchanged, with no keyword, into a body that carries a keyword in another sentence or in a list intro:
-
-| Old sentence | New body |
-| --- | --- |
-| Exit codes: 0 clean, 2 findings, 3 registry unreachable, 5 not published. | "`opm catalog registry check` pulls the named published build and verifies out of band what a platform verifies when it imports the catalog" |
-| A failure that asks no registry (a registry mapping that does not parse) exits 1. | "`opm catalog registry check` exits 5 for an unpublished coordinate, 3 for every other registry answer and 1 for a failure that asks no registry" |
-| Platform selection is a per-command concern (`--platform`, see the `platform-resolution` capability), not a config-file field. | "There is no provider configuration value" |
-| The one exception is `opm config vet`, which loads the file named on its command line into a throwaway value to validate it without touching the resolved configuration. | "Subcommands do not call `config.Load()` independently" |
-| Kubernetes values resolve at point of use per command; the platform source is a per-command concern reported by every render-bearing command (see `platform-resolution`), not an initialization-time value. Provider does not exist as a resolved value. | "The CLI emits a single `\"initializing CLI\"` debug log line when `--verbose` is specified" |
-| CUE evaluation contexts are owned by the per-invocation kernel, not by configuration. | "`GlobalConfig` contains no `Providers` field and no `CueContext` field" |
-| The command creates: and its bullet | "`opm config init` creates the default configuration `config.cue` in `~/.opm/`" |
-| Checks performed: and its two numbered items | "`opm config vet` validates the `~/.opm` configuration with two checks" |
-| Each resolved value records: and its three bullets | "The CLI tracks the source of each resolved configuration value for verbose logging" |
-| The two bullets `"resolved config path"` and `"resolved registry"` | "The debug log lines `\"resolved config path\"` and `\"resolved registry\"` are retained" |
-| The five bullets of the field list (`Kubernetes`, `Log`, `Registry`, `ConfigPath`, `Flags`) | "`GlobalConfig` contains the fields `Kubernetes`, `Log`, `Registry`, `ConfigPath` and `Flags`" |
-| The bullets `opm module tidy --check` and `opm module vet` of the gate list | "The tidy, vet and zip gates" |
-
 ## Ledger entries of cli-B7, unit 7b (health-evaluation, instance-building, k8s-helpers, mod-apply, module-synthetic-instance, release-gates, command-reference)
 
 One subsection per rewritten requirement, 13 in all: `health-evaluation` 2, `instance-building` 2, `k8s-helpers` 2, `mod-apply` 2, `module-synthetic-instance` 2, `release-gates` 2 and `command-reference` 1. With unit 7a (15) this completes section 7 (28 requirements, all fourteen specs). All 13 are form c2, because the old scenarios of each belong to different new behaviors; no other form is used, so no parent keeps a header and no other spec cites a renamed header (`grep -rnF --exclude-dir=archive` over the repo finds the 13 old headers only in `openspec/specs/` and in this change). Every new body is built from whole sentences or whole lines of the old body, copied unchanged, or from parts of one sentence cut at a list boundary with the subject repeated. A clause row names where the old text appears; the list "Words changed or added in unit 7b" names each substitution. Each split of a requirement that had a `Source:` line carries the whole old line as a `**Source**` metadata line (`health-evaluation` both requirements, enhancement 0012; `release-gates` both requirements, the first the line with RELEASING.md and enhancement 0021, the second the line with the security pass; the last body of the second, "G1 runs the docs pins script without `--warn` and counts each printed line as a violation", follows the old `Source:` line in the old text and carries none). Old scenario names are all kept; the byte check ran once per rewritten requirement and printed no `DIFF` and no `LOST`. A new scenario restates a case the old text names, or copies the WHEN and THEN lines of an old scenario; the Changed column says which.
@@ -5815,29 +5593,6 @@ Lengths (old, new): old 1701; new "The `lint` job of `pr.yml` runs the step "Doc
 - `command-reference`, "Hidden and deprecated commands and flags and the `help` command are left out of the command reference and cobra's `completion` command is listed": a named reference to the generation body gives the scope of "left out" and "listed".
 - `module-synthetic-instance` and the other bodies not named above: built from whole old sentences, unchanged.
 
-### Strength table of cli-B7 unit 7b
-
-Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text:
-
-| Old sentence | New body | Word added |
-| --- | --- | --- |
-| This covers `opm instance status`, `opm instance list`, `opm instance tree`, and the `--wait` readiness wait of `opm instance apply` and `opm module apply`. | "The library health decisions cover instance status, list and tree and the apply wait" | "SHALL cover" |
-| Three readiness checks are not decisions of the package and stay in the cli: ... | "The Established wait and the operator install dispatch by kind stay in the cli"; "The tree child rows and the status colouring stay in the cli" | "SHALL stay" |
-| The exemptions named in the previous requirement are not copies. | "The readiness exemptions are not copies" | "SHALL NOT be" |
-| The loading entry points map onto kernel acquire verbs: | the three path bodies of "Loader validates consumer values and produces a concrete ModuleInstance" | "SHALL map" |
-| There is no `values.cue` fallback: the instance package is self-contained. | "An instance package acquired from its directory holds its `values` inline and has no `values.cue` fallback" | "SHALL be no" |
-
-Plain sentences copied unchanged, with no keyword, into a body that carries a keyword in another sentence or in a SHALL intro:
-
-| Old sentence | New body |
-| --- | --- |
-| In every synthesis path the kernel unifies inputs against the resolved `#ModuleInstance` schema and lets CUE derive uuid, components, auto-secrets, and standard labels. All paths run the kernel's shape gate and concreteness enforcement, producing a `*module.Instance`. | "The CLI produces validated, concrete instances exclusively through the library kernel" |
-| The three list items of the loading entry points | the path body whose intro line carries the keyword |
-| The three list items of the value priority | "With no `--values` files the builder discovers values by a three-step priority" |
-| The step runs with the job's read-only token. | "The `lint` job of `pr.yml` runs the step \"Docs bundles for moved pins\" on every pull request and fetches the base commit" |
-| Only the `opm module` commands (`build`, `apply` and `vet`) synthesize; `opm instance build` never does. | "The CLI synthesizes a concrete instance from a module CUE package directory via kernel `SynthesizeInstance`" |
-| The table rows of the flags | the flag body whose intro line carries the keyword |
-
 ## Ledger entries of cli-B8, unit 8a (repo-automation, resource-conversion, resource-discovery, status-verbose, workflow-security)
 
 ### Ledger: repo-automation, The label sync keeps bot-managed and cascade labels
@@ -6057,35 +5812,13 @@ Lengths (old, new): old 618; new "The publish-templates job and the publish job 
 - Named references: a body ends with "(Requirement: <exact header>)" or "(Requirements: <exact header>; <exact header>)", the named reference that gives it its referent. The bodies are: `repo-automation` "Other third-party Go modules keep their weekly Dependabot updates" (to the parent "Dependabot leaves cuelang.org/go to library releases", for "Other"); `resource-conversion` the three class bodies (to their neighbours, for the intro "Ascending, the classes"), "The CLI pins the library weight order in a unit test of its own" (to the first order body, for "this order") and "The applied objects and the render digest come from the same exported set" and "An export failure exits with the general error code and names the failing resource" (to the export body, for "the exported objects" and "the failing resource"); `resource-discovery` the traversal, skip and match bodies of `DiscoverChildren` (to the body that provides it, for "The traversal", "Non-workload parent kinds" and "Child matching") and the four later bodies of the unreadable-entry set (to the groups body and to the command body, for "this way", "the warning", "A warning" and "the tracked resources"); `status-verbose` the pod list, pod discovery, layout and colour bodies (to the `--details` body and the layout body, for "the pod detail block" and "the unhealthy workload"); `workflow-security` "publish-templates and goreleaser check out the release tag as `refs/tags/<tag>`" (to the first publishing body, for "These guards").
 - `repo-automation`, "`.github/labels.yml` lists the release-please, Dependabot and release-cascade labels": "It SHALL list" reads "`.github/labels.yml` SHALL list" (the subject of the first sentence of the same old requirement).
 - `repo-automation`, parent "Dependabot leaves cuelang.org/go to library releases" and "The cli's CUE version moves only through a library release": the old sentence is cut at ", so". The parent part ends with a period in place of the comma. The second part drops "so" at the cut, starts with a capital letter and reads "SHALL move" in place of "moves" (keyword).
-- `repo-automation`, the three label bodies, the three cuelang.org/go bodies, the two `workflow-security` permission bodies and the two publishing bodies: the old `Source:` line is whole in a `**Source**:` line of each new block (the citation ruling of 2026-10-20 00:40); the inline `Source:` sentence leaves the body.
+- `repo-automation`, the three label bodies, the three cuelang.org/go bodies, the two `workflow-security` permission bodies and the two publishing bodies: the old `Source:` line is whole in a `**Source**:` line of each new block (the citation rule: a split block carries its full old `Source:` line as metadata); the inline `Source:` sentence leaves the body.
 - `resource-conversion`, the three class bodies: the old sentence "Ascending, the classes are: ..." is cut at list boundaries (after "ClusterRole of `rbac.authorization.k8s.io`" and after "ServiceAccount, Role and RoleBinding"). The intro reads "Ascending, the classes SHALL be:" in all three (keyword, subject repeated). The first two parts end with a period in place of the semicolon.
 - `resource-discovery`, "`DiscoverChildren` returns children as `[]*unstructured.Unstructured` and differs from the tree ownership walk in its return contract": "It returns" reads "`DiscoverChildren` SHALL return" (subject copied from the old text, keyword). The em-dash of the Note reads a colon.
 - `resource-discovery`, "`DiscoverChildren` skips non-workload parent kinds": the em-dash reads a colon.
 - `workflow-security`, "publish-templates and goreleaser check out the release tag as `refs/tags/<tag>`": the old sentences 2 and 3 are in one body, unchanged.
 - `status-verbose`, "The pod detail block has a fixed layout": the old sentence "The format SHALL be:" and the fenced block of the old text move into the THEN line of the new scenario "Pod detail block layout"; the body ends with the pointer "The format is shown in the scenario `Pod detail block layout`." (the pointer of the mod-vet precedent).
-- The `health-evaluation` body "The readiness exemptions are not copies" (first commit of unit 8a): "the previous requirement" reads the exact headers of the two requirements that name the exemptions (DECISIONS.md 2026-10-20 09:50).
-
-### Strength table of cli-B8 unit 8a
-
-Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text:
-
-| Old sentence | New body | Word added |
-| --- | --- | --- |
-| Ascending, the classes are: ... | the three class bodies "Library weight classes: ..." | "SHALL be" |
-| ... so the cli's CUE version moves only through a library release: ... | "The cli's CUE version moves only through a library release" | "SHALL move" |
-| It returns children as `[]*unstructured.Unstructured` for UID extraction (used by the events command to match `event.involvedObject.uid`). | "`DiscoverChildren` returns children as `[]*unstructured.Unstructured` and differs from the tree ownership walk in its return contract" | "SHALL return" |
-
-Plain sentences copied unchanged, with no keyword, into a body that carries a keyword in another sentence:
-
-| Old sentence | New body |
-| --- | --- |
-| The order follows Flux's staged apply (enhancement 0012, "..."). | "Library weight classes: CustomResourceDefinition to ClusterRole" |
-| The library's own weight-table guard test covers rows the library adds. | "The CLI pins the library weight order in a unit test of its own" |
-| Note: `internal/kubernetes/tree.go` already implements equivalent ownership walking ... | "`DiscoverChildren` returns children as `[]*unstructured.Unstructured` and differs from the tree ownership walk in its return contract" |
-| The table rows of the traversal | "The traversal of `DiscoverChildren` is targeted, not generic" |
-| The three list items of the pod detail block | "The pod detail block lists each pod of the unhealthy workload with name, phase and detail" |
-| (The global `--verbose` flag controls log verbosity only and does not affect status output.) | "Pods of the unhealthy workload are discovered by its `.spec.selector.matchLabels`" |
-| These guards stop a mistaken or bot-branch dispatch; a person with write access can still change the workflow on a branch, ... | "publish-templates and goreleaser check out the release tag as `refs/tags/<tag>`" |
+- The `health-evaluation` body "The readiness exemptions are not copies" (first commit of unit 8a): "the previous requirement" reads the exact headers of the two requirements that name the exemptions.
 
 ## Ledger entries of cli-B8, unit 8b (instance-identity-labeling, mod-instance-optional, mod-list, pkg-types, platform-pull, refactoring-requirements, registry-login, secret-inventory-migration, status-wide-output)
 
@@ -6284,3 +6017,162 @@ Lengths (old, new): old 603; new "Wide format adds a REPLICAS column to the stat
 - `refactoring-requirements`, "The identifier rule applies to internal packages only": "applies" reads "SHALL apply" (keyword).
 - `pkg-types`, the list items of "Shared domain types the CLI owns are exported under `pkg/errors/` and `pkg/loader/`" and the body of "There is no `pkg/bundle/` package", and `registry-login`, "`opm registry login` stores a credential in the standard OCI/docker credential file": the em-dash reads a colon.
 - `pkg-types`, "Instance values and module metadata are read through the library's accessors": the old list is cut after its second item at a list boundary. The intro is in both parts (the old sentence is over 500 characters on its own), and the second item ends with a period in place of the semicolon.
+
+## Strength table
+
+Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text:
+
+| Old sentence | New body | Word added |
+| --- | --- | --- |
+| `opm operator install` is the exception: it refuses on such a resource | "Operator install refuses a resource adopted by another instance" | "it refuses" reads "it SHALL refuse" |
+| An instance deploys the operator when any one of these holds, read from its record without rendering: it is na... | "An instance deploys the operator when one of three signals holds" | "any one of these holds" reads "any one of these SHALL hold" |
+| With `--wait` the command also waits, bounded, for the deleted resources to disappear ("Instance delete waits ... | "With --wait the command also waits for the deleted resources to disappear" | "the command also waits" reads "the command SHALL also wait" |
+| Two selection modes exist, and the caller chooses between them explicitly: | "Release and prerelease are the two selection modes" | "exist," reads "SHALL exist," |
+| The write-if-absent seeding of a missing Platform is unchanged: it happens only when no CR exists, and it seed... | "The write-if-absent seeding of a missing Platform is unchanged" | "is unchanged:" reads "SHALL be unchanged:" |
+| - The same generator serves the deps fallback of every other render (see "Renders fall back to their own deps"... | "The same generator serves every other render" | "serves" reads "SHALL serve" |
+| Every source resolves to a platform module directory the kernel acquires; the CR source is generated into one ... | "Every platform source resolves to a platform module directory" | "Every source resolves to" reads "Every source SHALL resolve to" |
+| - `opm instance diff`, `opm instance apply` and `opm module apply` keep failing on an unreachable cluster: the... | "Instance diff, instance apply and module apply keep failing on an unreachable cluster" | "keep failing" reads "SHALL keep failing" |
+| A registry that hands out bearer tokens and whose token endpoint refuses the caller is a refused credential li... | "A refusing token endpoint is a refused credential" | "is a refused credential" reads "SHALL be a refused credential" |
+| The gates: kernel loadability (modules only: ...) ... already-published tag. | "Publish evaluates the gates of the gate list (THEN line of the scenario "The ten gates of the gate list")" | "The gates:" reads "The gates SHALL be:"; the body sentence "The gates SHALL be those listed in scenario ..." is added |
+| A release with no template changed publishes nothing and succeeds, and a re-run after a partial publish skips ... | "A release with no template changed publishes nothing" | "publishes" reads "SHALL publish", "succeeds" reads "succeed", "skips" reads "SHALL skip" |
+| A `BREAKING CHANGE:` footer in a pull request body or a branch commit message SHALL NOT be relied on, because ... | "The migration note goes in the pull request body" | "the migration note goes" reads "The migration note of a breaking change SHALL go"; the trailing comma reads a period |
+| The action mints the dispatch token and chooses the targets: catalog_opm and opm-operator, as release-tool edg... | "The cascade-notify action mints the dispatch token and chooses the targets" | "The action" reads "The `cascade-notify` action"; "mints" reads "SHALL mint", "chooses" reads "choose" |
+| The kernel reports advisory facts as structured rows and attaches no message strings to a render result. | "The CLI words the advisory facts of the kernel as warnings" | "reports" reads "SHALL report", "attaches" reads "SHALL attach" |
+| The digest leaves the value of the `app.kubernetes.io/managed-by` label out, so the CLI (`opm-cli`) and the op... | "The digest leaves out the value of the managed-by label" | "The digest leaves" reads "`status.lastAppliedRenderDigest` SHALL leave" |
+| Evaluator-version skew reporting applies to a future cross-binary comparison, where the CLI and operator binar... | "Evaluator-version skew applies to a future cross-binary comparison" | "applies" reads "SHALL apply" |
+| When the platform is generated from the render's own deps (`opm module build` and `opm module vet` without `--... | "A platform generated from the render's own deps carries the module's replacements" | "are carried" reads "SHALL be carried" |
+| The provenance signal (`SourceLocal`, the `module-instance.opmodel.dev/source: local` annotation) keeps its fi... | "The provenance signal keeps its file-presence rule" | "keeps" reads "SHALL keep" |
+| The switch is the only thing the flag does: which demands are skippable, and what a skip does to the rendered ... | "Render-bearing commands accept --skip-unprovided and pass it to the kernel" | "is" reads "SHALL be" |
+| A platform the CLI generates (from the cluster Platform or from the render's own dependency pins) pins the ker... | "A platform the CLI generates is never refused for its core" | "pins" reads "SHALL pin"; "this way" reads the quoted refusal |
+| **Catalog and core as a consistent set.** This covers the `cue.mod/module.cue` files of the three templates, `... | "The catalog and core pins cover a fixed set of cue.mod/module.cue files" | "This covers" reads "The consistent set SHALL cover" |
+| **Catalog and core as a consistent set.** This covers the `cue.mod/module.cue` files of the three templates, `... | "The catalog and core pins also cover the remaining cue.mod/module.cue files of the fixed set" | "This covers" reads "The consistent set SHALL cover" |
+| Exit codes: 0 when the working tree changed; 3 when it did not; any other code on error. | "Exit 0 means the working tree changed and exit 3 means it did not" | "Exit codes:" reads "Exit codes SHALL be:" |
+| `cue.mod/module.cue` declares the package's own module path, a language version, and dependencies: the deploye... | "The cue.mod/module.cue file declares the package's module path, language version and dependencies" | "declares" reads "SHALL declare" |
+| `instance.cue` declares `package instance`, imports core at the module's core major and the module at its majo... | "The instance.cue file declares the package, the imports and the module instance" | "declares" reads "SHALL declare" |
+| `values.cue` declares `package instance` and one `values` field, filled as "Values start from the author's int... | "The values.cue file declares one values field" | "declares" reads "SHALL declare"; the cite of the renamed requirement reads its new header "values.cue is filled from the first applicable source and the report names it" |
+| With one positional, a value containing `/` or `.` is the module path, and anything else is the instance name. | "With one positional a value with a slash or a dot is the module path" | "is" reads "SHALL be" twice |
+| A prompted value passes the same checks as the flag or positional it replaces, before any registry access. | "A prompted value passes the same checks as the flag it replaces" | "passes" reads "SHALL pass" |
+| Reading the module's own module file, between resolution and acquire, stays exit 3 for every failure. | "Reading the module's own module file stays exit 3 for every failure" | "stays" reads "SHALL stay" |
+| The declared pair is verified against fetched coordinates wherever it later meets a registry (operator acquire... | "The declared module identity pair is verified where it meets a registry" | "The declared pair" reads "The declared pair (`spec.module.path` and `spec.module.version`)", copied from the first sentence; "is verified" reads "SHALL be verified" |
+| This mirrors where the refusal lives in the system: `Discriminated: false` is a condition platform-package gener... | "The undiscriminated exit mirrors where platform-package generation refuses" | "This mirrors" reads "This SHALL mirror" |
+| A catalog pin's target is the newest published release in its major. | "The targets of a catalog pin and a core pin follow the release cascade" | "is" reads "SHALL be" |
+| A core pin already newer than that target stays. | "A core pin already newer than the cascade target stays" | "stays" reads "SHALL stay" |
+| Each entry names the repo-relative file or directory, the module paths frozen there, and a one-sentence reason saying why the pin must stay old. | "A `.cascade-frozen` entry names the file or directory, the frozen module paths and a one-sentence reason" | "Each entry names" reads "Each entry SHALL name" |
+| A pin is frozen only when the test depends on that exact old version. | "A pin is frozen only when the test depends on that exact old version" | "A pin is frozen" reads "A pin SHALL be frozen" |
+| A pin that is old only because a tree was copied from an older tree, or because an upstream release moved on, is not frozen. | "A pin that is old only because a tree was copied or an upstream release moved on is not frozen" | "is not frozen" reads "SHALL NOT be frozen" |
+| The effective applier identity is the ServiceAccount named by the controller Deployment's `--default-service-account` argument, ... | "The effective applier identity is the ServiceAccount named by --default-service-account when that argument is present" | "is" reads "SHALL be" |
+| ... the existing cluster-reachability precondition applies and the test skips as it does today, ... | "An applier check that could not be performed skips the test" | "the test skips" reads "the test SHALL skip" |
+| The module commands (`opm module build`, `apply`, `vet`) are unaffected: they synthesize the instance in the override namespace, so the override and `metadata.namespace` agree. | "The module commands are unaffected by the namespace refusal of the instance render commands" | "are unaffected" reads "SHALL be unaffected" |
+| Setting either as a pod environment variable has no effect. | "The operator's registry is a command-line flag rendered from the registry value, not an environment variable" | "has no effect" reads "SHALL have no effect" |
+| An open list's value domain is still judged at the leaf, so narrowing it keeps reporting `domain narrowed`. | "An open list's value domain is still judged at the leaf" | "is still judged" reads "SHALL still be judged" |
+| Enhancement 0011 (...) settled that the publish gate's predecessor is found by the literal rule ... | "The publish gate's predecessor is found by the literal backward scan of the published history" | "is found" reads "SHALL be found" |
+| Enhancement 0011 (...) settled that the publish gate's predecessor is found by the literal rule ... implemented in `internal/publish` over the registry's version enumeration | "The literal predecessor rule is implemented in `internal/publish` over the registry's version enumeration" | "is found" reads "SHALL be found" |
+| The newest release within a major is the newest stable version; when the major has no stable version, the newest prerelease that is not a development build (for... | "The newest release within a major is the newest stable version, else the newest prerelease that is not a development build" | "SHALL be" |
+| A major is skipped when it holds no selectable release, declares no `opmodel.dev/core` dependency, or declares a different core major. | "A major with no selectable release, no core dependency or a different core major is skipped, and the command exits 2 when every major is skipped" | "SHALL be" |
+| The segment is module-kind and cli-CI-published only. | "The `templates` segment is module-kind and cli-CI-published only and no gate reserves a name within it" | "SHALL be" |
+| No gate reserves a name within it: the publish gates admit any single-segment name made of lowercase letters, digits, dots, underscores and hyphens, `index` inc... | "The `templates` segment is module-kind and cli-CI-published only and no gate reserves a name within it" | "SHALL reserve" |
+| The cli's PR check and release job refuse a template that breaks any of these rules. | "The cli's PR check and release job refuse a template that breaks a publish gate, the vet, the tree, bump, `Version` or module path rule" | "SHALL refuse" |
+| Init with no template, on a directory that already holds a module tree, repairs that tree instead of scaffolding. | "Init with no template on a directory that already holds a module tree repairs that tree and adopts the version the tree states" | "SHALL repair" |
+| Repair leaves the `Version` of an identity file that exists untouched. | "Init with no template on a directory that already holds a module tree repairs that tree and adopts the version the tree states" | "SHALL leave" |
+| An `@vN` suffix selects the newest release within that major (stable preferred, prerelease fallback); a full semver selects the exact tag | "An `@vN` suffix floats within a major and a full semver pins a tag" | "SHALL select" |
+| no suffix selects the default major of the official template the bare word names, and no other reference has a default major: an unknown bare word and a literal... | "No suffix selects a default major for an official template only" | "SHALL select" |
+| `--from` accepts the same forms explicitly and any published module as a clone source; `-t/--template` is an alias. | "`--from` accepts the same forms explicitly and any published module as a clone source, and `-t/--template` is an alias" | "SHALL accept"; "SHALL be" |
+| The official templates use `module.cue` and `components.cue` by convention, and every root `.cue` file carries the same `package` clause. | "A module tree contains `cue.mod/module.cue` and `identity/identity.cue`, the module body is a single CUE package at the tree root and every root `.cue` file carries the same `package` clause" | "SHALL carry"; "SHALL use" |
+| That means every dependency an import in the module needs, at the version minimum version selection picks; a dependency imported for the first time at its lates... | "The exact content `cue mod tidy` produces holds every needed dependency at the version minimum version selection picks and no other" | "SHALL mean" |
+| Exit codes: 0 tidied, already tidy, or check passed; 1 dependency resolution or registry failure; 2 not tidy under `--check`, or the target is not a module root... | "Tidy exit codes are 0 tidied, already tidy or check passed, 1 resolution or registry failure and 2 not tidy or not a module root" | "SHALL be" |
+| The test reads the source, not its types: it sees a string or pattern predicate, ... | "The error-text test reads the source and not its types" | "SHALL read" |
+| Every other apply keeps the check, and the CRD-presence and CRD field-floor gates still run for the operator's instance. | "Every other apply keeps the operator-version ceiling check and the operator's instance still runs the CRD gates" | "SHALL keep"; "SHALL still run" |
+| This covers `opm instance status`, `opm instance list`, `opm instance tree`, and the `--wait` readiness wait of `opm instance apply` and `opm module apply`. | "The library health decisions cover instance status, list and tree and the apply wait" | "SHALL cover" |
+| Three readiness checks are not decisions of the package and stay in the cli: ... | "The Established wait and the operator install dispatch by kind stay in the cli"; "The tree child rows and the status colouring stay in the cli" | "SHALL stay" |
+| The exemptions named in the previous requirement are not copies. | "The readiness exemptions are not copies" | "SHALL NOT be" |
+| The loading entry points map onto kernel acquire verbs: | the three path bodies of "Loader validates consumer values and produces a concrete ModuleInstance" | "SHALL map" |
+| There is no `values.cue` fallback: the instance package is self-contained. | "An instance package acquired from its directory holds its `values` inline and has no `values.cue` fallback" | "SHALL be no" |
+| Ascending, the classes are: ... | the three class bodies "Library weight classes: ..." | "SHALL be" |
+| ... so the cli's CUE version moves only through a library release: ... | "The cli's CUE version moves only through a library release" | "SHALL move" |
+| It returns children as `[]*unstructured.Unstructured` for UID extraction (used by the events command to match `event.involvedObject.uid`). | "`DiscoverChildren` returns children as `[]*unstructured.Unstructured` and differs from the tree ownership walk in its return contract" | "SHALL return" |
+| This requirement applies to internal packages only. | "The identifier rule applies to internal packages only" | "applies" reads "SHALL apply" |
+
+Plain sentences copied unchanged, with no keyword, into a body that carries a keyword in another sentence, in a list intro or in a SHALL intro:
+
+| Old sentence | New body |
+| --- | --- |
+| The receiver computes the cascade diff with this repository's `task -x deps:cascade`. | "The cascade receiver runs on a dispatch, a daily sweep and a manual run" |
+| A run from any ref other than `main` is always a dry run. | "The caller passes dry-run so that the receiver is live only when CASCADE_DRY_RUN is exactly false" |
+| In a dry run the receiver computes the diff, title, body and labels and writes them to the job summary, and push... | "The dry-run switch is enforced in three places and a dry run pushes nothing" |
+| The release-PR gate statuses are still posted. | "The dry-run switch is enforced in three places and a dry run pushes nothing" |
+| Two cases are excepted: a release pull request whose gates-only evaluation fails before it writes its result in... | "Gate statuses are posted on every pull request into main except in two cases" |
+| This change does not make either status a required check. | "Gate statuses are posted on every pull request into main except in two cases" |
+| In `warn` mode a problem is posted as a success whose description starts `WARN:`. | "A same-repository release pull request gets its gate statuses from a gates-only receiver run" |
+| The `cascade` Environment deploys from `main` only. | "No other job declares the cascade Environment, release.yml sets no workflow-level env key and the Environment deploys from main only" |
+| Typed kernel refusals (unresolved demands) and `ValidationError` values with details keep their dedicated format... | "PrintValidationError groups CUE positions on any error" |
+| The warnings are worded by the CLI from the kernel's advisory diagnostic rows (unhandled optional traits, and re... | "ShowRenderOutput logs the render warnings via the module-scoped logger" |
+| This mirrors where the refusal lives in the system: `Routable: false` is the condition a platform-package gener... | "An over-subscribed contract is reported with its providing registry keys and fails the command" |
+| Two majors of one catalog are two registry entries and so two providers; two transformers of one entry are one ... | "Providers are counted per enabled registry entry and the command computes no count of its own" |
+| A disabled entry never defines a key. | "The colliding heading states what is left out and tells the reader to keep one defining entry enabled" |
+| When a catalog member or contract type a fixture exercises is removed from the published catalog, the fixture is removed with it rather than kept unvetted; a replacement fixture is added when the replacement mechanism exists. | "A fixture does not depend on a catalog mechanism the catalog has withdrawn" |
+| The rule is mechanical, not stylistic: CUE resolves modules by longest-prefix match on the module path, ... | "A test fixture module declares its path under the testing domain" |
+| CUE keeps a dependency the consumer already lists at its listed version, so a consumer re-pinned to a new fixture version but left on an older core still passes `cue mod tidy --check` ... | "A consumer that names a fixture version pins every shared dependency as CUE resolves it" |
+| A core pin's target is the core version that the input's catalog pins, ... The source is workspace RELEASING.md, section "The cascade", "Consistent set". | "The targets of a catalog pin and a core pin follow the release cascade" |
+| A `cue.mod` file moves by `cue mod get` then `cue mod tidy`, ... A Go literal moves by editing the literal. | "A `cue.mod` pin moves by `cue mod get` then `cue mod tidy` and is never bumped by a hand edit" |
+| Test inputs include a test module's `cue.mod/module.cue` and a module file a test writes from a Go literal. | "A test pin is moved to the release cascade's target unless `.cascade-frozen` lists it with a reason" |
+| The file uses the format in workspace RELEASING.md, section "Cascade files". | "A `.cascade-frozen` entry names the file or directory, the frozen module paths and a one-sentence reason" |
+| Between an upstream release and the release cascade that follows it, a pin is behind but not in breach. | "A pin that is old only because a tree was copied or an upstream release moved on is not frozen" |
+| The directory may be a standalone CUE module or a package inside another CUE module, such as an instance directory within a module tree. | "`opm instance build` takes one positional argument naming an instance" |
+| 2. Otherwise, an argument whose first element contains a dot is a published module path. (and list items 1 and 3) | "`opm module build` classifies its argument as a local directory or a published module path before any registry access" |
+| This covers a missing kubeconfig, an unreachable `kind-opm-dev` context, and an applier-grant check that could not be performed. | "A cluster-required run fails every precondition that would skip" |
+| The instance file owns its namespace: `metadata.namespace` is part of the instance's identity. | "`opm instance apply`, `build`, `diff` and `vet` refuse a namespace override that differs from the instance's `metadata.namespace`" |
+| A tracked resource that orphan detection could not read stays a warning that does not change the exit code. | "`opm instance diff` keeps NotFound as a new resource, behaves as before with no failure and warns on an unreadable tracked resource" |
+| Everything the flow resolves: core, the catalogs, and this repository's fixture modules, is published on GHCR, and the pinned operator's built-in `--registry` default routes both `opmodel.dev/*` and `testing.opmodel.dev/*` there. | "The `cluster:operator` task installs the pinned operator without requiring a local registry container" |
+| The operator's registry is a command-line flag the module renders from that value, not an environment variable: `--registry` wins over `OPM_REGISTRY`, which is read only when the flag is empty, and the operator overwrites `CUE_REGISTRY` in its own process environment. | "The operator's registry is a command-line flag rendered from the registry value, not an environment variable" |
+| Its purpose is a pass/fail verdict with clear diagnostics for module authors: identity, values, and whether the module's components render with the catalogs it declares. | "`opm mod vet` validates values against `#config` and renders the synthesized instance without outputting manifests" |
+| All four affect the verdict: `-f` selects the values, `-n` and `--name` set the synthesized instance's namespace and name for the render, and `--platform` renders against that platform module instead of the module-deps platform. | "`opm mod vet` accepts an optional module path argument and exposes `-f`/`--values`, `-n`/`--namespace`, `--name` and `--platform`" |
+| A field is "required" for this rule when it carries the required constraint (`!`) or is a regular field with no default. | "A field that was optional and is required in the new definition reports `field made required`" |
+| A defaulted field that loses its default is the default rule's finding (`default removed`), not this one's. | "A defaulted field that loses its default and the reverse transition do not report `field made required`" |
+| A default is compared only where an author wrote one: a value whose disjunction marks a default with `*`. | "A default is compared only where an author wrote one, and the implicit default of a plain open list is not compared" |
+| A stable-preferring selector coincides with that rule only on a prerelease-only history and would miss breaks that prerelease pinners (blessed by enhancement 0010: a subscription names exactly one catalog build) can see. | "The documentation of the selector states how it differs from the predecessor selection of the publish gate" |
+| the exact content `cue mod tidy` of the CUE version the CLI embeds produces for the same tree and registry | "The exact content `cue mod tidy` produces holds every needed dependency at the version minimum version selection picks and no other" |
+| The refusal names the absolute path it checked; for `opm module tidy` on an existing directory without `cue.mod`, it also points at `opm module init` (no catalo... | "Tidy refuses a path that is not a module root with exit 2 before any registry access" |
+| - the run was started by `workflow_dispatch`; - the pull request's head branch starts with `release-please--`; - the pull request's head branch is the cascade b... | "The job applies on `workflow_dispatch`, on `release-please--` and `deps/cascade` head branches and on the `deps-cascade` label" |
+| - the pull request changes a file under `internal/operator/`, `internal/cmd/operator/`, `templates/` or `hack/platform/`; | "The job applies when a pull request changes a file under `internal/operator/`, `internal/cmd/operator/`, `templates/` or `hack/platform/`" |
+| the pull request changes one of the job's own inputs: the workflow file itself, its decision script `.github/scripts/e2e-cluster-applies.sh`, `Taskfile.yml` (wh... | "The job applies when a pull request changes the workflow file, its decision script, `Taskfile.yml` or `hack/fixtures.sh`" |
+| the pull request changes one of the job's own inputs: | "The job applies when a pull request changes `hack/kind-config.yaml`, `hack/kind-platform.yaml`, `hack/kind-operator-rbac.yaml` or `hack/opm-config.cue`" |
+| `hack/kind-config.yaml`, `hack/kind-platform.yaml`, `hack/kind-operator-rbac.yaml`, `hack/opm-config.cue` | "The job applies when a pull request changes `hack/kind-config.yaml`, `hack/kind-platform.yaml`, `hack/kind-operator-rbac.yaml` or `hack/opm-config.cue`" |
+| the pull request changes one of the job's own inputs: | "The job applies when a pull request changes a Go file directly under `tests/e2e/` or anything under `tests/e2e/testdata/operator-owned/`" |
+| any Go file directly under `tests/e2e/` (the cluster-backed tests and the suite's shared helpers such as `TestMain` and `runOPMWithEnv`), or anything under `tes... | "The job applies when a pull request changes a Go file directly under `tests/e2e/` or anything under `tests/e2e/testdata/operator-owned/`" |
+| Later tests (the operator lifecycle test tears the operator, CRDs and every ModuleInstance down and reinstalls) leave nothing of that state for a step after the... | "An operator-owned test that fails logs its ModuleInstance, the cluster Platform and the operator's logs before its cleanup deletes the evidence" |
+| When an operator-owned test fails, | "When an operator-owned test fails, a test that times out waiting for the operator to reconcile names the ModuleInstance's `Ready` condition in its failure message" |
+| Types that no code in the tree or its consumers constructs (`ConfigError`, `TransformError`, `FieldError`) are removed rather than preserved. | "Types that no code constructs are removed and every exported type keeps its `.Error()` string and `Unwrap()` behavior across moves" |
+| It does not see a message made by formatting the error, or a message handed to another function as a string. | "The error-text test reads the source and not its types" |
+| The version-skew ceiling gate still applies. | "`opm instance apply` against an operator-owned instance acts as a spec editor only" |
+| Omitting it does not leave ownership untouched: it releases this field manager's claim, and the API server prunes the operator's ownership marker. | "A thin-editor apply carries the live `spec.owner` value and never changes it" |
+| CLI-executor mode (absent CR or `spec.owner: cli`) drives the direct render/apply/prune/status path; operator-owned mode drives the thin-editor apply and finalizer-delegating delete paths. | "Ownership mode resolution is implemented in exactly one function that all mutating commands consume" |
+| Whether the operator removes the workloads is governed by `spec.prune`, which has no CRD default and which the CLI does not write: absent it, the operator removes the CR and deliberately orphans the workloads. | "`opm instance delete` of an operator-owned instance reports the outcome that actually occurred and never claims a prune it has not established" |
+| The CR's disappearance therefore proves the finalizer completed, not that anything was pruned. | the same body |
+| The four bullets and the six bullets of the lists (`errors-domain` allowed cases, `log-output-style` palette and semantic styles, `errors-domain` hint causes) | the body whose intro line carries the keyword |
+| Exit codes: 0 clean, 2 findings, 3 registry unreachable, 5 not published. | "`opm catalog registry check` pulls the named published build and verifies out of band what a platform verifies when it imports the catalog" |
+| A failure that asks no registry (a registry mapping that does not parse) exits 1. | "`opm catalog registry check` exits 5 for an unpublished coordinate, 3 for every other registry answer and 1 for a failure that asks no registry" |
+| Platform selection is a per-command concern (`--platform`, see the `platform-resolution` capability), not a config-file field. | "There is no provider configuration value" |
+| The one exception is `opm config vet`, which loads the file named on its command line into a throwaway value to validate it without touching the resolved configuration. | "Subcommands do not call `config.Load()` independently" |
+| Kubernetes values resolve at point of use per command; the platform source is a per-command concern reported by every render-bearing command (see `platform-resolution`), not an initialization-time value. Provider does not exist as a resolved value. | "The CLI emits a single `\"initializing CLI\"` debug log line when `--verbose` is specified" |
+| CUE evaluation contexts are owned by the per-invocation kernel, not by configuration. | "`GlobalConfig` contains no `Providers` field and no `CueContext` field" |
+| The command creates: and its bullet | "`opm config init` creates the default configuration `config.cue` in `~/.opm/`" |
+| Checks performed: and its two numbered items | "`opm config vet` validates the `~/.opm` configuration with two checks" |
+| Each resolved value records: and its three bullets | "The CLI tracks the source of each resolved configuration value for verbose logging" |
+| The two bullets `"resolved config path"` and `"resolved registry"` | "The debug log lines `\"resolved config path\"` and `\"resolved registry\"` are retained" |
+| The five bullets of the field list (`Kubernetes`, `Log`, `Registry`, `ConfigPath`, `Flags`) | "`GlobalConfig` contains the fields `Kubernetes`, `Log`, `Registry`, `ConfigPath` and `Flags`" |
+| The bullets `opm module tidy --check` and `opm module vet` of the gate list | "The tidy, vet and zip gates" |
+| In every synthesis path the kernel unifies inputs against the resolved `#ModuleInstance` schema and lets CUE derive uuid, components, auto-secrets, and standard labels. All paths run the kernel's shape gate and concreteness enforcement, producing a `*module.Instance`. | "The CLI produces validated, concrete instances exclusively through the library kernel" |
+| The three list items of the loading entry points | the path body whose intro line carries the keyword |
+| The three list items of the value priority | "With no `--values` files the builder discovers values by a three-step priority" |
+| The step runs with the job's read-only token. | "The `lint` job of `pr.yml` runs the step \"Docs bundles for moved pins\" on every pull request and fetches the base commit" |
+| Only the `opm module` commands (`build`, `apply` and `vet`) synthesize; `opm instance build` never does. | "The CLI synthesizes a concrete instance from a module CUE package directory via kernel `SynthesizeInstance`" |
+| The table rows of the flags | the flag body whose intro line carries the keyword |
+| The order follows Flux's staged apply (enhancement 0012, "..."). | "Library weight classes: CustomResourceDefinition to ClusterRole" |
+| The library's own weight-table guard test covers rows the library adds. | "The CLI pins the library weight order in a unit test of its own" |
+| Note: `internal/kubernetes/tree.go` already implements equivalent ownership walking ... | "`DiscoverChildren` returns children as `[]*unstructured.Unstructured` and differs from the tree ownership walk in its return contract" |
+| The table rows of the traversal | "The traversal of `DiscoverChildren` is targeted, not generic" |
+| The three list items of the pod detail block | "The pod detail block lists each pod of the unhealthy workload with name, phase and detail" |
+| (The global `--verbose` flag controls log verbosity only and does not affect status output.) | "Pods of the unhealthy workload are discovered by its `.spec.selector.matchLabels`" |
+| These guards stop a mistaken or bot-branch dispatch; a person with write access can still change the workflow on a branch, ... | "publish-templates and goreleaser check out the release tag as `refs/tags/<tag>`" |
+| With a host argument, that host is targeted literally. | "`opm registry login` without a host argument resolves the configured registry mapping to its host set" |
+| User-facing terminal output (success messages, log prefixes, command descriptions) is governed by the UX principle that users think in terms of modules and is explicitly excluded. | "The identifier rule applies to internal packages only" |

@@ -17,7 +17,7 @@ Spec deltas, in eight batches of at most 28 requirements. A batch holds whole sp
 - **cli-B7 (28):** `pr-workflow` (3), `catalog-registry-check` (2), `ci-workflow` (2), `config` (2), `config-commands` (2), `config-types` (2), `docs-bundle` (2), `health-evaluation` (2), `instance-building` (2), `k8s-helpers` (2), `mod-apply` (2), `module-synthetic-instance` (2), `release-gates` (2), `command-reference` (1).
 - **cli-B8 (19):** `repo-automation` (2), `resource-conversion` (2), `resource-discovery` (2), `status-verbose` (2), `workflow-security` (2), `instance-identity-labeling`, `mod-instance-optional`, `mod-list`, `pkg-types`, `platform-pull`, `refactoring-requirements`, `registry-login`, `secret-inventory-migration`, `status-wide-output` (1 each).
 
-The delta files are written batch by batch in later units, not in this proposal step. Each rewrite is a split or a move into scenarios. The rules are those of the swarm's approved guide, summarized in `design.md`.
+The delta files are written batch by batch. Each rewrite is a split or a move into scenarios. The rules are in `design.md`.
 
 Repo extras, in the last unit:
 
@@ -29,7 +29,7 @@ Affected commands and packages: none. No Go file, flag, exit code or output chan
 
 Release class: none, as it would be after GA and in beta. Spec text, a task and CI text only; commit types are `docs` for specs and `ci` or `chore` for the gate, so release-please cuts no release.
 
-Delivery: one PR per change, the default. The change has ten task sections, more than the "about five" that the repo rules name. See `design.md` section "Sections" for why this is one change and what the supervisor must confirm at the proposal gate.
+Delivery: one PR per change, the default. The change has ten task sections, more than the "about five" that the repo rules name. See `design.md` section "Sections" for why this is one change. For the one-sentence checks that each rewritten body needs, see the section "Strength table" of `design.md`.
 
 ## Capabilities
 
