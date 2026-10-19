@@ -484,14 +484,14 @@ The finalizer guard and the no-record refusal of `opm operator uninstall` SHALL 
 
 ### Requirement: Install runs every check that can refuse it before it writes
 
-Install SHALL run, before it writes any object, every check that can refuse it: resolving the module and reading the operator version it deploys, rendering it, the check of the values against the target version's `#config`, the target rules of install (the operator version against the CLI's, the rendered image against the module's stated operator version, and the rendered ModuleInstance CRD against the CLI's floor). (Requirement: Install checks status-subresource permission and the guard first)
+Install SHALL run, before it writes any object, every check that can refuse it: resolving the module and reading the operator version it deploys, rendering it, the check of the values against the target version's `#config`, the target rules of install (the operator version against the CLI's, the rendered image against the module's stated operator version, and the rendered ModuleInstance CRD against the CLI's floor). (Requirement: Install runs the permission check and apply guard before writing)
 
 #### Scenario: The module, render, values and target rules are checked before the first write
 
 - **WHEN** install runs
 - **THEN** it SHALL run the resolving of the module, the rendering, the check of the values against the target version's `#config` and the target rules of install before it writes any object
 
-### Requirement: Install checks status-subresource permission and the guard first
+### Requirement: Install runs the permission check and apply guard before writing
 
 Install SHALL run, before it writes any object, every check that can refuse it: the status-subresource permission check, and the apply guard over every object the render names (capability `apply-pruning`, "The ownership guard judges every apply"). An install that refuses SHALL change no object in the cluster. (Requirement: Install runs every check that can refuse it before it writes)
 
@@ -589,7 +589,7 @@ Install needs every object its render names, so, unlike any other apply, it SHAL
 
 ### Requirement: Every refusal of the guard exits 2 and names the object, the instance and the annotation
 
-Every refusal of the guard in this phase SHALL exit 2, SHALL name the object and the instance that owns or adopts it, SHALL name the `opmodel.dev/adopt` annotation and the UUID to set where the annotation lifts the refusal, and SHALL leave the cluster unchanged; that includes a failed read by the guard, with or without a record. No refusal of install SHALL tell the user to delete or rename an object. (Requirement: Install checks status-subresource permission and the guard first)
+Every refusal of the guard in this phase SHALL exit 2, SHALL name the object and the instance that owns or adopts it, SHALL name the `opmodel.dev/adopt` annotation and the UUID to set where the annotation lifts the refusal, and SHALL leave the cluster unchanged; that includes a failed read by the guard, with or without a record. No refusal of install SHALL tell the user to delete or rename an object. (Requirement: Install runs the permission check and apply guard before writing)
 
 #### Scenario: Objects that carry another identity, with no record and no annotation, are refused
 

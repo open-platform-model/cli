@@ -280,7 +280,7 @@ When `--dry-run` is set and pruning is enabled, the apply SHALL read each stale 
 
 ### Requirement: The dry-run preview lists the resources a real prune would delete or leave behind
 
-When `--dry-run` is set and pruning is enabled, the apply SHALL list each stale resource the verdict allows a real apply to delete with the status `would prune`, and SHALL list separately each stale resource of a protected kind (core `Namespace`, `apiextensions.k8s.io` `CustomResourceDefinition`) with the status `left behind`. The preview SHALL use the same protected-kind rule as the real prune.
+When `--dry-run` is set and pruning is enabled, the apply SHALL list each stale resource the delete verdict allows a real apply to delete with the status `would prune`, and SHALL list separately each stale resource of a protected kind (core `Namespace`, `apiextensions.k8s.io` `CustomResourceDefinition`) with the status `left behind`. The preview SHALL use the same protected-kind rule as the real prune.
 
 #### Scenario: Preview separates pruned and left-behind resources
 
