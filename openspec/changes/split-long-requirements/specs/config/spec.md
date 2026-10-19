@@ -163,3 +163,8 @@ The following debug log lines SHALL be retained:
 
 - **WHEN** `--verbose` flag is specified
 - **THEN** the debug output SHALL NOT contain any registry-bootstrap or provider-extraction log lines
+
+#### Scenario: The retained debug log lines are present
+
+- **WHEN** `--verbose` flag is specified
+- **THEN** the debug output SHALL contain the `"resolved config path"` and `"resolved registry"` log lines

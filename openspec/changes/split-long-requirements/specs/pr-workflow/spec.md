@@ -13,7 +13,8 @@
 ### Requirement: Template publish gates run dry-run
 
 The `template-gates` job SHALL build `opm` from the pull request, install the cue version that the cli's `go.mod` requires for `cuelang.org/go`, and run `.github/scripts/publish-templates.sh --dry-run`, so every gate runs over every template tree without pushing.
-The job SHALL report every failing template, not only the first, including when a template's identity cannot be evaluated.
+For every template the gates SHALL be, in order:
+(Requirements: The identity and layout gates; The tidy, vet and zip gates; The publish dry-run gates; The version order gate)
 
 #### Scenario: Template gate violation fails the PR
 - **WHEN** a template tree violates a publish gate other than already-published
@@ -79,9 +80,8 @@ Every other dependency, core and the catalogs included, SHALL resolve from GHCR 
 - **WHEN** a pull request bumps a fixture to a version GHCR does not hold yet and a unit or e2e test resolves it
 - **THEN** the fixture resolves from the job-local registry seeded from the tree, and core and the catalogs resolve from GHCR
 
-### Requirement: The identity and tree layout gates of each template
+### Requirement: The identity and layout gates
 
-For every template the gates SHALL be, in order:
 - the identity: its `Version` SHALL be a stable SemVer `X.Y.Z`, and its `ModulePath` SHALL be `opmodel.dev/templates/<directory>@v<major of Version>`;
 - the tree layout: it SHALL hold no symbolic link, no special file and no nested `cue.mod`.
 (Requirement: Template publish gates run dry-run)
@@ -90,9 +90,8 @@ For every template the gates SHALL be, in order:
 - **WHEN** the identity `ModulePath` of the template in `templates/<directory>/` is not `opmodel.dev/templates/<directory>@v<major>`
 - **THEN** the `template-gates` job exits non-zero naming the expected path
 
-### Requirement: The tidy, vet and module zip gates of each template
+### Requirement: The tidy, vet and zip gates
 
-For every template the gates SHALL be, in order:
 - `opm module tidy --check`;
 - `opm module vet`, which renders the template's `debugValues` against a platform generated from its own pins;
 - the module zip that `cue mod publish --out` builds from the tree, the same `modzip.CreateFromDir` file selection `opm module publish` zips with, SHALL hold exactly the tree's files, so the published module is the one vet rendered.
@@ -107,9 +106,8 @@ For every template the gates SHALL be, in order:
 - **WHEN** a template tree holds a symbolic link, a special file, a nested `cue.mod`, or any other file its module zip leaves out, whether or not its version is already published
 - **THEN** the `template-gates` job exits non-zero naming the template and the file
 
-### Requirement: The `opm module publish --dry-run` gates of each template pass or refuse only because the version is already published
+### Requirement: The publish dry-run gates
 
-For every template the gates SHALL be, in order:
 - the `opm module publish --dry-run` gates, which SHALL either pass or refuse only because the template's version is already published.
 Any other refusal or a failed vet SHALL fail the job.
 (Requirement: Template publish gates run dry-run)
@@ -118,9 +116,8 @@ Any other refusal or a failed vet SHALL fail the job.
 - **WHEN** a template tree violates a publish gate other than already-published
 - **THEN** the `template-gates` job exits non-zero naming the refusal
 
-### Requirement: The version order gate of each template
+### Requirement: The version order gate
 
-For every template the gates SHALL be, in order:
 - the version order: an unpublished version SHALL be above the highest stable version GHCR holds for the template's major, and an already-published version SHALL be that highest version, because `opm module init` resolves it.
 (Requirement: Template publish gates run dry-run)
 
@@ -161,9 +158,18 @@ The comparison SHALL NOT depend on git history, so a change that reached `main` 
 A failure to fetch, list, verify, build or compare SHALL fail the job and SHALL NOT count the template as unpublished.
 (Requirement: Template publish gates run dry-run)
 
-#### Scenario: A fetch, list, verify, build or compare failure never passes as unpublished
+#### Scenario: A fetch, list or verify failure never passes as unpublished
 - **WHEN** GHCR holds a template's declared version but the published artifact or the template's version list cannot be fetched, or the artifact does not match its manifest digest
 - **THEN** the `template-gates` job exits non-zero naming the template
+
+### Requirement: The job reports every failing template and not only the first
+
+The job SHALL report every failing template, not only the first, including when a template's identity cannot be evaluated.
+(Requirement: Template publish gates run dry-run)
+
+#### Scenario: A broken identity does not hide the failure of another template
+- **WHEN** one template's identity package cannot be evaluated and another template fails a gate
+- **THEN** the `template-gates` job exits non-zero naming both templates
 
 ### Requirement: The `fixtures` job runs `hack/fixtures.sh check`
 
@@ -184,6 +190,7 @@ The `fixtures` job SHALL check out with `fetch-depth: 0`, build `opm`, install c
 ### Requirement: The `fixtures` job seeds a job-local registry
 
 The `fixtures` job SHALL then run `hack/fixtures.sh seed` to publish the tree's fixtures into a job-local `registry:2` service on `localhost:5000` with a fresh `CUE_CACHE_DIR`.
+(Requirement: The `fixtures` job runs `hack/fixtures.sh check`)
 
 #### Scenario: The seed step publishes the tree's fixtures into a job-local registry
 
@@ -193,6 +200,7 @@ The `fixtures` job SHALL then run `hack/fixtures.sh seed` to publish the tree's 
 ### Requirement: The `fixtures` job runs the consumers and the render parity program against the mixed mapping
 
 Against the mixed mapping (`testing.opmodel.dev` local, everything else GHCR) the `fixtures` job SHALL then run `hack/fixtures.sh consumers examples tests/e2e/testdata/operator-owned`, which MUST pass (see `test-fixture-lineage`), and `tests/integration/render-parity` with `OPM_ITEST_RENDER_PARITY=1`.
+(Requirement: The `fixtures` job seeds a job-local registry)
 
 #### Scenario: Render parity runs against the seeded registry
 - **WHEN** the seed step has published the tree's fixtures to the job-local registry

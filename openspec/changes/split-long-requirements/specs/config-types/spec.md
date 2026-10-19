@@ -67,6 +67,8 @@ Any other value SHALL fail config validation naming the allowed values. No flag 
 
 The `skewPolicy` value SHALL govern how a render responds when a module's `cue.mod` requires a newer build of an OPM-namespace path (core or a catalog) than the platform pins: `warn` renders against the platform's build and reports the skew; `refuse` fails the render before evaluation.
 
+**Source**: enhancement 0019 ("Skew policy defaults to warn-and-render; the comparison reads the two committed resolutions; older-than-platform is data").
+
 #### Scenario: Refuse configured
 
 - **WHEN** `config.cue` sets `skewPolicy: "refuse"` and a render against the local platform hits a newer module requirement
