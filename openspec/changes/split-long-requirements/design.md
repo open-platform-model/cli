@@ -4716,3 +4716,349 @@ Plain sentences copied unchanged, with no keyword, into a body that carries a ke
 | any Go file directly under `tests/e2e/` (the cluster-backed tests and the suite's shared helpers such as `TestMain` and `runOPMWithEnv`), or anything under `tes... | "The job applies when a pull request changes a Go file directly under `tests/e2e/` or anything under `tests/e2e/testdata/operator-owned/`" |
 | Later tests (the operator lifecycle test tears the operator, CRDs and every ModuleInstance down and reinstalls) leave nothing of that state for a step after the... | "An operator-owned test that fails logs its ModuleInstance, the cluster Platform and the operator's logs before its cleanup deletes the evidence" |
 | When an operator-owned test fails, | "When an operator-owned test fails, a test that times out waiting for the operator to reconcile names the ModuleInstance's `Ready` condition in its failure message" |
+
+## Ledger entries of cli-B6, unit 6b (errors-domain, flag-conventions, inventory-ownership, log-output-style, apply-preflight-gates)
+
+### Ledger: errors-domain, Error types package location
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "All error types are defined in `pkg/errors/` and the package exports the named types and sentinels", "Types that no code constructs are removed and every exported type keeps its `.Error()` string and `Unwrap()` behavior across moves".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Error types importable from pkg/errors | "All error types are defined in `pkg/errors/` and the package exports the named types and sentinels", "Error types importable from pkg/errors" | No (byte equal, checked) |
+| Import alias convention | "All error types are defined in `pkg/errors/` and the package exports the named types and sentinels", "Import alias convention" | No (byte equal, checked) |
+| ValidationError wrapping is unchanged | "Types that no code constructs are removed and every exported type keeps its `.Error()` string and `Unwrap()` behavior across moves", "ValidationError wrapping is unchanged" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| All error types SHALL be defined in `pkg/errors/`. | body of "All error types are defined in `pkg/errors/` and the package exports the named types and sentinels" |
+| The package SHALL export `DetailError` ... | body of "All error types are defined in `pkg/errors/` and the package exports the named types and sentinels" |
+| Types that no code in the tree or its consumers constructs ... are removed rather than preserved. | body of "Types that no code constructs are removed and every exported type keeps its `.Error()` string and `Unwrap()` behavior across moves" |
+| Every exported type SHALL keep its `.Error()` string and `Unwrap()` behavior ... | body of "Types that no code constructs are removed and every exported type keeps its `.Error()` string and `Unwrap()` behavior across moves" |
+
+Lengths (old, new): old 570; new "All error types are defined in `pkg/errors/` and the package exports the named types and sentinels" 311; "Types that no code constructs are removed and every exported type keeps its `.Error()` string and `Unwrap()` behavior across moves" 258.
+
+### Ledger: errors-domain, Fetch and resolution answers are decided by error type
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The cli decides what a registry fetch or dependency resolution failure means from the typed error and reads a CUE evaluation error by its path", "Non-test cli code reads error text only in four listed cases and a test fails on any other error-text predicate", "The error-text test reads the source and not its types".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| A predecessor package with an unprovided import reads as absent | "The cli decides what a registry fetch or dependency resolution failure means from the typed error and reads a CUE evaluation error by its path", "A predecessor package with an unprovided import reads as absent" | No (byte equal, checked) |
+| A registry failure never reads as absent | "The cli decides what a registry fetch or dependency resolution failure means from the typed error and reads a CUE evaluation error by its path", "A registry failure never reads as absent" | No (byte equal, checked) |
+| A new text match is refused | "Non-test cli code reads error text only in four listed cases and a test fails on any other error-text predicate", "A new text match is refused" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "A listed text read is allowed" in "Non-test cli code reads error text only in four listed cases and a test fails on any other error-text predicate"
+- "A message made by formatting the error is not seen" in "The error-text test reads the source and not its types"
+
+| Old clause | New place |
+| --- | --- |
+| The cli SHALL decide what a registry fetch failure or a dependency resolution failure means ... from the typed error ... and SHALL NOT decide it from the text | body of "The cli decides what a registry fetch or dependency resolution failure means from the typed error and reads a CUE evaluation error by its path" |
+| Source line (whole) | body of "The cli decides what a registry fetch or dependency resolution failure means from the typed error and reads a CUE evaluation error by its path" (as `**Source**`); body of "Non-test cli code reads error text only in four listed cases and a test fails on any other error-text predicate" (as `**Source**`); body of "The error-text test reads the source and not its types" (as `**Source**`) |
+| Where the cause is a CUE evaluation error, the cli SHALL read the error's path, never its text. | body of "The cli decides what a registry fetch or dependency resolution failure means from the typed error and reads a CUE evaluation error by its path" |
+| Non-test cli code MAY read error text only in these cases ... (four bullets) | body of "Non-test cli code reads error text only in four listed cases and a test fails on any other error-text predicate" |
+| A test SHALL fail when non-test cli code gains an error-text predicate outside that list. | body of "Non-test cli code reads error text only in four listed cases and a test fails on any other error-text predicate" |
+| The test reads the source, not its types ... (two sentences) | body of "The error-text test reads the source and not its types" |
+
+Lengths (old, new): old 1225; new "The cli decides what a registry fetch or dependency resolution failure means from the typed error and reads a CUE evaluation error by its path" 332; "Non-test cli code reads error text only in four listed cases and a test fails on any other error-text predicate" 497; "The error-text test reads the source and not its types" 440.
+
+### Ledger: errors-domain, Platform module build failure hints
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A platform module build failure caused by the package shape or a `#registry` key gets a hint that names the fix", "A platform module build that the registry refuses for its credentials gets a login hint and exits 4", "A platform module build that fails on another registry fetch, an unresolved dependency or anything else gets a pin or fix hint", "A platform module build failure hint is read from the type of the error and only a refused credential changes the exit code".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| An unpublished catalog pin | "A platform module build that fails on another registry fetch, an unresolved dependency or anything else gets a pin or fix hint", "An unpublished catalog pin" | No (byte equal, checked) |
+| A refused registry | "A platform module build that fails on another registry fetch, an unresolved dependency or anything else gets a pin or fix hint", "A refused registry" | No (byte equal, checked) |
+| A refused credential | "A platform module build that the registry refuses for its credentials gets a login hint and exits 4", "A refused credential" | No (byte equal, checked) |
+| A refused credential under a prefix mapping | "A platform module build that the registry refuses for its credentials gets a login hint and exits 4", "A refused credential under a prefix mapping" | No (byte equal, checked) |
+| A refused credential with dependencies on several registry hosts | "A platform module build that the registry refuses for its credentials gets a login hint and exits 4", "A refused credential with dependencies on several registry hosts" | No (byte equal, checked) |
+| A refusal the cli receives as not found | "A platform module build that fails on another registry fetch, an unresolved dependency or anything else gets a pin or fix hint", "A refusal the cli receives as not found" | No (byte equal, checked) |
+| A token endpoint that refuses the credentials | "A platform module build that the registry refuses for its credentials gets a login hint and exits 4", "A token endpoint that refuses the credentials" | No (byte equal, checked) |
+| A directly imported dependency whose module file does not parse | "A platform module build that fails on another registry fetch, an unresolved dependency or anything else gets a pin or fix hint", "A directly imported dependency whose module file does not parse" | No (byte equal, checked) |
+| An import whose package name does not match | "A platform module build that fails on another registry fetch, an unresolved dependency or anything else gets a pin or fix hint", "An import whose package name does not match" | No (byte equal, checked) |
+| A registry key that differs from the imported catalog | "A platform module build failure caused by the package shape or a `#registry` key gets a hint that names the fix", "A registry key that differs from the imported catalog" | No (byte equal, checked) |
+| A registry entry the shape check refuses | "A platform module build that fails on another registry fetch, an unresolved dependency or anything else gets a pin or fix hint", "A registry entry the shape check refuses" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "The package is not a single `#Platform` package" in "A platform module build failure caused by the package shape or a `#registry` key gets a hint that names the fix"
+- "A refused credential exits 4 and every other cause exits 2" in "A platform module build failure hint is read from the type of the error and only a refused credential changes the exit code"
+
+| Old clause | New place |
+| --- | --- |
+| When a platform module fails to build, the cli SHALL add one hint chosen from the cause: (intro) | body of "A platform module build failure caused by the package shape or a `#registry` key gets a hint that names the fix"; body of "A platform module build that the registry refuses for its credentials gets a login hint and exits 4"; body of "A platform module build that fails on another registry fetch, an unresolved dependency or anything else gets a pin or fix hint" |
+| bullet: the package is not a single `#Platform` package | body of "A platform module build failure caused by the package shape or a `#registry` key gets a hint that names the fix" |
+| bullet: a CUE evaluation error at a path under `#registry` | body of "A platform module build failure caused by the package shape or a `#registry` key gets a hint that names the fix" |
+| bullet: the registry refused the credentials ... | body of "A platform module build that the registry refuses for its credentials gets a login hint and exits 4" |
+| bullet: any other registry fetch failed, or a dependency did not resolve ... | body of "A platform module build that fails on another registry fetch, an unresolved dependency or anything else gets a pin or fix hint" |
+| bullet: anything else ... | body of "A platform module build that fails on another registry fetch, an unresolved dependency or anything else gets a pin or fix hint" |
+| The cause SHALL be read from the type of the error, never from its text. | body of "A platform module build failure hint is read from the type of the error and only a refused credential changes the exit code" |
+| A refused credential SHALL exit with the permission exit code 4. | body of "A platform module build failure hint is read from the type of the error and only a refused credential changes the exit code" |
+| Every other cause SHALL exit with the validation exit code 2, and its hint SHALL NOT change the exit code. | body of "A platform module build failure hint is read from the type of the error and only a refused credential changes the exit code" |
+
+Lengths (old, new): old 1331; new "A platform module build failure caused by the package shape or a `#registry` key gets a hint that names the fix" 350; "A platform module build that the registry refuses for its credentials gets a login hint and exits 4" 480; "A platform module build that fails on another registry fetch, an unresolved dependency or anything else gets a pin or fix hint" 432; "A platform module build failure hint is read from the type of the error and only a refused credential changes the exit code" 283.
+
+### Ledger: flag-conventions, Force overrides a protective refusal and never answers a prompt
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "Force carries out what a command otherwise refuses in order to protect existing state", "No command offers a non-deprecated `--force` whose effect is to skip a confirmation prompt".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Force is not the prompt flag of instance delete | "No command offers a non-deprecated `--force` whose effect is to skip a confirmation prompt", "Force is not the prompt flag of instance delete" | No (byte equal, checked) |
+| Force keeps its meaning on the commands that refuse | "Force carries out what a command otherwise refuses in order to protect existing state", "Force keeps its meaning on the commands that refuse" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| On every command that offers `--force` without deprecation, the flag SHALL mean one thing ... | body of "Force carries out what a command otherwise refuses in order to protect existing state" |
+| `opm instance apply` and `opm module apply` SHALL prune ... `opm platform pull` ... `opm config init` ... | body of "Force carries out what a command otherwise refuses in order to protect existing state" |
+| `--force` SHALL default to false. | body of "Force carries out what a command otherwise refuses in order to protect existing state" |
+| No command SHALL offer a non-deprecated `--force` whose effect is to skip a confirmation prompt. | body of "No command offers a non-deprecated `--force` whose effect is to skip a confirmation prompt" |
+
+Lengths (old, new): old 595; new "Force carries out what a command otherwise refuses in order to protect existing state" 498; "No command offers a non-deprecated `--force` whose effect is to skip a confirmation prompt" 96.
+
+### Ledger: flag-conventions, Version and template list print machine-readable output
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`opm version` accepts `-o`/`--output` with exactly the values `text`, `json` and `yaml`", "`opm module template list` accepts `-o`/`--output` with exactly the values `table`, `json` and `yaml`", "Any other `--output` value exits 1 with an invalid output format message and prints nothing on standard output".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Version as JSON | "`opm version` accepts `-o`/`--output` with exactly the values `text`, `json` and `yaml`", "Version as JSON" | No (byte equal, checked) |
+| Version default is unchanged | "`opm version` accepts `-o`/`--output` with exactly the values `text`, `json` and `yaml`", "Version default is unchanged" | No (byte equal, checked) |
+| Template list as JSON | "`opm module template list` accepts `-o`/`--output` with exactly the values `table`, `json` and `yaml`", "Template list as JSON" | No (byte equal, checked) |
+| Invalid format | "Any other `--output` value exits 1 with an invalid output format message and prints nothing on standard output", "Invalid format" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| `opm version` SHALL accept `-o`/`--output` ... `text` ... `json` and `yaml` ... fields | body of "`opm version` accepts `-o`/`--output` with exactly the values `text`, `json` and `yaml`" |
+| `opm module template list` SHALL accept ... `json` and `yaml` SHALL print a list ... | body of "`opm module template list` accepts `-o`/`--output` with exactly the values `table`, `json` and `yaml`" |
+| On both commands any other value SHALL exit 1 with the message ... | body of "Any other `--output` value exits 1 with an invalid output format message and prints nothing on standard output" |
+
+Lengths (old, new): old 759; new "`opm version` accepts `-o`/`--output` with exactly the values `text`, `json` and `yaml`" 318; "`opm module template list` accepts `-o`/`--output` with exactly the values `table`, `json` and `yaml`" 273; "Any other `--output` value exits 1 with an invalid output format message and prints nothing on standard output" 386.
+
+### Ledger: flag-conventions, Delete-data is the only flag that allows deletion of PersistentVolumeClaims
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`--delete-data` is the only flag that deletes tracked PersistentVolumeClaims and it defaults to false", "The help of each command that accepts `--delete-data` says that PersistentVolumeClaims are kept by default".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| The flag is offered with a safe default | "`--delete-data` is the only flag that deletes tracked PersistentVolumeClaims and it defaults to false", "The flag is offered with a safe default" | No (byte equal, checked) |
+| Yes alone keeps claims | "`--delete-data` is the only flag that deletes tracked PersistentVolumeClaims and it defaults to false", "Yes alone keeps claims" | No (byte equal, checked) |
+| Force alone keeps claims | "`--delete-data` is the only flag that deletes tracked PersistentVolumeClaims and it defaults to false", "Force alone keeps claims" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "The help names the flag that deletes claims" in "The help of each command that accepts `--delete-data` says that PersistentVolumeClaims are kept by default"
+
+| Old clause | New place |
+| --- | --- |
+| `opm instance delete`, `opm instance apply` and `opm module apply` SHALL each accept `--delete-data` ... | body of "`--delete-data` is the only flag that deletes tracked PersistentVolumeClaims and it defaults to false" |
+| No other flag SHALL have that effect: `--yes` ... `--force` ... | body of "`--delete-data` is the only flag that deletes tracked PersistentVolumeClaims and it defaults to false" |
+| The help of each of the three commands SHALL say ... and SHALL name `--delete-data`. | body of "The help of each command that accepts `--delete-data` says that PersistentVolumeClaims are kept by default" |
+
+Lengths (old, new): old 503; new "`--delete-data` is the only flag that deletes tracked PersistentVolumeClaims and it defaults to false" 374; "The help of each command that accepts `--delete-data` says that PersistentVolumeClaims are kept by default" 245.
+
+### Ledger: inventory-ownership, Thin-editor apply on operator-owned instances
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`opm instance apply` against an operator-owned instance acts as a spec editor only", "A module resolving from local bytes is refused in thin-editor mode", "A thin-editor apply carries the live `spec.owner` value and never changes it".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| The operator's ownership survives a values edit | "A thin-editor apply carries the live `spec.owner` value and never changes it", "The operator's ownership survives a values edit" | No (byte equal, checked) |
+| Values update on an operator-owned instance | "`opm instance apply` against an operator-owned instance acts as a spec editor only", "Values update on an operator-owned instance" | No (byte equal, checked) |
+| Local module refused in thin-editor mode | "A module resolving from local bytes is refused in thin-editor mode", "Local module refused in thin-editor mode" | No (byte equal, checked) |
+| No status writes in thin-editor mode | "`opm instance apply` against an operator-owned instance acts as a spec editor only", "No status writes in thin-editor mode" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| `opm instance apply` against an operator-owned instance SHALL act as a spec editor only ... | body of "`opm instance apply` against an operator-owned instance acts as a spec editor only" |
+| In this mode the CLI MUST NOT render-and-apply resources, prune, write `status`, or run the status-RBAC pre-flight. | body of "`opm instance apply` against an operator-owned instance acts as a spec editor only" |
+| The version-skew ceiling gate still applies. | body of "`opm instance apply` against an operator-owned instance acts as a spec editor only" |
+| A module resolving from local bytes ... SHALL be refused in this mode | body of "A module resolving from local bytes is refused in thin-editor mode" |
+| The applied document SHALL carry the instance's current `spec.owner` value ... | body of "A thin-editor apply carries the live `spec.owner` value and never changes it" |
+| Omitting it does not leave ownership untouched ... | body of "A thin-editor apply carries the live `spec.owner` value and never changes it" |
+| The CLI SHALL NOT change the owner's value in this mode. | body of "A thin-editor apply carries the live `spec.owner` value and never changes it" |
+
+Lengths (old, new): old 970; new "`opm instance apply` against an operator-owned instance acts as a spec editor only" 464; "A module resolving from local bytes is refused in thin-editor mode" 267; "A thin-editor apply carries the live `spec.owner` value and never changes it" 432.
+
+### Ledger: inventory-ownership, Ownership mode resolution is a single branch point
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "Ownership mode resolution is implemented in exactly one function that all mutating commands consume", "The CLI never changes an instance's `spec.owner`".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Apply and delete share the resolver | "Ownership mode resolution is implemented in exactly one function that all mutating commands consume", "Apply and delete share the resolver" | No (byte equal, checked) |
+| Modes route to distinct paths | "Ownership mode resolution is implemented in exactly one function that all mutating commands consume", "Modes route to distinct paths" | No (byte equal, checked) |
+| No CLI command changes the owner | "The CLI never changes an instance's `spec.owner`", "No CLI command changes the owner" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The mapping from `spec.owner` to a CLI execution mode SHALL be implemented in exactly one function ... | body of "Ownership mode resolution is implemented in exactly one function that all mutating commands consume" |
+| CLI-executor mode (absent CR or `spec.owner: cli`) drives ... | body of "Ownership mode resolution is implemented in exactly one function that all mutating commands consume" |
+| The CLI SHALL NOT change an instance's `spec.owner`: `apply` writes `cli` ... | body of "The CLI never changes an instance's `spec.owner`" |
+
+Lengths (old, new): old 557; new "Ownership mode resolution is implemented in exactly one function that all mutating commands consume" 343; "The CLI never changes an instance's `spec.owner`" 213.
+
+### Ledger: inventory-ownership, Operator-owned delete hands cleanup to the operator's finalizer
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`opm instance delete` against an operator-owned instance deletes the CR and delegates workload cleanup to the operator's finalizer", "`opm instance delete` verifies that the operator is ready before it deletes an operator-owned instance and refuses when it is not", "`opm instance delete` of an operator-owned instance reports the outcome that actually occurred and never claims a prune it has not established".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Delete without spec.prune reports the orphaning | "`opm instance delete` of an operator-owned instance reports the outcome that actually occurred and never claims a prune it has not established", "Delete without spec.prune reports the orphaning" | No (byte equal, checked) |
+| Delete of an operator-owned instance | "`opm instance delete` against an operator-owned instance deletes the CR and delegates workload cleanup to the operator's finalizer", "Delete of an operator-owned instance" | No (byte equal, checked) |
+| Delete refused while the operator is down | "`opm instance delete` verifies that the operator is ready before it deletes an operator-owned instance and refuses when it is not", "Delete refused while the operator is down" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| `opm instance delete` against an operator-owned instance SHALL delete the `ModuleInstance` CR ... | body of "`opm instance delete` against an operator-owned instance deletes the CR and delegates workload cleanup to the operator's finalizer" |
+| Before deleting, the CLI SHALL verify the operator is ready and refuse when it is not ... | body of "`opm instance delete` verifies that the operator is ready before it deletes an operator-owned instance and refuses when it is not" |
+| The readiness check SHALL locate the operator by its fixed names ... | body of "`opm instance delete` verifies that the operator is ready before it deletes an operator-owned instance and refuses when it is not" |
+| Whether the operator removes the workloads is governed by `spec.prune` ... | body of "`opm instance delete` of an operator-owned instance reports the outcome that actually occurred and never claims a prune it has not established" |
+| The CR's disappearance therefore proves the finalizer completed ... | body of "`opm instance delete` of an operator-owned instance reports the outcome that actually occurred and never claims a prune it has not established" |
+| The CLI SHALL report the outcome that actually occurred and MUST NOT claim a prune it has not established. | body of "`opm instance delete` of an operator-owned instance reports the outcome that actually occurred and never claims a prune it has not established" |
+
+Lengths (old, new): old 948; new "`opm instance delete` against an operator-owned instance deletes the CR and delegates workload cleanup to the operator's finalizer" 216; "`opm instance delete` verifies that the operator is ready before it deletes an operator-owned instance and refuses when it is not" 464; "`opm instance delete` of an operator-owned instance reports the outcome that actually occurred and never claims a prune it has not established" 411.
+
+### Ledger: log-output-style, Centralized color palette for human log output
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The `internal/output` package defines named color constants and all human-readable styled output references them", "The palette includes six named colors for nouns, statuses and completion checkmarks".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Color constants are defined and accessible | "The `internal/output` package defines named color constants and all human-readable styled output references them", "Color constants are defined and accessible" | No (byte equal, checked) |
+| All status colors follow the visibility hierarchy | "The palette includes six named colors for nouns, statuses and completion checkmarks", "All status colors follow the visibility hierarchy" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The `internal/output` package SHALL define a centralized set of named color constants ... | body of "The `internal/output` package defines named color constants and all human-readable styled output references them" |
+| All human-readable styled output SHALL reference these constants ... | body of "The `internal/output` package defines named color constants and all human-readable styled output references them" |
+| The palette SHALL include: (six bullets) | body of "The palette includes six named colors for nouns, statuses and completion checkmarks" |
+
+Lengths (old, new): old 549; new "The `internal/output` package defines named color constants and all human-readable styled output references them" 213; "The palette includes six named colors for nouns, statuses and completion checkmarks" 463.
+
+### Ledger: log-output-style, Semantic style constructors
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The output package provides semantic style functions that map domain concepts to visual styles", "`StatusStyle` returns the appropriate style for a given resource status string".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| StatusStyle returns correct style for each status | "`StatusStyle` returns the appropriate style for a given resource status string", "StatusStyle returns correct style for each status" | No (byte equal, checked) |
+| Unknown status falls back to default style | "`StatusStyle` returns the appropriate style for a given resource status string", "Unknown status falls back to default style" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "Noun style is a cyan foreground" in "The output package provides semantic style functions that map domain concepts to visual styles"
+
+| Old clause | New place |
+| --- | --- |
+| The output package SHALL provide semantic style functions ... | body of "The output package provides semantic style functions that map domain concepts to visual styles" |
+| The following semantic styles SHALL be defined: (four bullets) | body of "The output package provides semantic style functions that map domain concepts to visual styles" |
+| A `StatusStyle(status string) lipgloss.Style` function SHALL return the appropriate style ... | body of "`StatusStyle` returns the appropriate style for a given resource status string" |
+
+Lengths (old, new): old 606; new "The output package provides semantic style functions that map domain concepts to visual styles" 480; "`StatusStyle` returns the appropriate style for a given resource status string" 125.
+
+### Ledger: log-output-style, Validation check line formatting
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`FormatVetCheck` renders a validation check result with a green checkmark, a label and an optional right-aligned detail string", "The detail text of a validation check line aligns at column 34", "A validation check line with an empty detail renders only the checkmark and label".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Check line with detail renders aligned output | "`FormatVetCheck` renders a validation check result with a green checkmark, a label and an optional right-aligned detail string", "Check line with detail renders aligned output" | No (byte equal, checked) |
+| Check line without detail renders cleanly | "A validation check line with an empty detail renders only the checkmark and label", "Check line without detail renders cleanly" | No (byte equal, checked) |
+| Multiple check lines align consistently | "The detail text of a validation check line aligns at column 34", "Multiple check lines align consistently" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The output package SHALL provide a `FormatVetCheck(label, detail string)` function ... | body of "`FormatVetCheck` renders a validation check result with a green checkmark, a label and an optional right-aligned detail string" |
+| The format SHALL be: `✔ <label>` followed by right-aligned dim detail text when provided. | body of "`FormatVetCheck` renders a validation check result with a green checkmark, a label and an optional right-aligned detail string" |
+| The checkmark SHALL use the existing `colorGreenCheck` (`10`) constant. | body of "`FormatVetCheck` renders a validation check result with a green checkmark, a label and an optional right-aligned detail string" |
+| The detail text SHALL be rendered in dim/faint style ... | body of "`FormatVetCheck` renders a validation check result with a green checkmark, a label and an optional right-aligned detail string" |
+| The alignment column for detail text SHALL be 34 characters ... | body of "The detail text of a validation check line aligns at column 34" |
+| When `detail` is empty, the function SHALL render only the checkmark and label ... | body of "A validation check line with an empty detail renders only the checkmark and label" |
+
+Lengths (old, new): old 730; new "`FormatVetCheck` renders a validation check result with a green checkmark, a label and an optional right-aligned detail string" 474; "The detail text of a validation check line aligns at column 34" 289; "A validation check line with an empty detail renders only the checkmark and label" 249.
+
+### Ledger: apply-preflight-gates, Operator-version ceiling
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "Before applying, the CLI compares the operator version of the `Platform` to its own version on MAJOR.MINOR only", "Apply refuses with an upgrade-the-CLI error when the operator's MAJOR.MINOR is greater than the CLI's MAJOR.MINOR", "The operator-version ceiling check is skipped when the Platform or the field is absent or when reading the Platform fails due to RBAC", "The operator-version ceiling check is skipped with a warning when the CLI version or the operator version is not valid semver", "The instance apply that `opm operator install` performs for the operator's own instance skips the operator-version ceiling check", "Every other apply keeps the operator-version ceiling check and the operator's instance still runs the CRD gates".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Solo cluster skips the ceiling | "The operator-version ceiling check is skipped when the Platform or the field is absent or when reading the Platform fails due to RBAC", "Solo cluster skips the ceiling" | No (byte equal, checked) |
+| Older CLI refused | "Apply refuses with an upgrade-the-CLI error when the operator's MAJOR.MINOR is greater than the CLI's MAJOR.MINOR", "Older CLI refused" | No (byte equal, checked) |
+| Dev build skips with warning | "The operator-version ceiling check is skipped with a warning when the CLI version or the operator version is not valid semver", "Dev build skips with warning" | No (byte equal, checked) |
+| Platform read denied degrades to warning | "The operator-version ceiling check is skipped when the Platform or the field is absent or when reading the Platform fails due to RBAC", "Platform read denied degrades to warning" | No (byte equal, checked) |
+| Newer prerelease counter on the same line passes | "Before applying, the CLI compares the operator version of the `Platform` to its own version on MAJOR.MINOR only", "Newer prerelease counter on the same line passes" | No (byte equal, checked) |
+| Beta operator against an alpha CLI of the same line passes | "Before applying, the CLI compares the operator version of the `Platform` to its own version on MAJOR.MINOR only", "Beta operator against an alpha CLI of the same line passes" | No (byte equal, checked) |
+| Newer operator patch passes | "Before applying, the CLI compares the operator version of the `Platform` to its own version on MAJOR.MINOR only", "Newer operator patch passes" | No (byte equal, checked) |
+| Newer operator minor refused | "Apply refuses with an upgrade-the-CLI error when the operator's MAJOR.MINOR is greater than the CLI's MAJOR.MINOR", "Newer operator minor refused" | No (byte equal, checked) |
+| Older CLI repairs a newer operator | "The instance apply that `opm operator install` performs for the operator's own instance skips the operator-version ceiling check", "Older CLI repairs a newer operator" | No (byte equal, checked) |
+| Ordinary apply against the same cluster still refused | "Every other apply keeps the operator-version ceiling check and the operator's instance still runs the CRD gates", "Ordinary apply against the same cluster still refused" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| Before applying, the CLI SHALL read the cluster-scoped singleton `Platform` and compare ... MAJOR.MINOR only ... SHALL be ignored on both sides ... | body of "Before applying, the CLI compares the operator version of the `Platform` to its own version on MAJOR.MINOR only" |
+| If the Platform or the field is absent, the check SHALL be skipped (solo cluster semantics). | body of "The operator-version ceiling check is skipped when the Platform or the field is absent or when reading the Platform fails due to RBAC" |
+| If the operator's MAJOR.MINOR is greater than the CLI's MAJOR.MINOR, apply SHALL refuse ... name both full versions as read. | body of "Apply refuses with an upgrade-the-CLI error when the operator's MAJOR.MINOR is greater than the CLI's MAJOR.MINOR" |
+| If the CLI's own version is not valid semver (dev build), the check SHALL be skipped with a warning. | body of "The operator-version ceiling check is skipped with a warning when the CLI version or the operator version is not valid semver" |
+| If the operator version is not valid semver, the check SHALL be skipped with a warning. | body of "The operator-version ceiling check is skipped with a warning when the CLI version or the operator version is not valid semver" |
+| If reading the Platform fails due to RBAC, the check SHALL be skipped with a warning ... | body of "The operator-version ceiling check is skipped when the Platform or the field is absent or when reading the Platform fails due to RBAC" |
+| The instance apply that `opm operator install` performs ... SHALL skip this check ... | body of "The instance apply that `opm operator install` performs for the operator's own instance skips the operator-version ceiling check" |
+| Every other apply keeps the check, and the CRD-presence and CRD field-floor gates still run ... | body of "Every other apply keeps the operator-version ceiling check and the operator's instance still runs the CRD gates" |
+| Source line (whole) | body of "Before applying, the CLI compares the operator version of the `Platform` to its own version on MAJOR.MINOR only" (as `**Source**`); body of "Apply refuses with an upgrade-the-CLI error when the operator's MAJOR.MINOR is greater than the CLI's MAJOR.MINOR" (as `**Source**`); body of "The operator-version ceiling check is skipped when the Platform or the field is absent or when reading the Platform fails due to RBAC" (as `**Source**`); body of "The operator-version ceiling check is skipped with a warning when the CLI version or the operator version is not valid semver" (as `**Source**`); body of "The instance apply that `opm operator install` performs for the operator's own instance skips the operator-version ceiling check" (as `**Source**`); body of "Every other apply keeps the operator-version ceiling check and the operator's instance still runs the CRD gates" (as `**Source**`) |
+
+Lengths (old, new): old 1522; new "Before applying, the CLI compares the operator version of the `Platform` to its own version on MAJOR.MINOR only" 357; "Apply refuses with an upgrade-the-CLI error when the operator's MAJOR.MINOR is greater than the CLI's MAJOR.MINOR" 314; "The operator-version ceiling check is skipped when the Platform or the field is absent or when reading the Platform fails due to RBAC" 357; "The operator-version ceiling check is skipped with a warning when the CLI version or the operator version is not valid semver" 315; "The instance apply that `opm operator install` performs for the operator's own instance skips the operator-version ceiling check" 465; "Every other apply keeps the operator-version ceiling check and the operator's instance still runs the CRD gates" 258.
+
+### Ledger: apply-preflight-gates, Gate ordering and dry-run exemption
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The gates run in a fixed order, all before the first resource write", "Dry-run applies skip four gates and still resolve ownership and run the ownership guard".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Gates precede all writes | "The gates run in a fixed order, all before the first resource write", "Gates precede all writes" | No (byte equal, checked) |
+| Dry-run skips gates | "Dry-run applies skip four gates and still resolve ownership and run the ownership guard", "Dry-run skips gates" | No (byte equal, checked) |
+| Dry-run runs the ownership guard | "Dry-run applies skip four gates and still resolve ownership and run the ownership guard", "Dry-run runs the ownership guard" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The gates SHALL run in the order: ... all before the first resource write. | body of "The gates run in a fixed order, all before the first resource write" |
+| Dry-run applies SHALL skip the CRD presence, CRD field floor, operator-version ceiling and status-RBAC gates ... | body of "Dry-run applies skip four gates and still resolve ownership and run the ownership guard" |
+| A dry run SHALL still resolve ownership and SHALL still run the ownership guard ... | body of "Dry-run applies skip four gates and still resolve ownership and run the ownership guard" |
+
+Lengths (old, new): old 639; new "The gates run in a fixed order, all before the first resource write" 329; "Dry-run applies skip four gates and still resolve ownership and run the ownership guard" 309.
+
+### Words changed or added in unit 6b
+
+- Named references: the bodies of `errors-domain` "The error-text test reads the source and not its types"; `flag-conventions` "Any other `--output` value exits 1 with an invalid output format message and prints nothing on standard output" and "The help of each command that accepts `--delete-data` says that PersistentVolumeClaims are kept by default"; `inventory-ownership` "A module resolving from local bytes is refused in thin-editor mode", "A thin-editor apply carries the live `spec.owner` value and never changes it" and "`opm instance delete` verifies that the operator is ready before it deletes an operator-owned instance and refuses when it is not"; `log-output-style` "The palette includes six named colors for nouns, statuses and completion checkmarks", "The detail text of a validation check line aligns at column 34" and "A validation check line with an empty detail renders only the checkmark and label"; and five of the eight bodies of `apply-preflight-gates` (all but the first and the two gate-order requirements) end with "(Requirement: <exact header>)", the named reference that gives the body its referent ("that list", "On both commands", "this mode", "the palette", "the function", "this check").
+- `errors-domain`, "A platform module build failure hint is read from the type of the error and only a refused credential changes the exit code": the body starts with "When a platform module fails to build," copied from the intro of the old list, and the first sentence reads "the cause SHALL be read" with a lower-case "the".
+- `errors-domain`, "The error-text test reads the source and not its types": "The test reads the source" became "The test SHALL read the source" (keyword, see the strength table).
+- `errors-domain`, "Non-test cli code reads error text only in four listed cases and a test fails on any other error-text predicate": the old sentence "A test SHALL fail when non-test cli code gains an error-text predicate outside that list." moved into this body so that "that list" has its referent in the same body.
+- `inventory-ownership`, bodies "A module resolving from local bytes is refused in thin-editor mode" and "`opm instance delete` verifies that the operator is ready before it deletes an operator-owned instance and refuses when it is not": the em-dash became a colon.
+- `apply-preflight-gates`, "Every other apply keeps the operator-version ceiling check and the operator's instance still runs the CRD gates": "keeps" became "SHALL keep" and "still run" became "SHALL still run" (keyword, see the strength table).
+- The `**Source**` metadata lines carry the whole old `Source:` line (enhancement 0021, both quotes), on every split of "Fetch and resolution answers are decided by error type" and of "Operator-version ceiling".
+- Every other body is built from whole old sentences, unchanged.
+
+### Strength table of cli-B6 unit 6b
+
+Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text:
+
+| Old sentence | New body | Word added |
+| --- | --- | --- |
+| The test reads the source, not its types: it sees a string or pattern predicate, ... | "The error-text test reads the source and not its types" | "SHALL read" |
+| Every other apply keeps the check, and the CRD-presence and CRD field-floor gates still run for the operator's instance. | "Every other apply keeps the operator-version ceiling check and the operator's instance still runs the CRD gates" | "SHALL keep"; "SHALL still run" |
+
+Plain sentences copied unchanged, with no keyword, into a body that carries a keyword in another sentence or in a SHALL bullet intro:
+
+| Old sentence | New body |
+| --- | --- |
+| Types that no code in the tree or its consumers constructs (`ConfigError`, `TransformError`, `FieldError`) are removed rather than preserved. | "Types that no code constructs are removed and every exported type keeps its `.Error()` string and `Unwrap()` behavior across moves" |
+| It does not see a message made by formatting the error, or a message handed to another function as a string. | "The error-text test reads the source and not its types" |
+| The version-skew ceiling gate still applies. | "`opm instance apply` against an operator-owned instance acts as a spec editor only" |
+| Omitting it does not leave ownership untouched: it releases this field manager's claim, and the API server prunes the operator's ownership marker. | "A thin-editor apply carries the live `spec.owner` value and never changes it" |
+| CLI-executor mode (absent CR or `spec.owner: cli`) drives the direct render/apply/prune/status path; operator-owned mode drives the thin-editor apply and finalizer-delegating delete paths. | "Ownership mode resolution is implemented in exactly one function that all mutating commands consume" |
+| Whether the operator removes the workloads is governed by `spec.prune`, which has no CRD default and which the CLI does not write: absent it, the operator removes the CR and deliberately orphans the workloads. | "`opm instance delete` of an operator-owned instance reports the outcome that actually occurred and never claims a prune it has not established" |
+| The CR's disappearance therefore proves the finalizer completed, not that anything was pruned. | the same body |
+| The four bullets and the six bullets of the lists (`errors-domain` allowed cases, `log-output-style` palette and semantic styles, `errors-domain` hint causes) | the body whose intro line carries the keyword |
