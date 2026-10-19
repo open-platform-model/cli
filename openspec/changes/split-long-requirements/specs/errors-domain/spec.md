@@ -10,7 +10,7 @@
 
 ### Requirement: Platform module build failure hints
 **Reason**: Split into requirements that each state one behavior.
-**Migration**: See "A platform module build failure caused by the package shape or a `#registry` key gets a hint that names the fix", "A platform module build that the registry refuses for its credentials gets a login hint and exits 4", "A platform module build that fails on another registry fetch, an unresolved dependency or anything else gets a pin or fix hint", "A platform module build failure hint is read from the type of the error and only a refused credential changes the exit code".
+**Migration**: See "Platform build hint for the package shape and the `#registry` key", "Platform build hint for a refused credential", "Platform build hint for another fetch failure or an unresolved dependency", "Platform build hint for anything else", "A platform module build failure hint is read from the type of the error and only a refused credential changes the exit code".
 
 ## ADDED Requirements
 
@@ -86,7 +86,7 @@ The test SHALL read the source, not its types: it sees a string or pattern predi
 - **WHEN** non-test cli code compares a message made by formatting the error
 - **THEN** the test does not see it, because it reads the source and not its types
 
-### Requirement: A platform module build failure caused by the package shape or a `#registry` key gets a hint that names the fix
+### Requirement: Platform build hint for the package shape and the `#registry` key
 
 When a platform module fails to build, the cli SHALL add one hint chosen from the cause:
 - the package is not a single `#Platform` package: the hint names the expected shape;
@@ -103,7 +103,7 @@ When a platform module fails to build, the cli SHALL add one hint chosen from th
 - **THEN** the message names the entry and the hint says the key must equal the module path of
   the catalog it imports
 
-### Requirement: A platform module build that the registry refuses for its credentials gets a login hint and exits 4
+### Requirement: Platform build hint for a refused credential
 
 When a platform module fails to build, the cli SHALL add one hint chosen from the cause:
 - the registry refused the credentials (a 401 answer from the registry or from its token endpoint, or a 403 answer that reaches the cli as a refusal): the hint says to log in to the registry and names the command `opm registry login`, followed by the registry host when every dependency the platform's `cue.mod/module.cue` declares routes to one host through the configured registry mapping;
@@ -136,11 +136,11 @@ When a platform module fails to build, the cli SHALL add one hint chosen from th
 - **THEN** the build fails with exit code 4 and the hint is the login hint with the registry
   host, as for a 401 answer from the registry itself
 
-### Requirement: A platform module build that fails on another registry fetch, an unresolved dependency or anything else gets a pin or fix hint
+### Requirement: Platform build hint for another fetch failure or an unresolved dependency
 
 When a platform module fails to build, the cli SHALL add one hint chosen from the cause:
 - any other registry fetch failed, or a dependency did not resolve (an import no module provides, an ambiguous import, a dependency module file that does not parse): the hint says to pin a published build in the platform's `cue.mod/module.cue`;
-- anything else: the hint says to fix the platform module and names its directory and module file.
+(Requirement: Platform build hint for a refused credential)
 
 #### Scenario: An unpublished catalog pin
 
@@ -163,6 +163,12 @@ When a platform module fails to build, the cli SHALL add one hint chosen from th
 - **WHEN** the platform module imports a dependency whose `cue.mod/module.cue` does not parse
 - **THEN** the hint says to pin a published build, the same hint the defect gets when it is met
   while the module graph is expanded
+
+### Requirement: Platform build hint for anything else
+
+When a platform module fails to build, the cli SHALL add one hint chosen from the cause:
+- anything else: the hint says to fix the platform module and names its directory and module file.
+(Requirement: Platform build hint for the package shape and the `#registry` key) (Requirement: Platform build hint for a refused credential) (Requirement: Platform build hint for another fetch failure or an unresolved dependency)
 
 #### Scenario: An import whose package name does not match
 

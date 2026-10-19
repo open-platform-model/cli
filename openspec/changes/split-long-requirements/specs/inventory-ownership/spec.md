@@ -10,7 +10,7 @@
 
 ### Requirement: Operator-owned delete hands cleanup to the operator's finalizer
 **Reason**: Split into requirements that each state one behavior.
-**Migration**: See "`opm instance delete` against an operator-owned instance deletes the CR and delegates workload cleanup to the operator's finalizer", "`opm instance delete` verifies that the operator is ready before it deletes an operator-owned instance and refuses when it is not", "`opm instance delete` of an operator-owned instance reports the outcome that actually occurred and never claims a prune it has not established".
+**Migration**: See "Operator-owned instance delete hands cleanup to the finalizer", "`opm instance delete` verifies that the operator is ready before it deletes an operator-owned instance and refuses when it is not", "`opm instance delete` of an operator-owned instance reports the outcome that actually occurred and never claims a prune it has not established".
 
 ## ADDED Requirements
 
@@ -72,7 +72,7 @@ The CLI SHALL NOT change an instance's `spec.owner`: `apply` writes `cli` when i
 - **WHEN** a user looks for a CLI command or flag that moves an instance between CLI and operator ownership
 - **THEN** none exists; `spec.owner` is set at creation and changed only outside the CLI
 
-### Requirement: `opm instance delete` against an operator-owned instance deletes the CR and delegates workload cleanup to the operator's finalizer
+### Requirement: Operator-owned instance delete hands cleanup to the finalizer
 
 `opm instance delete` against an operator-owned instance SHALL delete the `ModuleInstance` CR and delegate workload cleanup to the operator's `opmodel.dev/cleanup` finalizer, waiting bounded and reporting completion.
 
@@ -83,7 +83,7 @@ The CLI SHALL NOT change an instance's `spec.owner`: `apply` writes `cli` when i
 
 ### Requirement: `opm instance delete` verifies that the operator is ready before it deletes an operator-owned instance and refuses when it is not
 
-Before deleting, the CLI SHALL verify the operator is ready and refuse when it is not: deleting a finalizer-armed CR with no running controller wedges the CR in terminating state. The readiness check SHALL locate the operator by its fixed names, as the `operator-lifecycle` capability's running-operator check defines. (Requirement: `opm instance delete` against an operator-owned instance deletes the CR and delegates workload cleanup to the operator's finalizer)
+Before deleting, the CLI SHALL verify the operator is ready and refuse when it is not: deleting a finalizer-armed CR with no running controller wedges the CR in terminating state. The readiness check SHALL locate the operator by its fixed names, as the `operator-lifecycle` capability's running-operator check defines. (Requirement: Operator-owned instance delete hands cleanup to the finalizer)
 
 #### Scenario: Delete refused while the operator is down
 
@@ -93,7 +93,7 @@ Before deleting, the CLI SHALL verify the operator is ready and refuse when it i
 
 ### Requirement: `opm instance delete` of an operator-owned instance reports the outcome that actually occurred and never claims a prune it has not established
 
-Whether the operator removes the workloads is governed by `spec.prune`, which has no CRD default and which the CLI does not write: absent it, the operator removes the CR and deliberately orphans the workloads. The CR's disappearance therefore proves the finalizer completed, not that anything was pruned. The CLI SHALL report the outcome that actually occurred and MUST NOT claim a prune it has not established.
+Whether the operator removes the workloads is governed by `spec.prune`, which has no CRD default and which the CLI does not write: absent it, the operator removes the CR and deliberately orphans the workloads. The CR's disappearance therefore proves the finalizer completed, not that anything was pruned. The CLI SHALL report the outcome that actually occurred and MUST NOT claim a prune it has not established. (Requirement: Operator-owned instance delete hands cleanup to the finalizer)
 
 #### Scenario: Delete without spec.prune reports the orphaning
 

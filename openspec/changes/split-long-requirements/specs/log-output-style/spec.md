@@ -33,6 +33,7 @@ The palette SHALL include:
 - Red (`196`) for `deleted` status
 - Bold red (`204`) for `failed` status
 - Green (`10`) for completion checkmarks
+
 (Requirement: The `internal/output` package defines named color constants and all human-readable styled output references them)
 
 #### Scenario: All status colors follow the visibility hierarchy

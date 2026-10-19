@@ -87,7 +87,7 @@ The instance apply that `opm operator install` performs for the operator's own i
 
 ### Requirement: Every other apply keeps the operator-version ceiling check and the operator's instance still runs the CRD gates
 
-Every other apply SHALL keep the check, and the CRD-presence and CRD field-floor gates SHALL still run for the operator's instance. (Requirement: Before applying, the CLI compares the operator version of the `Platform` to its own version on MAJOR.MINOR only)
+Every other apply SHALL keep the check, and the CRD-presence and CRD field-floor gates SHALL still run for the operator's instance. (Requirement: The instance apply that `opm operator install` performs for the operator's own instance skips the operator-version ceiling check)
 
 **Source**: enhancement 0021 ("The CLI's ceiling on operator versions compares `MAJOR.MINOR` only").
 
