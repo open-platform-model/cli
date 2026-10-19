@@ -5483,3 +5483,356 @@ Plain sentences copied unchanged, with no keyword, into a body that carries a ke
 | The two bullets `"resolved config path"` and `"resolved registry"` | "The debug log lines `\"resolved config path\"` and `\"resolved registry\"` are retained" |
 | The five bullets of the field list (`Kubernetes`, `Log`, `Registry`, `ConfigPath`, `Flags`) | "`GlobalConfig` contains the fields `Kubernetes`, `Log`, `Registry`, `ConfigPath` and `Flags`" |
 | The bullets `opm module tidy --check` and `opm module vet` of the gate list | "The tidy, vet and zip gates" |
+
+## Ledger entries of cli-B7, unit 7b (health-evaluation, instance-building, k8s-helpers, mod-apply, module-synthetic-instance, release-gates, command-reference)
+
+One subsection per rewritten requirement, 13 in all: `health-evaluation` 2, `instance-building` 2, `k8s-helpers` 2, `mod-apply` 2, `module-synthetic-instance` 2, `release-gates` 2 and `command-reference` 1. With unit 7a (15) this completes section 7 (28 requirements, all fourteen specs). All 13 are form c2, because the old scenarios of each belong to different new behaviors; no other form is used, so no parent keeps a header and no other spec cites a renamed header (`grep -rnF --exclude-dir=archive` over the repo finds the 13 old headers only in `openspec/specs/` and in this change). Every new body is built from whole sentences or whole lines of the old body, copied unchanged, or from parts of one sentence cut at a list boundary with the subject repeated. A clause row names where the old text appears; the list "Words changed or added in unit 7b" names each substitution. Each split of a requirement that had a `Source:` line carries the whole old line as a `**Source**` metadata line (`health-evaluation` both requirements, enhancement 0012; `release-gates` both requirements, the first the line with RELEASING.md and enhancement 0021, the second the line with the security pass; the last body of the second, "G1 runs the docs pins script without `--warn` and counts each printed line as a violation", follows the old `Source:` line in the old text and carries none). Old scenario names are all kept; the byte check ran once per rewritten requirement and printed no `DIFF` and no `LOST`. A new scenario restates a case the old text names, or copies the WHEN and THEN lines of an old scenario; the Changed column says which.
+
+### Ledger: health-evaluation, Readiness is judged by the library health package
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The cli takes every readiness decision from the library health package", "The library health decisions cover instance status, list and tree and the apply wait", "The Established wait and the operator install dispatch by kind stay in the cli", "The tree child rows and the status colouring stay in the cli".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Status uses the library verdict | "The cli takes every readiness decision from the library health package", "Status uses the library verdict" | No (byte equal, checked) |
+| A passive kind is applied, not ready | "The cli takes every readiness decision from the library health package", "A passive kind is applied, not ready" | No (byte equal, checked) |
+| Missing and unreadable objects count against the aggregate | "The cli takes every readiness decision from the library health package", "Missing and unreadable objects count against the aggregate" | No (byte equal, checked) |
+| Nothing to fold is unknown | "The cli takes every readiness decision from the library health package", "Nothing to fold is unknown" | No (byte equal, checked) |
+| (new) | "The library health decisions cover instance status, list and tree and the apply wait", "Instance status takes its row from the library verdict" | New restatement scenario: its WHEN and THEN lines are those of the old scenario "Status uses the library verdict", byte for byte; only the name differs |
+| (new) | "The Established wait and the operator install dispatch by kind stay in the cli", "The Established wait stays in the cli" | New restatement scenario: only words of the old clause, no new case. |
+| (new) | "The tree child rows and the status colouring stay in the cli", "The tree child rows never feed an aggregate" | New restatement scenario: only words of the old clause, no new case. |
+
+| Old clause | New place |
+| --- | --- |
+| The cli SHALL take every decision the library's `opm/k8s/health` mak... | body of "The cli takes every readiness decision from the library health package", verbatim |
+| This `opm instance status`, `opm instance list`, `opm instance tree`... | body of "The library health decisions cover instance status, list and tree and the apply wait", with the word changes of the list "Words changed or added in unit 7b" |
+| Three readiness checks are not decisions of the package and stay in ... | body of "The Established wait and the operator install dispatch by kind stay in the cli", with the word changes of the list "Words changed or added in unit 7b" |
+| Three readiness checks are not decisions of the package and stay in ... | body of "The tree child rows and the status colouring stay in the cli", with the word changes of the list "Words changed or added in unit 7b" |
+
+Lengths (old, new): old 1217; new "The cli takes every readiness decision from the library health package" 422; "The library health decisions cover instance status, list and tree and the apply wait" 247; "The Established wait and the operator install dispatch by kind stay in the cli" 373; "The tree child rows and the status colouring stay in the cli" 379.
+
+### Ledger: health-evaluation, The cli carries no readiness evaluator of its own
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "No non-test Go file in the cli declares a copy of the library health package's decisions", "The readiness exemptions are not copies", "A unit test fails when a health decision is declared again or bound to a name of `opm/k8s/health`".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| A reintroduced evaluator fails the unit tests | "A unit test fails when a health decision is declared again or bound to a name of `opm/k8s/health`", "A reintroduced evaluator fails the unit tests" | No (byte equal, checked) |
+| A re-export of the library package fails the unit tests | "A unit test fails when a health decision is declared again or bound to a name of `opm/k8s/health`", "A re-export of the library package fails the unit tests" | No (byte equal, checked) |
+| (new) | "No non-test Go file in the cli declares a copy of the library health package's decisions", "An alias of the library health type is refused" | New restatement scenario: its WHEN and THEN lines are those of the old scenario "A re-export of the library package fails the unit tests", byte for byte; only the name differs |
+| (new) | "The readiness exemptions are not copies", "The colouring of FormatHealthStatus is not a copy" | New restatement scenario: only words of the old clause, no new case. |
+
+| Old clause | New place |
+| --- | --- |
+| No non-test Go file in the cli SHALL declare a copy of the package's... | body of "No non-test Go file in the cli declares a copy of the library health package's decisions", verbatim |
+| The exemptions named in the previous requirement copies. | body of "The readiness exemptions are not copies", with the word changes of the list "Words changed or added in unit 7b" |
+| A unit test SHALL fail when a top-level declaration named `HealthSta... | body of "A unit test fails when a health decision is declared again or bound to a name of `opm/k8s/health`", verbatim |
+
+Lengths (old, new): old 796; new "No non-test Go file in the cli declares a copy of the library health package's decisions" 313; "The readiness exemptions are not copies" 226; "A unit test fails when a health decision is declared again or bound to a name of `opm/k8s/health`" 358.
+
+### Ledger: instance-building, Loader validates consumer values and produces a concrete ModuleInstance
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The CLI produces validated, concrete instances exclusively through the library kernel", "The module-directory path acquires a directory with kernel AcquireModuleFromDir and SynthesizeInstance", "The published-module path acquires a module with kernel AcquireModuleFromRegistry and SynthesizeInstance", "The instance-package path acquires an instance package directory with kernel AcquireInstanceFromDir".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Successful load from module directory | "The module-directory path acquires a directory with kernel AcquireModuleFromDir and SynthesizeInstance", "Successful load from module directory" | No (byte equal, checked) |
+| Successful load from instance file | "The instance-package path acquires an instance package directory with kernel AcquireInstanceFromDir", "Successful load from instance file" | No (byte equal, checked) |
+| Successful synthesis from a module-package directory | "The module-directory path acquires a directory with kernel AcquireModuleFromDir and SynthesizeInstance", "Successful synthesis from a module-package directory" | No (byte equal, checked) |
+| Module Gate catches type mismatch | "The CLI produces validated, concrete instances exclusively through the library kernel", "Module Gate catches type mismatch" | No (byte equal, checked) |
+| Successful synthesis from a published module | "The published-module path acquires a module with kernel AcquireModuleFromRegistry and SynthesizeInstance", "Successful synthesis from a published module" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The CLI SHALL produce validated, concrete instances exclusively thro... | body of "The CLI produces validated, concrete instances exclusively through the library kernel", verbatim |
+| The loading entry points map onto kernel acquire verbs: | body of "The module-directory path acquires a directory with kernel AcquireModuleFromDir and SynthesizeInstance", with the word changes of the list "Words changed or added in unit 7b" |
+| 1. **Module-directory path**: kernel `AcquireModuleFromDir` + `Synth... | body of "The module-directory path acquires a directory with kernel AcquireModuleFromDir and SynthesizeInstance", verbatim |
+| The loading entry points map onto kernel acquire verbs: | body of "The published-module path acquires a module with kernel AcquireModuleFromRegistry and SynthesizeInstance", with the word changes of the list "Words changed or added in unit 7b" |
+| 2. **Published-module path**: kernel `AcquireModuleFromRegistry` + `... | body of "The published-module path acquires a module with kernel AcquireModuleFromRegistry and SynthesizeInstance", verbatim |
+| The loading entry points map onto kernel acquire verbs: | body of "The instance-package path acquires an instance package directory with kernel AcquireInstanceFromDir", with the word changes of the list "Words changed or added in unit 7b" |
+| 3. **Instance package**: kernel `AcquireInstanceFromDir` on an insta... | body of "The instance-package path acquires an instance package directory with kernel AcquireInstanceFromDir", verbatim |
+
+Lengths (old, new): old 1593; new "The CLI produces validated, concrete instances exclusively through the library kernel" 483; "The module-directory path acquires a directory with kernel AcquireModuleFromDir and SynthesizeInstance" 491; "The published-module path acquires a module with kernel AcquireModuleFromRegistry and SynthesizeInstance" 457; "The instance-package path acquires an instance package directory with kernel AcquireInstanceFromDir" 407.
+
+### Ledger: instance-building, Value selection falls back to module defaults when no files are given
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "With no `--values` files the builder discovers values by a three-step priority", "The builder never reads values from `Module.Values` and `--values` files make `values.cue` and `debugValues` ignored", "An instance package acquired from its directory holds its `values` inline and has no `values.cue` fallback".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| No values file, `values.cue` exists in module directory | "With no `--values` files the builder discovers values by a three-step priority", "No values file, `values.cue` exists in module directory" | No (byte equal, checked) |
+| Instance file is self-contained | "An instance package acquired from its directory holds its `values` inline and has no `values.cue` fallback", "Instance file is self-contained" | No (byte equal, checked) |
+| No values files, no values.cue, debugValues defined | "With no `--values` files the builder discovers values by a three-step priority", "No values files, no values.cue, debugValues defined" | No (byte equal, checked) |
+| No values files, no values.cue, no debugValues | "With no `--values` files the builder discovers values by a three-step priority", "No values files, no values.cue, no debugValues" | No (byte equal, checked) |
+| Multiple `--values` files are unified | "The builder never reads values from `Module.Values` and `--values` files make `values.cue` and `debugValues` ignored", "Multiple `--values` files are unified" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| When no `--values` files are provided, the builder SHALL discover va... | body of "With no `--values` files the builder discovers values by a three-step priority", verbatim |
+| 1. When `instance.cue` is present: auto-discover `values.cue` from t... | body of "With no `--values` files the builder discovers values by a three-step priority", verbatim |
+| 2. When `instance.cue` is absent and `debugValues` is defined in the... | body of "With no `--values` files the builder discovers values by a three-step priority", verbatim |
+| 3. When neither `instance.cue` nor `values.cue` nor `debugValues` is... | body of "With no `--values` files the builder discovers values by a three-step priority", verbatim |
+| The builder SHALL NOT read values from `Module.Values`. If `--values... | body of "The builder never reads values from `Module.Values` and `--values` files make `values.cue` and `debugValues` ignored", verbatim |
+| When an instance package is acquired from its directory (`AcquireIns... | body of "An instance package acquired from its directory holds its `values` inline and has no `values.cue` fallback", with the word changes of the list "Words changed or added in unit 7b" |
+
+Lengths (old, new): old 823; new "With no `--values` files the builder discovers values by a three-step priority" 433; "The builder never reads values from `Module.Values` and `--values` files make `values.cue` and `debugValues` ignored" 143; "An instance package acquired from its directory holds its `values` inline and has no `values.cue` fallback" 250.
+
+### Ledger: k8s-helpers, A kind the cluster does not serve is an error that names it
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A kind the cluster does not serve is an unreadable object with an error that names the kind and its API version", "`opm instance delete` and the stale-resource prune do not count an object of an unserved kind as already gone".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Delete with a recorded kind the cluster does not serve | "`opm instance delete` and the stale-resource prune do not count an object of an unserved kind as already gone", "Delete with a recorded kind the cluster does not serve" | No (byte equal, checked) |
+| Prune with a stale kind the cluster does not serve | "`opm instance delete` and the stale-resource prune do not count an object of an unserved kind as already gone", "Prune with a stale kind the cluster does not serve" | No (byte equal, checked) |
+| Apply of a kind the cluster does not serve | "A kind the cluster does not serve is an unreadable object with an error that names the kind and its API version", "Apply of a kind the cluster does not serve" | No (byte equal, checked) |
+| An existence check before an apply | "A kind the cluster does not serve is an unreadable object with an error that names the kind and its API version", "An existence check before an apply" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| When discovery answers and the group and version, or the kind in it,... | body of "A kind the cluster does not serve is an unreadable object with an error that names the kind and its API version", verbatim |
+| `opm instance delete` and the stale-resource prune SHALL NOT count s... | body of "`opm instance delete` and the stale-resource prune do not count an object of an unserved kind as already gone", verbatim |
+
+Lengths (old, new): old 544; new "A kind the cluster does not serve is an unreadable object with an error that names the kind and its API version" 295; "`opm instance delete` and the stale-resource prune do not count an object of an unserved kind as already gone" 375.
+
+### Ledger: k8s-helpers, A failed discovery request is an error
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A failed discovery request is not read as an unserved kind or a missing object and the API error stays in the error chain", "An apply stops at a failed discovery request and exits with code 4, 3 or 1", "`opm instance delete` exits with the same codes and any other command that reads recorded objects reports the failure through the same path as a failed read".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Discovery is forbidden during delete | "`opm instance delete` exits with the same codes and any other command that reads recorded objects reports the failure through the same path as a failed read", "Discovery is forbidden during delete" | No (byte equal, checked) |
+| Discovery is forbidden during diff | "`opm instance delete` exits with the same codes and any other command that reads recorded objects reports the failure through the same path as a failed read", "Discovery is forbidden during diff" | No (byte equal, checked) |
+| Discovery is unavailable during the first-install check | "An apply stops at a failed discovery request and exits with code 4, 3 or 1", "Discovery is unavailable during the first-install check" | No (byte equal, checked) |
+| Discovery fails during the apply of objects | "An apply stops at a failed discovery request and exits with code 4, 3 or 1", "Discovery fails during the apply of objects" | No (byte equal, checked) |
+| Discovery fails during prune | "An apply stops at a failed discovery request and exits with code 4, 3 or 1", "Discovery fails during prune" | No (byte equal, checked) |
+| (new) | "A failed discovery request is not read as an unserved kind or a missing object and the API error stays in the error chain", "The error chain carries the ServiceUnavailable error" | New restatement scenario: its WHEN and THEN lines are those of the old scenario "Discovery is unavailable during the first-install check", byte for byte; only the name differs |
+
+| Old clause | New place |
+| --- | --- |
+| When a discovery request fails (the API server denies it, is unavail... | body of "A failed discovery request is not read as an unserved kind or a missing object and the API error stays in the error chain", verbatim |
+| An apply SHALL stop at a failed discovery request, in its first-inst... | body of "An apply stops at a failed discovery request and exits with code 4, 3 or 1", verbatim |
+| `opm instance delete` SHALL exit with the same codes when a discover... | body of "`opm instance delete` exits with the same codes and any other command that reads recorded objects reports the failure through the same path as a failed read", verbatim |
+
+Lengths (old, new): old 710; new "A failed discovery request is not read as an unserved kind or a missing object and the API error stays in the error chain" 256; "An apply stops at a failed discovery request and exits with code 4, 3 or 1" 220; "`opm instance delete` exits with the same codes and any other command that reads recorded objects reports the failure through the same path as a failed read" 446.
+
+### Ledger: module-synthetic-instance, Synthesize a `#ModuleInstance` from a module-package directory
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The CLI synthesizes a concrete instance from a module CUE package directory via kernel `SynthesizeInstance`", "The synthesis loads the module as a whole CUE package and the kernel derives uuid, components, auto-secrets and standard labels in CUE", "The produced instance has kind `ModuleInstance` and the synthesis does not apply `#ModuleRelease`".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Module directory loads as a whole CUE package | "The synthesis loads the module as a whole CUE package and the kernel derives uuid, components, auto-secrets and standard labels in CUE", "Module directory loads as a whole CUE package" | No (byte equal, checked) |
+| Emitted kind is ModuleInstance | "The produced instance has kind `ModuleInstance` and the synthesis does not apply `#ModuleRelease`", "Emitted kind is ModuleInstance" | No (byte equal, checked) |
+| No synthetic wrapper module | "The synthesis loads the module as a whole CUE package and the kernel derives uuid, components, auto-secrets and standard labels in CUE", "No synthetic wrapper module" | No (byte equal, checked) |
+| One CUE context | "The synthesis loads the module as a whole CUE package and the kernel derives uuid, components, auto-secrets and standard labels in CUE", "One CUE context" | No (byte equal, checked) |
+| (new) | "The CLI synthesizes a concrete instance from a module CUE package directory via kernel `SynthesizeInstance`", "Only the opm module commands synthesize" | New restatement scenario: only words of the old clause, no new case. |
+
+| Old clause | New place |
+| --- | --- |
+| The CLI SHALL synthesize a concrete instance from a module CUE packa... | body of "The CLI synthesizes a concrete instance from a module CUE package directory via kernel `SynthesizeInstance`", verbatim |
+| The synthesis SHALL load the module as a whole CUE package (matching... | body of "The synthesis loads the module as a whole CUE package and the kernel derives uuid, components, auto-secrets and standard labels in CUE", verbatim |
+| The produced instance SHALL have `kind: "ModuleInstance"`; the synth... | body of "The produced instance has kind `ModuleInstance` and the synthesis does not apply `#ModuleRelease`", verbatim |
+
+Lengths (old, new): old 742; new "The CLI synthesizes a concrete instance from a module CUE package directory via kernel `SynthesizeInstance`" 260; "The synthesis loads the module as a whole CUE package and the kernel derives uuid, components, auto-secrets and standard labels in CUE" 308; "The produced instance has kind `ModuleInstance` and the synthesis does not apply `#ModuleRelease`" 172.
+
+### Ledger: module-synthetic-instance, Synthesize a `#ModuleInstance` from a published module
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The CLI synthesizes a concrete instance from a published module through the kernel and writes nothing to disk but CUE's module cache", "Values selection, metadata defaults and the output banner of a published module are the same as for a module-package directory".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Published module synthesizes | "The CLI synthesizes a concrete instance from a published module through the kernel and writes nothing to disk but CUE's module cache", "Published module synthesizes" | No (byte equal, checked) |
+| debugValues of a published module | "Values selection, metadata defaults and the output banner of a published module are the same as for a module-package directory", "debugValues of a published module" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The CLI SHALL synthesize a concrete instance from a published module... | body of "The CLI synthesizes a concrete instance from a published module through the kernel and writes nothing to disk but CUE's module cache", verbatim |
+| Values selection, metadata defaults and the output banner SHALL be t... | body of "Values selection, metadata defaults and the output banner of a published module are the same as for a module-package directory", verbatim |
+
+Lengths (old, new): old 544; new "The CLI synthesizes a concrete instance from a published module through the kernel and writes nothing to disk but CUE's module cache" 433; "Values selection, metadata defaults and the output banner of a published module are the same as for a module-package directory" 252.
+
+### Ledger: command-reference, The command reference is generated into the docs bundle
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The CLI reference is generated by docs-kit's `cobra` extractor into `reference/cli/` when the docs bundle is built", "Hidden and deprecated commands and flags and the `help` command are left out of the command reference and cobra's `completion` command is listed".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| A new subcommand appears in the reference | "The CLI reference is generated by docs-kit's `cobra` extractor into `reference/cli/` when the docs bundle is built", "A new subcommand appears in the reference" | No (byte equal, checked) |
+| A hidden command stays out | "Hidden and deprecated commands and flags and the `help` command are left out of the command reference and cobra's `completion` command is listed", "A hidden command stays out" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The CLI reference SHALL be generated by docs-kit's `cobra` extractor... | body of "The CLI reference is generated by docs-kit's `cobra` extractor into `reference/cli/` when the docs bundle is built", verbatim |
+| Hidden and deprecated commands and flags and the `help` command SHAL... | body of "Hidden and deprecated commands and flags and the `help` command are left out of the command reference and cobra's `completion` command is listed", verbatim |
+
+Lengths (old, new): old 563; new "The CLI reference is generated by docs-kit's `cobra` extractor into `reference/cli/` when the docs bundle is built" 430; "Hidden and deprecated commands and flags and the `help` command are left out of the command reference and cobra's `completion` command is listed" 132.
+
+### Ledger: mod-apply, `opm module apply` deploys a module package via the synthetic instance flow
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The `module apply` subcommand accepts an optional module-package directory and deploys the synthesized `#ModuleInstance`", "The `module apply` subcommand accepts only directory inputs", "The `module apply` subcommand produces the same cluster-side effects as `opm instance apply` after the render stage".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Default to current directory | "The `module apply` subcommand accepts an optional module-package directory and deploys the synthesized `#ModuleInstance`", "Default to current directory" | No (byte equal, checked) |
+| File argument rejected | "The `module apply` subcommand accepts only directory inputs", "File argument rejected" | No (byte equal, checked) |
+| (new) | "The `module apply` subcommand produces the same cluster-side effects as `opm instance apply` after the render stage", "Dry-run is one of the cluster-side effects" | New restatement scenario: its WHEN and THEN lines are those of the old scenario "Dry-run makes no cluster changes", byte for byte; only the name differs |
+
+| Old clause | New place |
+| --- | --- |
+| The CLI SHALL provide a `module apply` subcommand (with alias `mod a... | body of "The `module apply` subcommand accepts an optional module-package directory and deploys the synthesized `#ModuleInstance`", verbatim |
+| The subcommand SHALL accept only directory inputs.<!-- Was: syntheti... | body of "The `module apply` subcommand accepts only directory inputs", verbatim |
+| The subcommand SHALL produce the same cluster-side effects as `opm i... | body of "The `module apply` subcommand produces the same cluster-side effects as `opm instance apply` after the render stage", verbatim |
+
+Lengths (old, new): old 785; new "The `module apply` subcommand accepts an optional module-package directory and deploys the synthesized `#ModuleInstance`" 417; "The `module apply` subcommand accepts only directory inputs" 328; "The `module apply` subcommand produces the same cluster-side effects as `opm instance apply` after the render stage" 452.
+
+### Ledger: mod-apply, Flag surface matches `opm instance apply` plus `--name`
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`opm module apply` accepts the flags `-f` and `--platform`", "`opm module apply` accepts the flags `--name` and `-n`", "`opm module apply` accepts the flags `--kubeconfig`, `--context` and `--dry-run`", "`opm module apply` accepts the flags `--create-namespace`, `--no-prune` and `--force`", "`opm module apply` accepts the flag `--wait`", "`opm module apply` accepts the flag `--timeout`".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Values files override debugValues | "`opm module apply` accepts the flags `-f` and `--platform`", "Values files override debugValues" | No (byte equal, checked) |
+| Namespace flag participates in instance identity | "`opm module apply` accepts the flags `--name` and `-n`", "Namespace flag participates in instance identity" | No (byte equal, checked) |
+| Name flag participates in instance identity | "`opm module apply` accepts the flags `--name` and `-n`", "Name flag participates in instance identity" | No (byte equal, checked) |
+| Dry-run makes no cluster changes | "`opm module apply` accepts the flags `--kubeconfig`, `--context` and `--dry-run`", "Dry-run makes no cluster changes" | No (byte equal, checked) |
+| Wait blocks until the applied resources are healthy | "`opm module apply` accepts the flag `--wait`", "Wait blocks until the applied resources are healthy" | No (byte equal, checked) |
+| Wait is skipped on dry-run | "`opm module apply` accepts the flag `--wait`", "Wait is skipped on dry-run" | No (byte equal, checked) |
+| Create-namespace auto-creates the target namespace | "`opm module apply` accepts the flags `--create-namespace`, `--no-prune` and `--force`", "Create-namespace auto-creates the target namespace" | No (byte equal, checked) |
+| No-prune preserves stale resources | "`opm module apply` accepts the flags `--create-namespace`, `--no-prune` and `--force`", "No-prune preserves stale resources" | No (byte equal, checked) |
+| Force allows 0-resource render to prune all | "`opm module apply` accepts the flags `--create-namespace`, `--no-prune` and `--force`", "Force allows 0-resource render to prune all" | No (byte equal, checked) |
+| (new) | "`opm module apply` accepts the flag `--timeout`", "The timeout bounds the readiness wait" | New restatement scenario: its WHEN and THEN lines are those of the old scenario "Wait blocks until the applied resources are healthy", byte for byte; only the name differs |
+
+| Old clause | New place |
+| --- | --- |
+| The `module apply` subcommand SHALL accept the following flags with ... | body of "`opm module apply` accepts the flags `-f` and `--platform`", verbatim |
+| \| Flag \| Type \| Default \| Behavior \| | body of "`opm module apply` accepts the flags `-f` and `--platform`", verbatim |
+| \| --- \| --- \| --- \| --- \| | body of "`opm module apply` accepts the flags `-f` and `--platform`", verbatim |
+| \| `-f`, `--values` \| repeatable string \| empty \| Values files ov... | body of "`opm module apply` accepts the flags `-f` and `--platform`", verbatim |
+| \| `--platform` \| string \| resolved by precedence \| Platform modu... | body of "`opm module apply` accepts the flags `-f` and `--platform`", verbatim |
+| The `module apply` subcommand SHALL accept the following flags with ... | body of "`opm module apply` accepts the flags `--name` and `-n`", verbatim |
+| \| Flag \| Type \| Default \| Behavior \| | body of "`opm module apply` accepts the flags `--name` and `-n`", verbatim |
+| \| --- \| --- \| --- \| --- \| | body of "`opm module apply` accepts the flags `--name` and `-n`", verbatim |
+| \| `--name` \| string \| `<module>-debug` \| Synthetic `metadata.nam... | body of "`opm module apply` accepts the flags `--name` and `-n`", verbatim |
+| \| `-n`, `--namespace` \| string \| from config \| Target namespace ... | body of "`opm module apply` accepts the flags `--name` and `-n`", verbatim |
+| The `module apply` subcommand SHALL accept the following flags with ... | body of "`opm module apply` accepts the flags `--kubeconfig`, `--context` and `--dry-run`", verbatim |
+| \| Flag \| Type \| Default \| Behavior \| | body of "`opm module apply` accepts the flags `--kubeconfig`, `--context` and `--dry-run`", verbatim |
+| \| --- \| --- \| --- \| --- \| | body of "`opm module apply` accepts the flags `--kubeconfig`, `--context` and `--dry-run`", verbatim |
+| \| `--kubeconfig` \| string \| from env/config \| Path to kubeconfig... | body of "`opm module apply` accepts the flags `--kubeconfig`, `--context` and `--dry-run`", verbatim |
+| \| `--context` \| string \| current-context \| Kubernetes context to... | body of "`opm module apply` accepts the flags `--kubeconfig`, `--context` and `--dry-run`", verbatim |
+| \| `--dry-run` \| bool \| false \| Server-side dry-run; no cluster c... | body of "`opm module apply` accepts the flags `--kubeconfig`, `--context` and `--dry-run`", verbatim |
+| The `module apply` subcommand SHALL accept the following flags with ... | body of "`opm module apply` accepts the flags `--create-namespace`, `--no-prune` and `--force`", verbatim |
+| \| Flag \| Type \| Default \| Behavior \| | body of "`opm module apply` accepts the flags `--create-namespace`, `--no-prune` and `--force`", verbatim |
+| \| --- \| --- \| --- \| --- \| | body of "`opm module apply` accepts the flags `--create-namespace`, `--no-prune` and `--force`", verbatim |
+| \| `--create-namespace` \| bool \| false \| Create the target namesp... | body of "`opm module apply` accepts the flags `--create-namespace`, `--no-prune` and `--force`", verbatim |
+| \| `--no-prune` \| bool \| false \| Skip pruning of stale resources \| | body of "`opm module apply` accepts the flags `--create-namespace`, `--no-prune` and `--force`", verbatim |
+| \| `--force` \| bool \| false \| Allow a 0-resource render to prune ... | body of "`opm module apply` accepts the flags `--create-namespace`, `--no-prune` and `--force`", verbatim |
+| The `module apply` subcommand SHALL accept the following flags with ... | body of "`opm module apply` accepts the flag `--wait`", verbatim |
+| \| Flag \| Type \| Default \| Behavior \| | body of "`opm module apply` accepts the flag `--wait`", verbatim |
+| \| --- \| --- \| --- \| --- \| | body of "`opm module apply` accepts the flag `--wait`", verbatim |
+| \| `--wait` \| bool \| false \| After a successful apply and invento... | body of "`opm module apply` accepts the flag `--wait`", verbatim |
+| The `module apply` subcommand SHALL accept the following flags with ... | body of "`opm module apply` accepts the flag `--timeout`", verbatim |
+| \| Flag \| Type \| Default \| Behavior \| | body of "`opm module apply` accepts the flag `--timeout`", verbatim |
+| \| --- \| --- \| --- \| --- \| | body of "`opm module apply` accepts the flag `--timeout`", verbatim |
+| \| `--timeout` \| duration \| 5m \| Bound on the CustomResourceDefin... | body of "`opm module apply` accepts the flag `--timeout`", verbatim |
+
+Lengths (old, new): old 1418; new "`opm module apply` accepts the flags `-f` and `--platform`" 341; "`opm module apply` accepts the flags `--name` and `-n`" 347; "`opm module apply` accepts the flags `--kubeconfig`, `--context` and `--dry-run`" 367; "`opm module apply` accepts the flags `--create-namespace`, `--no-prune` and `--force`" 403; "`opm module apply` accepts the flag `--wait`" 297; "`opm module apply` accepts the flag `--timeout`" 418.
+
+### Ledger: release-gates, Release PRs refuse local, unpublished or mismatched pins, the operator module pin included
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The release-pin check fails on a `replace` directive and on a pseudo-version or untagged OPM Go requirement", "The release-pin check fails on a template `-0.dev.` pin and on a tracked `local-module.cue`", "The release-pin check fails on an unserved or mismatched operator module pin", "The release-pin check reports all failures in one run and exits zero when none holds", "The release-pin check runs as a step of the `lint` job on release-please branches only", "`task deps:release-check` runs the release-pin check locally on any branch".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Clean release PR passes | "The release-pin check reports all failures in one run and exits zero when none holds", "Clean release PR passes" | No (byte equal, checked) |
+| Pseudo-version library pin fails the release PR | "The release-pin check fails on a `replace` directive and on a pseudo-version or untagged OPM Go requirement", "Pseudo-version library pin fails the release PR" | No (byte equal, checked) |
+| Several violations are reported together | "The release-pin check reports all failures in one run and exits zero when none holds", "Several violations are reported together" | No (byte equal, checked) |
+| Recorded operator version out of step with the pinned module | "The release-pin check fails on an unserved or mismatched operator module pin", "Recorded operator version out of step with the pinned module" | No (byte equal, checked) |
+| Pinned module version not served | "The release-pin check fails on an unserved or mismatched operator module pin", "Pinned module version not served" | No (byte equal, checked) |
+| Tag lookup failure is not a pass | "The release-pin check fails on a `replace` directive and on a pseudo-version or untagged OPM Go requirement", "Tag lookup failure is not a pass" | No (byte equal, checked) |
+| Ordinary PR is not gated | "The release-pin check runs as a step of the `lint` job on release-please branches only", "Ordinary PR is not gated" | No (byte equal, checked) |
+| Release branch push is gated | "The release-pin check runs as a step of the `lint` job on release-please branches only", "Release branch push is gated" | No (byte equal, checked) |
+| (new) | "The release-pin check fails on a template `-0.dev.` pin and on a tracked `local-module.cue`", "A template pin and a replace directive are reported together" | New restatement scenario: its WHEN and THEN lines are those of the old scenario "Several violations are reported together", byte for byte; only the name differs |
+| (new) | "`task deps:release-check` runs the release-pin check locally on any branch", "The task runs the check on any branch" | New restatement scenario: only words of the old clause, no new case. |
+
+| Old clause | New place |
+| --- | --- |
+| A release-pin check (G1) SHALL fail, naming every offending pin and ... | body of "The release-pin check fails on a `replace` directive and on a pseudo-version or untagged OPM Go requirement", verbatim |
+| - `go.mod` carries a `replace` directive; | body of "The release-pin check fails on a `replace` directive and on a pseudo-version or untagged OPM Go requirement", verbatim |
+| - a `github.com/open-platform-model/*` requirement in `go.mod` is a ... | body of "The release-pin check fails on a `replace` directive and on a pseudo-version or untagged OPM Go requirement", verbatim |
+| A release-pin check (G1) SHALL fail, naming every offending pin and ... | body of "The release-pin check fails on a template `-0.dev.` pin and on a tracked `local-module.cue`", verbatim |
+| - a template `cue.mod/module.cue` under `templates/` pins a dependen... | body of "The release-pin check fails on a template `-0.dev.` pin and on a tracked `local-module.cue`", verbatim |
+| - a `cue.mod/local-module.cue` file is tracked anywhere in the repos... | body of "The release-pin check fails on a template `-0.dev.` pin and on a tracked `local-module.cue`", verbatim |
+| A release-pin check (G1) SHALL fail, naming every offending pin and ... | body of "The release-pin check fails on an unserved or mismatched operator module pin", verbatim |
+| - the operator module pin in `internal/operator/pin.go` names a modu... | body of "The release-pin check fails on an unserved or mismatched operator module pin", verbatim |
+| The check SHALL report all failures in one run, not only the first, ... | body of "The release-pin check reports all failures in one run and exits zero when none holds", verbatim |
+| A release-pin check (G1)SHALL run as a step inside the existing `lin... | body of "The release-pin check runs as a step of the `lint` job on release-please branches only", verbatim |
+| `task deps:release-check` SHALL run the same check locally on any br... | body of "`task deps:release-check` runs the release-pin check locally on any branch", verbatim |
+
+Lengths (old, new): old 1375; new "The release-pin check fails on a `replace` directive and on a pseudo-version or untagged OPM Go requirement" 327; "The release-pin check fails on a template `-0.dev.` pin and on a tracked `local-module.cue`" 303; "The release-pin check fails on an unserved or mismatched operator module pin" 383; "The release-pin check reports all failures in one run and exits zero when none holds" 399; "The release-pin check runs as a step of the `lint` job on release-please branches only" 321; "`task deps:release-check` runs the release-pin check locally on any branch" 175.
+
+### Ledger: release-gates, Pull requests that move library or the operator warn about missing docs bundles
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The `lint` job of `pr.yml` runs the step "Docs bundles for moved pins" on every pull request and fetches the base commit", "The docs bundle step checks nothing when the library version and `PinnedOperatorVersion` equal the base's", "The docs bundle step runs the dump program on the tree and looks up each printed pin anonymously", "The docs bundle step prints a GitHub warning annotation for each missing bundle and each lookup or read it cannot complete", "The docs bundle step bounds each GHCR request and has a timeout and `continue-on-error: true`", "The docs bundle step exits zero in every case that prints a warning and so never fails the job", "G1 runs the docs pins script without `--warn` and counts each printed line as a violation".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| A cascade pull request moves library to a version without a bundle | "The docs bundle step prints a GitHub warning annotation for each missing bundle and each lookup or read it cannot complete", "A cascade pull request moves library to a version without a bundle" | No (byte equal, checked) |
+| An ordinary pull request checks nothing | "The docs bundle step checks nothing when the library version and `PinnedOperatorVersion` equal the base's", "An ordinary pull request checks nothing" | No (byte equal, checked) |
+| An unreadable pin is a warning, not a pass | "The docs bundle step prints a GitHub warning annotation for each missing bundle and each lookup or read it cannot complete", "An unreadable pin is a warning, not a pass" | No (byte equal, checked) |
+| G1 still fails a release pull request | "G1 runs the docs pins script without `--warn` and counts each printed line as a violation", "G1 still fails a release pull request" | No (byte equal, checked) |
+| (new) | "The `lint` job of `pr.yml` runs the step "Docs bundles for moved pins" on every pull request and fetches the base commit", "The step runs on every pull request" | New restatement scenario: only words of the old clause, no new case. |
+| (new) | "The docs bundle step runs the dump program on the tree and looks up each printed pin anonymously", "The dump program runs when a pin moved" | New restatement scenario: its WHEN and THEN lines are those of the old scenario "A cascade pull request moves library to a version without a bundle", byte for byte; only the name differs |
+| (new) | "The docs bundle step bounds each GHCR request and has a timeout and `continue-on-error: true`", "Each GHCR request is bounded" | New restatement scenario: only words of the old clause, no new case. |
+| (new) | "The docs bundle step exits zero in every case that prints a warning and so never fails the job", "A warning never fails the job" | New restatement scenario: its WHEN and THEN lines are those of the old scenario "A cascade pull request moves library to a version without a bundle", byte for byte; only the name differs |
+
+| Old clause | New place |
+| --- | --- |
+| `pr.yml`'s `lint` job SHALL run the step "Docs bundles for moved pin... | body of "The `lint` job of `pr.yml` runs the step "Docs bundles for moved pins" on every pull request and fetches the base commit", verbatim |
+| When the `github.com/open-platform-model/library` version in `go.mod... | body of "The docs bundle step checks nothing when the library version and `PinnedOperatorVersion` equal the base's", with the word changes of the list "Words changed or added in unit 7b" |
+| Otherwise SHALL run `go run ./hack/docskit-dump pins` on the tree an... | body of "The docs bundle step runs the dump program on the tree and looks up each printed pin anonymously", with the word changes of the list "Words changed or added in unit 7b" |
+| Otherwise SHALL print a GitHub warning annotation, also written to t... | body of "The docs bundle step prints a GitHub warning annotation for each missing bundle and each lookup or read it cannot complete", with the word changes of the list "Words changed or added in unit 7b" |
+| Each GHCR request SHALL be bounded (`--connect-timeout 10 --max-time... | body of "The docs bundle step bounds each GHCR request and has a timeout and `continue-on-error: true`", verbatim |
+| The step SHALL exit zero in every one of those cases, so it never fa... | body of "The docs bundle step exits zero in every case that prints a warning and so never fails the job", verbatim |
+| G1 (`release-pin-check.sh`) SHALL run the same script without `--war... | body of "G1 runs the docs pins script without `--warn` and counts each printed line as a violation", verbatim |
+
+Lengths (old, new): old 1701; new "The `lint` job of `pr.yml` runs the step "Docs bundles for moved pins" on every pull request and fetches the base commit" 268; "The docs bundle step checks nothing when the library version and `PinnedOperatorVersion` equal the base's" 333; "The docs bundle step runs the dump program on the tree and looks up each printed pin anonymously" 291; "The docs bundle step prints a GitHub warning annotation for each missing bundle and each lookup or read it cannot complete" 479; "The docs bundle step bounds each GHCR request and has a timeout and `continue-on-error: true`" 194; "The docs bundle step exits zero in every case that prints a warning and so never fails the job" 275; "G1 runs the docs pins script without `--warn` and counts each printed line as a violation" 314.
+
+### Words changed or added in unit 7b
+
+- Named references: a body ends with "(Requirement: <exact header>)" or "(Requirements: <exact header>; <exact header>)", the named reference that gives it its referent ("the package", "such an object", "the same codes", "the failure", "those cases", "Otherwise", "the same check", "the same script", "the exemptions named in the previous requirement", "the module-directory path", "the subcommand", "all failures"). The bodies are: `health-evaluation` "The library health decisions cover instance status, list and tree and the apply wait", "The Established wait and the operator install dispatch by kind stay in the cli", "The tree child rows and the status colouring stay in the cli" and "No non-test Go file in the cli declares a copy of the library health package's decisions" (to "The cli takes every readiness decision from the library health package"), "The readiness exemptions are not copies" (to the two exemption requirements; its sentence keeps the words "the previous requirement" of the old text); `instance-building` "The published-module path acquires a module with kernel AcquireModuleFromRegistry and SynthesizeInstance" (to the module-directory path requirement); `k8s-helpers` "`opm instance delete` and the stale-resource prune do not count an object of an unserved kind as already gone" (to the unserved-kind requirement) and the last body of "A failed discovery request is an error" (to the apply requirement and the first body); `mod-apply` "The `module apply` subcommand accepts only directory inputs" and "The `module apply` subcommand produces the same cluster-side effects as `opm instance apply` after the render stage" (to the first body); `module-synthetic-instance` "Values selection, metadata defaults and the output banner of a published module are the same as for a module-package directory" (to the three live requirements of the same spec that it names); `release-gates` "The release-pin check reports all failures in one run and exits zero when none holds" (to the three pin-check bodies), "`task deps:release-check` runs the release-pin check locally on any branch" (to the step requirement), the docs bundle bodies "runs the dump program on the tree and looks up each printed pin anonymously" and "prints a GitHub warning annotation ..." (to the check-nothing body), "exits zero in every case that prints a warning and so never fails the job" (to the warning body) and "G1 runs the docs pins script without `--warn` and counts each printed line as a violation" (to the first docs bundle body).
+- `health-evaluation`, "The cli takes every readiness decision from the library health package" and "The library health decisions cover instance status, list and tree and the apply wait": the old sentence "This covers ..." has its own body and reads "This SHALL cover ..." (keyword, see the strength table).
+- `health-evaluation`, "The Established wait and the operator install dispatch by kind stay in the cli" and "The tree child rows and the status colouring stay in the cli": the old sentence "Three readiness checks are not decisions of the package and stay in the cli: ..." is cut at the list boundary after "once they exist)". The first part ends with a period in place of the comma. The second part repeats the opening "Three readiness checks are not decisions of the package and ... stay in the cli:". Both read "and SHALL stay in the cli" (keyword).
+- `health-evaluation`, "The readiness exemptions are not copies": "are not copies" reads "SHALL NOT be copies" (keyword).
+- `instance-building`, the three path bodies: the intro sentence "The loading entry points map onto kernel acquire verbs:" is repeated in each and reads "SHALL map" (keyword). The list item keeps its number (1., 2., 3.) and its whole line.
+- `instance-building`, "An instance package acquired from its directory holds its `values` inline and has no `values.cue` fallback": "There is no `values.cue` fallback" reads "There SHALL be no `values.cue` fallback" (keyword) and the em-dash reads a colon.
+- `release-gates`, the three pin-check bodies: the old intro "A release-pin check (G1) SHALL fail, naming every offending pin and its file, when any of the following holds in the tree under test:" is repeated in each; the last bullet of each body ends with a period in place of the semicolon.
+- `release-gates`, "The release-pin check runs as a step of the `lint` job on release-please branches only": "It SHALL run" reads "A release-pin check (G1) SHALL run" (the subject of the first sentence of the same old requirement).
+- `release-gates`, "The docs bundle step checks nothing when the library version and `PinnedOperatorVersion` equal the base's": "it SHALL check nothing" reads "the step SHALL check nothing" (the subject "The step" of the same old text).
+- `release-gates`, "The docs bundle step runs the dump program on the tree and looks up each printed pin anonymously" and "The docs bundle step prints a GitHub warning annotation for each missing bundle and each lookup or read it cannot complete": the old sentence "Otherwise it SHALL run ..., and SHALL print ..." is cut at the boundary ", and". The first part ends with a period in place of the comma. Both parts read "Otherwise the step SHALL" ("it" reads "the step", the subject of the same old text; "and" falls at the cut).
+- `mod-apply`, "The `module apply` subcommand accepts an optional module-package directory and deploys the synthesized `#ModuleInstance`" and "The `module apply` subcommand accepts only directory inputs": the `<!-- Was: ... -->` comment closes the old line that holds both sentences, so both bodies carry it unchanged.
+- `mod-apply`, the five flag bodies: the old intro line, the table header row and the separator row are repeated in each body, followed by the rows of that body only; the rows are old lines, unchanged.
+- `module-synthetic-instance` and the other bodies not named above: built from whole old sentences, unchanged.
+
+### Strength table of cli-B7 unit 7b
+
+Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text:
+
+| Old sentence | New body | Word added |
+| --- | --- | --- |
+| This covers `opm instance status`, `opm instance list`, `opm instance tree`, and the `--wait` readiness wait of `opm instance apply` and `opm module apply`. | "The library health decisions cover instance status, list and tree and the apply wait" | "SHALL cover" |
+| Three readiness checks are not decisions of the package and stay in the cli: ... | "The Established wait and the operator install dispatch by kind stay in the cli"; "The tree child rows and the status colouring stay in the cli" | "SHALL stay" |
+| The exemptions named in the previous requirement are not copies. | "The readiness exemptions are not copies" | "SHALL NOT be" |
+| The loading entry points map onto kernel acquire verbs: | the three path bodies of "Loader validates consumer values and produces a concrete ModuleInstance" | "SHALL map" |
+| There is no `values.cue` fallback: the instance package is self-contained. | "An instance package acquired from its directory holds its `values` inline and has no `values.cue` fallback" | "SHALL be no" |
+
+Plain sentences copied unchanged, with no keyword, into a body that carries a keyword in another sentence or in a SHALL intro:
+
+| Old sentence | New body |
+| --- | --- |
+| In every synthesis path the kernel unifies inputs against the resolved `#ModuleInstance` schema and lets CUE derive uuid, components, auto-secrets, and standard labels. All paths run the kernel's shape gate and concreteness enforcement, producing a `*module.Instance`. | "The CLI produces validated, concrete instances exclusively through the library kernel" |
+| The three list items of the loading entry points | the path body whose intro line carries the keyword |
+| The three list items of the value priority | "With no `--values` files the builder discovers values by a three-step priority" |
+| The step runs with the job's read-only token. | "The `lint` job of `pr.yml` runs the step \"Docs bundles for moved pins\" on every pull request and fetches the base commit" |
+| Only the `opm module` commands (`build`, `apply` and `vet`) synthesize; `opm instance build` never does. | "The CLI synthesizes a concrete instance from a module CUE package directory via kernel `SynthesizeInstance`" |
+| The table rows of the flags | the flag body whose intro line carries the keyword |
