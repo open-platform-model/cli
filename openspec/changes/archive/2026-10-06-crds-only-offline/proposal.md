@@ -53,9 +53,9 @@ None.
   directory.
 - `.github/workflows/pr.yml`'s integration job keeps running `opm controller install --crds-only`; it now needs no
   registry for that step.
-- Delivers the cli side of enhancement 0021 ("The operator's install artifact is a registry module on its own version train") (revised 2026-10-06): the CLI carries no controller manifest beyond the CRDs
+- Delivers the cli side of enhancement 0021 ("The controller's install artifact is a registry module on its own version train") (revised 2026-10-06): the CLI carries no controller manifest beyond the CRDs
   of its pinned module version, and the CRDs-only form applies them without a registry or the controller's instance.
-  The change depends on the revised enhancement 0021 ("The operator's install artifact is a registry module on its own version train") reaching enhancements main.
+  The change depends on the revised enhancement 0021 ("The controller's install artifact is a registry module on its own version train") reaching enhancements main.
 
 ## Enhancement
 

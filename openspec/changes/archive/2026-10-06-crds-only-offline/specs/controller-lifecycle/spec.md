@@ -217,6 +217,6 @@ Install SHALL run, before it writes any object, every check that can refuse it: 
 
 ### Requirement: CRDs-only install applies the CRDs of the same module render
 
-**Reason**: The CRDs-only form no longer renders the module at install time. It applies CRDs the pin task rendered from the pinned module version and the CLI embeds, so it works with no registry (enhancement 0021 ("The operator's install artifact is a registry module on its own version train"), revised 2026-10-06).
+**Reason**: The CRDs-only form no longer renders the module at install time. It applies CRDs the pin task rendered from the pinned module version and the CLI embeds, so it works with no registry (enhancement 0021 ("The controller's install artifact is a registry module on its own version train"), revised 2026-10-06).
 
 **Migration**: `opm controller install --crds-only` keeps its name and result for the pinned version. Pass no `--version` with it; to install another version's CRDs, run a full install of that version.
