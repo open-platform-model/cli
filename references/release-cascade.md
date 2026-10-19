@@ -49,7 +49,7 @@ docs-bundle check lives in the PR's CI, not in the task.
 ## The receiver workflow
 
 `.github/workflows/deps-cascade.yml` is the receiver. It runs on an upstream's `upstream-released`
-dispatch, on a daily sweep at 06:17 UTC, or by hand with `dry_run`.
+dispatch, on a daily sweep (the schedule is in `.github/workflows`), or by hand with `dry_run`.
 
 - Its `cascade` job calls the reusable `cascade-receive.yml` in `open-platform-model/.github`. Its
   `compute` job runs this task (never a local script). Its `gates` job posts the release-PR gates.
