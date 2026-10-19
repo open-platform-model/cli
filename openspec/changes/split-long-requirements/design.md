@@ -2920,7 +2920,7 @@ Plain sentences that carry an RFC 2119 keyword in the new text and had none in t
 
 ## Ledger entries of cli-B4, unit 4b (release-cascade-wiring, cmdutil, platform-check)
 
-One subsection per rewritten requirement, 16 in all: `release-cascade-wiring` 6, `cmdutil` 5 and `platform-check` 5. With unit 4a this completes cli-B4 (28 requirements, running N 112). Every new body is built from whole sentences of the old body, copied unchanged, or from parts of one sentence cut at a list boundary with the subject repeated. The subject words changed are listed under each requirement: a pronoun or "the command" read as the command or file named in the same old requirement or in the Purpose of the spec, an em-dash read as a colon, a closing period where a list marker or a comma stood. Each split block carries the whole old `Source:` line as a `**Source**:` metadata line. Three bodies end with a named reference to a requirement of the same spec, where the old sentence cannot stand without the referent. Old scenario names are all kept; the byte check against `origin/main` ran once per rewritten requirement and printed no `DIFF` and no `LOST`. `grep -rn --exclude-dir=archive` over the repo found no reference to an old header of this unit.
+One subsection per rewritten requirement, 16 in all: `release-cascade-wiring` 6, `cmdutil` 5 and `platform-check` 5. With unit 4a this completes cli-B4 (28 requirements, running N 112). Every new body is built from whole sentences of the old body, copied unchanged, or from parts of one sentence cut at a list boundary with the subject repeated. The subject words changed are listed under each requirement: a pronoun or "the command" read as the command or file named in the same old requirement or in the Purpose of the spec, an em-dash read as a colon, a closing period where a list marker or a comma stood. Each split block carries the whole old `Source:` line as a `**Source**:` metadata line. Six bodies end with a named reference to a requirement of the same spec, where the old sentence cannot stand without the referent. Old scenario names are all kept; the byte check against `origin/main` ran once per rewritten requirement and printed no `DIFF` and no `LOST`. `grep -rn --exclude-dir=archive` over the repo found no reference to an old header of this unit.
 
 ### Ledger: release-cascade-wiring, The cascade receiver runs on a dispatch, a daily sweep and a manual run
 
@@ -3038,8 +3038,9 @@ New scenarios (each restates only a case the old text names):
 Words changed or added:
 - "The cascade gates job ...": "It SHALL have one job" reads "`.github/workflows/cascade-gates.yml` SHALL have one job" (the subject of the first sentence)
 - Three bodies that hold the opening clause of the statuses sentence: the sentence is cut at the colon (a period stands in the exceptions body) or at the semicolon between its two list items (a period closes the first item; the second item follows the colon of the opening clause, as in the old text)
+- "An ordinary or fork pull request ..." and "A same-repository release pull request ...": each body ends with "(Requirement: Gate statuses are posted on every pull request into main except in two cases)", the named reference that gives the two exceptions of the old sentence to the rule they qualify
 
-Lengths (old, new): old 1373; new "The cascade gates workflow runs on pull_request_target with no workflow permissions" 174; "The cascade gates job calls the shared gates workflow and checks out no pull request code" 390; "Gate statuses are posted on every pull request into main except in two cases" 491; "An ordinary or fork pull request gets n/a gate statuses" 219; "A same-repository release pull request gets its gate statuses from a gates-only receiver run" 335.
+Lengths (old, new): old 1373; new "The cascade gates workflow runs on pull_request_target with no workflow permissions" 174; "The cascade gates job calls the shared gates workflow and checks out no pull request code" 390; "Gate statuses are posted on every pull request into main except in two cases" 491; "An ordinary or fork pull request gets n/a gate statuses" 311; "A same-repository release pull request gets its gate statuses from a gates-only receiver run" 427.
 
 ### Ledger: release-cascade-wiring, Only the caller-owned cascade jobs read the App key
 
@@ -3061,7 +3062,10 @@ New scenarios (each restates only a case the old text names):
 | The `cascade` Environment deploys from `main` only. | body of "No other job declares the cascade Environment, ...", verbatim (the body carries SHALL in its first sentence) |
 | Source: workspace RELEASING.md, sections "Notify after publish" and "T... | `**Source**:` line of both, the whole old line |
 
-Lengths (old, new): old 899; new "Only the caller-owned cascade jobs read the App key with a fixed job shape" 495; "No other job declares the cascade Environment, release.yml sets no workflow-level env key and the Environment deploys from main only" 239.
+Words changed or added:
+- "No other job declares the cascade Environment, ...": the body ends with "(Requirement: Only the caller-owned cascade jobs read the App key with a fixed job shape)", the named reference that tells which jobs "No other job" leaves out
+
+Lengths (old, new): old 899; new "Only the caller-owned cascade jobs read the App key with a fixed job shape" 495; "No other job declares the cascade Environment, release.yml sets no workflow-level env key and the Environment deploys from main only" 329.
 
 ### Ledger: release-cascade-wiring, Every cascade reference is pinned to one .github main commit and checked in CI
 
@@ -3154,6 +3158,7 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "ShowRenderOutput r
 
 Words changed or added:
 - Items 1 and 2: the em-dash reads a colon
+- Each body keeps the old item number after a blank line, so that the item renders as a separate paragraph
 
 Lengths (old, new): old 706; new "ShowRenderOutput returns an ExitError with ExitValidationError when the render has errors" 277; "ShowRenderOutput shows compact transformer matches by default and detailed matches in verbose mode" 250; "ShowRenderOutput logs the render warnings via the module-scoped logger" 421.
 

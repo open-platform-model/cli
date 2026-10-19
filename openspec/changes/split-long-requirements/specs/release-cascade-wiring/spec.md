@@ -174,7 +174,7 @@ The commit statuses `cascade/freshness` (G2) and `cascade/settled` (G3) SHALL th
 
 ### Requirement: An ordinary or fork pull request gets n/a gate statuses
 
-The commit statuses `cascade/freshness` (G2) and `cascade/settled` (G3) SHALL then be posted on every pull request into `main` opened or synchronized after this change: `n/a` success on an ordinary or fork pull request.
+The commit statuses `cascade/freshness` (G2) and `cascade/settled` (G3) SHALL then be posted on every pull request into `main` opened or synchronized after this change: `n/a` success on an ordinary or fork pull request. (Requirement: Gate statuses are posted on every pull request into main except in two cases)
 
 **Source**: workspace RELEASING.md, section "Gates"; owner decisions 11 and 12 (warn first); Phase 3 wiring contract (version 3.1) §8.3.
 
@@ -185,7 +185,7 @@ The commit statuses `cascade/freshness` (G2) and `cascade/settled` (G3) SHALL th
 
 ### Requirement: A same-repository release pull request gets its gate statuses from a gates-only receiver run
 
-The commit statuses `cascade/freshness` (G2) and `cascade/settled` (G3) SHALL then be posted on every pull request into `main` opened or synchronized after this change: on a same-repository release pull request, a gates-only receiver run evaluates them. In `warn` mode a problem is posted as a success whose description starts `WARN:`.
+The commit statuses `cascade/freshness` (G2) and `cascade/settled` (G3) SHALL then be posted on every pull request into `main` opened or synchronized after this change: on a same-repository release pull request, a gates-only receiver run evaluates them. In `warn` mode a problem is posted as a success whose description starts `WARN:`. (Requirement: Gate statuses are posted on every pull request into main except in two cases)
 
 **Source**: workspace RELEASING.md, section "Gates"; owner decisions 11 and 12 (warn first); Phase 3 wiring contract (version 3.1) §8.3.
 
@@ -207,7 +207,7 @@ The key SHALL be read only in the caller-owned `notify-downstream` job of `relea
 
 ### Requirement: No other job declares the cascade Environment, release.yml sets no workflow-level env key and the Environment deploys from main only
 
-No other job in the repository SHALL declare `environment: cascade`, and `release.yml` SHALL set no workflow-level `env` key, because workflow-level env reaches the notify action's steps. The `cascade` Environment deploys from `main` only.
+No other job in the repository SHALL declare `environment: cascade`, and `release.yml` SHALL set no workflow-level `env` key, because workflow-level env reaches the notify action's steps. The `cascade` Environment deploys from `main` only. (Requirement: Only the caller-owned cascade jobs read the App key with a fixed job shape)
 
 **Source**: workspace RELEASING.md, sections "Notify after publish" and "Two-job split"; owner decision 5; Phase 3 wiring contract (version 3.1) §2.2 and §10.1 item 9.
 

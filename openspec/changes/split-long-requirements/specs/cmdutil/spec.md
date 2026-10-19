@@ -64,6 +64,7 @@ Commands SHALL build the resolved instance selector from their positional `<file
 ### Requirement: ShowRenderOutput returns an ExitError with ExitValidationError when the render has errors
 
 The render output function (`render.ShowOutput`) SHALL accept a render result and output options (verbose flag). It SHALL:
+
 1. Check for render errors: if present, format and print render errors via `printValidationError`, then return an `*ExitError` with `ExitValidationError`.
 
 #### Scenario: ShowRenderOutput returns error when render has errors
@@ -76,6 +77,7 @@ The render output function (`render.ShowOutput`) SHALL accept a render result an
 ### Requirement: ShowRenderOutput shows compact transformer matches by default and detailed matches in verbose mode
 
 The render output function (`render.ShowOutput`) SHALL accept a render result and output options (verbose flag). It SHALL:
+
 2. Show transformer match output: verbose mode shows module metadata and match reasons; default mode shows compact match lines.
 
 #### Scenario: ShowRenderOutput shows compact matches in default mode
@@ -95,6 +97,7 @@ The render output function (`render.ShowOutput`) SHALL accept a render result an
 ### Requirement: ShowRenderOutput logs the render warnings via the module-scoped logger
 
 The render output function (`render.ShowOutput`) SHALL accept a render result and output options (verbose flag). It SHALL:
+
 3. Log any warnings from the render result via the module-scoped logger. The warnings are worded by the CLI from the kernel's advisory diagnostic rows (unhandled optional traits, and resolved-versions rows marked newer); the render result carries no kernel-authored message strings to pass through.
 
 #### Scenario: ShowRenderOutput logs warnings
