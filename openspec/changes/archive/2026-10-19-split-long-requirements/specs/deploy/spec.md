@@ -863,7 +863,7 @@ When `spec.prune` is set and the inventory tracks at least one PersistentVolumeC
 
 ### Requirement: The dry run and the run with --yes state the same outcome for PersistentVolumeClaims
 
-The dry run, and the run with `--yes`, SHALL state the same outcome for PersistentVolumeClaims in their output.
+The dry run, and the run with `--yes`, SHALL state the same outcome for PersistentVolumeClaims in their output. (Requirement: Instance delete reads the instance record before it asks for confirmation)
 
 #### Scenario: Same outcome in a dry run and with --yes
 
@@ -1039,7 +1039,7 @@ With `--wait`, on a real run of a CLI-owned instance in which no tracked resourc
 
 ### Requirement: A resource is gone when its read returns NotFound or its UID differs
 
-With `--wait`, on a real run of a CLI-owned instance in which no tracked resource failed, a resource is gone when its read returns NotFound, or when the live object under its name has a UID other than the one of the object that was deleted. A read that fails with another error SHALL NOT count as gone.
+With `--wait`, on a real run of a CLI-owned instance in which no tracked resource failed, a resource is gone when its read returns NotFound, or when the live object under its name has a UID other than the one of the object that was deleted. A read that fails with another error SHALL NOT count as gone. (Requirement: Instance delete with `--wait` waits for the deleted resources to disappear)
 
 #### Scenario: Name taken by a new object
 

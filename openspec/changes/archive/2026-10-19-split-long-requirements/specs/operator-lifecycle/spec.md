@@ -502,7 +502,7 @@ Install SHALL run, before it writes any object, every check that can refuse it: 
 
 ### Requirement: Install runs its status-subresource permission check and the apply guard before it writes
 
-Install SHALL run, before it writes any object, every check that can refuse it: the status-subresource permission check, and the apply guard over every object the render names (capability `apply-pruning`, "Ownership guard judges every apply and dry run"). An install that refuses SHALL change no object in the cluster.
+Install SHALL run, before it writes any object, every check that can refuse it: the status-subresource permission check, and the apply guard over every object the render names (capability `apply-pruning`, "The ownership guard judges every apply"). An install that refuses SHALL change no object in the cluster.
 
 #### Scenario: A refused install leaves the CRDs untouched
 

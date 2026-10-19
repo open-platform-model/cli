@@ -52,7 +52,7 @@ The `cue.mod/module.cue` file SHALL be exactly what `opm module tidy` leaves, so
 
 ### Requirement: The instance.cue file declares the package, the imports and the module instance
 
-`instance.cue` SHALL declare `package instance`, imports core at the module's core major and the module at its major, embeds `core.#ModuleInstance`, sets `metadata.name` and `metadata.namespace`, and sets `#module` to the imported module.
+`instance.cue` SHALL declare `package instance`, import core at the module's core major and the module at its major, embed `core.#ModuleInstance`, set `metadata.name` and `metadata.namespace`, and set `#module` to the imported module.
 
 #### Scenario: The instance file
 - **WHEN** `opm instance init` writes `instance.cue`
