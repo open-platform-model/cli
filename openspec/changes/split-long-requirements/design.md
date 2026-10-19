@@ -2917,3 +2917,486 @@ Plain sentences that carry an RFC 2119 keyword in the new text and had none in t
 | Old sentence | New body | Word added |
 | --- | --- | --- |
 | The declared pair is verified against fetched coordinates wherever it later meets a registry (operator acquire... | "The declared module identity pair is verified where it meets a registry" | "The declared pair" reads "The declared pair (`spec.module.path` and `spec.module.version`)", copied from the first sentence; "is verified" reads "SHALL be verified" |
+
+## Ledger entries of cli-B4, unit 4b (release-cascade-wiring, cmdutil, platform-check)
+
+One subsection per rewritten requirement, 16 in all: `release-cascade-wiring` 6, `cmdutil` 5 and `platform-check` 5. With unit 4a this completes cli-B4 (28 requirements, running N 112). Every new body is built from whole sentences of the old body, copied unchanged, or from parts of one sentence cut at a list boundary with the subject repeated. The subject words changed are listed under each requirement: a pronoun or "the command" read as the command or file named in the same old requirement or in the Purpose of the spec, an em-dash read as a colon, a closing period where a list marker or a comma stood. Each split block carries the whole old `Source:` line as a `**Source**:` metadata line. Three bodies end with a named reference to a requirement of the same spec, where the old sentence cannot stand without the referent. Old scenario names are all kept; the byte check against `origin/main` ran once per rewritten requirement and printed no `DIFF` and no `LOST`. `grep -rn --exclude-dir=archive` over the repo found no reference to an old header of this unit.
+
+### Ledger: release-cascade-wiring, The cascade receiver runs on a dispatch, a daily sweep and a manual run
+
+Form: b (MODIFIED parent, ADDED split-offs). The parent stays with a shorter body and both its scenarios. New requirements: "The cascade job calls the shared receiver workflow at the pinned commit with fixed permissions", "The cascade job passes the dry-run, gates-only, gate mode and setup-go inputs".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| An upstream release starts the receiver | "The cascade receiver runs on a dispatch, a daily sweep and a manual run", "An upstream release starts the receiver" | No (byte equal, checked) |
+| The daily sweep runs without a dispatch | "The cascade receiver runs on a dispatch, a daily sweep and a manual run", "The daily sweep runs without a dispatch" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "The cascade job calls the pinned shared receiver" in "The cascade job calls the shared receiver workflow at the pinned commit with fixed permissions"
+- "The gate modes default to warn" in "The cascade job passes the dry-run, gates-only, gate mode and setup-go inputs"
+
+| Old clause | New place |
+| --- | --- |
+| `.github/workflows/deps-cascade.yml` SHALL run on `repository_dispatch... | body of the parent, verbatim |
+| It SHALL declare `permissions: {}` at the workflow level and SHALL hav... | body of the parent, verbatim |
+| The receiver computes the cascade diff with this repository's `task -x... | body of the parent, verbatim (the parent carries SHALL in its other sentences) |
+| Its job `cascade` SHALL call the shared `open-platform-model/.github`... | body of "The cascade job calls the shared receiver workflow at the pinned commit with fixed permissions", cut at the list boundary before ", and SHALL pass" |
+| and SHALL pass `dry-run`, `gates-only` from the `gates_only` input, `g... | body of "The cascade job passes the dry-run, gates-only, gate mode and setup-go inputs", the second part of the same sentence |
+| Source: workspace RELEASING.md, sections "The receiver", "Two-job spli... | `**Source**:` line of the parent and of both split-offs, the whole old line |
+
+Words changed or added:
+- Both split-offs: "Its job `cascade`" reads "The job `cascade` of `.github/workflows/deps-cascade.yml`" (the subject is the workflow file named in the first sentence of the same paragraph)
+- "The cascade job calls ...": the closing period stands where ", and SHALL pass" began
+- "The cascade job passes ...": the text starts at "SHALL pass"; the "and" before it is dropped
+
+Lengths (old, new): old 1124; new "The cascade job calls the shared receiver workflow at the pinned commit with fixed permissions" 274; "The cascade job passes the dry-run, gates-only, gate mode and setup-go inputs" 317; "The cascade receiver runs on a dispatch, a daily sweep and a manual run" 488.
+
+### Ledger: release-cascade-wiring, The receiver publishes only through its own cascade Environment job
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The publish job needs cascade, runs in the cascade Environment and grants only two read permissions", "The publish job has exactly one step, the shared cascade-publish action with fixed inputs", "The publish job runs only on the receiver caller's if: byte for byte", "The receiver checks that the cascade labels exist and never creates one".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| A live run publishes from the caller's own job | "The publish job needs cascade, runs in the cascade Environment and grants only two read permissions", "A live run publishes from the caller's own job" | No (byte equal, checked) |
+| The receiver never creates a label in the cli | "The receiver checks that the cascade labels exist and never creates one", "The receiver never creates a label in the cli" | No (byte equal, checked) |
+| A gates-only run never publishes | "The publish job runs only on the receiver caller's if: byte for byte", "A gates-only run never publishes" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "The publish job runs the shared action as its one step" in "The publish job has exactly one step, the shared cascade-publish action with fixed inputs"
+
+| Old clause | New place |
+| --- | --- |
+| `deps-cascade.yml` SHALL have a second job, `publish`, that needs `cas... | body of "The publish job needs cascade, runs in the cascade Environment and grants only two read permissions", cut at the list boundary before ", and has exactly one step" |
+| and has exactly one step: the shared `cascade-publish` action at the r... | body of "The publish job has exactly one step, the shared cascade-publish action with fixed inputs", the second part of the same sentence with the subject repeated |
+| Its `if:` SHALL be the receiver caller's `if:` in `.github` `reference... | body of "The publish job runs only on the receiver caller's if: byte for byte" |
+| Because `.github/labels.yml` owns the repository's labels, publish SHA... | body of "The receiver checks that the cascade labels exist and never creates one", verbatim |
+| Source: workspace RELEASING.md, sections "Two-job split" and "Labels";... | `**Source**:` line of all four, the whole old line |
+
+Words changed or added:
+- "The publish job needs cascade ...": the list ends at "`pull-requests: read`" with a closing period where ", and has exactly one step" began
+- "The publish job has exactly one step ...": "that needs `cascade`, runs ..., and has exactly one step" reads "that has exactly one step" (the earlier list items sit in the first split)
+- "The publish job runs only on ...": "Its `if:`" reads "The `if:` of the `publish` job"
+
+Lengths (old, new): old 1267; new "The publish job needs cascade, runs in the cascade Environment and grants only two read permissions" 215; "The publish job has exactly one step, the shared cascade-publish action with fixed inputs" 414; "The publish job runs only on the receiver caller's if: byte for byte" 351; "The receiver checks that the cascade labels exist and never creates one" 136.
+
+### Ledger: release-cascade-wiring, The receiver is a dry run unless CASCADE_DRY_RUN is exactly false
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The caller passes dry-run so that the receiver is live only when CASCADE_DRY_RUN is exactly false", "The dry-run switch is enforced in three places and a dry run pushes nothing".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Variable unset | "The caller passes dry-run so that the receiver is live only when CASCADE_DRY_RUN is exactly false", "Variable unset" | No (byte equal, checked) |
+| Variable set to true | "The caller passes dry-run so that the receiver is live only when CASCADE_DRY_RUN is exactly false", "Variable set to true" | No (byte equal, checked) |
+| Manual dry run while live | "The caller passes dry-run so that the receiver is live only when CASCADE_DRY_RUN is exactly false", "Manual dry run while live" | No (byte equal, checked) |
+| Repository code cannot unlock publishing in a dry run | "The dry-run switch is enforced in three places and a dry run pushes nothing", "Repository code cannot unlock publishing in a dry run" | No (byte equal, checked) |
+| Live only at exactly false | "The caller passes dry-run so that the receiver is live only when CASCADE_DRY_RUN is exactly false", "Live only at exactly false" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The caller SHALL pass `dry-run` as `${{ inputs.dry_run == true || vars... | body of "The caller passes dry-run so that the receiver is live only when CASCADE_DRY_RUN is exactly false", verbatim |
+| A run from any ref other than `main` is always a dry run. | body of "The caller passes dry-run ...", verbatim (the body carries SHALL in its first sentence) |
+| The switch SHALL be enforced in three places that read `inputs` and `v... | body of "The dry-run switch is enforced in three places and a dry run pushes nothing" |
+| In a dry run the receiver computes the diff, title, body and labels | body of "The dry-run switch is enforced in three places and a dry run pushes nothing", verbatim |
+| The release-PR gate statuses are still posted. | body of "The dry-run switch is enforced in three places and a dry run pushes nothing", verbatim |
+| Source: workspace RELEASING.md, sections "The receiver" and "Stop swit... | `**Source**:` line of both, the whole old line |
+
+Words changed or added:
+- "The dry-run switch ...": "The switch" reads "The `dry-run` switch" (the token is the one the first sentence of the old body names)
+
+Lengths (old, new): old 1007; new "The caller passes dry-run so that the receiver is live only when CASCADE_DRY_RUN is exactly false" 392; "The dry-run switch is enforced in three places and a dry run pushes nothing" 496.
+
+### Ledger: release-cascade-wiring, Pull requests into main carry the cascade gate statuses
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The cascade gates workflow runs on pull_request_target with no workflow permissions", "The cascade gates job calls the shared gates workflow and checks out no pull request code", "Gate statuses are posted on every pull request into main except in two cases", "An ordinary or fork pull request gets n/a gate statuses", "A same-repository release pull request gets its gate statuses from a gates-only receiver run".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Ordinary pull request | "An ordinary or fork pull request gets n/a gate statuses", "Ordinary pull request" | No (byte equal, checked) |
+| Release pull request with a shipped pin behind | "A same-repository release pull request gets its gate statuses from a gates-only receiver run", "Release pull request with a shipped pin behind" | No (byte equal, checked) |
+| The gate job checks out no pull request code | "The cascade gates job calls the shared gates workflow and checks out no pull request code", "The gate job checks out no pull request code" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "The gates workflow runs on pull request events" in "The cascade gates workflow runs on pull_request_target with no workflow permissions"
+- "A Dependabot pull request whose token cannot post statuses" in "Gate statuses are posted on every pull request into main except in two cases"
+
+| Old clause | New place |
+| --- | --- |
+| `.github/workflows/cascade-gates.yml` SHALL run on `pull_request_targe... | body of "The cascade gates workflow runs on pull_request_target with no workflow permissions", verbatim |
+| It SHALL declare `permissions: {}` at the workflow level. | body of "The cascade gates workflow runs on pull_request_target with no workflow permissions", verbatim |
+| It SHALL have one job that calls the shared `open-platform-model/.gith... | body of "The cascade gates job calls the shared gates workflow and checks out no pull request code" |
+| The commit statuses `cascade/freshness` (G2) and `cascade/settled` (G3... | opening clause and the first list item, body of "An ordinary or fork pull request gets n/a gate statuses" |
+| ... on a same-repository release pull request, a gates-only receiver r... | opening clause and the second list item, body of "A same-repository release pull request gets its gate statuses from a gates-only receiver run" |
+| ... opened or synchronized after this change: (opening clause) | opening clause, also the first sentence of the body of "Gate statuses are posted on every pull request into main except in two cases", which then holds the exceptions |
+| Two cases are excepted: a release pull request whose gates-only evalua... | body of "Gate statuses are posted on every pull request into main except in two cases", verbatim |
+| In `warn` mode a problem is posted as a success whose description star... | body of "A same-repository release pull request gets its gate statuses from a gates-only receiver run", verbatim |
+| This change does not make either status a required check. | body of "Gate statuses are posted on every pull request into main except in two cases", verbatim |
+| Source: workspace RELEASING.md, section "Gates"; ... | `**Source**:` line of all five, the whole old line |
+
+Words changed or added:
+- "The cascade gates job ...": "It SHALL have one job" reads "`.github/workflows/cascade-gates.yml` SHALL have one job" (the subject of the first sentence)
+- Three bodies that hold the opening clause of the statuses sentence: the sentence is cut at the colon (a period stands in the exceptions body) or at the semicolon between its two list items (a period closes the first item; the second item follows the colon of the opening clause, as in the old text)
+
+Lengths (old, new): old 1373; new "The cascade gates workflow runs on pull_request_target with no workflow permissions" 174; "The cascade gates job calls the shared gates workflow and checks out no pull request code" 390; "Gate statuses are posted on every pull request into main except in two cases" 491; "An ordinary or fork pull request gets n/a gate statuses" 219; "A same-repository release pull request gets its gate statuses from a gates-only receiver run" 335.
+
+### Ledger: release-cascade-wiring, Only the caller-owned cascade jobs read the App key
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "Only the caller-owned cascade jobs read the App key with a fixed job shape", "No other job declares the cascade Environment, release.yml sets no workflow-level env key and the Environment deploys from main only".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| A branch run cannot reach the key | "No other job declares the cascade Environment, release.yml sets no workflow-level env key and the Environment deploys from main only", "A branch run cannot reach the key" | No (byte equal, checked) |
+| A pull request adds a step to a key-holding job | "Only the caller-owned cascade jobs read the App key with a fixed job shape", "A pull request adds a step to a key-holding job" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "Only the key-holding jobs declare the cascade Environment" in "No other job declares the cascade Environment, release.yml sets no workflow-level env key and the Environment deploys from main only"
+
+| Old clause | New place |
+| --- | --- |
+| The key SHALL be read only in the caller-owned `notify-downstream` job... | body of "Only the caller-owned cascade jobs read the App key with a fixed job shape", verbatim |
+| No other job in the repository SHALL declare `environment: cascade`, a... | body of "No other job declares the cascade Environment, ...", verbatim |
+| The `cascade` Environment deploys from `main` only. | body of "No other job declares the cascade Environment, ...", verbatim (the body carries SHALL in its first sentence) |
+| Source: workspace RELEASING.md, sections "Notify after publish" and "T... | `**Source**:` line of both, the whole old line |
+
+Lengths (old, new): old 899; new "Only the caller-owned cascade jobs read the App key with a fixed job shape" 495; "No other job declares the cascade Environment, release.yml sets no workflow-level env key and the Environment deploys from main only" 239.
+
+### Ledger: release-cascade-wiring, Every cascade reference is pinned to one .github main commit and checked in CI
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The release and receiver workflows name the same full SHA of a .github main commit", "The gates workflow and the resolver checkout name the same full SHA of a .github main commit", "A .github change reaches the cli only through a pin pull request", "The wiring-check script is a byte-identical copy of the pinned file and runs offline", "The wiring-check values file holds the cli's values", "The wiring check asserts the pin, the key rules, the job shapes and the caller shapes", "The required lint job runs the wiring check on every pull request", "Nothing reaches the wiring step from around it", "Every checkout of .github is pinned to a full SHA with fixed keys".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| All five references carry one SHA | "The release and receiver workflows name the same full SHA of a .github main commit", "All five references carry one SHA" | No (byte equal, checked) |
+| One reference moves alone | "The gates workflow and the resolver checkout name the same full SHA of a .github main commit", "One reference moves alone" | No (byte equal, checked) |
+| A workflow env key in release.yml | "The wiring check asserts the pin, the key rules, the job shapes and the caller shapes", "A workflow env key in release.yml" | No (byte equal, checked) |
+| A pin that exists only in a fork | "The required lint job runs the wiring check on every pull request", "A pin that exists only in a fork" | No (byte equal, checked) |
+| The copy is the canonical script | "The wiring-check script is a byte-identical copy of the pinned file and runs offline", "The copy is the canonical script" | No (byte equal, checked) |
+| A publishing workflow restores a cache | "The wiring check asserts the pin, the key rules, the job shapes and the caller shapes", "A publishing workflow restores a cache" | No (byte equal, checked) |
+| A copy that drifted from the pinned file | "The required lint job runs the wiring check on every pull request", "A copy that drifted from the pinned file" | No (byte equal, checked) |
+| A run step before the wiring step | "Nothing reaches the wiring step from around it", "A run step before the wiring step" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "A .github change arrives as one pin pull request" in "A .github change reaches the cli only through a pin pull request"
+- "The task runs the check offline" in "The wiring-check script is a byte-identical copy of the pinned file and runs offline"
+- "The values file holds the cli's values" in "The wiring-check values file holds the cli's values"
+- "The resolver checkout carries only fixed keys" in "Every checkout of .github is pinned to a full SHA with fixed keys"
+
+| Old clause | New place |
+| --- | --- |
+| Every reference this repository makes to the cascade code SHALL name t... | sentence over 500 on its own, cut at a list boundary: opening clause with the first three list items in "The release and receiver workflows name ...", opening clause with the last two in "The gates workflow and the resolver checkout name ..." |
+| A `.github` change SHALL reach this repository only through a pull req... | body of "A .github change reaches the cli only through a pin pull request", verbatim |
+| `.tasks/cascade/wiring-check.sh` SHALL be a byte-identical copy of `.g... | body of "The wiring-check script is a byte-identical copy of the pinned file and runs offline", first part of a sentence over 500, closing period where ", and" stood |
+| and `.tasks/cascade/wiring-check.yaml` SHALL hold the cli's values fro... | body of "The wiring-check values file holds the cli's values", second part of the same sentence |
+| The check SHALL assert the pin, the cascade key rule, the release key... | body of "The wiring check asserts the pin, the key rules, the job shapes and the caller shapes" |
+| `pr.yml`'s required `lint` job SHALL run it on every pull request | body of "The required lint job runs the wiring check on every pull request" |
+| Nothing SHALL reach that step from around it: ... | body of "Nothing reaches the wiring step from around it" |
+| Every checkout of `.github` (the `cascade-task.yml` resolver checkout)... | body of "Every checkout of .github is pinned to a full SHA with fixed keys", verbatim |
+| `task cascade:wiring:check` SHALL run the same check offline, and the... | body of "The wiring-check script is a byte-identical copy of the pinned file and runs offline", verbatim |
+| Source: owner decision 24 and the supervisor's extension ...; ... | `**Source**:` line of all nine, the whole old line |
+
+Words changed or added:
+- "The release and receiver workflows ..." and "The gates workflow ...": the opening clause is repeated, the list is cut at the boundary between "`deps-cascade.yml`," and "the `cascade-gates.yml` workflow"; the first closes with a period where ", " stood, the second keeps the "and" before its last item
+- "The wiring-check script ...": the sentence ends at "moved only with the pin" with a closing period; the sentence on `task cascade:wiring:check` follows unchanged
+- "The wiring-check values file ...": the "and" before `.tasks/cascade/wiring-check.yaml` is dropped
+- "The wiring check asserts ...": "The check" reads "The check of `.tasks/cascade/wiring-check.sh`"
+- "The required lint job ...": "it" reads "`.tasks/cascade/wiring-check.sh`"
+- "Nothing reaches the wiring step ...": "that step" reads "the step \"Verify the cascade wiring\"" (the step named in the same old paragraph)
+
+Lengths (old, new): old 3255; new "The release and receiver workflows name the same full SHA of a .github main commit" 357; "The gates workflow and the resolver checkout name the same full SHA of a .github main commit" 370; "A .github change reaches the cli only through a pin pull request" 273; "The wiring-check script is a byte-identical copy of the pinned file and runs offline" 263; "The wiring-check values file holds the cli's values" 411; "The wiring check asserts the pin, the key rules, the job shapes and the caller shapes" 457; "The required lint job runs the wiring check on every pull request" 413; "Nothing reaches the wiring step from around it" 384; "Every checkout of .github is pinned to a full SHA with fixed keys" 248.
+
+### Ledger: cmdutil, InstanceSelectorFlags carries and validates the resolved instance selector
+
+Form: b (MODIFIED parent, ADDED split-off). The parent stays with a shorter body and its three scenarios. New requirements: "Commands build the instance selector from their positional argument".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Both selectors set is rejected | "InstanceSelectorFlags carries and validates the resolved instance selector", "Both selectors set is rejected" | No (byte equal, checked) |
+| Neither selector set is rejected | "InstanceSelectorFlags carries and validates the resolved instance selector", "Neither selector set is rejected" | No (byte equal, checked) |
+| Exactly one selector set is accepted | "InstanceSelectorFlags carries and validates the resolved instance selector", "Exactly one selector set is accepted" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "A command builds its selector from the positional argument" in "Commands build the instance selector from their positional argument"
+
+| Old clause | New place |
+| --- | --- |
+| The `InstanceSelectorFlags` struct SHALL carry the resolved instance s... | body of the parent, verbatim |
+| Commands SHALL build it from their positional `<file|name|uuid>` argum... | body of "Commands build the instance selector from their positional argument" |
+| It SHALL provide a `Validate()` method that enforces mutual exclusivit... | body of the parent, verbatim ("It" is the struct of the first sentence, kept in the same body) |
+| <!-- Was: ReleaseSelectorFlags, --release-name/--release-id (enhanceme... | end of the body of "Commands build the instance selector from their positional argument", verbatim |
+
+Words changed or added:
+- "Commands build ...": "it" reads "the resolved instance selector" (the phrase of the first sentence of the old body)
+
+Lengths (old, new): old 655; new "Commands build the instance selector from their positional argument" 400; "InstanceSelectorFlags carries and validates the resolved instance selector" 282.
+
+### Ledger: cmdutil, ShowRenderOutput checks for errors, shows transformer matches, and logs warnings
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "ShowRenderOutput returns an ExitError with ExitValidationError when the render has errors", "ShowRenderOutput shows compact transformer matches by default and detailed matches in verbose mode", "ShowRenderOutput logs the render warnings via the module-scoped logger".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| ShowRenderOutput returns error when render has errors | "ShowRenderOutput returns an ExitError with ExitValidationError when the render has errors", "ShowRenderOutput returns error when render has errors" | No (byte equal, checked) |
+| ShowRenderOutput shows compact matches in default mode | "ShowRenderOutput shows compact transformer matches by default and detailed matches in verbose mode", "ShowRenderOutput shows compact matches in default mode" | No (byte equal, checked) |
+| ShowRenderOutput shows detailed matches in verbose mode | "ShowRenderOutput shows compact transformer matches by default and detailed matches in verbose mode", "ShowRenderOutput shows detailed matches in verbose mode" | No (byte equal, checked) |
+| ShowRenderOutput logs warnings | "ShowRenderOutput logs the render warnings via the module-scoped logger", "ShowRenderOutput logs warnings" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The render output function (`render.ShowOutput`) SHALL accept a render... | first line of all three bodies, verbatim |
+| 1. Check for render errors — if present, format and print render error... | body of "ShowRenderOutput returns an ExitError with ExitValidationError when the render has errors" |
+| 2. Show transformer match output — verbose mode shows module metadata... | body of "ShowRenderOutput shows compact transformer matches by default and detailed matches in verbose mode" |
+| 3. Log any warnings from the render result via the module-scoped logge... | body of "ShowRenderOutput logs the render warnings via the module-scoped logger", verbatim |
+
+Words changed or added:
+- Items 1 and 2: the em-dash reads a colon
+
+Lengths (old, new): old 706; new "ShowRenderOutput returns an ExitError with ExitValidationError when the render has errors" 277; "ShowRenderOutput shows compact transformer matches by default and detailed matches in verbose mode" 250; "ShowRenderOutput logs the render warnings via the module-scoped logger" 421.
+
+### Ledger: cmdutil, PrintValidationError groups CUE positions on any error
+
+Form: b (MODIFIED parent, ADDED split-off). The parent stays with a shorter body and its two scenarios. New requirements: "PrintValidationError accepts a message string and an error".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Kernel validation error with CUE positions | "PrintValidationError groups CUE positions on any error", "Kernel validation error with CUE positions" | No (byte equal, checked) |
+| Generic error without CUE details | "PrintValidationError groups CUE positions on any error", "Generic error without CUE details" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "PrintValidationError is called with a message and an error" in "PrintValidationError accepts a message string and an error"
+
+| Old clause | New place |
+| --- | --- |
+| The `PrintValidationError` function SHALL accept a message string and... | body of "PrintValidationError accepts a message string and an error", verbatim |
+| When the error chain carries CUE errors with at least one valid source... | body of the parent |
+| Typed kernel refusals (unresolved demands) and `ValidationError` value... | body of the parent, verbatim (the parent carries SHALL in its other sentences) |
+| For other errors, it SHALL use the standard key-value log format. | body of the parent |
+
+Words changed or added:
+- The parent: both "it" read "`PrintValidationError`" (the function named in the sentence that moved out)
+
+Lengths (old, new): old 510; new "PrintValidationError accepts a message string and an error" 79; "PrintValidationError groups CUE positions on any error" 470.
+
+### Ledger: cmdutil, PrintRenderErrors formats render errors with diagnostic detail
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The render refusal printer accepts a render error and prints the component name, transformer FQN and cause of a transform error", "The render refusal printer prints the component names of an unmatched-components refusal and the candidate transformers in verbose mode", "The render refusal printer prints every contract key and the competing catalogs of an over-subscription refusal", "Unresolved demands are rendered from the demand rows and name the defining catalog".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Unmatched components error with diagnostics | "The render refusal printer prints the component names of an unmatched-components refusal and the candidate transformers in verbose mode", "Unmatched components error with diagnostics" | No (byte equal, checked) |
+| Over-subscribed contracts print once | "The render refusal printer prints every contract key and the competing catalogs of an over-subscription refusal", "Over-subscribed contracts print once" | No (byte equal, checked) |
+| Transform error | "The render refusal printer accepts a render error and prints the component name, transformer FQN and cause of a transform error", "Transform error" | No (byte equal, checked) |
+| Unresolved demands format from rows | "Unresolved demands are rendered from the demand rows and name the defining catalog", "Unresolved demands format from rows" | No (byte equal, checked) |
+| A defined but unimplemented demand names its catalog | "Unresolved demands are rendered from the demand rows and name the defining catalog", "A defined but unimplemented demand names its catalog" | No (byte equal, checked) |
+| A demand no catalog defines keeps the plain line | "Unresolved demands are rendered from the demand rows and name the defining catalog", "A demand no catalog defines keeps the plain line" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The render refusal printer (`printValidationError`, funnelling into `c... | body of "The render refusal printer accepts a render error and prints the component name, transformer FQN and cause of a transform error", verbatim |
+| For an unmatched-components refusal it SHALL print the component names... | body of "The render refusal printer prints the component names of an unmatched-components refusal ..." |
+| For an over-subscription refusal it SHALL print every contract key | body of "The render refusal printer prints every contract key and the competing catalogs of an over-subscription refusal" |
+| For transform errors, it SHALL print the component name, transformer F... | body of "The render refusal printer accepts a render error and prints ...", verbatim ("it" is the printer of the first sentence in the same body) |
+| Unresolved demands SHALL be rendered from the demand rows themselves, | body of "Unresolved demands are rendered from the demand rows and name the defining catalog", verbatim |
+
+Words changed or added:
+- "... unmatched-components refusal ..." and "... over-subscription refusal": the first "it" reads "the render refusal printer" (the subject of the first sentence)
+
+Lengths (old, new): old 985; new "The render refusal printer accepts a render error and prints the component name, transformer FQN and cause of a transform error" 266; "The render refusal printer prints the component names of an unmatched-components refusal and the candidate transformers in verbose mode" 357; "The render refusal printer prints every contract key and the competing catalogs of an over-subscription refusal" 175; "Unresolved demands are rendered from the demand rows and name the defining catalog" 232.
+
+### Ledger: cmdutil, Shared inventory resolution helper in the query workflow
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "ResolveInventory resolves the record by instance ID or by instance name", "ResolveInventory returns an InstanceNotFoundError with exit code 5 when no record is found", "ResolveInventory returns the live resources and the missing entries on success".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Resolve by instance name | "ResolveInventory resolves the record by instance ID or by instance name", "Resolve by instance name" | No (byte equal, checked) |
+| Resolve by instance UUID | "ResolveInventory resolves the record by instance ID or by instance name", "Resolve by instance UUID" | No (byte equal, checked) |
+| Instance not found | "ResolveInventory returns an InstanceNotFoundError with exit code 5 when no record is found", "Instance not found" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "A successful resolution returns the live resources and the missing entries" in "ResolveInventory returns the live resources and the missing entries on success"
+
+| Old clause | New place |
+| --- | --- |
+| `query.ResolveInventory` (in `internal/workflow/query`) SHALL resolve... | body of "ResolveInventory resolves the record by instance ID or by instance name", verbatim |
+| If `InstanceID` is non-empty, it SHALL resolve via `inventory.FindReco... | body of "ResolveInventory resolves the record by instance ID or by instance name", verbatim |
+| When no record is found, it SHALL return an `InstanceNotFoundError` wi... | body of "ResolveInventory returns an InstanceNotFoundError with exit code 5 when no record is found" |
+| On success it SHALL also return the live resources and the missing ent... | body of "ResolveInventory returns the live resources and the missing entries on success" |
+| <!-- Was: cmdutil.ResolveInventory over *ReleaseSelectorFlags, Release... | end of the body of "ResolveInventory returns an InstanceNotFoundError with exit code 5 when no record is found", verbatim |
+
+Words changed or added:
+- The last two bodies: "it" reads "`query.ResolveInventory`" (the subject of the first sentence)
+
+Lengths (old, new): old 793; new "ResolveInventory resolves the record by instance ID or by instance name" 359; "ResolveInventory returns an InstanceNotFoundError with exit code 5 when no record is found" 331; "ResolveInventory returns the live resources and the missing entries on success" 145.
+
+### Ledger: platform-check, opm platform check reports a platform's contract inventory
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "opm platform check is registered under a platform command group and never applies, renders or contacts a cluster", "opm platform check reports the defined contracts, their implementations and the provider-fulfilled contracts nothing requires", "opm platform check reports every contract key that more than one enabled registry entry defines", "opm platform check reports the provider-fulfilled contracts required by transformers of more than one enabled registry entry", "opm platform check reports every comparable pair of enabled transformers", "opm platform check reports a verdict line for each inventory boolean and words verdicts as vacuous only when nothing is defined, provided or colliding".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| A healthy platform reports clean | "opm platform check reports the defined contracts, their implementations and the provider-fulfilled contracts nothing requires", "A healthy platform reports clean" | No (byte equal, checked) |
+| A platform whose catalogs list nothing reports an empty inventory | "opm platform check reports a verdict line for each inventory boolean and words verdicts as vacuous only when nothing is defined, provided or colliding", "A platform whose catalogs list nothing reports an empty inventory" | No (byte equal, checked) |
+| The report names the defining catalog | "opm platform check reports the defined contracts, their implementations and the provider-fulfilled contracts nothing requires", "The report names the defining catalog" | No (byte equal, checked) |
+| The report names both transformers of a comparable pair | "opm platform check reports every comparable pair of enabled transformers", "The report names both transformers of a comparable pair" | No (byte equal, checked) |
+| Providers of a contract no enabled catalog defines are not vacuous | "opm platform check reports the provider-fulfilled contracts required by transformers of more than one enabled registry entry", "Providers of a contract no enabled catalog defines are not vacuous" | No (byte equal, checked) |
+| A platform whose only contracts collide is not vacuous | "opm platform check reports every contract key that more than one enabled registry entry defines", "A platform whose only contracts collide is not vacuous" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "The check applies, renders and contacts no cluster" in "opm platform check is registered under a platform command group and never applies, renders or contacts a cluster"
+
+| Old clause | New place |
+| --- | --- |
+| The CLI SHALL provide `opm platform check`, registered under a `platfo... | body of "opm platform check is registered under a platform command group and never applies, renders or contacts a cluster", verbatim |
+| The command SHALL NOT apply, render, or contact a cluster. | body of the same requirement, verbatim |
+| It SHALL build the resolved platform through the kernel and read its c... | the sentence is over 500, cut at list boundaries: lead clause repeated in each of the five bodies that list its items; first three items in "opm platform check reports the defined contracts ..." |
+| every contract key more than one enabled registry entry defines, each... | lead clause and this item, body of "opm platform check reports every contract key that more than one enabled registry entry defines" |
+| the provider-fulfilled contracts required by transformers of more than... | lead clause and this item, body of "opm platform check reports the provider-fulfilled contracts required by transformers of more than one enabled registry entry" |
+| every pair of enabled transformers whose match predicates are comparab... | lead clause and this item, body of "opm platform check reports every comparable pair of enabled transformers" |
+| and a verdict line for each of the three booleans the inventory carrie... | lead clause and this item, body of "opm platform check reports a verdict line for each inventory boolean and words verdicts as vacuous only when nothing is defined, provided or colliding" |
+| The report SHALL word the verdicts as vacuous only when no enabled cat... | same body as the verdict item, verbatim |
+
+Words changed or added:
+- The five list bodies: "It SHALL build" reads "`opm platform check` SHALL build" (the command of the first sentence); the list items are joined by semicolons as in the old text; the last item of a body closes with a period; the "and" before the verdict item is dropped
+
+Lengths (old, new): old 1331; new "opm platform check is registered under a platform command group and never applies, renders or contacts a cluster" 147; "opm platform check reports the defined contracts, their implementations and the provider-fulfilled contracts nothing requires" 294; "opm platform check reports every contract key that more than one enabled registry entry defines" 251; "opm platform check reports the provider-fulfilled contracts required by transformers of more than one enabled registry entry" 345; "opm platform check reports every comparable pair of enabled transformers" 317; "opm platform check reports a verdict line for each inventory boolean and words verdicts as vacuous only when nothing is defined, provided or colliding" 466.
+
+### Ledger: platform-check, An over-subscribed contract fails the command
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "An over-subscribed contract is reported with its providing registry keys and fails the command", "Providers are counted per enabled registry entry and the command computes no count of its own".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Over-subscription exits non-zero | "An over-subscribed contract is reported with its providing registry keys and fails the command", "Over-subscription exits non-zero" | No (byte equal, checked) |
+| Catalog-fulfilled plurality is not over-subscription | "An over-subscribed contract is reported with its providing registry keys and fails the command", "Catalog-fulfilled plurality is not over-subscription" | No (byte equal, checked) |
+| Two majors of one provider catalog are two providers | "Providers are counted per enabled registry entry and the command computes no count of its own", "Two majors of one provider catalog are two providers" | No (byte equal, checked) |
+| A disabled defining catalog does not hide over-subscription | "Providers are counted per enabled registry entry and the command computes no count of its own", "A disabled defining catalog does not hide over-subscription" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| A provider-fulfilled contract required by transformers of more than on... | body of "An over-subscribed contract is reported with its providing registry keys and fails the command" |
+| This mirrors where the refusal lives in the system: `Routable: false`... | body of the same requirement, verbatim (the body carries SHALL in its first sentence; "This" follows the exit rule it explains) |
+| Two majors of one catalog are two registry entries and so two provider... | body of "Providers are counted per enabled registry entry and the command computes no count of its own", verbatim (the body carries SHALL NOT in its last sentence) |
+| The command reads the count the platform's core derives and the render... | body of "Providers are counted per enabled registry entry ..." |
+
+Words changed or added:
+- "the command SHALL exit" reads "`opm platform check` SHALL exit"; "The command reads" reads "`opm platform check` reads" (the command named in the Purpose of the spec and in the header of the spec's first requirement)
+
+Lengths (old, new): old 795; new "An over-subscribed contract is reported with its providing registry keys and fails the command" 487; "Providers are counted per enabled registry entry and the command computes no count of its own" 325.
+
+### Ledger: platform-check, An undiscriminated platform fails the command
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A comparable pair of enabled transformers is reported with both transformers and the shared contracts and fails the command", "The undiscriminated exit mirrors where platform-package generation refuses", "Transformers with incomparable predicates are reported as implementations and do not change the exit status".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| A comparable pair exits non-zero | "A comparable pair of enabled transformers is reported with both transformers and the shared contracts and fails the command", "A comparable pair exits non-zero" | No (byte equal, checked) |
+| Discriminated plurality exits zero | "Transformers with incomparable predicates are reported as implementations and do not change the exit status", "Discriminated plurality exits zero" | No (byte equal, checked) |
+| Both refusals are reported together | "A comparable pair of enabled transformers is reported with both transformers and the shared contracts and fails the command", "Both refusals are reported together" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "An undiscriminated platform is refused where platform-package generation refuses it" in "The undiscriminated exit mirrors where platform-package generation refuses"
+
+| Old clause | New place |
+| --- | --- |
+| A pair of enabled transformers whose match predicates are comparable o... | body of "A comparable pair of enabled transformers is reported with both transformers and the shared contracts and fails the command" |
+| No arbitration between the two transformers SHALL be applied or sugges... | body of "A comparable pair of enabled transformers is reported with both transformers and the shared contracts and fails the command", verbatim |
+| This mirrors where the refusal lives in the system: `Discriminated: fa... | body of "The undiscriminated exit mirrors where platform-package generation refuses", with SHALL added (see the strength table) and the named reference of the exit rule it explains |
+| Transformers with incomparable predicates over a shared contract (a di... | body of "Transformers with incomparable predicates are reported as implementations and do not change the exit status", verbatim |
+
+Words changed or added:
+- "A comparable pair of enabled transformers is reported with both transformers and the shared contracts and fails the command": "the command SHALL exit" reads "`opm platform check` SHALL exit"; the citation in brackets stays in the sentence
+- "The undiscriminated exit mirrors ...": the body ends with "(Requirement: A comparable pair of enabled transformers is reported with both transformers and the shared contracts and fails the command)", the named reference of a requirement of the same spec (the sentence "This mirrors" explains the exit rule that block holds)
+
+Lengths (old, new): old 879; new "A comparable pair of enabled transformers is reported with both transformers and the shared contracts and fails the command" 433; "The undiscriminated exit mirrors where platform-package generation refuses" 386; "Transformers with incomparable predicates are reported as implementations and do not change the exit status" 211.
+
+### Ledger: platform-check, A platform that cannot build fails with its build diagnostic
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A platform that does not build fails with the grouped CUE diagnostics and the validation error code", "A registry that refuses the credentials fails with the permission error code 4 and the registry login hint", "A platform whose inventory cannot be read fails naming the missing field and the core release", "A platform module that pins an older core also names the platform directory and the cue mod get command".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| A broken platform module reports the build error | "A platform that does not build fails with the grouped CUE diagnostics and the validation error code", "A broken platform module reports the build error" | No (byte equal, checked) |
+| A platform built against a core without the inventory | "A platform whose inventory cannot be read fails naming the missing field and the core release", "A platform built against a core without the inventory" | No (byte equal, checked) |
+| A platform built against a core without the comparable-predicate report | "A platform whose inventory cannot be read fails naming the missing field and the core release", "A platform built against a core without the comparable-predicate report" | No (byte equal, checked) |
+| A platform built against a core without the provider count | "A platform module that pins an older core also names the platform directory and the cue mod get command", "A platform built against a core without the provider count" | No (byte equal, checked) |
+| A registry that refuses the credentials | "A registry that refuses the credentials fails with the permission error code 4 and the registry login hint", "A registry that refuses the credentials" | No (byte equal, checked) |
+| A refused credential with dependencies on several registry hosts | "A registry that refuses the credentials fails with the permission error code 4 and the registry login hint", "A refused credential with dependencies on several registry hosts" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| If the resolved platform does not build, the command SHALL report the... | body of "A platform that does not build fails with the grouped CUE diagnostics and the validation error code" |
+| When the platform does not build because the registry refused the cred... | body of "A registry that refuses the credentials fails with the permission error code 4 and the registry login hint" |
+| The hint SHALL name the registry host when every dependency the platfo... | body of the same requirement, verbatim |
+| If the platform builds but its inventory cannot be read, the command S... | body of "A platform whose inventory cannot be read fails naming the missing field and the core release" |
+| When the inventory cannot be read because the platform module pins a c... | body of "A platform module that pins an older core also names the platform directory and the cue mod get command" |
+
+Words changed or added:
+- Four bodies: "the command" reads "`opm platform check`"
+- "A platform module that pins an older core ...": the body ends with "(Requirement: A platform whose inventory cannot be read fails naming the missing field and the core release)", the named reference that gives "also" its referent
+
+Lengths (old, new): old 1092; new "A platform that does not build fails with the grouped CUE diagnostics and the validation error code" 214; "A registry that refuses the credentials fails with the permission error code 4 and the registry login hint" 438; "A platform whose inventory cannot be read fails naming the missing field and the core release" 197; "A platform module that pins an older core also names the platform directory and the cue mod get command" 385.
+
+### Ledger: platform-check, A colliding contract key fails the command
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A colliding contract key is reported under its own heading and fails the command", "The colliding heading states what is left out and tells the reader to keep one defining entry enabled", "The command computes no collision of its own and the fulfilled and discriminated verdicts may read yes on a colliding platform".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Two majors sharing keys exit non-zero and name the entries | "A colliding contract key is reported under its own heading and fails the command", "Two majors sharing keys exit non-zero and name the entries" | No (byte equal, checked) |
+| A collision and an over-subscription are reported together | "A colliding contract key is reported under its own heading and fails the command", "A collision and an over-subscription are reported together" | No (byte equal, checked) |
+| A disabled second major is not a collision | "The colliding heading states what is left out and tells the reader to keep one defining entry enabled", "A disabled second major is not a collision" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "The fulfilled and discriminated verdicts may read yes on a colliding platform" in "The command computes no collision of its own and the fulfilled and discriminated verdicts may read yes on a colliding platform"
+
+| Old clause | New place |
+| --- | --- |
+| A contract key that more than one enabled registry entry's catalog lis... | body of "A colliding contract key is reported under its own heading and fails the command" |
+| The routable verdict SHALL name the colliding count beside the over-su... | body of "A colliding contract key is reported under its own heading and fails the command" |
+| The heading SHALL state that a colliding key is left out of the define... | body of "The colliding heading states what is left out and tells the reader to keep one defining entry enabled" |
+| A disabled entry never defines a key. | body of the same requirement, verbatim (the body carries SHALL in its first sentence) |
+| The command reads the collisions the platform's core derives and the r... | body of "The command computes no collision of its own and the fulfilled and discriminated verdicts may read yes on a colliding platform" |
+| Because a colliding key is absent from the defined contracts, the `ful... | body of the same requirement, verbatim |
+| Source: enhancement 0026 (interim safety net until side-by-side majors... | `**Source**:` line of all three, the whole old line |
+
+Words changed or added:
+- "the command SHALL exit", "the command's error" and "The command reads" read "`opm platform check` SHALL exit", "`opm platform check`'s error" and "`opm platform check` reads"
+- "The colliding heading states ...": the body ends with "(Requirement: A colliding contract key is reported under its own heading and fails the command)", the named reference that gives "The heading" its referent
+
+Lengths (old, new): old 1181; new "A colliding contract key is reported under its own heading and fails the command" 478; "The colliding heading states what is left out and tells the reader to keep one defining entry enabled" 418; "The command computes no collision of its own and the fulfilled and discriminated verdicts may read yes on a colliding platform" 333.
+
+### Strength table of cli-B4 unit 4b
+
+Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text:
+
+| Old sentence | New body | Word added |
+| --- | --- | --- |
+| This mirrors where the refusal lives in the system: `Discriminated: false` is a condition platform-package gener... | "The undiscriminated exit mirrors where platform-package generation refuses" | "This mirrors" reads "This SHALL mirror" |
+
+Plain sentences copied unchanged, with no keyword, into a body that carries a keyword in another sentence:
+
+| Old sentence | New body |
+| --- | --- |
+| The receiver computes the cascade diff with this repository's `task -x deps:cascade`. | "The cascade receiver runs on a dispatch, a daily sweep and a manual run" |
+| A run from any ref other than `main` is always a dry run. | "The caller passes dry-run so that the receiver is live only when CASCADE_DRY_RUN is exactly false" |
+| In a dry run the receiver computes the diff, title, body and labels and writes them to the job summary, and push... | "The dry-run switch is enforced in three places and a dry run pushes nothing" |
+| The release-PR gate statuses are still posted. | "The dry-run switch is enforced in three places and a dry run pushes nothing" |
+| Two cases are excepted: a release pull request whose gates-only evaluation fails before it writes its result in... | "Gate statuses are posted on every pull request into main except in two cases" |
+| This change does not make either status a required check. | "Gate statuses are posted on every pull request into main except in two cases" |
+| In `warn` mode a problem is posted as a success whose description starts `WARN:`. | "A same-repository release pull request gets its gate statuses from a gates-only receiver run" |
+| The `cascade` Environment deploys from `main` only. | "No other job declares the cascade Environment, release.yml sets no workflow-level env key and the Environment deploys from main only" |
+| Typed kernel refusals (unresolved demands) and `ValidationError` values with details keep their dedicated format... | "PrintValidationError groups CUE positions on any error" |
+| The warnings are worded by the CLI from the kernel's advisory diagnostic rows (unhandled optional traits, and re... | "ShowRenderOutput logs the render warnings via the module-scoped logger" |
+| This mirrors where the refusal lives in the system: `Routable: false` is the condition a platform-package gener... | "An over-subscribed contract is reported with its providing registry keys and fails the command" |
+| Two majors of one catalog are two registry entries and so two providers; two transformers of one entry are one ... | "Providers are counted per enabled registry entry and the command computes no count of its own" |
+| A disabled entry never defines a key. | "The colliding heading states what is left out and tells the reader to keep one defining entry enabled" |
