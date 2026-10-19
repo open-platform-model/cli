@@ -5063,3 +5063,420 @@ Plain sentences copied unchanged, with no keyword, into a body that carries a ke
 | Whether the operator removes the workloads is governed by `spec.prune`, which has no CRD default and which the CLI does not write: absent it, the operator removes the CR and deliberately orphans the workloads. | "`opm instance delete` of an operator-owned instance reports the outcome that actually occurred and never claims a prune it has not established" |
 | The CR's disappearance therefore proves the finalizer completed, not that anything was pruned. | the same body |
 | The four bullets and the six bullets of the lists (`errors-domain` allowed cases, `log-output-style` palette and semantic styles, `errors-domain` hint causes) | the body whose intro line carries the keyword |
+
+
+## Ledger entries of cli-B7, unit 7a (pr-workflow, catalog-registry-check, ci-workflow, config, config-commands, config-types, docs-bundle)
+
+One subsection per rewritten requirement, 15 in all: `pr-workflow` 3, `catalog-registry-check` 2, `ci-workflow` 2, `config` 2, `config-commands` 2, `config-types` 2 and `docs-bundle` 2. The other seven specs of cli-B7 (`health-evaluation`, `instance-building`, `k8s-helpers`, `mod-apply`, `module-synthetic-instance`, `release-gates`, `command-reference`) follow in the second half. Every new body is built from whole sentences of the old body, copied unchanged, or from parts of one sentence cut at a boundary with the subject repeated. A clause row names where a clause of the old body appears; the list "Words changed or added in unit 7a" names each substitution. 14 are form c2, because the old scenarios of each belong to different new behaviors. "Template publish gates run dry-run" is form b, because `release-workflow` cites its header by name, so the parent keeps the header and all 11 scenarios, and the split-off bodies get restatement scenarios whose WHEN and THEN lines are copied from an old scenario. Old scenario names are all kept; the byte check ran once per rewritten requirement and printed no `DIFF` and no `LOST`. `grep -rn --exclude-dir=archive` over the repo found no reference to an old header of this unit other than the two `release-workflow` cites of "Template publish gates run dry-run", which stay true. The `**Source**` lines carry the whole old `Source:` lines.
+
+### Ledger: pr-workflow, Registry mapping is set at workflow level
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The PR workflow sets `OPM_REGISTRY` and `CUE_REGISTRY` at workflow level", "Only the `unit`, `fixtures` and `e2e` jobs run a registry service and every other dependency resolves from GHCR".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Tests resolve fixtures and core from GHCR | "The PR workflow sets `OPM_REGISTRY` and `CUE_REGISTRY` at workflow level", "Tests resolve fixtures and core from GHCR" | No (byte equal, checked) |
+| Seeded jobs resolve the tree's fixture version | "Only the `unit`, `fixtures` and `e2e` jobs run a registry service and every other dependency resolves from GHCR", "Seeded jobs resolve the tree's fixture version" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The PR workflow SHALL set `OPM_REGISTRY` and `CUE_REGISTRY` as workflo... | body of "The PR workflow sets `OPM_REGISTRY` and `CUE_REGISTRY` at workflow level", verbatim |
+| Only the `unit`, `fixtures` and `e2e` jobs SHALL run a registry servic... | body of "Only the `unit`, `fixtures` and `e2e` jobs run a registry service and every other dependency resolves from GHCR", verbatim |
+| Every other dependency, core and the catalogs included, SHALL resolve... | body of "Only the `unit`, `fixtures` and `e2e` jobs run a registry service and every other dependency resolves from GHCR", verbatim |
+
+Lengths (old, new): old 635; new "The PR workflow sets `OPM_REGISTRY` and `CUE_REGISTRY` at workflow level" 205; "Only the `unit`, `fixtures` and `e2e` jobs run a registry service and every other dependency resolves from GHCR" 429.
+
+### Ledger: pr-workflow, Template publish gates run dry-run
+
+Form: b (MODIFIED parent with its header and all 11 old scenarios, ADDED splits). The header stays because the `release-workflow` requirements "The script runs the identity, layout, tidy, vet and zip gates on every template tree" and "The script runs the dry-run publish gates, the version order and the content check on every template tree" cite it by name. The parent keeps the first sentence of the old body and the sentence on reporting every failing template. New requirements: "The identity and tree layout gates of each template", "The tidy, vet and module zip gates of each template", "The `opm module publish --dry-run` gates of each template pass or refuse only because the version is already published", "The version order gate of each template", "An already-published template version passes only when the artifact GHCR holds contains exactly the tree's files", "A template whose tree differs from its published artifact fails the job", "A failure to fetch, list, verify, build or compare fails the job and never counts the template as unpublished". Each split body names the parent, or the requirement that gives it its referent, with a trailing "(Requirement: <exact header>)".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Template gate violation fails the PR | "Template publish gates run dry-run", "Template gate violation fails the PR" | No (byte equal, checked) |
+| Already-published template passes | "Template publish gates run dry-run", "Already-published template passes" | No (byte equal, checked) |
+| Template that does not vet fails the PR | "Template publish gates run dry-run", "Template that does not vet fails the PR" | No (byte equal, checked) |
+| Changed template at an already-published version fails the PR | "Template publish gates run dry-run", "Changed template at an already-published version fails the PR" | No (byte equal, checked) |
+| A change pushed to main without a bump fails later pull requests | "Template publish gates run dry-run", "A change pushed to main without a bump fails later pull requests" | No (byte equal, checked) |
+| A change and its revert are not a change | "Template publish gates run dry-run", "A change and its revert are not a change" | No (byte equal, checked) |
+| A fetch error never passes as unpublished | "Template publish gates run dry-run", "A fetch error never passes as unpublished" | No (byte equal, checked) |
+| A file the module zip omits fails the PR | "Template publish gates run dry-run", "A file the module zip omits fails the PR" | No (byte equal, checked) |
+| A version init would not resolve fails the PR | "Template publish gates run dry-run", "A version init would not resolve fails the PR" | No (byte equal, checked) |
+| A module path that does not match its directory fails the PR | "Template publish gates run dry-run", "A module path that does not match its directory fails the PR" | No (byte equal, checked) |
+| A broken identity does not hide other failures | "Template publish gates run dry-run", "A broken identity does not hide other failures" | No (byte equal, checked) |
+| (new) | "The identity and tree layout gates of each template", "The identity gate fails the PR on a module path that does not match its directory" | New restatement scenario: its WHEN and THEN lines are those of the old scenario "A module path that does not match its directory fails the PR", byte for byte; only the name differs |
+| (new) | "The tidy, vet and module zip gates of each template", "The vet gate fails a template that does not vet" | New restatement scenario: its WHEN and THEN lines are those of the old scenario "Template that does not vet fails the PR", byte for byte; only the name differs |
+| (new) | "The tidy, vet and module zip gates of each template", "The module zip gate fails a tree with a file the zip omits" | New restatement scenario: its WHEN and THEN lines are those of the old scenario "A file the module zip omits fails the PR", byte for byte; only the name differs |
+| (new) | "The `opm module publish --dry-run` gates of each template pass or refuse only because the version is already published", "A publish gate refusal other than already-published fails the PR" | New restatement scenario: its WHEN and THEN lines are those of the old scenario "Template gate violation fails the PR", byte for byte; only the name differs |
+| (new) | "The version order gate of each template", "The version order gate fails a version init would not resolve" | New restatement scenario: its WHEN and THEN lines are those of the old scenario "A version init would not resolve fails the PR", byte for byte; only the name differs |
+| (new) | "An already-published template version passes only when the artifact GHCR holds contains exactly the tree's files", "A published artifact that holds exactly the tree's files passes" | New restatement scenario: its WHEN and THEN lines are those of the old scenario "Already-published template passes", byte for byte; only the name differs |
+| (new) | "An already-published template version passes only when the artifact GHCR holds contains exactly the tree's files", "A reverted change passes the content check" | New restatement scenario: its WHEN and THEN lines are those of the old scenario "A change and its revert are not a change", byte for byte; only the name differs |
+| (new) | "A template whose tree differs from its published artifact fails the job", "A changed tree at an already-published version fails the PR" | New restatement scenario: its WHEN and THEN lines are those of the old scenario "Changed template at an already-published version fails the PR", byte for byte; only the name differs |
+| (new) | "A template whose tree differs from its published artifact fails the job", "A change that reached main without a bump fails every later pull request" | New restatement scenario: its WHEN and THEN lines are those of the old scenario "A change pushed to main without a bump fails later pull requests", byte for byte; only the name differs |
+| (new) | "A failure to fetch, list, verify, build or compare fails the job and never counts the template as unpublished", "A fetch, list, verify, build or compare failure never passes as unpublished" | New restatement scenario: its WHEN and THEN lines are those of the old scenario "A fetch error never passes as unpublished", byte for byte; only the name differs |
+
+| Old clause | New place |
+| --- | --- |
+| The `template-gates` job SHALL build `opm` from the pull request, inst... | body of "Template publish gates run dry-run", verbatim |
+| For every template the gates SHALL be, in order: | body of "The identity and tree layout gates of each template", verbatim; body of "The tidy, vet and module zip gates of each template", verbatim; body of "The `opm module publish --dry-run` gates of each template pass or refuse only because the version is already published", verbatim; body of "The version order gate of each template", verbatim |
+| - the identity: its `Version` SHALL be a stable SemVer `X.Y.Z`, and it... | body of "The identity and tree layout gates of each template", verbatim |
+| - the tree layout: it SHALL hold no symbolic link, no special file and... | body of "The identity and tree layout gates of each template": the closing ";" reads "." |
+| - `opm module tidy --check`; | body of "The tidy, vet and module zip gates of each template", verbatim |
+| - `opm module vet`, which renders the template's `debugValues` against... | body of "The tidy, vet and module zip gates of each template", verbatim |
+| - the module zip that `cue mod publish --out` builds from the tree, th... | body of "The tidy, vet and module zip gates of each template": the closing ";" reads "." |
+| - the `opm module publish --dry-run` gates, which SHALL either pass or... | body of "The `opm module publish --dry-run` gates of each template pass or refuse only because the version is already published": the closing ";" reads "." |
+| - the version order: an unpublished version SHALL be above the highest... | body of "The version order gate of each template", verbatim |
+| An already-published version SHALL pass only when the artifact GHCR ho... | body of "An already-published template version passes only when the artifact GHCR holds contains exactly the tree's files", verbatim |
+| The script SHALL fetch the published module zip from GHCR with an anon... | body of "An already-published template version passes only when the artifact GHCR holds contains exactly the tree's files", verbatim |
+| A template whose tree differs from its published artifact SHALL fail t... | body of "A template whose tree differs from its published artifact fails the job", verbatim |
+| The comparison SHALL NOT depend on git history, so a change that reach... | body of "A template whose tree differs from its published artifact fails the job", verbatim |
+| A failure to fetch, list, verify, build or compare SHALL fail the job... | body of "A failure to fetch, list, verify, build or compare fails the job and never counts the template as unpublished", verbatim |
+| Any other refusal or a failed vet SHALL fail the job. | body of "The `opm module publish --dry-run` gates of each template pass or refuse only because the version is already published", verbatim |
+| The job SHALL report every failing template, not only the first, inclu... | body of "Template publish gates run dry-run", verbatim |
+
+Lengths (old, new): old 2243; new "Template publish gates run dry-run" 386; "The identity and tree layout gates of each template" 341; "The tidy, vet and module zip gates of each template" 471; "The `opm module publish --dry-run` gates of each template pass or refuse only because the version is already published" 288; "The version order gate of each template" 324; "An already-published template version passes only when the artifact GHCR holds contains exactly the tree's files" 395; "A template whose tree differs from its published artifact fails the job" 438; "A failure to fetch, list, verify, build or compare fails the job and never counts the template as unpublished" 168.
+
+### Ledger: pr-workflow, Fixture gates, seed and render parity
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The `fixtures` job runs `hack/fixtures.sh check`", "The `fixtures` job seeds a job-local registry", "The `fixtures` job runs the consumers and the render parity program against the mixed mapping", "`task test:fixtures` runs the steps of the `fixtures` job against a local registry".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Fixture with a gate violation | "The `fixtures` job runs `hack/fixtures.sh check`", "Fixture with a gate violation" | No (byte equal, checked) |
+| Changed fixture at an already-published version | "The `fixtures` job runs `hack/fixtures.sh check`", "Changed fixture at an already-published version" | No (byte equal, checked) |
+| Unchanged fixture at a published version | "The `fixtures` job runs `hack/fixtures.sh check`", "Unchanged fixture at a published version" | No (byte equal, checked) |
+| Render parity runs against the seeded registry | "The `fixtures` job runs the consumers and the render parity program against the mixed mapping", "Render parity runs against the seeded registry" | No (byte equal, checked) |
+| Consumer left on a stale core pin | "The `fixtures` job runs the consumers and the render parity program against the mixed mapping", "Consumer left on a stale core pin" | No (byte equal, checked) |
+| (new) | "The `fixtures` job seeds a job-local registry", "The seed step publishes the tree's fixtures into a job-local registry" | New restatement scenario: only words of the old clause, no new case. |
+| (new) | "`task test:fixtures` runs the steps of the `fixtures` job against a local registry", "The fixtures steps run against a local registry" | New restatement scenario: only words of the old clause, no new case. |
+
+| Old clause | New place |
+| --- | --- |
+| The `fixtures` job SHALL check out with `fetch-depth: 0`, build `opm`,... | body of "The `fixtures` job runs `hack/fixtures.sh check`", verbatim |
+| It SHALL then run `hack/fixtures.sh seed` to publish the tree's fixtur... | body of "The `fixtures` job seeds a job-local registry": "It" reads "The `fixtures` job" (subject copied from the first sentence of the same old requirement) |
+| Against the mixed mapping (`testing.opmodel.dev` local, everything els... | body of "The `fixtures` job runs the consumers and the render parity program against the mixed mapping": "it" reads "the `fixtures` job" (same subject) |
+| `task test:fixtures` SHALL run the same steps against a local registry... | body of "`task test:fixtures` runs the steps of the `fixtures` job against a local registry", verbatim |
+
+Lengths (old, new): old 885; new "The `fixtures` job runs `hack/fixtures.sh check`" 365; "The `fixtures` job seeds a job-local registry" 176; "The `fixtures` job runs the consumers and the render parity program against the mixed mapping" 302; "`task test:fixtures` runs the steps of the `fixtures` job against a local registry" 278.
+
+### Ledger: catalog-registry-check, Out-of-band verification of a published catalog
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`opm catalog registry check` pulls the named published build and verifies out of band what a platform verifies when it imports the catalog", "`opm catalog registry check` reports the member inventory per kind and apiVersion", "`opm catalog registry check --compat` runs the predecessor comparison for the fetched build exactly as publish would have", "The help text of `opm catalog registry check` states that the check is an aid and not a guarantee".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Identity mismatch found out of band | "`opm catalog registry check` pulls the named published build and verifies out of band what a platform verifies when it imports the catalog", "Identity mismatch found out of band" | No (byte equal, checked) |
+| Compat aid over a published build | "`opm catalog registry check --compat` runs the predecessor comparison for the fetched build exactly as publish would have", "Compat aid over a published build" | No (byte equal, checked) |
+| Aid, not guarantee | "The help text of `opm catalog registry check` states that the check is an aid and not a guarantee", "Aid, not guarantee" | No (byte equal, checked) |
+| (new) | "`opm catalog registry check` reports the member inventory per kind and apiVersion", "The member inventory is reported per kind and apiVersion" | New restatement scenario: only words of the old clause, no new case. |
+
+| Old clause | New place |
+| --- | --- |
+| `opm catalog registry check <path@version>` SHALL pull the named publi... | body of "`opm catalog registry check` pulls the named published build and verifies out of band what a platform verifies when it imports the catalog", verbatim |
+| It SHALL report the catalog's member inventory per kind and apiVersion... | body of "`opm catalog registry check` reports the member inventory per kind and apiVersion": "It" reads "`opm catalog registry check <path@version>`" (subject copied from the first sentence of the same old requirement) |
+| With `--compat`, it SHALL additionally run the predecessor comparison... | body of "`opm catalog registry check --compat` runs the predecessor comparison for the fetched build exactly as publish would have": "it" reads "`opm catalog registry check <path@version>`" (same subject) |
+| The command's help text SHALL state that the check is an aid and not a... | body of "The help text of `opm catalog registry check` states that the check is an aid and not a guarantee": "The command's" reads "The `opm catalog registry check <path@version>` command's" (subject copied in); the em-dash reads a colon |
+| Exit codes: 0 clean, 2 findings, 3 registry unreachable, 5 not publish... | body of "`opm catalog registry check` pulls the named published build and verifies out of band what a platform verifies when it imports the catalog", verbatim |
+
+Lengths (old, new): old 796; new "`opm catalog registry check` pulls the named published build and verifies out of band what a platform verifies when it imports the catalog" 482; "`opm catalog registry check` reports the member inventory per kind and apiVersion" 112; "`opm catalog registry check --compat` runs the predecessor comparison for the fetched build exactly as publish would have" 163; "The help text of `opm catalog registry check` states that the check is an aid and not a guarantee" 161.
+
+### Ledger: catalog-registry-check, An unpublished coordinate exits 5 and every other registry answer exits 3
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`opm catalog registry check` exits 5 for an unpublished coordinate, 3 for every other registry answer and 1 for a failure that asks no registry", "`opm catalog registry check` takes the not-held decision from the library's typed fetch classification and never from the message text".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Version not published | "`opm catalog registry check` exits 5 for an unpublished coordinate, 3 for every other registry answer and 1 for a failure that asks no registry", "Version not published" | No (byte equal, checked) |
+| Forbidden tag lookup reads as not published | "`opm catalog registry check` exits 5 for an unpublished coordinate, 3 for every other registry answer and 1 for a failure that asks no registry", "Forbidden tag lookup reads as not published" | No (byte equal, checked) |
+| (new) | "`opm catalog registry check` takes the not-held decision from the library's typed fetch classification and never from the message text", "The not-held decision comes from the typed fetch classification" | New restatement scenario: only words of the old clause, no new case. |
+
+| Old clause | New place |
+| --- | --- |
+| `opm catalog registry check <path@version>` SHALL exit 5 when the regi... | body of "`opm catalog registry check` exits 5 for an unpublished coordinate, 3 for every other registry answer and 1 for a failure that asks no registry", verbatim; body of "`opm catalog registry check` takes the not-held decision from the library's typed fetch classification and never from the message text", verbatim |
+| A registry answer other than not-held, or no response, while the named... | body of "`opm catalog registry check` exits 5 for an unpublished coordinate, 3 for every other registry answer and 1 for a failure that asks no registry", verbatim |
+| A failure that asks no registry (a registry mapping that does not pars... | body of "`opm catalog registry check` exits 5 for an unpublished coordinate, 3 for every other registry answer and 1 for a failure that asks no registry", verbatim |
+| Source: enhancement 0011 ("A published catalog can be verified out of... | `**Source**` line (whole old line) of "`opm catalog registry check` exits 5 for an unpublished coordinate, 3 for every other registry answer and 1 for a failure that asks no registry"; "`opm catalog registry check` takes the not-held decision from the library's typed fetch classification and never from the message text" |
+| The CLI SHALL take the not-held decision from the library's typed fetc... | body of "`opm catalog registry check` takes the not-held decision from the library's typed fetch classification and never from the message text", verbatim |
+| Source: enhancement 0021 ("A beta line reaches GA only when its exit c... | `**Source**` line (whole old line) of "`opm catalog registry check` exits 5 for an unpublished coordinate, 3 for every other registry answer and 1 for a failure that asks no registry"; "`opm catalog registry check` takes the not-held decision from the library's typed fetch classification and never from the message text" |
+
+Lengths (old, new): old 754; new "`opm catalog registry check` exits 5 for an unpublished coordinate, 3 for every other registry answer and 1 for a failure that asks no registry" 441; "`opm catalog registry check` takes the not-held decision from the library's typed fetch classification and never from the message text" 382.
+
+### Ledger: ci-workflow, Fixture modules are published to GHCR by CI
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A workflow publishes the repository's fixture modules to GHCR through `opm module publish`", "The fixture publish workflow triggers on pushes to `main` that touch the fixtures and offers `workflow_dispatch`", "The fixture publish workflow requests `packages: write` at the job level only and skips cleanly on forks", "Idempotency of the fixture publish lives in the caller `hack/fixtures.sh publish`".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Unchanged fixture republished | "Idempotency of the fixture publish lives in the caller `hack/fixtures.sh publish`", "Unchanged fixture republished" | No (byte equal, checked) |
+| Bumped fixture publishes | "A workflow publishes the repository's fixture modules to GHCR through `opm module publish`", "Bumped fixture publishes" | No (byte equal, checked) |
+| Fork run | "The fixture publish workflow requests `packages: write` at the job level only and skips cleanly on forks", "Fork run" | No (byte equal, checked) |
+| (new) | "The fixture publish workflow triggers on pushes to `main` that touch the fixtures and offers `workflow_dispatch`", "A push that touches the fixtures triggers the workflow" | New restatement scenario: only words of the old clause, no new case. |
+
+| Old clause | New place |
+| --- | --- |
+| A workflow (`.github/workflows/publish-fixtures.yml`) SHALL publish th... | body of "A workflow publishes the repository's fixture modules to GHCR through `opm module publish`", verbatim |
+| It SHALL trigger on pushes to `main` that touch `tests/fixtures/module... | body of "The fixture publish workflow triggers on pushes to `main` that touch the fixtures and offers `workflow_dispatch`": "It" reads "A workflow (`.github/workflows/publish-fixtures.yml`)" (the subject of the first sentence of the same old requirement) |
+| The workflow SHALL request `packages: write` at the job level only, an... | body of "The fixture publish workflow requests `packages: write` at the job level only and skips cleanly on forks": "The workflow" reads "The workflow (`.github/workflows/publish-fixtures.yml`)" (path copied from the first sentence) |
+| Idempotency SHALL live in the caller: `hack/fixtures.sh publish` SHALL... | body of "Idempotency of the fixture publish lives in the caller `hack/fixtures.sh publish`", verbatim |
+
+Lengths (old, new): old 912; new "A workflow publishes the repository's fixture modules to GHCR through `opm module publish`" 242; "The fixture publish workflow triggers on pushes to `main` that touch the fixtures and offers `workflow_dispatch`" 315; "The fixture publish workflow requests `packages: write` at the job level only and skips cleanly on forks" 180; "Idempotency of the fixture publish lives in the caller `hack/fixtures.sh publish`" 266.
+
+### Ledger: ci-workflow, One file names the linter version
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "One file names the linter version CI installs", "Every use of the golangci-lint action reads that file and pins one action commit", "The committed golangci-lint schema matches the linter version's minor line and its checksum", "The configuration check fails when the linter version rules do not hold or the installed golangci-lint is of another minor line".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| A workflow names its own version | "Every use of the golangci-lint action reads that file and pins one action commit", "A workflow names its own version" | No (byte equal, checked) |
+| The version moves to a minor line without a committed schema | "The committed golangci-lint schema matches the linter version's minor line and its checksum", "The version moves to a minor line without a committed schema" | No (byte equal, checked) |
+| The committed schema was edited | "The committed golangci-lint schema matches the linter version's minor line and its checksum", "The committed schema was edited" | No (byte equal, checked) |
+| The two workflows pin different action commits | "Every use of the golangci-lint action reads that file and pins one action commit", "The two workflows pin different action commits" | No (byte equal, checked) |
+| The installed linter is of another minor line | "The configuration check fails when the linter version rules do not hold or the installed golangci-lint is of another minor line", "The installed linter is of another minor line" | No (byte equal, checked) |
+| go.mod names a linter version | "One file names the linter version CI installs", "go.mod names a linter version" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The file `.golangci-lint-version` SHALL be the only place that names t... | body of "One file names the linter version CI installs", verbatim |
+| Every use of the golangci-lint action, in any letter case and quoted o... | body of "Every use of the golangci-lint action reads that file and pins one action commit", verbatim |
+| The committed schema SHALL be the one for that version's minor line, S... | body of "The committed golangci-lint schema matches the linter version's minor line and its checksum", verbatim |
+| The configuration check SHALL fail when any of these does not hold, an... | body of "The configuration check fails when the linter version rules do not hold or the installed golangci-lint is of another minor line", verbatim |
+
+Lengths (old, new): old 732; new "One file names the linter version CI installs" 167; "Every use of the golangci-lint action reads that file and pins one action commit" 310; "The committed golangci-lint schema matches the linter version's minor line and its checksum" 224; "The configuration check fails when the linter version rules do not hold or the installed golangci-lint is of another minor line" 387.
+
+### Ledger: config-commands, Config init writes only the configuration file
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`opm config init` creates the default configuration `config.cue` in `~/.opm/`", "`opm config init` writes no platform module or platform file", "`opm config init` remains offline".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Initialize configuration for first time | "`opm config init` creates the default configuration `config.cue` in `~/.opm/`", "Initialize configuration for first time" | No (byte equal, checked) |
+| An existing platform directory is left alone | "`opm config init` writes no platform module or platform file", "An existing platform directory is left alone" | No (byte equal, checked) |
+| Legacy data-only platform file is removed | "`opm config init` writes no platform module or platform file", "Legacy data-only platform file is removed" | No (byte equal, checked) |
+| Refuse to overwrite existing configuration | "`opm config init` creates the default configuration `config.cue` in `~/.opm/`", "Refuse to overwrite existing configuration" | No (byte equal, checked) |
+| Force overwrite existing configuration | "`opm config init` creates the default configuration `config.cue` in `~/.opm/`", "Force overwrite existing configuration" | No (byte equal, checked) |
+| (new) | "`opm config init` remains offline", "Init stays offline" | New restatement scenario: only words of the old clause, no new case. |
+
+| Old clause | New place |
+| --- | --- |
+| The `opm config init` command SHALL create the default configuration i... | body of "`opm config init` creates the default configuration `config.cue` in `~/.opm/`", verbatim |
+| The command creates: | body of "`opm config init` creates the default configuration `config.cue` in `~/.opm/`", verbatim |
+| - `~/.opm/config.cue` [em-dash] scalar-only configuration file (registry, kube... | body of "`opm config init` creates the default configuration `config.cue` in `~/.opm/`": the em-dash reads a colon |
+| The command SHALL NOT write a platform module or any platform file: no... | body of "`opm config init` writes no platform module or platform file": "The command" reads "The `opm config init` command" (subject copied from the first sentence) |
+| An existing `~/.opm/platform/` directory SHALL be left untouched, with... | body of "`opm config init` writes no platform module or platform file", verbatim |
+| When a legacy data-only `~/.opm/platform.cue` exists, `--force` SHALL... | body of "`opm config init` writes no platform module or platform file", verbatim |
+| The command SHALL remain normatively offline: it SHALL NOT run `cue mo... | body of "`opm config init` remains offline": "The command" reads "The `opm config init` command" (same subject) |
+
+Lengths (old, new): old 645; new "`opm config init` creates the default configuration `config.cue` in `~/.opm/`" 205; "`opm config init` writes no platform module or platform file" 351; "`opm config init` remains offline" 122.
+
+### Ledger: config-commands, Config vet checks only the configuration file
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`opm config vet` validates the `~/.opm` configuration with two checks", "`opm config vet` builds no platform module and warns about a `platform/` directory", "`opm config vet` fails on a leftover legacy `~/.opm/platform.cue`", "`opm config vet` prints a styled line for each passing check".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Valid configuration passes validation | "`opm config vet` prints a styled line for each passing check", "Valid configuration passes validation" | No (byte equal, checked) |
+| Missing config file fails with actionable error | "`opm config vet` validates the `~/.opm` configuration with two checks", "Missing config file fails with actionable error" | No (byte equal, checked) |
+| A leftover platform directory warns | "`opm config vet` builds no platform module and warns about a `platform/` directory", "A leftover platform directory warns" | No (byte equal, checked) |
+| Legacy platform file fails with migration hint | "`opm config vet` fails on a leftover legacy `~/.opm/platform.cue`", "Legacy platform file fails with migration hint" | No (byte equal, checked) |
+| Stale providers block fails with migration hint | "`opm config vet` validates the `~/.opm` configuration with two checks", "Stale providers block fails with migration hint" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The `opm config vet` command SHALL validate the `~/.opm` configuration... | body of "`opm config vet` validates the `~/.opm` configuration with two checks", verbatim |
+| Checks performed: | body of "`opm config vet` validates the `~/.opm` configuration with two checks", verbatim |
+| 1. Config file exists at resolved path | body of "`opm config vet` validates the `~/.opm` configuration with two checks", verbatim |
+| 2. Config file is syntactically valid CUE and satisfies the embedded c... | body of "`opm config vet` validates the `~/.opm` configuration with two checks", verbatim |
+| Vet SHALL NOT build, load or require any platform module. | body of "`opm config vet` builds no platform module and warns about a `platform/` directory": "Vet" reads "The `opm config vet` command" (subject copied from the first sentence) |
+| When a `platform/` directory exists beside the config file, vet SHALL... | body of "`opm config vet` builds no platform module and warns about a `platform/` directory", verbatim |
+| A leftover legacy data-only `~/.opm/platform.cue` SHALL fail vet namin... | body of "`opm config vet` fails on a leftover legacy `~/.opm/platform.cue`", verbatim |
+| Each check SHALL print a styled line to stdout using `FormatVetCheck`... | body of "`opm config vet` prints a styled line for each passing check", verbatim |
+
+Lengths (old, new): old 794; new "`opm config vet` validates the `~/.opm` configuration with two checks" 243; "`opm config vet` builds no platform module and warns about a `platform/` directory" 298; "`opm config vet` fails on a leftover legacy `~/.opm/platform.cue`" 132; "`opm config vet` prints a styled line for each passing check" 228.
+
+### Ledger: config, Configuration precedence chain
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The CLI resolves every configuration value by Flag > Environment > Config > Default, once, and records the source of each", "There is no provider configuration value", "Subcommands do not call `config.Load()` independently", "A subcommand-local flag overrides the globally-resolved value for that invocation", "Registry and config path resolve in `config.Load` and Kubernetes config at the point of use", "Config loading is single-pass and has no registry-bootstrap phase".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Flag overrides environment variable | "The CLI resolves every configuration value by Flag > Environment > Config > Default, once, and records the source of each", "Flag overrides environment variable" | No (byte equal, checked) |
+| Environment overrides config file | "The CLI resolves every configuration value by Flag > Environment > Config > Default, once, and records the source of each", "Environment overrides config file" | No (byte equal, checked) |
+| Config file overrides default for kubeconfig | "The CLI resolves every configuration value by Flag > Environment > Config > Default, once, and records the source of each", "Config file overrides default for kubeconfig" | No (byte equal, checked) |
+| Config file overrides default for namespace | "The CLI resolves every configuration value by Flag > Environment > Config > Default, once, and records the source of each", "Config file overrides default for namespace" | No (byte equal, checked) |
+| Default used when no override present | "The CLI resolves every configuration value by Flag > Environment > Config > Default, once, and records the source of each", "Default used when no override present" | No (byte equal, checked) |
+| Subcommand local flag overrides global resolution | "A subcommand-local flag overrides the globally-resolved value for that invocation", "Subcommand local flag overrides global resolution" | No (byte equal, checked) |
+| Timestamps flag overrides config | "The CLI resolves every configuration value by Flag > Environment > Config > Default, once, and records the source of each", "Timestamps flag overrides config" | No (byte equal, checked) |
+| Timestamps config overrides default | "The CLI resolves every configuration value by Flag > Environment > Config > Default, once, and records the source of each", "Timestamps config overrides default" | No (byte equal, checked) |
+| Configuration loaded once per CLI invocation | "Subcommands do not call `config.Load()` independently", "Configuration loaded once per CLI invocation" | No (byte equal, checked) |
+| No separate base resolution step | "Registry and config path resolve in `config.Load` and Kubernetes config at the point of use", "No separate base resolution step" | No (byte equal, checked) |
+| Single-pass load | "Config loading is single-pass and has no registry-bootstrap phase", "Single-pass load" | No (byte equal, checked) |
+| Providers field rejected | "There is no provider configuration value", "Providers field rejected" | No (byte equal, checked) |
+| Imports rejected | "Config loading is single-pass and has no registry-bootstrap phase", "Imports rejected" | No (byte equal, checked) |
+| (new) | "The CLI resolves every configuration value by Flag > Environment > Config > Default, once, and records the source of each", "The flag, environment variable, config field and default of each value" | New restatement scenario: only words of the old clause, no new case. The rule table moved into the THEN line; the body keeps the SHALL and names the scenario. |
+
+| Old clause | New place |
+| --- | --- |
+| The CLI SHALL resolve ALL configuration values using precedence: Flag... | body of "The CLI resolves every configuration value by Flag > Environment > Config > Default, once, and records the source of each", verbatim |
+| Resolution SHALL occur once during `PersistentPreRunE` and the results... | body of "The CLI resolves every configuration value by Flag > Environment > Config > Default, once, and records the source of each", verbatim |
+| There SHALL be no provider configuration value: the `providers` config... | body of "There is no provider configuration value", verbatim |
+| Platform selection is a per-command concern (`--platform`, see the `pl... | body of "There is no provider configuration value", verbatim |
+| Each resolved value SHALL record the final value, the source it came f... | body of "The CLI resolves every configuration value by Flag > Environment > Config > Default, once, and records the source of each", verbatim |
+| Subcommands SHALL NOT call `config.Load()` independently. | body of "Subcommands do not call `config.Load()` independently", verbatim |
+| They SHALL access the pre-loaded configuration via the `*config.Global... | body of "Subcommands do not call `config.Load()` independently", verbatim |
+| The one exception is `opm config vet`, which loads the file named on i... | body of "Subcommands do not call `config.Load()` independently", verbatim |
+| Subcommand-local flags (e.g., `opm mod apply --namespace production`)... | body of "A subcommand-local flag overrides the globally-resolved value for that invocation", verbatim |
+| Registry and config path resolution SHALL be performed by `config.Load... | body of "Registry and config path resolve in `config.Load` and Kubernetes config at the point of use", verbatim |
+| Kubernetes config resolution SHALL be performed by `config.ResolveKube... | body of "Registry and config path resolve in `config.Load` and Kubernetes config at the point of use", verbatim |
+| There SHALL NOT be a separate `ResolveBase` or `ResolveAll` resolution... | body of "Registry and config path resolve in `config.Load` and Kubernetes config at the point of use", verbatim |
+| Config loading SHALL be single-pass: because `~/.opm/config.cue` conta... | body of "Config loading is single-pass and has no registry-bootstrap phase", verbatim |
+| Registry SHALL resolve by ordinary field precedence after the file is... | body of "Config loading is single-pass and has no registry-bootstrap phase", verbatim |
+| The table of seven values (header row, separator row, 7 rows: Registry, Config Path, Kubeconfig, Context, Namespace, Timestamps, Skew policy) | scenario "The flag, environment variable, config field and default of each value" of "The CLI resolves every configuration value by Flag > Environment > Config > Default, once, and records the source of each", in the THEN line, byte for byte; the body names the scenario |
+
+Lengths (old, new): old 2357; new "The CLI resolves every configuration value by Flag > Environment > Config > Default, once, and records the source of each" 434; "There is no provider configuration value" 246; "Subcommands do not call `config.Load()` independently" 334; "A subcommand-local flag overrides the globally-resolved value for that invocation" 133; "Registry and config path resolve in `config.Load` and Kubernetes config at the point of use" 294; "Config loading is single-pass and has no registry-bootstrap phase" 307.
+
+### Ledger: config, Resolution tracking for debugging
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The CLI tracks the source of each resolved configuration value for verbose logging", "The CLI emits a single `"initializing CLI"` debug log line when `--verbose` is specified", "The debug log lines `"resolved config path"` and `"resolved registry"` are retained".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Verbose mode shows initialization-time values | "The CLI emits a single `"initializing CLI"` debug log line when `--verbose` is specified", "Verbose mode shows initialization-time values" | No (byte equal, checked) |
+| Verbose mode shows resolution source | "The CLI tracks the source of each resolved configuration value for verbose logging", "Verbose mode shows resolution source" | No (byte equal, checked) |
+| No bootstrap log lines exist | "The debug log lines `"resolved config path"` and `"resolved registry"` are retained", "No bootstrap log lines exist" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The CLI SHALL track the source of each resolved configuration value fo... | body of "The CLI tracks the source of each resolved configuration value for verbose logging", verbatim |
+| Each resolved value records: | body of "The CLI tracks the source of each resolved configuration value for verbose logging", verbatim |
+| - The final value used | body of "The CLI tracks the source of each resolved configuration value for verbose logging", verbatim |
+| - The source (flag, env, config, or default) | body of "The CLI tracks the source of each resolved configuration value for verbose logging", verbatim |
+| - Any shadowed values from lower-precedence sources | body of "The CLI tracks the source of each resolved configuration value for verbose logging", verbatim |
+| The CLI SHALL emit a single "initializing CLI" debug log line when `--... | body of "The CLI emits a single `"initializing CLI"` debug log line when `--verbose` is specified", verbatim |
+| Kubernetes values resolve at point of use per command; the platform so... | body of "The CLI emits a single `"initializing CLI"` debug log line when `--verbose` is specified", verbatim |
+| Provider does not exist as a resolved value. | body of "The CLI emits a single `"initializing CLI"` debug log line when `--verbose` is specified", verbatim |
+| The following debug log lines SHALL be retained: | body of "The debug log lines `"resolved config path"` and `"resolved registry"` are retained", verbatim |
+| - `"resolved config path"` [em-dash] shows config file location and source | body of "The debug log lines `"resolved config path"` and `"resolved registry"` are retained": the em-dash reads a colon |
+| - `"resolved registry"` [em-dash] shows registry URL and source | body of "The debug log lines `"resolved config path"` and `"resolved registry"` are retained": the em-dash reads a colon |
+
+Lengths (old, new): old 829; new "The CLI tracks the source of each resolved configuration value for verbose logging" 237; "The CLI emits a single `"initializing CLI"` debug log line when `--verbose` is specified" 419; "The debug log lines `"resolved config path"` and `"resolved registry"` are retained" 169.
+
+### Ledger: config-types, Single GlobalConfig type in config package
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The `internal/config` package exports a single `GlobalConfig` struct and no `Config` or `OPMConfig` type", "`GlobalConfig` contains the fields `Kubernetes`, `Log`, `Registry`, `ConfigPath` and `Flags`", "`GlobalConfig` contains no `Providers` field and no `CueContext` field".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| GlobalConfig contains only surviving fields | "`GlobalConfig` contains the fields `Kubernetes`, `Log`, `Registry`, `ConfigPath` and `Flags`", "GlobalConfig contains only surviving fields" | No (byte equal, checked) |
+| Config and OPMConfig types do not exist | "The `internal/config` package exports a single `GlobalConfig` struct and no `Config` or `OPMConfig` type", "Config and OPMConfig types do not exist" | No (byte equal, checked) |
+| (new) | "`GlobalConfig` contains no `Providers` field and no `CueContext` field", "GlobalConfig has no Providers field and no CueContext field" | New restatement scenario: only words of the old clause, no new case. |
+
+| Old clause | New place |
+| --- | --- |
+| The `internal/config` package SHALL export a single `GlobalConfig` str... | body of "The `internal/config` package exports a single `GlobalConfig` struct and no `Config` or `OPMConfig` type", verbatim |
+| The types `Config` and `OPMConfig` SHALL NOT exist. | body of "The `internal/config` package exports a single `GlobalConfig` struct and no `Config` or `OPMConfig` type", verbatim |
+| `GlobalConfig` SHALL contain the following fields: | body of "`GlobalConfig` contains the fields `Kubernetes`, `Log`, `Registry`, `ConfigPath` and `Flags`", verbatim |
+| - `Kubernetes` (`KubernetesConfig`): Kubernetes settings from config f... | body of "`GlobalConfig` contains the fields `Kubernetes`, `Log`, `Registry`, `ConfigPath` and `Flags`", verbatim |
+| - `Log` (`LogConfig`): Logging settings from config file | body of "`GlobalConfig` contains the fields `Kubernetes`, `Log`, `Registry`, `ConfigPath` and `Flags`", verbatim |
+| - `Registry` (`string`): Resolved registry URL (after flag > env > con... | body of "`GlobalConfig` contains the fields `Kubernetes`, `Log`, `Registry`, `ConfigPath` and `Flags`", verbatim |
+| - `ConfigPath` (`string`): Resolved config file path | body of "`GlobalConfig` contains the fields `Kubernetes`, `Log`, `Registry`, `ConfigPath` and `Flags`", verbatim |
+| - `Flags` (`GlobalFlags`): Raw CLI flag values | body of "`GlobalConfig` contains the fields `Kubernetes`, `Log`, `Registry`, `ConfigPath` and `Flags`", verbatim |
+| `GlobalConfig` SHALL NOT contain a `Providers` field or a `CueContext`... | body of "`GlobalConfig` contains no `Providers` field and no `CueContext` field", verbatim |
+| CUE evaluation contexts are owned by the per-invocation kernel, not by... | body of "`GlobalConfig` contains no `Providers` field and no `CueContext` field", verbatim |
+
+Lengths (old, new): old 753; new "The `internal/config` package exports a single `GlobalConfig` struct and no `Config` or `OPMConfig` type" 221; "`GlobalConfig` contains the fields `Kubernetes`, `Log`, `Registry`, `ConfigPath` and `Flags`" 367; "`GlobalConfig` contains no `Providers` field and no `CueContext` field" 163.
+
+### Ledger: config-types, Skew policy configuration key
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`config.cue` accepts an optional `skewPolicy` key with the values `warn` and `refuse`, defaulting to `warn`", "The `skewPolicy` value governs how a render responds to a module that requires a newer build than the platform pins", "The `skewPolicy` key applies to the local default or a `--platform` directory and the cluster Platform CR takes precedence".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Default is warn | "`config.cue` accepts an optional `skewPolicy` key with the values `warn` and `refuse`, defaulting to `warn`", "Default is warn" | No (byte equal, checked) |
+| Refuse configured | "The `skewPolicy` value governs how a render responds to a module that requires a newer build than the platform pins", "Refuse configured" | No (byte equal, checked) |
+| Cluster CR overrides the key | "The `skewPolicy` key applies to the local default or a `--platform` directory and the cluster Platform CR takes precedence", "Cluster CR overrides the key" | No (byte equal, checked) |
+| Invalid value rejected | "`config.cue` accepts an optional `skewPolicy` key with the values `warn` and `refuse`, defaulting to `warn`", "Invalid value rejected" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| `config.cue` SHALL accept an optional `skewPolicy` key with the values... | body of "`config.cue` accepts an optional `skewPolicy` key with the values `warn` and `refuse`, defaulting to `warn`", verbatim |
+| The value SHALL govern how a render responds when a module's `cue.mod`... | body of "The `skewPolicy` value governs how a render responds to a module that requires a newer build than the platform pins": "The value" reads "The `skewPolicy` value" (key name copied from the first sentence) |
+| The key applies when the platform is the local default or a `--platfor... | body of "The `skewPolicy` key applies to the local default or a `--platform` directory and the cluster Platform CR takes precedence": "The key" reads "The `skewPolicy` key" (same name) |
+| Any other value SHALL fail config validation naming the allowed values... | body of "`config.cue` accepts an optional `skewPolicy` key with the values `warn` and `refuse`, defaulting to `warn`", verbatim |
+| No flag SHALL exist for it. | body of "`config.cue` accepts an optional `skewPolicy` key with the values `warn` and `refuse`, defaulting to `warn`", verbatim |
+
+Lengths (old, new): old 883; new "`config.cue` accepts an optional `skewPolicy` key with the values `warn` and `refuse`, defaulting to `warn`" 374; "The `skewPolicy` value governs how a render responds to a module that requires a newer build than the platform pins" 286; "The `skewPolicy` key applies to the local default or a `--platform` directory and the cluster Platform CR takes precedence" 247.
+
+### Ledger: docs-bundle, The cli publishes one docs bundle that carries its pins
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The repository declares one docs-kit project, `cli`, in `docs-kit.cue`", "The docs bundle carries the authored pages and the generated command reference together and `task docs:bundle` builds it".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| The bundle holds both kinds of page and the pins | "The docs bundle carries the authored pages and the generated command reference together and `task docs:bundle` builds it", "The bundle holds both kinds of page and the pins" | No (byte equal, checked) |
+| A dev pin is refused | "The docs bundle carries the authored pages and the generated command reference together and `task docs:bundle` builds it", "A dev pin is refused" | No (byte equal, checked) |
+| (new) | "The repository declares one docs-kit project, `cli`, in `docs-kit.cue`", "The cli project is declared in docs-kit.cue" | New restatement scenario: only words of the old clause, no new case. |
+
+| Old clause | New place |
+| --- | --- |
+| The repository SHALL declare one docs-kit project, `cli`, in `docs-kit... | body of "The repository declares one docs-kit project, `cli`, in `docs-kit.cue`", verbatim |
+| The bundle SHALL carry the authored pages under `docs/site/` and the g... | body of "The docs bundle carries the authored pages and the generated command reference together and `task docs:bundle` builds it", verbatim |
+| `task docs:bundle` SHALL build it into `out/cli/` and `task docs:bundl... | body of "The docs bundle carries the authored pages and the generated command reference together and `task docs:bundle` builds it", verbatim |
+
+Lengths (old, new): old 711; new "The repository declares one docs-kit project, `cli`, in `docs-kit.cue`" 404; "The docs bundle carries the authored pages and the generated command reference together and `task docs:bundle` builds it" 306.
+
+### Ledger: docs-bundle, The dump program prints the command tree and the pins the cli compiles in
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`go run ./hack/docskit-dump` prints the command tree as one `docs.opmodel.dev/cobradump/v1` document", "`go run ./hack/docskit-dump pins` prints the pins the cli compiles in as one `docs.opmodel.dev/pins/v1` document", "Two runs of the dump program print the same bytes", "Any other argument to the dump program exits 1 with a usage line", "The `opm` binary does not contain the dump program or `cobradump`".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| The pins equal the sources the site read | "`go run ./hack/docskit-dump pins` prints the pins the cli compiles in as one `docs.opmodel.dev/pins/v1` document", "The pins equal the sources the site read" | No (byte equal, checked) |
+| A library that pins only a core major is refused | "`go run ./hack/docskit-dump pins` prints the pins the cli compiles in as one `docs.opmodel.dev/pins/v1` document", "A library that pins only a core major is refused" | No (byte equal, checked) |
+| A wrong argument is refused | "Any other argument to the dump program exits 1 with a usage line", "A wrong argument is refused" | No (byte equal, checked) |
+| (new) | "`go run ./hack/docskit-dump` prints the command tree as one `docs.opmodel.dev/cobradump/v1` document", "The dump prints the command tree" | New restatement scenario: only words of the old clause, no new case. |
+| (new) | "Two runs of the dump program print the same bytes", "Two runs print the same bytes" | New restatement scenario: only words of the old clause, no new case. |
+| (new) | "The `opm` binary does not contain the dump program or `cobradump`", "The opm binary holds neither the program nor cobradump" | New restatement scenario: only words of the old clause, no new case. |
+
+| Old clause | New place |
+| --- | --- |
+| `go run ./hack/docskit-dump` SHALL print one `docs.opmodel.dev/cobradu... | body of "`go run ./hack/docskit-dump` prints the command tree as one `docs.opmodel.dev/cobradump/v1` document", the part up to ", and" with a period; body of "`go run ./hack/docskit-dump pins` prints the pins the cli compiles in as one `docs.opmodel.dev/pins/v1` document", the rest, the second part gets "SHALL print" from the first part |
+| Two runs SHALL print the same bytes. | body of "Two runs of the dump program print the same bytes", verbatim |
+| Any other argument SHALL exit 1 with `docskit-dump: usage: docskit-dum... | body of "Any other argument to the dump program exits 1 with a usage line", verbatim |
+| The `opm` binary SHALL NOT contain the program or `cobradump`. | body of "The `opm` binary does not contain the dump program or `cobradump`", verbatim |
+
+Lengths (old, new): old 783; new "`go run ./hack/docskit-dump` prints the command tree as one `docs.opmodel.dev/cobradump/v1` document" 131; "`go run ./hack/docskit-dump pins` prints the pins the cli compiles in as one `docs.opmodel.dev/pins/v1` document" 468; "Two runs of the dump program print the same bytes" 267; "Any other argument to the dump program exits 1 with a usage line" 321; "The `opm` binary does not contain the dump program or `cobradump`" 293.
+
+### Words changed or added in unit 7a
+
+- Named references: a body ends with "(Requirement: <exact header>)" or "(Requirements: <exact header>; <exact header>)", the named reference that gives it its referent ("every template the gates", "the script", "the comparison", "it" for the linter file, "that version", "any of these", "the same steps", "each check", "Any other argument", "the program", "Two runs"). The bodies are: `pr-workflow` the seven bodies of "Template publish gates run dry-run" splits (to the parent; "A template whose tree differs from its published artifact fails the job" also to the content-check requirement), "`task test:fixtures` runs the steps of the `fixtures` job against a local registry" (to the three `fixtures` job requirements); `ci-workflow` "Every use of the golangci-lint action reads that file and pins one action commit" and "The committed golangci-lint schema matches the linter version's minor line and its checksum" (to "One file names the linter version CI installs") and "The configuration check fails when the linter version rules do not hold or the installed golangci-lint is of another minor line" (to the three requirements, because "any of these" names the whole set); `config-commands` "`opm config vet` prints a styled line for each passing check" (to the checks requirement); `docs-bundle` "Two runs of the dump program print the same bytes", "Any other argument to the dump program exits 1 with a usage line" and "The `opm` binary does not contain the dump program or `cobradump`" (to the two dump requirements).
+- `config`, "The CLI resolves every configuration value by Flag > Environment > Config > Default, once, and records the source of each": the body names the scenario "The flag, environment variable, config field and default of each value" in "(Scenario: ...)", where the old table of seven values now stands in the THEN line, byte for byte. The body keeps both SHALL sentences and the "Each resolved value SHALL record" sentence.
+- `pr-workflow`, bodies that list gates: the old list intro "For every template the gates SHALL be, in order:" repeats at the head of each of the four bodies that list a part of the gates; the closing ";" of the last bullet of a body reads ".".
+- `pr-workflow`, "The `fixtures` job seeds a job-local registry" and "The `fixtures` job runs the consumers and the render parity program against the mixed mapping": "It" and "it" read "The `fixtures` job" and "the `fixtures` job" (the subject of the first sentence of the same old requirement).
+- `catalog-registry-check`, "`opm catalog registry check` reports the member inventory per kind and apiVersion" and "`opm catalog registry check --compat` runs the predecessor comparison for the fetched build exactly as publish would have": "It" and "it" read "`opm catalog registry check <path@version>`" (the subject of the first sentence of the same old requirement). The help text body reads "The `opm catalog registry check <path@version>` command's help text" where the old text said "The command's help text", and its em-dash reads a colon.
+- `catalog-registry-check`, "An unpublished coordinate exits 5 and every other registry answer exits 3": the sentence on exit 5 repeats verbatim in both bodies as context ("not-held" has its meaning there); the `**Source**` metadata lines carry both old `Source:` lines (enhancement 0011 and enhancement 0021, both quotes) on both bodies.
+- `ci-workflow`, "The fixture publish workflow triggers on pushes to `main` that touch the fixtures and offers `workflow_dispatch`" and "The fixture publish workflow requests `packages: write` at the job level only and skips cleanly on forks": "It" reads "A workflow (`.github/workflows/publish-fixtures.yml`)" and "The workflow" reads "The workflow (`.github/workflows/publish-fixtures.yml`)" (the subject and path of the first sentence of the same old requirement).
+- `config-commands`, "`opm config init` writes no platform module or platform file" and "`opm config init` remains offline": "The command" reads "The `opm config init` command"; "`opm config vet` builds no platform module and warns about a `platform/` directory": "Vet SHALL NOT build" reads "The `opm config vet` command SHALL NOT build". The em-dash of the `config.cue` bullet reads a colon.
+- `config`, "The debug log lines `\"resolved config path\"` and `\"resolved registry\"` are retained": the two em-dashes read colons.
+- `config-types`, "The `skewPolicy` value governs how a render responds to a module that requires a newer build than the platform pins" and "The `skewPolicy` key applies to the local default or a `--platform` directory and the cluster Platform CR takes precedence": "The value" and "The key" read "The `skewPolicy` value" and "The `skewPolicy` key" (the key name of the first sentence of the same old requirement). "Any other value SHALL fail config validation naming the allowed values. No flag SHALL exist for it." moves up beside the sentence that names the values, so "other" and "it" keep their referent.
+- `docs-bundle`, "`go run ./hack/docskit-dump` prints the command tree as one `docs.opmodel.dev/cobradump/v1` document" and "`go run ./hack/docskit-dump pins` prints the pins the cli compiles in as one `docs.opmodel.dev/pins/v1` document": the old sentence is cut at ", and" (the list boundary between the two documents), a period is added after "builds", and the second part reads "SHALL print" from the first part. "Two runs SHALL print the same bytes." has its own body because it holds for both documents.
+- Every other body is built from whole old sentences, unchanged.
+
+### Strength table of cli-B7 unit 7a
+
+Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text: none. This unit adds no keyword.
+
+Plain sentences copied unchanged, with no keyword, into a body that carries a keyword in another sentence or in a list intro:
+
+| Old sentence | New body |
+| --- | --- |
+| Exit codes: 0 clean, 2 findings, 3 registry unreachable, 5 not published. | "`opm catalog registry check` pulls the named published build and verifies out of band what a platform verifies when it imports the catalog" |
+| A failure that asks no registry (a registry mapping that does not parse) exits 1. | "`opm catalog registry check` exits 5 for an unpublished coordinate, 3 for every other registry answer and 1 for a failure that asks no registry" |
+| Platform selection is a per-command concern (`--platform`, see the `platform-resolution` capability), not a config-file field. | "There is no provider configuration value" |
+| The one exception is `opm config vet`, which loads the file named on its command line into a throwaway value to validate it without touching the resolved configuration. | "Subcommands do not call `config.Load()` independently" |
+| Kubernetes values resolve at point of use per command; the platform source is a per-command concern reported by every render-bearing command (see `platform-resolution`), not an initialization-time value. Provider does not exist as a resolved value. | "The CLI emits a single `\"initializing CLI\"` debug log line when `--verbose` is specified" |
+| CUE evaluation contexts are owned by the per-invocation kernel, not by configuration. | "`GlobalConfig` contains no `Providers` field and no `CueContext` field" |
+| The command creates: and its bullet | "`opm config init` creates the default configuration `config.cue` in `~/.opm/`" |
+| Checks performed: and its two numbered items | "`opm config vet` validates the `~/.opm` configuration with two checks" |
+| Each resolved value records: and its three bullets | "The CLI tracks the source of each resolved configuration value for verbose logging" |
+| The two bullets `"resolved config path"` and `"resolved registry"` | "The debug log lines `\"resolved config path\"` and `\"resolved registry\"` are retained" |
+| The five bullets of the field list (`Kubernetes`, `Log`, `Registry`, `ConfigPath`, `Flags`) | "`GlobalConfig` contains the fields `Kubernetes`, `Log`, `Registry`, `ConfigPath` and `Flags`" |
+| The bullets `opm module tidy --check` and `opm module vet` of the gate list | "The tidy, vet and module zip gates of each template" |

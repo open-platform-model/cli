@@ -1,0 +1,213 @@
+## REMOVED Requirements
+
+### Requirement: Registry mapping is set at workflow level
+**Reason**: Split into requirements that each state one behavior.
+**Migration**: See "The PR workflow sets `OPM_REGISTRY` and `CUE_REGISTRY` at workflow level", "Only the `unit`, `fixtures` and `e2e` jobs run a registry service and every other dependency resolves from GHCR".
+
+### Requirement: Fixture gates, seed and render parity
+**Reason**: Split into requirements that each state one behavior.
+**Migration**: See "The `fixtures` job runs `hack/fixtures.sh check`", "The `fixtures` job seeds a job-local registry", "The `fixtures` job runs the consumers and the render parity program against the mixed mapping", "`task test:fixtures` runs the steps of the `fixtures` job against a local registry".
+
+## MODIFIED Requirements
+
+### Requirement: Template publish gates run dry-run
+
+The `template-gates` job SHALL build `opm` from the pull request, install the cue version that the cli's `go.mod` requires for `cuelang.org/go`, and run `.github/scripts/publish-templates.sh --dry-run`, so every gate runs over every template tree without pushing.
+The job SHALL report every failing template, not only the first, including when a template's identity cannot be evaluated.
+
+#### Scenario: Template gate violation fails the PR
+- **WHEN** a template tree violates a publish gate other than already-published
+- **THEN** the `template-gates` job exits non-zero naming the refusal
+
+#### Scenario: Already-published template passes
+- **WHEN** a template's declared version is already on GHCR and is the highest stable version there for its major, it passes every other gate, and the published artifact holds exactly the tree's files
+- **THEN** the `template-gates` job exits zero
+
+#### Scenario: Template that does not vet fails the PR
+- **WHEN** a template's `debugValues` do not render, for example a field left as an unresolved disjunction
+- **THEN** `opm module vet` prints the render error
+- **AND** the `template-gates` job exits non-zero naming the template
+
+#### Scenario: Changed template at an already-published version fails the PR
+- **WHEN** a template's tree differs in any file, its `cue.mod` pins and comments included, from the artifact GHCR holds at the template's declared version
+- **THEN** the `template-gates` job exits non-zero, prints the difference, and names the template and `opm module version set` as the fix
+
+#### Scenario: A change pushed to main without a bump fails later pull requests
+- **WHEN** a commit that changed a template without bumping it reached `main` directly, possibly with a release cut on top of it, and a pull request that does not touch the template is opened afterwards
+- **THEN** the pull request's `template-gates` job exits non-zero naming that template
+
+#### Scenario: A change and its revert are not a change
+- **WHEN** a template was changed and the change was reverted, so its tree again equals its published artifact
+- **THEN** the template passes and the job does not fail for it
+
+#### Scenario: A fetch error never passes as unpublished
+- **WHEN** GHCR holds a template's declared version but the published artifact or the template's version list cannot be fetched, or the artifact does not match its manifest digest
+- **THEN** the `template-gates` job exits non-zero naming the template
+
+#### Scenario: A file the module zip omits fails the PR
+- **WHEN** a template tree holds a symbolic link, a special file, a nested `cue.mod`, or any other file its module zip leaves out, whether or not its version is already published
+- **THEN** the `template-gates` job exits non-zero naming the template and the file
+
+#### Scenario: A version init would not resolve fails the PR
+- **WHEN** a template declares a prerelease version, an unpublished version not above the highest published stable version of its major, or a published version below that highest one
+- **THEN** the `template-gates` job exits non-zero naming the template and the highest published version
+
+#### Scenario: A module path that does not match its directory fails the PR
+- **WHEN** the identity `ModulePath` of the template in `templates/<directory>/` is not `opmodel.dev/templates/<directory>@v<major>`
+- **THEN** the `template-gates` job exits non-zero naming the expected path
+
+#### Scenario: A broken identity does not hide other failures
+- **WHEN** one template's identity package cannot be evaluated and another template fails a gate
+- **THEN** the `template-gates` job exits non-zero naming both templates
+
+## ADDED Requirements
+
+### Requirement: The PR workflow sets `OPM_REGISTRY` and `CUE_REGISTRY` at workflow level
+
+The PR workflow SHALL set `OPM_REGISTRY` and `CUE_REGISTRY` as workflow-level environment mapping `testing.opmodel.dev` and `opmodel.dev` to `ghcr.io/open-platform-model`, followed by `registry.cue.works`.
+
+#### Scenario: Tests resolve fixtures and core from GHCR
+- **WHEN** an integration test loads a module that imports `opmodel.dev/core` or a `testing.opmodel.dev` fixture
+- **THEN** the import resolves from GHCR through the workflow-level mapping
+
+### Requirement: Only the `unit`, `fixtures` and `e2e` jobs run a registry service and every other dependency resolves from GHCR
+
+Only the `unit`, `fixtures` and `e2e` jobs SHALL run a registry service: each seeds a job-local `registry:2` from the tree with `hack/fixtures.sh seed` and maps `testing.opmodel.dev` to it (the mixed mapping), because the examples and the e2e testdata pin the tree's fixture version, which GHCR holds only after the merge publishes it.
+Every other dependency, core and the catalogs included, SHALL resolve from GHCR in every job.
+
+#### Scenario: Seeded jobs resolve the tree's fixture version
+- **WHEN** a pull request bumps a fixture to a version GHCR does not hold yet and a unit or e2e test resolves it
+- **THEN** the fixture resolves from the job-local registry seeded from the tree, and core and the catalogs resolve from GHCR
+
+### Requirement: The identity and tree layout gates of each template
+
+For every template the gates SHALL be, in order:
+- the identity: its `Version` SHALL be a stable SemVer `X.Y.Z`, and its `ModulePath` SHALL be `opmodel.dev/templates/<directory>@v<major of Version>`;
+- the tree layout: it SHALL hold no symbolic link, no special file and no nested `cue.mod`.
+(Requirement: Template publish gates run dry-run)
+
+#### Scenario: The identity gate fails the PR on a module path that does not match its directory
+- **WHEN** the identity `ModulePath` of the template in `templates/<directory>/` is not `opmodel.dev/templates/<directory>@v<major>`
+- **THEN** the `template-gates` job exits non-zero naming the expected path
+
+### Requirement: The tidy, vet and module zip gates of each template
+
+For every template the gates SHALL be, in order:
+- `opm module tidy --check`;
+- `opm module vet`, which renders the template's `debugValues` against a platform generated from its own pins;
+- the module zip that `cue mod publish --out` builds from the tree, the same `modzip.CreateFromDir` file selection `opm module publish` zips with, SHALL hold exactly the tree's files, so the published module is the one vet rendered.
+(Requirement: Template publish gates run dry-run)
+
+#### Scenario: The vet gate fails a template that does not vet
+- **WHEN** a template's `debugValues` do not render, for example a field left as an unresolved disjunction
+- **THEN** `opm module vet` prints the render error
+- **AND** the `template-gates` job exits non-zero naming the template
+
+#### Scenario: The module zip gate fails a tree with a file the zip omits
+- **WHEN** a template tree holds a symbolic link, a special file, a nested `cue.mod`, or any other file its module zip leaves out, whether or not its version is already published
+- **THEN** the `template-gates` job exits non-zero naming the template and the file
+
+### Requirement: The `opm module publish --dry-run` gates of each template pass or refuse only because the version is already published
+
+For every template the gates SHALL be, in order:
+- the `opm module publish --dry-run` gates, which SHALL either pass or refuse only because the template's version is already published.
+Any other refusal or a failed vet SHALL fail the job.
+(Requirement: Template publish gates run dry-run)
+
+#### Scenario: A publish gate refusal other than already-published fails the PR
+- **WHEN** a template tree violates a publish gate other than already-published
+- **THEN** the `template-gates` job exits non-zero naming the refusal
+
+### Requirement: The version order gate of each template
+
+For every template the gates SHALL be, in order:
+- the version order: an unpublished version SHALL be above the highest stable version GHCR holds for the template's major, and an already-published version SHALL be that highest version, because `opm module init` resolves it.
+(Requirement: Template publish gates run dry-run)
+
+#### Scenario: The version order gate fails a version init would not resolve
+- **WHEN** a template declares a prerelease version, an unpublished version not above the highest published stable version of its major, or a published version below that highest one
+- **THEN** the `template-gates` job exits non-zero naming the template and the highest published version
+
+### Requirement: An already-published template version passes only when the artifact GHCR holds contains exactly the tree's files
+
+An already-published version SHALL pass only when the artifact GHCR holds at that version contains exactly the tree's files.
+The script SHALL fetch the published module zip from GHCR with an anonymous pull token, verify it against its manifest digest, and compare it with the tree's module zip file by file, by path and bytes, comments included.
+(Requirement: Template publish gates run dry-run)
+
+#### Scenario: A published artifact that holds exactly the tree's files passes
+- **WHEN** a template's declared version is already on GHCR and is the highest stable version there for its major, it passes every other gate, and the published artifact holds exactly the tree's files
+- **THEN** the `template-gates` job exits zero
+
+#### Scenario: A reverted change passes the content check
+- **WHEN** a template was changed and the change was reverted, so its tree again equals its published artifact
+- **THEN** the template passes and the job does not fail for it
+
+### Requirement: A template whose tree differs from its published artifact fails the job
+
+A template whose tree differs from its published artifact SHALL fail the job, because published versions are immutable.
+The comparison SHALL NOT depend on git history, so a change that reached `main` without a pull request, or under a later release tag, fails every later pull request's job until a bump lands.
+(Requirement: An already-published template version passes only when the artifact GHCR holds contains exactly the tree's files)
+
+#### Scenario: A changed tree at an already-published version fails the PR
+- **WHEN** a template's tree differs in any file, its `cue.mod` pins and comments included, from the artifact GHCR holds at the template's declared version
+- **THEN** the `template-gates` job exits non-zero, prints the difference, and names the template and `opm module version set` as the fix
+
+#### Scenario: A change that reached main without a bump fails every later pull request
+- **WHEN** a commit that changed a template without bumping it reached `main` directly, possibly with a release cut on top of it, and a pull request that does not touch the template is opened afterwards
+- **THEN** the pull request's `template-gates` job exits non-zero naming that template
+
+### Requirement: A failure to fetch, list, verify, build or compare fails the job and never counts the template as unpublished
+
+A failure to fetch, list, verify, build or compare SHALL fail the job and SHALL NOT count the template as unpublished.
+(Requirement: Template publish gates run dry-run)
+
+#### Scenario: A fetch, list, verify, build or compare failure never passes as unpublished
+- **WHEN** GHCR holds a template's declared version but the published artifact or the template's version list cannot be fetched, or the artifact does not match its manifest digest
+- **THEN** the `template-gates` job exits non-zero naming the template
+
+### Requirement: The `fixtures` job runs `hack/fixtures.sh check`
+
+The `fixtures` job SHALL check out with `fetch-depth: 0`, build `opm`, install cue v0.17.1, and run `hack/fixtures.sh check` with `BASE_REF` set to `origin/<base branch>`: every fixture MUST pass the publish gates dry-run against GHCR, and a fixture changed since the merge-base MUST carry a version GHCR does not hold yet, because published versions are immutable.
+
+#### Scenario: Fixture with a gate violation
+- **WHEN** a PR makes a fixture's `metadata.modulePath` disagree with its identity package
+- **THEN** the `fixtures` job SHALL fail, naming the disagreement
+
+#### Scenario: Changed fixture at an already-published version
+- **WHEN** a PR changes a fixture tree without bumping its identity version and GHCR already holds that tag
+- **THEN** the `fixtures` job SHALL fail, naming the fixture and pointing at `opm module version set`
+
+#### Scenario: Unchanged fixture at a published version
+- **WHEN** a fixture is unchanged since the merge-base and its version is already on GHCR
+- **THEN** the check SHALL report it as published and unchanged and pass
+
+### Requirement: The `fixtures` job seeds a job-local registry
+
+The `fixtures` job SHALL then run `hack/fixtures.sh seed` to publish the tree's fixtures into a job-local `registry:2` service on `localhost:5000` with a fresh `CUE_CACHE_DIR`.
+
+#### Scenario: The seed step publishes the tree's fixtures into a job-local registry
+
+- **WHEN** the `fixtures` job runs `hack/fixtures.sh seed`
+- **THEN** the tree's fixtures are published into a job-local `registry:2` service on `localhost:5000` with a fresh `CUE_CACHE_DIR`
+
+### Requirement: The `fixtures` job runs the consumers and the render parity program against the mixed mapping
+
+Against the mixed mapping (`testing.opmodel.dev` local, everything else GHCR) the `fixtures` job SHALL then run `hack/fixtures.sh consumers examples tests/e2e/testdata/operator-owned`, which MUST pass (see `test-fixture-lineage`), and `tests/integration/render-parity` with `OPM_ITEST_RENDER_PARITY=1`.
+
+#### Scenario: Render parity runs against the seeded registry
+- **WHEN** the seed step has published the tree's fixtures to the job-local registry
+- **THEN** the render-parity program SHALL load each fixture from the tree and from the registry and require byte-identical renders
+
+#### Scenario: Consumer left on a stale core pin
+- **WHEN** a PR bumps a fixture whose own `cue.mod` moved core, and re-pins `tests/e2e/testdata/operator-owned` to the new fixture version but leaves its core pin unchanged
+- **THEN** the `fixtures` job SHALL fail, printing the core pin diff and a `FAIL tests/e2e/testdata/operator-owned` line
+
+### Requirement: `task test:fixtures` runs the steps of the `fixtures` job against a local registry
+
+`task test:fixtures` SHALL run the same steps against a local registry.
+(Requirements: The `fixtures` job runs `hack/fixtures.sh check`; The `fixtures` job seeds a job-local registry; The `fixtures` job runs the consumers and the render parity program against the mixed mapping)
+
+#### Scenario: The fixtures steps run against a local registry
+
+- **WHEN** `task test:fixtures` runs
+- **THEN** it SHALL run the same steps against a local registry

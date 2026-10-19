@@ -42,10 +42,10 @@
 
 ## 7. cli-B7: pr-workflow (3), catalog-registry-check, ci-workflow, config, config-commands, config-types, docs-bundle, health-evaluation, instance-building, k8s-helpers, mod-apply, module-synthetic-instance, release-gates (2 each), command-reference (1), 28 requirements
 
-- [ ] 7.1 List the 28 long requirements of the fourteen specs and confirm the count
-- [ ] 7.2 Write the delta files for the fourteen specs and append their ledger subsections
-- [ ] 7.3 Grep for old headers; run the byte check per rewritten requirement
-- [ ] 7.4 Run the gate with N=196 and the per-spec validation; `task lint` and `task test` green, then commit `docs(openspec): split the long requirements of fourteen config, workflow and helper specs`
+- [x] 7.1 List the 28 long requirements of the fourteen specs and confirm the count (unit 7a, `pr-workflow` 3, `catalog-registry-check` 2, `ci-workflow` 2, `config` 2, `config-commands` 2, `config-types` 2 and `docs-bundle` 2: 15 long requirements)
+- [x] 7.2 Write the delta files for the fourteen specs and append their ledger subsections (unit 7a, `pr-workflow` 3, `catalog-registry-check` 2, `ci-workflow` 2, `config` 2, `config-commands` 2, `config-types` 2 and `docs-bundle` 2)
+- [x] 7.3 Grep for old headers; run the byte check per rewritten requirement (unit 7a, `pr-workflow` 3, `catalog-registry-check` 2, `ci-workflow` 2, `config` 2, `config-commands` 2, `config-types` 2 and `docs-bundle` 2)
+- [x] 7.4 Run the gate with N=196 and the per-spec validation; `task lint` and `task test` green, then commit `docs(openspec): split the long requirements of fourteen config, workflow and helper specs` (unit 7a: gate with N=183, the per-spec validation of `pr-workflow`, `catalog-registry-check`, `ci-workflow`, `config`, `config-commands`, `config-types` and `docs-bundle`, `task lint` and `task test:unit` ran (the cluster-backed `task test` did not run), and the commit `docs(openspec): split the long requirements of pr-workflow, catalog-registry-check, ci-workflow, config, config-commands, config-types and docs-bundle` was made)
 
 ## 8. cli-B8: repo-automation, resource-conversion, resource-discovery, status-verbose, workflow-security (2 each), instance-identity-labeling, mod-instance-optional, mod-list, pkg-types, platform-pull, refactoring-requirements, registry-login, secret-inventory-migration, status-wide-output (1 each), 19 requirements
 
