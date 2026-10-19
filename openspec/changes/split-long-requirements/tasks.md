@@ -1,9 +1,9 @@
 ## 1. cli-B1: operator-lifecycle (17), apply-pruning (11), 28 requirements
 
-- [ ] 1.1 Re-read both specs from the branch and list the 28 long requirements by name; confirm the count against `openspec validate --specs --strict --json`
-- [ ] 1.2 Write the delta files `specs/operator-lifecycle/spec.md` and `specs/apply-pruning/spec.md` with the forms of `design.md`, and append the ledger subsections to `design.md`
-- [ ] 1.3 Grep the repo (not `openspec/changes/archive/`) for each renamed or removed header; run the byte check once per rewritten requirement
-- [ ] 1.4 Run the gate with N=28 and the per-spec validation; `task lint` and `task test` green, then commit `docs(openspec): split the long requirements of operator-lifecycle and apply-pruning`
+- [x] 1.1 Re-read both specs from the branch and list the 28 long requirements by name; confirm the count against `openspec validate --specs --strict --json`
+- [x] 1.2 Write the delta files `specs/operator-lifecycle/spec.md` and `specs/apply-pruning/spec.md` with the forms of `design.md`, and append the ledger subsections to `design.md`
+- [x] 1.3 Grep the repo (not `openspec/changes/archive/`) for each renamed or removed header; run the byte check once per rewritten requirement
+- [x] 1.4 Run the gate with N=28 and the per-spec validation; `task lint` and `task test` green, then commit `docs(openspec): split the long requirements of operator-lifecycle and apply-pruning`
 
 ## 2. cli-B2: deploy (14), platform-resolution (9), artifact-publishing (5), 28 requirements
 
