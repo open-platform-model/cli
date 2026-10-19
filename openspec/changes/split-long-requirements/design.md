@@ -3879,9 +3879,9 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "Instance cluster-q
 | A path (an `instance.cue` file, or a directory holding one) SHALL be a... | body of "A path identifier is acquired through the library kernel and the `--namespace` flag overrides the namespace in the file" |
 | A path whose package is not a valid instance (wrong kind, no concrete ... | body of "A path identifier whose package is not a valid instance is refused with exit code 1" |
 
-Words changed or added: none; all three bodies are whole old sentences, unchanged.
+Words changed or added: none in the sentences; the second and third bodies end with "(Requirement: <header of the first requirement>)", the named reference that gives "A path" its cluster-query commands.
 
-Lengths (old, new): old 840; new "Instance cluster-query commands take one instance identifier, detected as a path, a UUID or a name from its shape" 315; "A path identifier is acquired through the library kernel and the `--namespace` flag overrides the namespace in the file" 334; "A path identifier whose package is not a valid instance is refused with exit code 1" 189.
+Lengths (old, new): old 840; new "Instance cluster-query commands take one instance identifier, detected as a path, a UUID or a name from its shape" 315; "A path identifier is acquired through the library kernel and the `--namespace` flag overrides the namespace in the file" 463; "A path identifier whose package is not a valid instance is refused with exit code 1" 318.
 
 ### Ledger: inst-commands, instance render commands accept --platform flag
 
@@ -4033,9 +4033,9 @@ New scenarios (each restates only a case the old text names):
 | The operator's registry is a command-line flag the module renders from... | body of "The operator's registry is a command-line flag rendered from the registry value, not an environment variable" |
 | Setting either as a pod environment variable SHALL have no effect. | body of "The operator's registry is a command-line flag rendered from the registry value, not an environment variable" |
 
-Words changed or added: "the task" reads "the `cluster:operator` task" (the task the scenarios of this requirement name) and "it" reads `KIND_CUE_REGISTRY` in the second body; "Setting either as a pod environment variable has no effect" reads "SHALL have no effect" (strength table); two bodies end with "(Requirement: <header of the first requirement>)".
+Words changed or added: "the task" reads "the `cluster:operator` task" (the task the scenarios of this requirement name) and "it" reads `KIND_CUE_REGISTRY` in the second body; "Setting either as a pod environment variable has no effect" reads "SHALL have no effect" (strength table); the second body ends with "(Requirement: <header of the first requirement>)" and the third with "(Requirement: <header of the second requirement>)", the named references that give "the operator's registry value" and "that value" their referent.
 
-Lengths (old, new): old 979; new "A local registry for the kind flow requires setting `KIND_CUE_REGISTRY` explicitly" 373; "When `KIND_CUE_REGISTRY` is set the `cluster:operator` task verifies, joins and passes the registry mapping as a values file" 448; "The operator's registry is a command-line flag rendered from the registry value, not an environment variable" 433.
+Lengths (old, new): old 979; new "A local registry for the kind flow requires setting `KIND_CUE_REGISTRY` explicitly" 373; "When `KIND_CUE_REGISTRY` is set the `cluster:operator` task verifies, joins and passes the registry mapping as a values file" 448; "The operator's registry is a command-line flag rendered from the registry value, not an environment variable" 475.
 
 ### Ledger: kind-cluster-tasks, cluster:operator builds the CLI it installs with
 
@@ -4111,9 +4111,9 @@ New scenarios (each restates only a case the old text names):
 | It SHALL NOT appear in the command's help, and its use SHALL print one... | body of "`--instance-name` stays accepted as a deprecated alias of `--name` on `opm mod vet`" |
 | Passing both `--name` and `--instance-name` SHALL be a usage error, an... | body of "`--instance-name` stays accepted as a deprecated alias of `--name` on `opm mod vet`" |
 
-Words changed or added: the body ends with "The syntax is shown in the scenario `Command syntax`.", the pointer to the new scenario `Command syntax` that holds the fenced syntax block of the old body byte for byte, indented in a THEN line (the 15:15 and 18:25 rulings: a fenced layout moves into a THEN line when the body names the scenario);
+Words changed or added: the first body ends with "The syntax is shown in the scenario `Command syntax`.", the pointer to the new scenario `Command syntax` that holds the fenced syntax block of the old body byte for byte, indented in a THEN line (a fenced layout moves into a THEN line when the body names the scenario); the second body (the deprecated alias) ends with "(Requirement: <header of the first requirement>)", the named reference that gives `--instance-name` its command.
 
-Lengths (old, new): old 755; new "`opm mod vet` accepts an optional module path argument and exposes `-f`/`--values`, `-n`/`--namespace`, `--name` and `--platform`" 488; "`--instance-name` stays accepted as a deprecated alias of `--name` on `opm mod vet`" 320.
+Lengths (old, new): old 755; new "`opm mod vet` accepts an optional module path argument and exposes `-f`/`--values`, `-n`/`--namespace`, `--name` and `--platform`" 488; "`--instance-name` stays accepted as a deprecated alias of `--name` on `opm mod vet`" 465.
 
 ### Ledger: mod-vet, mod vet exit codes
 
@@ -4138,7 +4138,7 @@ New scenarios (each restates only a case the old text names):
 | The `opm mod vet` command SHALL signal its verdict through the process... | body of "`opm mod vet` signals its verdict through the process exit code" |
 | The mapping of a failed core-schema fetch SHALL be the one `opm module... | body of "`opm mod vet` maps a failed core-schema fetch as `opm module publish` does and prints the login hint on a refusal" |
 
-Words changed or added: "as the table below details" reads "as the table in the scenario `Exit code table` details" (15:15 ruling: the rule table moves into the THEN of the scenario `Exit code table`, byte for byte as old rows); the second body ends with "(Requirement: <header of the first requirement>)", the referent of the core-schema fetch.
+Words changed or added: "as the table below details" reads "as the table in the scenario `Exit code table` details" (a rule table moves into the THEN of the scenario `Exit code table`, byte for byte as old rows); the second body ends with "(Requirement: <header of the first requirement>)", the referent of the core-schema fetch.
 
 Lengths (old, new): old 1340; new "`opm mod vet` signals its verdict through the process exit code" 488; "`opm mod vet` maps a failed core-schema fetch as `opm module publish` does and prints the login hint on a refusal" 228.
 
@@ -4162,7 +4162,7 @@ Lengths (old, new): old 569; new "`opm module vet` verifies the identity package
 
 ### Ledger: catalog-compatibility, Compatibility Comparison
 
-Form: c2 (REMOVED, ADDED under new names). New requirements: "`internal/compat.Check` reports every violation of the additive-only rule", "The comparison is a field-wise walk and not a single subsumption call", "Each violation carries the dotted path from the compared root and a stable kind discriminator", "A field that was optional and is required in the new definition reports `field made required`", "A defaulted field that loses its default and the reverse transition do not report `field made required`", "A default is compared only where an author wrote one, and the implicit default of a plain open list is not compared", "An open list's value domain is still judged at the leaf", "The default rule is applied to each pair of an open list's fixed elements", "The walk applies the provenance denylist at every depth", "Lists whose two sides have equal length are walked element-wise and lists of unequal length are judged as a leaf", "A leaf whose emitted syntax is identical on both sides reports nothing".
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`internal/compat.Check` reports every violation of the additive-only rule", "`Check` is a field-wise walk", "Each violation carries the dotted path from the compared root and a stable kind discriminator", "A field that was optional and is required in the new definition reports `field made required`", "A defaulted field that loses its default and the reverse transition do not report `field made required`", "A default is compared only where an author wrote one, and the implicit default of a plain open list is not compared", "An open list's value domain is still judged at the leaf", "The default rule is applied to each pair of an open list's fixed elements", "The walk applies the provenance denylist at every depth", "Lists whose two sides have equal length are walked element-wise and lists of unequal length are judged as a leaf", "A leaf whose emitted syntax is identical on both sides reports nothing".
 
 | Old scenario name | New place (requirement, scenario name) | Changed text? |
 | --- | --- | --- |
@@ -4174,7 +4174,7 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "`internal/compat.C
 | Authored list default is still compared | "A default is compared only where an author wrote one, and the implicit default of a plain open list is not compared", "Authored list default is still compared" | No (byte equal, checked) |
 | Default inside an open list's fixed element is compared | "The default rule is applied to each pair of an open list's fixed elements", "Default inside an open list's fixed element is compared" | No (byte equal, checked) |
 | Default change reported with both values | "Each violation carries the dotted path from the compared root and a stable kind discriminator", "Default change reported with both values" | No (byte equal, checked) |
-| Domain narrowing reported at a leaf | "The comparison is a field-wise walk and not a single subsumption call", "Domain narrowing reported at a leaf" | No (byte equal, checked) |
+| Domain narrowing reported at a leaf | "`Check` is a field-wise walk", "Domain narrowing reported at a leaf" | No (byte equal, checked) |
 | Additive widening passes | "`internal/compat.Check` reports every violation of the additive-only rule", "Additive widening passes" | No (byte equal, checked) |
 | Provenance inside a member reference is ignored | "The walk applies the provenance denylist at every depth", "Provenance inside a member reference is ignored" | No (byte equal, checked) |
 | Unchanged guarded leaf is silent | "A leaf whose emitted syntax is identical on both sides reports nothing", "Unchanged guarded leaf is silent" | No (byte equal, checked) |
@@ -4188,7 +4188,7 @@ New scenarios (each restates only a case the old text names):
 | Old clause | New place |
 | --- | --- |
 | The CLI SHALL provide a pure comparison (`internal/compat.Check`) that... | body of "`internal/compat.Check` reports every violation of the additive-only rule" |
-| The comparison (`internal/compat.Check`) SHALL be a field-wise walk: s... | body of "The comparison is a field-wise walk and not a single subsumption call" |
+| The comparison (`internal/compat.Check`) SHALL be a field-wise walk: s... | body of "`Check` is a field-wise walk" |
 | Each violation SHALL carry the dotted path from the compared root and ... | body of "Each violation carries the dotted path from the compared root and a stable kind discriminator" |
 | A field is "required" for this rule when it carries the required const... | body of "A field that was optional and is required in the new definition reports `field made required`" |
 | A field that carried the optional constraint (`?`) in the prior defini... | body of "A field that was optional and is required in the new definition reports `field made required`" |
@@ -4202,9 +4202,9 @@ New scenarios (each restates only a case the old text names):
 | Lists whose two sides have equal length SHALL be walked element-wise s... | body of "Lists whose two sides have equal length are walked element-wise and lists of unequal length are judged as a leaf" |
 | A leaf whose emitted syntax is identical on both sides SHALL report no... | body of "A leaf whose emitted syntax is identical on both sides reports nothing" |
 
-Words changed or added: "The comparison SHALL be" reads "The comparison (`internal/compat.Check`) SHALL be" (subject of the old first sentence); the em-dashes of that sentence read ":" and ","; "An open list's value domain is still judged" reads "SHALL still be judged" (strength table); the bodies for the violation, the made-required kind, the loss of a default, the open list, the walk and the leaf end with "(Requirement: <header>)", the named reference that gives "Each violation", "this rule", "this one's", "The walk", "that rule" and "the default rule" their referent.
+Words changed or added: "The comparison SHALL be" reads "The comparison (`internal/compat.Check`) SHALL be" (subject of the old first sentence); the em-dashes of that sentence read ":" and ","; "An open list's value domain is still judged" reads "SHALL still be judged" (strength table); the default body ends with "(Requirement: <header of the walk requirement>)", the named reference that gives "the comparison" its subject; the bodies for the violation, the made-required kind, the loss of a default, the open list, the walk and the leaf end with "(Requirement: <header>)", the named reference that gives "Each violation", "this rule", "this one's", "The walk", "that rule" and "the default rule" their referent.
 
-Lengths (old, new): old 2972; new "`internal/compat.Check` reports every violation of the additive-only rule" 434; "The comparison is a field-wise walk and not a single subsumption call" 423; "Each violation carries the dotted path from the compared root and a stable kind discriminator" 258; "A field that was optional and is required in the new definition reports `field made required`" 424; "A defaulted field that loses its default and the reverse transition do not report `field made required`" 330; "A default is compared only where an author wrote one, and the implicit default of a plain open list is not compared" 454; "An open list's value domain is still judged at the leaf" 244; "The default rule is applied to each pair of an open list's fixed elements" 442; "The walk applies the provenance denylist at every depth" 476; "Lists whose two sides have equal length are walked element-wise and lists of unequal length are judged as a leaf" 225; "A leaf whose emitted syntax is identical on both sides reports nothing" 161.
+Lengths (old, new): old 2972; new "`internal/compat.Check` reports every violation of the additive-only rule" 434; "`Check` is a field-wise walk" 423; "Each violation carries the dotted path from the compared root and a stable kind discriminator" 258; "A field that was optional and is required in the new definition reports `field made required`" 424; "A defaulted field that loses its default and the reverse transition do not report `field made required`" 330; "A default is compared only where an author wrote one, and the implicit default of a plain open list is not compared" 498; "An open list's value domain is still judged at the leaf" 244; "The default rule is applied to each pair of an open list's fixed elements" 442; "The walk applies the provenance denylist at every depth" 435; "Lists whose two sides have equal length are walked element-wise and lists of unequal length are judged as a leaf" 225; "A leaf whose emitted syntax is identical on both sides reports nothing" 120.
 
 ### Ledger: catalog-compatibility, Level Classification
 
@@ -4257,9 +4257,9 @@ New scenarios (each restates only a case the old text names):
 | A stable-preferring selector coincides with that rule only on a prerel... | body of "The documentation of the selector states how it differs from the predecessor selection of the publish gate" |
 | The documentation of the selector SHALL state this distinction, becaus... | body of "The documentation of the selector states how it differs from the predecessor selection of the publish gate" |
 
-Words changed or added: the em-dash of "Selection SHALL be pure" reads ":"; the long sentence about enhancement 0011 is cut at the list boundary of its dash list: the first body ends after the scan list (its em-dash reads ":"), the second body repeats the subject up to "the literal rule" and takes "implemented in `internal/publish` ..." (its em-dash reads ","), and the third body takes the part after the semicolon as a sentence ("a stable-preferring selector" reads "A stable-preferring selector"); "is found" reads "SHALL be found" in both bodies that repeat the subject (strength table); the last body ends with "(Requirement: <header of the first 0011 requirement>)", the referent of "that rule".
+Words changed or added: the em-dash of "Selection SHALL be pure" reads ":"; the long sentence about enhancement 0011 is cut at the list boundary of its dash list: the first body ends after the scan list (its em-dash reads ":"), the second body repeats the subject up to "the literal rule" and takes "implemented in `internal/publish` ..." (its em-dash reads ","), and the third body takes the part after the semicolon as a sentence ("a stable-preferring selector" reads "A stable-preferring selector"); "is found" reads "SHALL be found" in both bodies that repeat the subject (strength table); the selector body ends with "(Requirement: <header of the first selector requirement>)", the referent of "The selector"; the last body ends with "(Requirement: <header of the first 0011 requirement>)", the referent of "that rule".
 
-Lengths (old, new): old 1504; new "The CLI provides a stable-preferring version selector over a published-version list that is pure" 435; "The stable-preferring version selector is not exported and is not the compatibility gate's predecessor selection" 193; "The publish gate's predecessor is found by the literal backward scan of the published history" 473; "The literal predecessor rule is implemented in `internal/publish` over the registry's version enumeration" 350; "The documentation of the selector states how it differs from the predecessor selection of the publish gate" 437.
+Lengths (old, new): old 1504; new "The CLI provides a stable-preferring version selector over a published-version list that is pure" 435; "The stable-preferring version selector is not exported and is not the compatibility gate's predecessor selection" 305; "The publish gate's predecessor is found by the literal backward scan of the published history" 473; "The literal predecessor rule is implemented in `internal/publish` over the registry's version enumeration" 350; "The documentation of the selector states how it differs from the predecessor selection of the publish gate" 437.
 
 ### Strength table of cli-B5 unit 5b
 

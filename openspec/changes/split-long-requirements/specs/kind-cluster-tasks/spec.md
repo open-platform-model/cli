@@ -107,7 +107,7 @@ When `KIND_CUE_REGISTRY` is set, and only then, the `cluster:operator` task SHAL
 - **THEN** the task SHALL fail with a message naming `task registry:start` and the option of unsetting the variable to use GHCR
 
 ### Requirement: The operator's registry is a command-line flag rendered from the registry value, not an environment variable
-The operator's registry is a command-line flag the module renders from that value, not an environment variable: `--registry` wins over `OPM_REGISTRY`, which is read only when the flag is empty, and the operator overwrites `CUE_REGISTRY` in its own process environment. Setting either as a pod environment variable SHALL have no effect. (Requirement: A local registry for the kind flow requires setting `KIND_CUE_REGISTRY` explicitly)
+The operator's registry is a command-line flag the module renders from that value, not an environment variable: `--registry` wins over `OPM_REGISTRY`, which is read only when the flag is empty, and the operator overwrites `CUE_REGISTRY` in its own process environment. Setting either as a pod environment variable SHALL have no effect. (Requirement: When `KIND_CUE_REGISTRY` is set the `cluster:operator` task verifies, joins and passes the registry mapping as a values file)
 
 #### Scenario: A pod environment variable does not set the operator's registry
 

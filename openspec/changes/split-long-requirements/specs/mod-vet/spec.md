@@ -132,7 +132,7 @@ The `opm mod vet` command SHALL accept an optional module path argument that def
   ```
 
 ### Requirement: `--instance-name` stays accepted as a deprecated alias of `--name` on `opm mod vet`
-`--instance-name` SHALL stay accepted as a deprecated alias of `--name` with the same effect. It SHALL NOT appear in the command's help, and its use SHALL print one line on standard error that names `--name`. Passing both `--name` and `--instance-name` SHALL be a usage error, and nothing SHALL be validated or rendered.
+`--instance-name` SHALL stay accepted as a deprecated alias of `--name` with the same effect. It SHALL NOT appear in the command's help, and its use SHALL print one line on standard error that names `--name`. Passing both `--name` and `--instance-name` SHALL be a usage error, and nothing SHALL be validated or rendered. (Requirement: `opm mod vet` accepts an optional module path argument and exposes `-f`/`--values`, `-n`/`--namespace`, `--name` and `--platform`)
 
 #### Scenario: Deprecated alias keeps working
 

@@ -2,7 +2,7 @@
 
 ### Requirement: Compatibility Comparison
 **Reason**: Split into requirements that each state one behavior.
-**Migration**: See "`internal/compat.Check` reports every violation of the additive-only rule", "The comparison is a field-wise walk and not a single subsumption call", "Each violation carries the dotted path from the compared root and a stable kind discriminator", "A field that was optional and is required in the new definition reports `field made required`", "A defaulted field that loses its default and the reverse transition do not report `field made required`", "A default is compared only where an author wrote one, and the implicit default of a plain open list is not compared", "An open list's value domain is still judged at the leaf", "The default rule is applied to each pair of an open list's fixed elements", "The walk applies the provenance denylist at every depth", "Lists whose two sides have equal length are walked element-wise and lists of unequal length are judged as a leaf", "A leaf whose emitted syntax is identical on both sides reports nothing".
+**Migration**: See "`internal/compat.Check` reports every violation of the additive-only rule", "`Check` is a field-wise walk", "Each violation carries the dotted path from the compared root and a stable kind discriminator", "A field that was optional and is required in the new definition reports `field made required`", "A defaulted field that loses its default and the reverse transition do not report `field made required`", "A default is compared only where an author wrote one, and the implicit default of a plain open list is not compared", "An open list's value domain is still judged at the leaf", "The default rule is applied to each pair of an open list's fixed elements", "The walk applies the provenance denylist at every depth", "Lists whose two sides have equal length are walked element-wise and lists of unequal length are judged as a leaf", "A leaf whose emitted syntax is identical on both sides reports nothing".
 
 ### Requirement: Level Classification
 **Reason**: Split into requirements that each state one behavior.
@@ -33,7 +33,7 @@ The CLI SHALL provide a pure comparison (`internal/compat.Check`) that, given a 
 - **WHEN** the new definition only adds an option to a disjunction or adds an optional field
 - **THEN** `Check` reports no violations
 
-### Requirement: The comparison is a field-wise walk and not a single subsumption call
+### Requirement: `Check` is a field-wise walk
 The comparison (`internal/compat.Check`) SHALL be a field-wise walk: struct recursion for the removed-field, optional-or-defaulted and made-required rules, forward subsumption at leaves for the value domain, and explicit default comparison at every level, and SHALL NOT be implemented as a single subsumption call in either direction. (Requirement: `internal/compat.Check` reports every violation of the additive-only rule)
 
 #### Scenario: Domain narrowing reported at a leaf
@@ -70,7 +70,7 @@ A defaulted field that loses its default is the default rule's finding (`default
 - **THEN** `Check` reports `default removed` at its path, not `field made required`
 
 ### Requirement: A default is compared only where an author wrote one, and the implicit default of a plain open list is not compared
-A default is compared only where an author wrote one: a value whose disjunction marks a default with `*`. The implicit default CUE gives a plain open list (the list closed at its fixed elements: `[]` for `[...T]`, `[T]` for `[...T] & [_, ...]`) SHALL NOT count as a default on either side: it SHALL NOT be compared, its absence SHALL NOT report `default removed`, and a constraint-marker change on such a list (required to optional) SHALL report nothing.
+A default is compared only where an author wrote one: a value whose disjunction marks a default with `*`. The implicit default CUE gives a plain open list (the list closed at its fixed elements: `[]` for `[...T]`, `[T]` for `[...T] & [_, ...]`) SHALL NOT count as a default on either side: it SHALL NOT be compared, its absence SHALL NOT report `default removed`, and a constraint-marker change on such a list (required to optional) SHALL report nothing. (Requirement: `Check` is a field-wise walk)
 
 #### Scenario: Implicit open-list default is not compared
 
@@ -106,7 +106,7 @@ Defaults written inside an open list's fixed elements (`[*"a" | string, ...strin
 - **AND** declaring it `xs: [{a: *2 | int}, ...]` reports `default changed` at `xs[0].a`
 
 ### Requirement: The walk applies the provenance denylist at every depth
-The walk SHALL apply the provenance denylist of enhancement 0010 at every depth: the direct children `catalogVersion` and `description` of any field named `metadata` reached by the walk SHALL be neither compared nor reported, so a member reference embedded in another member (`appliesTo`, `composedResources`, `composedTraits`) does not report the referenced member's per-release provenance. (Requirement: The comparison is a field-wise walk and not a single subsumption call)
+The walk SHALL apply the provenance denylist of enhancement 0010 at every depth: the direct children `catalogVersion` and `description` of any field named `metadata` reached by the walk SHALL be neither compared nor reported, so a member reference embedded in another member (`appliesTo`, `composedResources`, `composedTraits`) does not report the referenced member's per-release provenance. (Requirement: `Check` is a field-wise walk)
 
 #### Scenario: Provenance inside a member reference is ignored
 
@@ -129,7 +129,7 @@ Lists whose two sides have equal length SHALL be walked element-wise so their el
 Known limitation (measured 2026-08-16, cue v0.17.1; narrowed 2026-08-26): a leaf that both changed and carries a `matchN` validator or a pending comprehension is judged by the forward subsume alone, which cannot evaluate those constructs: narrowing `matchN`'s alternatives is not detected and widening them reports `domain narrowed` spuriously. Unchanged leaves no longer report. A comparator-level fix for the changed-leaf residue is unowned.
 
 ### Requirement: A leaf whose emitted syntax is identical on both sides reports nothing
-A leaf whose emitted syntax is identical on both sides SHALL report nothing. (Requirement: The comparison is a field-wise walk and not a single subsumption call)
+A leaf whose emitted syntax is identical on both sides SHALL report nothing. (Requirement: `Check` is a field-wise walk)
 
 #### Scenario: Unchanged guarded leaf is silent
 
@@ -189,12 +189,12 @@ The CLI SHALL provide a stable-preferring version selector over a published-vers
 - **THEN** the selector returns the highest parseable stable entry instead
 
 ### Requirement: The stable-preferring version selector is not exported and is not the compatibility gate's predecessor selection
-The selector SHALL NOT be exported: template resolution is its only caller. This selector is NOT the compatibility gate's predecessor selection, and SHALL NOT ship in the compatibility package.
+The selector SHALL NOT be exported: template resolution is its only caller. This selector is NOT the compatibility gate's predecessor selection, and SHALL NOT ship in the compatibility package. (Requirement: The CLI provides a stable-preferring version selector over a published-version list that is pure)
 
 #### Scenario: The selector is not exported and is not in the compatibility package
 
 - **WHEN** the stable-preferring version selector is looked up
-- **THEN** the selector SHALL NOT be exported, template resolution SHALL be its only caller, and it SHALL NOT ship in the compatibility package
+- **THEN** the selector SHALL NOT be exported, template resolution is its only caller, and it SHALL NOT ship in the compatibility package
 
 ### Requirement: The publish gate's predecessor is found by the literal backward scan of the published history
 Enhancement 0011 ("Predecessor selection is D9's literal rule: a backward scan of the published history, prereleases included") (amending the earlier predecessor decision of the same enhancement) settled that the publish gate's predecessor SHALL be found by the literal rule: scan published versions strictly below the effective version, same major, prereleases included, newest first, each member resolving against the newest build carrying its `name` at its `apiVersion`.

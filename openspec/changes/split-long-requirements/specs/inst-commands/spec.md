@@ -56,7 +56,7 @@ The cluster-query commands (`status`, `tree`, `events`, `delete`) under `opm ins
 - **THEN** the CLI SHALL treat `./hello` as a path
 
 ### Requirement: A path identifier is acquired through the library kernel and the `--namespace` flag overrides the namespace in the file
-A path (an `instance.cue` file, or a directory holding one) SHALL be acquired through the library kernel as an instance package with the invocation's resolved registry, and the instance name and namespace SHALL be read from the acquired instance's metadata; the `--namespace` flag SHALL take precedence over the namespace in the file.
+A path (an `instance.cue` file, or a directory holding one) SHALL be acquired through the library kernel as an instance package with the invocation's resolved registry, and the instance name and namespace SHALL be read from the acquired instance's metadata; the `--namespace` flag SHALL take precedence over the namespace in the file. (Requirement: Instance cluster-query commands take one instance identifier, detected as a path, a UUID or a name from its shape)
 
 #### Scenario: status by instance path
 
@@ -69,7 +69,7 @@ A path (an `instance.cue` file, or a directory holding one) SHALL be acquired th
 - **THEN** the CLI SHALL look up the instance in the `staging` namespace
 
 ### Requirement: A path identifier whose package is not a valid instance is refused with exit code 1
-A path whose package is not a valid instance (wrong kind, no concrete `metadata.name` or `metadata.namespace`, build failure) SHALL be refused with exit code 1 and an error naming the path.
+A path whose package is not a valid instance (wrong kind, no concrete `metadata.name` or `metadata.namespace`, build failure) SHALL be refused with exit code 1 and an error naming the path. (Requirement: Instance cluster-query commands take one instance identifier, detected as a path, a UUID or a name from its shape)
 
 #### Scenario: path that is not a valid instance is refused
 
