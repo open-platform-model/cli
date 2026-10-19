@@ -430,7 +430,7 @@ Uninstall SHALL leave behind any object that the delete verdict of `opm instance
 
 ### Requirement: Uninstall leaves an unreadable Namespace or CRD behind without failing
 
-A recorded `Namespace` or `CustomResourceDefinition` that `opm operator uninstall` could not read SHALL instead be left behind, as it would be if read, and SHALL NOT count as a failure.
+When the read of a recorded `Namespace` or `CustomResourceDefinition` fails with an error other than NotFound, `opm operator uninstall` SHALL leave that object behind, as it would if the read had worked, and it SHALL NOT count as a failure.
 
 #### Scenario: Unreadable recorded Namespace is left behind
 
@@ -449,7 +449,7 @@ Re-running `opm operator uninstall` after the cause of a failed read is fixed SH
 
 ### Requirement: A failed record delete exits by the cause of the failure
 
-When the delete of the operator's instance record fails, the exit code SHALL be 4 when the API server denied the delete (Forbidden or Unauthorized), 3 when it answered with a server timeout or service unavailable, and 1 for any other failure.
+When the delete of the operator's instance record fails with an error other than NotFound, the exit code SHALL be 4 when the API server denied the delete (Forbidden or Unauthorized), 3 when it answered with a server timeout or service unavailable, and 1 for any other failure.
 
 #### Scenario: Record delete times out
 
@@ -484,7 +484,7 @@ When the delete of the operator's instance record fails, the exit code SHALL be 
 
 ### Requirement: The finalizer guard and the no-record refusal run before the plan is built
 
-The finalizer guard and the no-record refusal SHALL run before the plan is built.
+The finalizer guard and the no-record refusal of `opm operator uninstall` SHALL run before it builds the deletion plan.
 
 #### Scenario: Guard refuses before any plan
 
@@ -615,7 +615,7 @@ Objects of the render that exist with a deletion timestamp SHALL be waited out w
 
 ### Requirement: A failed read refuses the install in the check that made it
 
-Two of these checks read every object install applies, in this order: the wait for terminating objects and the apply guard. A read that fails with an error other than NotFound SHALL refuse the install in the check that made it. When the apply guard fails a read, the command SHALL exit 2, the code of the guard's other refusals.
+Two of the checks of install read every object install applies, in this order: the wait for terminating objects and the apply guard. A read that fails with an error other than NotFound SHALL refuse the install in the check that made it. When the apply guard fails a read, the command SHALL exit 2, the code of the guard's other refusals.
 
 #### Scenario: A read the apply guard fails exits with the guard code
 
@@ -629,7 +629,7 @@ Two of these checks read every object install applies, in this order: the wait f
 
 ### Requirement: A failed read in the wait for terminating objects exits by the read error
 
-When the wait for terminating objects fails a read, the command SHALL exit with the code of the read error: 4 when the API server denied the read (Forbidden or Unauthorized), 3 when it answered with a server timeout or service unavailable, and 1 for any other failure. An object that install cannot read from the start is therefore refused by the wait for terminating objects, with exit code 4 when the read is denied.
+When the wait for terminating objects fails a read with an error other than NotFound, the command SHALL exit with the code of the read error: 4 when the API server denied the read (Forbidden or Unauthorized), 3 when it answered with a server timeout or service unavailable, and 1 for any other failure. An object that install cannot read from the start is therefore refused by the wait for terminating objects, with exit code 4 when the read is denied.
 
 #### Scenario: An object unreadable from the start exits by the read error
 
@@ -675,7 +675,7 @@ Every CLI command that checks for a running operator before it acts SHALL locate
 
 ### Requirement: The running-operator check reads no Namespace and reports a missing CRD as not ready
 
-The `Namespace` is checked only as the `Deployment`'s namespace; the check reads no `Namespace` object and no instance record. An operator that lacks one of these CRDs SHALL be reported as not ready.
+The `Namespace` is checked only as the `Deployment`'s namespace; the check reads no `Namespace` object and no instance record. An operator that lacks one of its four fixed CRDs SHALL be reported as not ready.
 
 #### Scenario: Operator older than the fourth CRD is not ready
 
@@ -684,7 +684,7 @@ The `Namespace` is checked only as the `Deployment`'s namespace; the check reads
 
 ### Requirement: The operator counts as running only on a positive finding
 
-The operator SHALL count as running only when every one of these `CustomResourceDefinition`s reports `Established=True` and the `Deployment` has completed its rollout. Otherwise the check SHALL report the operator as not ready, name each object that failed, and point at `opm operator install`. A read of any of these objects that fails SHALL count that object as not ready, so the command proceeds only on a positive finding.
+The operator SHALL count as running only when every one of its four fixed `CustomResourceDefinition`s reports `Established=True` and the `Deployment` has completed its rollout. Otherwise the check SHALL report the operator as not ready, name each object that failed, and point at `opm operator install`. A read of any of the fixed-name objects that fails SHALL count that object as not ready, so the command proceeds only on a positive finding.
 
 #### Scenario: No operator at all
 

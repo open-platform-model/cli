@@ -105,7 +105,7 @@ When the read of the instance's `ModuleInstance` record fails with any error oth
 
 ### Requirement: A failed record read names its cause and exits by it
 
-The error SHALL name the instance and its namespace, carry the cause of the failed read, and tell the user to check access to the record and run the command again. The exit code SHALL be 4 when the API server denied the read (Forbidden or Unauthorized), 3 when it answered with a server timeout or service unavailable, and 1 for any other failure. A NotFound answer SHALL still mean that no record exists.
+When the read of the record fails, the error SHALL name the instance and its namespace, carry the cause of the failed read, and tell the user to check access to the record and run the command again. The exit code SHALL be 4 when the API server denied the read (Forbidden or Unauthorized), 3 when it answered with a server timeout or service unavailable, and 1 for any other failure. A NotFound answer SHALL still mean that no record exists.
 
 #### Scenario: Read denied
 
@@ -212,7 +212,7 @@ When `--dry-run` is set and pruning is enabled, the apply SHALL read each stale 
 
 ### Requirement: The dry-run preview lists the resources a real prune would delete or leave behind
 
-The apply SHALL list each stale resource the verdict allows a real apply to delete with the status `would prune`, and SHALL list separately each stale resource of a protected kind (core `Namespace`, `apiextensions.k8s.io` `CustomResourceDefinition`) with the status `left behind`. The preview SHALL use the same protected-kind rule as the real prune.
+When `--dry-run` is set and pruning is enabled, the apply SHALL list each stale resource the verdict allows a real apply to delete with the status `would prune`, and SHALL list separately each stale resource of a protected kind (core `Namespace`, `apiextensions.k8s.io` `CustomResourceDefinition`) with the status `left behind`. The preview SHALL use the same protected-kind rule as the real prune.
 
 #### Scenario: Preview separates pruned and left-behind resources
 
@@ -223,7 +223,7 @@ The apply SHALL list each stale resource the verdict allows a real apply to dele
 
 ### Requirement: The dry-run preview lists a PersistentVolumeClaim a real prune would keep
 
-The apply SHALL list separately each stale core `PersistentVolumeClaim` that a real apply with the same flags would keep, with the status `kept`. The preview SHALL use the same `--delete-data` rule as the real prune, so no stale resource is listed as `would prune` that a real apply with the same flags leaves in the cluster.
+When `--dry-run` is set and pruning is enabled, the apply SHALL list separately each stale core `PersistentVolumeClaim` that a real apply with the same flags would keep, with the status `kept`. The preview SHALL use the same `--delete-data` rule as the real prune, so no stale resource is listed as `would prune` that a real apply with the same flags leaves in the cluster.
 
 #### Scenario: Preview lists a claim as kept
 
@@ -237,7 +237,7 @@ The apply SHALL list separately each stale core `PersistentVolumeClaim` that a r
 
 ### Requirement: The dry-run preview lists a resource the verdict leaves in place on its own line
 
-A stale resource the verdict leaves in place SHALL NOT be listed as `would prune`. It SHALL be listed on its own line with the reason the verdict gives, which names the owner: with the status `would keep` when the live object is not managed by OPM or belongs to another instance, and with the status `would let go` when another instance is adopting it. Neither line SHALL change the exit code.
+In a dry run, a stale resource the delete verdict leaves in place SHALL NOT be listed as `would prune`. It SHALL be listed on its own line with the reason the verdict gives, which names the owner: with the status `would keep` when the live object is not managed by OPM or belongs to another instance, and with the status `would let go` when another instance is adopting it. Neither line SHALL change the exit code.
 
 #### Scenario: Preview keeps what the instance does not own
 
@@ -253,7 +253,7 @@ A stale resource the verdict leaves in place SHALL NOT be listed as `would prune
 
 ### Requirement: The dry-run preview lists no resource that is gone and flags one it cannot read
 
-A stale resource that is already gone SHALL be listed on no line. A stale resource whose live read fails with any error other than NotFound SHALL be listed with the status `cannot check` and the read error, and the dry run SHALL exit with the code the real apply exits with after such a failed prune: 1, or the code of a failed API discovery request (4 denied, 3 unavailable).
+In a dry run, a stale resource that is already gone SHALL be listed on no line. A stale resource whose live read fails with any error other than NotFound SHALL be listed with the status `cannot check` and the read error, and the dry run SHALL exit with the code the real apply exits with after such a failed prune: 1, or the code of a failed API discovery request (4 denied, 3 unavailable).
 
 #### Scenario: Preview leaves out a stale resource that is gone
 
@@ -525,7 +525,7 @@ When the instance's UUID is known and the live `opmodel.dev/adopt` annotation of
 
 ### Requirement: The apply warns about a resource let go and writes the inventory without it
 
-The apply SHALL print one warning that names the resource and the adopting instance and says how to take the resource back, SHALL apply the other rendered resources, and SHALL write the inventory without that resource. The apply SHALL NOT prune or otherwise delete it.
+For a resource let go, the apply SHALL print one warning that names the resource and the adopting instance and says how to take the resource back, SHALL apply the other rendered resources, and SHALL write the inventory without that resource. The apply SHALL NOT prune or otherwise delete it.
 
 #### Scenario: Annotating the resource back reverses the hand-over
 
@@ -535,7 +535,7 @@ The apply SHALL print one warning that names the resource and the adopting insta
 
 ### Requirement: A dry run skips a resource adopted by another instance
 
-A dry run SHALL NOT send such a resource to the server either: in place of the warning it SHALL print one line that names the resource with the status `would skip` and the same text, and it SHALL NOT fail because of it.
+A dry run SHALL NOT send a resource whose live adopt annotation names another instance to the server either: in place of the warning it SHALL print one line that names the resource with the status `would skip` and the same text, and it SHALL NOT fail because of it.
 
 #### Scenario: Dry run skips an adopted resource
 
@@ -558,7 +558,7 @@ When every rendered resource is let go, so that the apply applies nothing, the r
 
 ### Requirement: A dry run where every rendered resource is let go says that nothing would be applied
 
-A dry run in the same state SHALL print one closing line that says that nothing would be applied, for the same reason.
+A dry run in which every rendered resource is let go SHALL print one closing line that says that nothing would be applied, for the same reason.
 
 #### Scenario: Dry run where every rendered resource is adopted elsewhere
 
@@ -568,7 +568,7 @@ A dry run in the same state SHALL print one closing line that says that nothing 
 
 ### Requirement: Operator install refuses a resource adopted by another instance
 
-`opm operator install` is the exception: it SHALL refuse on such a resource (capability `operator-lifecycle`). Source: enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override" and "The stale set is component-blind, and the inventory digest hashes a canonical field encoding").
+`opm operator install` is the exception: it SHALL refuse on a rendered resource whose live adopt annotation names another instance (capability `operator-lifecycle`). Source: enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override" and "The stale set is component-blind, and the inventory digest hashes a canonical field encoding").
 
 #### Scenario: Operator install refuses an adopted resource
 
@@ -754,7 +754,7 @@ A dry run SHALL run the same guard, with the same reads, and the same verdict as
 
 ### Requirement: A dry run stops where the real run stops
 
-The dry run SHALL then stop where the real run stops: it SHALL send no rendered resource to the server, SHALL print no prune preview, and SHALL exit 1, the code of the real refusal, with an error that gives the number of refused resources, says that a real apply would be refused, and says that the dry run changed nothing. On a first apply it SHALL add the same earlier-identity line as the real refusal.
+After the dry run prints the `would refuse` lines, it SHALL stop where the real run stops: it SHALL send no rendered resource to the server, SHALL print no prune preview, and SHALL exit 1, the code of the real refusal, with an error that gives the number of refused resources, says that a real apply would be refused, and says that the dry run changed nothing. On a first apply it SHALL add the same earlier-identity line as the real refusal.
 
 #### Scenario: Dry run previews a refusal and exits 1
 
