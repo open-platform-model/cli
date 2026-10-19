@@ -89,7 +89,7 @@ No non-test Go file in the cli SHALL declare a copy of the package's decisions: 
 
 ### Requirement: The readiness exemptions are not copies
 
-The exemptions named in the previous requirement SHALL NOT be copies.
+The exemptions named in the requirements "The Established wait and the operator install dispatch by kind stay in the cli" and "The tree child rows and the status colouring stay in the cli" SHALL NOT be copies.
 (Requirements: The Established wait and the operator install dispatch by kind stay in the cli; The tree child rows and the status colouring stay in the cli)
 
 **Source**: enhancement 0012 ("The Kubernetes runtime decisions live in a fenced tier, `opm/k8s`, beside the kernel and inside the library module").

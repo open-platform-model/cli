@@ -178,6 +178,8 @@ The step SHALL exit zero in every one of those cases, so it never fails the job:
 G1 (`release-pin-check.sh`) SHALL run the same script without `--warn` and report each line it prints as a G1 violation; a non-zero exit with no line SHALL itself be a violation.
 (Requirement: The `lint` job of `pr.yml` runs the step "Docs bundles for moved pins" on every pull request and fetches the base commit)
 
+**Source**: security pass 2026-10-04, finding CAS-R2 (the check left the cascade task).
+
 #### Scenario: G1 still fails a release pull request
 
 - **WHEN** a release pull request's tree pins a library version whose docs bundle is not published
