@@ -105,7 +105,7 @@ When the read of the instance's `ModuleInstance` record fails with any error oth
 
 ### Requirement: A failed record read names its cause and exits by it
 
-When the read of the record fails, the error SHALL name the instance and its namespace, carry the cause of the failed read, and tell the user to check access to the record and run the command again. The exit code SHALL be 4 when the API server denied the read (Forbidden or Unauthorized), 3 when it answered with a server timeout or service unavailable, and 1 for any other failure. A NotFound answer SHALL still mean that no record exists.
+When the read of the record fails with any error other than NotFound, the error SHALL name the instance and its namespace, carry the cause of the failed read, and tell the user to check access to the record and run the command again. The exit code SHALL be 4 when the API server denied the read (Forbidden or Unauthorized), 3 when it answered with a server timeout or service unavailable, and 1 for any other failure. A NotFound answer SHALL still mean that no record exists.
 
 #### Scenario: Read denied
 
@@ -130,7 +130,7 @@ With `--create-namespace` and a missing namespace the record SHALL NOT be read a
 
 ### Requirement: Operator install does not say nothing changed after its CRD step
 
-`opm operator install` SHALL NOT say that nothing was changed when the read fails after the install applied its CustomResourceDefinitions.
+`opm operator install` SHALL NOT say that nothing was changed when the read of the instance's `ModuleInstance` record fails after the install applied its CustomResourceDefinitions.
 
 #### Scenario: Read denied inside operator install after its CRD step
 
@@ -177,7 +177,7 @@ The apply flow SHALL follow this sequence: (1) render resources, (2) compute man
 
 ### Requirement: The apply flow prunes only after every apply succeeded
 
-After step (6) of the apply flow: (7a) if all applied successfully, read each stale resource and prune those the delete verdict allows, judged with the instance identity the record held when step (4) read it, (7b) skip prune and inventory write if any apply failed, (9) exit with an error if step (7a) failed to delete a stale resource. No step SHALL filter the stale set after it is computed: the stale set is already component-blind.
+After step (6) of the apply flow, the apply SHALL follow this sequence: (7a) if all applied successfully, read each stale resource and prune those the delete verdict allows, judged with the instance identity the record held when step (4) read it, (7b) skip prune and inventory write if any apply failed, (9) exit with an error if step (7a) failed to delete a stale resource. No step SHALL filter the stale set after it is computed: the stale set is already component-blind.
 
 #### Scenario: Normal apply with pruning
 
@@ -316,7 +316,7 @@ A dry run SHALL print the warning too, when its ownership guard refuses nothing 
 
 ### Requirement: The warning of a real run names the Secret and not an older release
 
-The warning of a real run SHALL NOT send the user to that release, because the run writes the record and that release then deletes the Secret without reading it. It SHALL name the Secret (`opm.<name>.<id>`), SHALL say to keep it and not to apply with an older release, and SHALL name the docs page that describes the cleanup.
+The warning of a real run SHALL NOT send the user to the release to apply with first (`v1.0.0-beta.10`), because the run writes the record and that release then deletes the Secret without reading it. It SHALL name the Secret (`opm.<name>.<id>`), SHALL say to keep it and not to apply with an older release, and SHALL name the docs page that describes the cleanup.
 
 #### Scenario: Real-run warning names the Secret
 
@@ -535,7 +535,7 @@ For a resource let go, the apply SHALL print one warning that names the resource
 
 ### Requirement: A dry run skips a resource adopted by another instance
 
-A dry run SHALL NOT send a resource whose live adopt annotation names another instance to the server either: in place of the warning it SHALL print one line that names the resource with the status `would skip` and the same text, and it SHALL NOT fail because of it.
+When the instance's UUID is known and the live `opmodel.dev/adopt` annotation of a rendered resource names another instance, a dry run SHALL NOT send such a resource (the scope of "A resource adopted by another instance is not applied and does not fail the apply") to the server either: in place of the warning it SHALL print one line that names the resource with the status `would skip` and the same text, and it SHALL NOT fail because of it.
 
 #### Scenario: Dry run skips an adopted resource
 

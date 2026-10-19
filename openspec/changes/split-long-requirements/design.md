@@ -470,7 +470,7 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "The running-operat
 | --- | --- |
 | Every CLI command that checks for a running operator before it acts SH... | body of "The running-operator check locates the operator by its fixed names", verbatim |
 | The operator's objects SHALL be its fixed names, which every install o... | body of "The running-operator check locates the operator by its fixed names", verbatim |
-| The `Namespace` is checked only as the `Deployment`'s namespace; the c... | body of "The running-operator check reads no Namespace and reports a missing CRD as not ready", verbatim |
+| The `Namespace` is checked only as the `Deployment`'s namespace; the c... | body of "The running-operator check reads no Namespace and reports a missing CRD as not ready"; "the `Deployment`'s namespace" reads "the namespace of the `Deployment` `opm-operator-controller-manager`", the name from the old second sentence |
 | Otherwise the check SHALL report the operator as not ready, name each ... | body of "The operator counts as running only on a positive finding", verbatim |
 | An operator that lacks one of these CRDs SHALL be reported as not read... | reworded, nearest body: "The running-operator check reads no Namespace and reports a missing CRD as not ready"; the subject or a condition is restated so that the body reads alone, no rule changed |
 | The operator SHALL count as running only when every one of these `Cust... | reworded, nearest body: "The operator counts as running only on a positive finding"; the subject or a condition is restated so that the body reads alone, no rule changed |
@@ -516,11 +516,11 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "A failed read of t
 | The exit code SHALL be 4 when the API server denied the read (Forbidde... | body of "A failed record read names its cause and exits by it", verbatim |
 | A NotFound answer SHALL still mean that no record exists. | body of "A failed record read names its cause and exits by it", verbatim |
 | With `--create-namespace` and a missing namespace the record SHALL NOT... | body of "A missing namespace is not read for an instance record", verbatim |
-| `opm operator install` SHALL NOT say that nothing was changed when the... | body of "Operator install does not say nothing changed after its CRD step", verbatim |
+| `opm operator install` SHALL NOT say that nothing was changed when the... | body of "Operator install does not say nothing changed after its CRD step", verbatim except "the read" reads "the read of the instance's `ModuleInstance` record" (the subject of the first old sentence) |
 | When the read of the instance's `ModuleInstance` record fails with any... | reworded, nearest body: "A failed read of the instance record stops the apply before any change"; the subject or a condition is restated so that the body reads alone, no rule changed |
 | The system SHALL NOT treat the failed read as a first install: it SHAL... | reworded, nearest body: "A failed read of the instance record stops the apply before any change"; the subject or a condition is restated so that the body reads alone, no rule changed |
 | This SHALL hold for a dry run too, which SHALL NOT print a preview bui... | reworded, nearest body: "A failed read of the instance record stops the apply before any change"; the subject or a condition is restated so that the body reads alone, no rule changed |
-| The error SHALL name the instance and its namespace, carry the cause o... | reworded, nearest body: "A failed record read names its cause and exits by it"; the subject or a condition is restated so that the body reads alone, no rule changed |
+| The error SHALL name the instance and its namespace, carry the cause o... | reworded, nearest body: "A failed record read names its cause and exits by it"; the condition is "When the read of the record fails with any error other than NotFound": "fails with any error other than NotFound" is copied from the first old sentence, "the read of the record" is the subject of the old text without its qualifier (500-character limit); the rest is the old sentence |
 | The error of `opm instance apply` and `opm module apply` SHALL say tha... | reworded, nearest body: "A failed read of the instance record stops the apply before any change"; the subject or a condition is restated so that the body reads alone, no rule changed |
 | (detail) Stop with an error; do not treat the failed read as a first install; apply, prune and write nothing | body of "A failed read of the instance record stops the apply before any change"; two sentences joined, "it SHALL NOT apply any resource, SHALL NOT prune, and SHALL NOT write the record" reads "they SHALL NOT apply any resource, prune, or write the record" |
 | (detail) This holds for a dry run, which prints no preview built without the record | same body, "built" reads "made" |
@@ -562,7 +562,7 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "The apply flow rea
 | No step SHALL filter the stale set after it is computed: the stale set... | body of "The apply flow prunes only after every apply succeeded", verbatim |
 | (1) render resources, (2) compute manifest digest, (3) compute change ... | reworded, nearest body: "The apply flow reads, checks and applies before it prunes"; the subject or a condition is restated so that the body reads alone, no rule changed |
 | (detail) Steps (1) to (6) of the sequence | body of "The apply flow reads, checks and applies before it prunes", step text verbatim |
-| (detail) Steps (7a), (7b) and (9), and the rule that no step filters the stale set | body of "The apply flow prunes only after every apply succeeded"; step numbers kept, "step 4" reads "step (4)" |
+| (detail) Steps (7a), (7b) and (9), and the rule that no step filters the stale set | body of "The apply flow prunes only after every apply succeeded"; step numbers kept, "step 4" reads "step (4)"; the old sentence "The apply flow SHALL follow this sequence" supplies the keyword: "the apply SHALL follow this sequence" |
 | (detail) Step (8) | body of "The apply flow writes the record last"; "SHALL" added in front of the verb because every ADDED body needs one (the old sequence was one SHALL sentence) |
 
 ### Ledger: apply-pruning, Dry-run prune preview lists left-behind resources
@@ -620,7 +620,7 @@ New scenarios (each uses only words and values of the old body of this requireme
 | On a first-time apply (no `ModuleInstance` record), when one or more r... | body of "A first install over OPM-managed resources prints one warning", verbatim |
 | The warning SHALL NOT change the exit code and SHALL NOT stop the appl... | body of "The first-install warning says what the apply does and does not stop it", verbatim |
 | The dry-run warning SHALL name the release to apply with first (`v1.0.... | body of "The warning of a dry run names the release to apply with first", verbatim |
-| The warning of a real run SHALL NOT send the user to that release, bec... | body of "The warning of a real run names the Secret and not an older release", verbatim |
+| The warning of a real run SHALL NOT send the user to that release, bec... | body of "The warning of a real run names the Secret and not an older release"; "that release" reads "the release to apply with first (`v1.0.0-beta.10`)", words of the old second paragraph |
 | It SHALL name the Secret (`opm.<name>.<id>`), SHALL say to keep it and... | body of "The warning of a real run names the Secret and not an older release", verbatim |
 | The apply SHALL print no such warning when no rendered resource exists... | body of "The first-install warning is not printed when it does not apply", verbatim |
 | `opm operator install` SHALL NOT print it: install applies the render'... | body of "The first-install warning is not printed when it does not apply", verbatim |
@@ -719,7 +719,7 @@ New scenarios (each uses only words and values of the old body of this requireme
 | It SHALL print no success line that says resources were applied or are... | body of "A real apply that lets go of every rendered resource says that nothing was applied", verbatim |
 | Source: enhancement 0012 ("The apply guard runs on every apply, refusi... | body of "Operator install refuses a resource adopted by another instance", verbatim |
 | The apply SHALL print one warning that names the resource and the adop... | reworded, nearest body: "The apply warns about a resource let go and writes the inventory without it"; the subject or a condition is restated so that the body reads alone, no rule changed |
-| A dry run SHALL NOT send such a resource to the server either: in plac... | reworded, nearest body: "A dry run skips a resource adopted by another instance"; the subject or a condition is restated so that the body reads alone, no rule changed |
+| A dry run SHALL NOT send such a resource to the server either: in plac... | reworded, nearest body: "A dry run skips a resource adopted by another instance"; the first sentence of the old body of "A resource adopted by another instance is not applied and does not fail the apply" supplies the condition ("When the instance's UUID is known and the live `opmodel.dev/adopt` annotation of a rendered resource names another instance"), copied verbatim, and "such a resource" is tied to that requirement by name; the let-go set and the dry-run sentence are the old ones |
 | A dry run in the same state SHALL print one closing line that says tha... | reworded, nearest body: "A dry run where every rendered resource is let go says that nothing would be applied"; the subject or a condition is restated so that the body reads alone, no rule changed |
 | `opm operator install` is the exception: it refuses on such a resource... | reworded, nearest body: "Operator install refuses a resource adopted by another instance"; the subject or a condition is restated so that the body reads alone, no rule changed |
 | (detail) `opm operator install` is the exception: it refuses on such a resource | body of "Operator install refuses a resource adopted by another instance"; "it refuses" reads "it SHALL refuse" so that the body carries a SHALL |
@@ -815,3 +815,12 @@ New scenarios (each uses only words and values of the old body of this requireme
 ### Cross-unit reference left for unit cli-B2
 
 The requirement "Ownership guard judges every apply and dry run" of `apply-pruning` is removed here (form c2, split into fourteen requirements). `openspec/specs/deploy/spec.md` cites it in the requirement "Create-namespace creates the namespace only after every check passed", in the words `(capability apply-pruning, "Ownership guard judges every apply and dry run")`. That requirement is in unit cli-B2 and is rewritten there. B2 must write the new name `The ownership guard judges every apply` (or the dry-run requirement `A dry run previews each refusal of the guard` where the text speaks of a dry run) into its rewritten text. Until B2 lands, that one citation is stale by name. Checked with `grep -rn --exclude-dir=archive` on 2026-10-19: it is the only reference outside the rewritten requirements.
+
+
+### Strength table of cli-B1
+
+Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text:
+
+| Old sentence | New body | Word added |
+| --- | --- | --- |
+| `opm operator install` is the exception: it refuses on such a resource | "Operator install refuses a resource adopted by another instance" | "it refuses" reads "it SHALL refuse" |
