@@ -1,0 +1,317 @@
+## REMOVED Requirements
+
+### Requirement: One pipeline, two entry points
+**Reason**: Split into requirements that each state one behavior.
+**Migration**: See "Publish loads the artifact tree and validates its identity package by unification", "Publish derives the registry coordinates, runs the gates and pushes", "What is published is exactly the committed tree", "Module publish loads the tree through the kernel's module loader".
+
+### Requirement: Gates and refusal catalog
+**Reason**: Split into requirements that each state one behavior.
+**Migration**: See "Publish accumulates every refusal and refuses with exit code 2", "Each refusal follows one fixed shape", "One cause yields one refusal", "The loadability, identity and derivation gates", "The cue.mod, source, tag and package-name gates", "The domain, local-override and already-published gates".
+
+### Requirement: Exit codes
+**Reason**: Split into requirements that each state one behavior.
+**Migration**: See "Publish exits 0, 2, 4, 3 or 1 by outcome", "A failed already-published lookup does not hide locally derived refusals", "A failed registry operation with no HTTP response reads registry unreachable", "A 401 or 403 answer reads as refused credentials and exits 4", "Any other failure answer reads registry operation failed", "A 403 answer to the already-published lookup is not a failure", "A refusing token endpoint is a refused credential", "Publish with no registry configured exits 2".
+
+### Requirement: The compatibility gate
+**Reason**: Split into requirements that each state one behavior.
+**Migration**: See "Catalog publish compares each beta and GA member under the additive-only rule", "The compatibility baseline is the last published build that shipped the member", "A violation refuses as refusal 9", "A beta or GA name and apiVersion key is a permanent claim", "A dev build is not judged and is never a predecessor", "A release prerelease tag exempts beta and GA members until the first stable tag".
+
+### Requirement: Connectivity across the member walk
+**Reason**: Split into requirements that each state one behavior.
+**Migration**: See "A transport failure or a missing dependency aborts the walk as a connectivity error", "A package absent at a published version is the scan's negative signal", "The CLI takes fetch decisions from the library's typed classification".
+
+## ADDED Requirements
+
+### Requirement: Publish loads the artifact tree and validates its identity package by unification
+
+`opm module publish [dir]` and `opm catalog publish [dir]` SHALL share one implementation: load the artifact tree and its `identity/` subpackage, validate the identity package by unifying it against core's `#IdentityPackage` (surfacing CUE's own diagnostic — never a hand-rolled comparison).
+
+#### Scenario: Identity is validated by unification
+
+- **WHEN** the identity package has a renamed, mistyped, or missing required field
+- **THEN** publish refuses with CUE's unification error, carrying file and line
+- **AND** no procedural expected-versus-found message is printed
+
+#### Scenario: A tree that does not load surfaces the load error
+
+- **WHEN** the artifact tree fails to load
+- **THEN** publish surfaces the load error verbatim and reports no identity-derived refusal
+
+### Requirement: Publish derives the registry coordinates, runs the gates and pushes
+
+`opm module publish [dir]` and `opm catalog publish [dir]` SHALL share one implementation: derive the registry coordinates by reading and splitting the declared `modulePath` (never composing from parts, never editing the artifact to match a coordinate), run the gates, and push via CUE's module machinery with credentials from the same resolver chain reads use.
+
+#### Scenario: Clean artifact publishes at its declared version
+
+- **WHEN** a conformant artifact with concrete identity is published
+- **THEN** the plan prints, the push targets `<registryRepo>:v<Version>`, and the command exits 0
+
+### Requirement: What is published is exactly the committed tree
+
+What is published SHALL be exactly the committed tree — no copied build directory, no generated files in the pushed bytes.
+
+#### Scenario: Published bytes are the committed tree
+
+- **WHEN** an artifact is published
+- **THEN** what is published SHALL be exactly the committed tree — no copied build directory, no generated files in the pushed bytes
+
+### Requirement: Module publish loads the tree through the kernel's module loader
+
+For a module, publish SHALL additionally load the tree through the kernel's module loader, the same loader `opm module build` and the operator use, and SHALL refuse with the loader's own error when the loader refuses. Publish SHALL NOT judge a module loadable by any test the kernel does not apply.
+
+#### Scenario: A module the kernel refuses is refused by publish
+
+- **WHEN** a module tree loads as CUE but the kernel's module loader refuses it (for example `metadata.version` declared as a defaulted disjunction, or `kind` not `"Module"`)
+- **THEN** `opm module publish` and `opm module publish --dry-run` refuse with exit code 2, quoting the loader's error and naming the loader's failure class
+- **AND** `opm module vet` reports the same refusal
+- **AND** the same tree with the defect corrected passes the gate
+
+### Requirement: Publish accumulates every refusal and refuses with exit code 2
+
+Publish SHALL evaluate every evaluable gate, accumulate all refusals into one list, and refuse with exit code 2 when any gate fails.
+
+#### Scenario: Multiple defects reported in one pass
+
+- **WHEN** an artifact has both a coordinate disagreement and tag/version skew
+- **THEN** one invocation reports both refusals
+
+### Requirement: Each refusal follows one fixed shape
+
+Each refusal SHALL follow the fixed shape condition → evidence → consequence → action, print disagreeing values in aligned columns naming the file (and line where available) that declares each, and offer a runnable command as the action.
+
+#### Scenario: A refusal follows the fixed shape
+
+- **WHEN** publish refuses
+- **THEN** the refusal SHALL follow the fixed shape condition → evidence → consequence → action and offer a runnable command as the action
+
+### Requirement: One cause yields one refusal
+
+One cause SHALL yield one refusal.
+
+#### Scenario: Kernel refusal is one refusal
+
+- **WHEN** a module's identity `Version` is a defaulted disjunction
+- **THEN** publish reports exactly one refusal for it, the kernel loader's, and the identity gates still derive the tag from the default so the rest of the plan prints
+
+### Requirement: The loadability, identity and derivation gates
+
+The gates SHALL be: kernel loadability (modules only: the kernel's module loader accepts the tree; its refusal is surfaced verbatim and is the only refusal that cause yields); identity concreteness (a defaulted field counts as concrete at its default for tag derivation; an absent field or file is never publishable); `metadata` ↔ identity-package derivation.
+
+#### Scenario: The loadability and identity gates run
+
+- **WHEN** publish evaluates its gates
+- **THEN** the gates SHALL be: kernel loadability, identity concreteness and `metadata` ↔ identity-package derivation
+
+### Requirement: The cue.mod, source, tag and package-name gates
+
+The gates SHALL be: `cue.mod` `module:` ↔ declared path agreement (no `cue.mod` at all refuses, pointing at `opm mod init` — publish never creates or edits `cue.mod`); `source: {kind: "self"}` presence; tag equals the effective declared version and the tag major equals the path major; the module package name equals `metadata.name`.
+
+#### Scenario: The cue.mod and tag gates run
+
+- **WHEN** publish evaluates its gates
+- **THEN** the gates SHALL be: `cue.mod` `module:` ↔ declared path agreement, `source: {kind: "self"}` presence, tag equals the effective declared version and the tag major equals the path major, the module package name equals `metadata.name`
+
+### Requirement: The domain, local-override and already-published gates
+
+The gates SHALL be: namespace and kind-segment checks on owned domains only; local-override presence; already-published tag.
+
+#### Scenario: Already published is always a refusal
+
+- **WHEN** the registry already holds the resolved tag
+- **THEN** publish refuses, naming the artifact, the version, and the bump command
+- **AND** no flag or mode turns this condition into a success
+
+#### Scenario: Unowned domains are not policed
+
+- **WHEN** a third-party artifact under its own domain is published
+- **THEN** no namespace or kind-segment gate refuses it
+
+### Requirement: Publish exits 0, 2, 4, 3 or 1 by outcome
+
+Publish SHALL exit 0 on success, 2 on any refusal, 4 when a registry refuses the credentials (a 401 or 403 answer), 3 when a registry operation fails in any other way (the core-schema fetch, the already-published lookup, or the push), and 1 on unexpected failure. No consumer contract is made on distinguishing refusal causes by code.
+
+#### Scenario: Exit code by outcome
+
+- **WHEN** publish finishes
+- **THEN** it SHALL exit 0 on success, 2 on any refusal, 4 when a registry refuses the credentials (a 401 or 403 answer), 3 when a registry operation fails in any other way (the core-schema fetch, the already-published lookup, or the push), and 1 on unexpected failure
+
+### Requirement: A failed already-published lookup does not hide locally derived refusals
+
+When the already-published lookup is what failed, the plan and every locally-derived refusal SHALL still print before the registry error: the author's fixable problems are never hidden behind a failed registry operation, and a refusal-free plan renders an incomplete verdict rather than a GO.
+
+#### Scenario: Locally derived refusals print before the registry error
+
+- **WHEN** the already-published lookup is what failed
+- **THEN** the plan and every locally-derived refusal SHALL still print before the registry error
+
+### Requirement: A failed registry operation with no HTTP response reads registry unreachable
+
+A failed registry operation SHALL be named by its cause, and the message SHALL keep the registry operation and the registry's or the transport's own error text:
+- no HTTP response at all (a refused connection, a DNS or TLS failure, a timeout) SHALL read "registry unreachable";
+
+#### Scenario: Connectivity is not a refusal
+
+- **WHEN** the registry cannot be reached for the already-published lookup
+- **THEN** the command exits 3 and the message names the registry operation that failed
+
+### Requirement: A 401 or 403 answer reads as refused credentials and exits 4
+
+A failed registry operation SHALL be named by its cause, and the message SHALL keep the registry operation and the registry's or the transport's own error text:
+- a 401 or 403 answer that reaches the cli as such SHALL exit 4, SHALL read as refused credentials (authentication or permission), SHALL NOT read "unreachable", and SHALL point to `opm registry login`, naming the registry host the operation was routed to when it is known;
+
+#### Scenario: A refused credential is not called unreachable
+
+- **WHEN** the registry answers the already-published lookup with 401, or the push with 401 or 403
+- **THEN** the command exits 4
+- **AND** the message says the registry refused the credentials, names the registry operation, carries the registry's own error text and points to `opm registry login <host>`
+- **AND** the message does not contain "unreachable"
+
+### Requirement: Any other failure answer reads registry operation failed
+
+A failed registry operation SHALL be named by its cause, and the message SHALL keep the registry operation and the registry's or the transport's own error text:
+- any other failure answer SHALL read "registry operation failed" and SHALL NOT read "unreachable".
+
+#### Scenario: Another registry answer is not called unreachable
+
+- **WHEN** the registry answers the already-published lookup with 429 or 503
+- **THEN** the command exits 3 and the message says "registry operation failed" with the registry's own error text
+- **AND** the message does not contain "unreachable"
+
+### Requirement: A 403 answer to the already-published lookup is not a failure
+
+Publish SHALL exit 0 on success, 2 on any refusal, 4 when a registry refuses the credentials (a 401 or 403 answer), 3 when a registry operation fails in any other way (the core-schema fetch, the already-published lookup, or the push), and 1 on unexpected failure. A 403 answer to the already-published lookup is not such a failure: the registry client reads it as "this module is not published", so the lookup passes and the push is where a refusal shows.
+
+#### Scenario: A forbidden lookup reads as not published
+
+- **WHEN** the registry answers the already-published lookup with 403
+- **THEN** the lookup reports no published version and no error
+
+### Requirement: A refusing token endpoint is a refused credential
+
+A registry that hands out bearer tokens and whose token endpoint refuses the caller SHALL be a refused credential like any other: a 401 from the token endpoint on the lookup or the core-schema fetch, and a 401 or 403 from it on the push. A 403 from the token endpoint on the lookup or the core-schema fetch reaches the cli as "not found", as a 403 answer to the tag lookup does: the lookup passes, and the core-schema fetch reads "registry operation failed", exit 3.
+
+#### Scenario: A refusing token endpoint is not called unreachable
+
+- **WHEN** the registry hands out bearer tokens and its token endpoint answers 403 to the push
+- **THEN** the command exits 4
+- **AND** the message says the registry refused the credentials, carries "403 Forbidden" and points to `opm registry login <host>`
+- **AND** the message does not contain "unreachable"
+
+### Requirement: Publish with no registry configured exits 2
+
+When the core-schema fetch fails and no registry is configured (no `--registry` flag, no `OPM_REGISTRY`, no `registry` in the config file, and no `CUE_REGISTRY` in the environment), publish SHALL exit 2 with a message that says no registry is configured, keeps the cause, and points to `opm config init`.
+
+#### Scenario: No registry is configured
+
+- **WHEN** publish runs with no `--registry`, no `OPM_REGISTRY`, no `registry` in the config file and no `CUE_REGISTRY`, and the core schema cannot be loaded
+- **THEN** the command exits 2
+- **AND** the message says no registry is configured and points to `opm config init`
+
+### Requirement: Catalog publish compares each beta and GA member under the additive-only rule
+
+`opm catalog publish` SHALL, for every member of the tree at beta or GA level (transformers structurally excluded; alpha members exempt), compare the member against the last published build that shipped a member of that name at that apiVersion under the additive-only rule via the library comparator, over provenance-stripped definition values.
+
+#### Scenario: Each beta and GA member is compared
+
+- **WHEN** `opm catalog publish` runs for a tree with a member at beta or GA level
+- **THEN** it SHALL compare the member under the additive-only rule via the library comparator, over provenance-stripped definition values
+
+### Requirement: The compatibility baseline is the last published build that shipped the member
+
+`opm catalog publish` SHALL, for every member of the tree at beta or GA level (transformers structurally excluded; alpha members exempt), compare the member against the last published build that shipped a member of that name at that apiVersion — found by scanning published versions strictly below the effective version, within the same major, release prereleases (alpha, beta, rc) included and dev builds excluded, newest first. A member no published build has carried SHALL pass.
+
+#### Scenario: Prerelease predecessors count
+
+- **WHEN** the newest build carrying the member is a prerelease newer than the latest stable
+- **THEN** the comparison runs against that prerelease, not the stable
+
+#### Scenario: Release prereleases stay in the window
+
+- **WHEN** the published history holds alpha, beta and dev tags below the effective tag
+- **THEN** the predecessor window is the alpha and beta tags newest first, with no dev tag
+
+#### Scenario: apiVersion bump escapes
+
+- **WHEN** a member ships at an apiVersion no build has ever carried
+- **THEN** it passes the compatibility gate trivially
+
+### Requirement: A violation refuses as refusal 9
+
+Violations SHALL refuse as refusal 9: a header naming the member, its apiVersion, and the compared-against coordinate, followed by path-located violation lines.
+
+#### Scenario: Field removal refused against the true predecessor
+
+- **WHEN** a beta member removes a field relative to the newest published build that carried it
+- **THEN** publish refuses with the violation path and the predecessor coordinate
+
+### Requirement: A beta or GA name and apiVersion key is a permanent claim
+
+The gate makes a beta-or-GA name-and-apiVersion key a permanent claim on its own history: an incompatible re-introduction after a removal SHALL be refused identically.
+
+#### Scenario: Remove-then-readd refused
+
+- **WHEN** a member absent from the immediate predecessor was shipped incompatibly-reshaped, and an older build carried it
+- **THEN** the scan finds the older build and refuses
+
+### Requirement: A dev build is not judged and is never a predecessor
+
+A dev build, an effective tag whose prerelease segment carries a `dev` identifier (`v2.0.0-0.dev.1787747172.gcf5f131`), SHALL NOT be judged by the gate and SHALL NOT serve as any build's predecessor. The plan SHALL report the skip visibly on the `compat gate` row as `dev-exempt`; the row SHALL never read as a completed comparison for a dev build.
+
+#### Scenario: Dev build is not judged
+
+- **WHEN** the effective tag is a dev prerelease and a beta member is incompatible with the newest published release carrying it
+- **THEN** publish does not refuse on compatibility
+- **AND** the plan's `compat gate` row reads `dev-exempt`
+
+#### Scenario: Dev build is never the baseline
+
+- **WHEN** the published history holds a dev tag newer than the latest release tag, and only the dev tag carries an incompatible shape of a beta member
+- **THEN** a release-tagged publish compares against the release tag and passes
+- **AND** a member absent from every release tag but present in a dev tag is reported as new
+
+### Requirement: A release prerelease tag exempts beta and GA members until the first stable tag
+
+While the effective tag is a release prerelease (`-alpha.N`, `-beta.N`, `-rc.N`), beta and GA members SHALL NOT be compared; they SHALL be counted into a `prerelease-exempt` bucket rendered on the `compat gate` row next to `alpha-exempt`. The exemption SHALL end at the first stable tag of the major: a stable effective tag SHALL compare every beta and GA member against the newest published build carrying it, release prereleases included.
+
+#### Scenario: Prerelease module line is exempt, visibly
+
+- **WHEN** the effective tag is `v2.0.0-alpha.5` and a `v1beta1` member narrows a field relative to `v2.0.0-alpha.4`
+- **THEN** publish does not refuse on compatibility
+- **AND** the `compat gate` row counts that member under `prerelease-exempt` and reports `0 compared`
+
+#### Scenario: First stable tag arms the gate
+
+- **WHEN** the effective tag is `v2.0.0` and a `v1beta1` member narrows a field relative to `v2.0.0-alpha.5`
+- **THEN** publish refuses with the violation path and `compared against ...@2.0.0-alpha.5`
+
+### Requirement: A transport failure or a missing dependency aborts the walk as a connectivity error
+
+A transport failure during predecessor enumeration or package loading SHALL abort as a connectivity error with no partial verdict — the artifact was never judged. A dependency of the predecessor build that the registry does not hold SHALL abort as a connectivity error (exit 3). Source: enhancement 0011 ("`opm catalog publish` refuses a build that breaks a contract it already published").
+
+#### Scenario: Mid-walk failure renders no verdict
+
+- **WHEN** the registry becomes unreachable after some members have compared clean
+- **THEN** the command exits 3 and no GO or REFUSED verdict is printed
+
+#### Scenario: A predecessor's dependency is not held
+
+- **WHEN** a predecessor build is published but the registry does not hold one of its dependencies
+- **THEN** the command exits 3 and no GO or REFUSED verdict is printed
+
+### Requirement: A package absent at a published version is the scan's negative signal
+
+A package absent at a given published version is the scan's negative signal, never an error. Absent SHALL include a probed version the registry does not hold and a probed version that holds no CUE files for the package. Source: enhancement 0011 ("`opm catalog publish` refuses a build that breaks a contract it already published").
+
+#### Scenario: Package absent at a published version
+
+- **WHEN** a predecessor version is published but holds no CUE files for a member's package
+- **THEN** the walk moves on to the next older version and reports no error for that version
+
+### Requirement: The CLI takes fetch decisions from the library's typed classification
+
+A transport failure during predecessor enumeration or package loading SHALL abort as a connectivity error with no partial verdict — the artifact was never judged. The CLI SHALL take these decisions from the library's typed fetch classification and from the fetched build's contents, and SHALL NOT match a registry error's message text itself. Source: enhancement 0021 ("A beta line reaches GA only when its exit criteria hold").
+
+#### Scenario: Decisions come from the typed fetch classification
+
+- **WHEN** the walk meets a fetch result
+- **THEN** the CLI SHALL take its decisions from the library's typed fetch classification and from the fetched build's contents, and SHALL NOT match a registry error's message text itself
