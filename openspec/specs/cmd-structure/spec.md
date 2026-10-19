@@ -22,7 +22,7 @@ package-level variables or accessor functions.
 
 ### Requirement: Instance command group registered at root level
 
-The root command SHALL register `opm instance` (alias: `inst`) as a top-level command group via `cmdinstance.NewInstanceCmd(&cfg)`. This SHALL follow the same dependency injection pattern as `mod` and `config` groups. The former `cmdrelease.NewReleaseCmd` registration is removed (no back-compat alias — enhancement 0002 D8).
+The root command SHALL register `opm instance` (alias: `inst`) as a top-level command group via `cmdinstance.NewInstanceCmd(&cfg)`. This SHALL follow the same dependency injection pattern as `mod` and `config` groups. The former `cmdrelease.NewReleaseCmd` registration is removed (no back-compat alias — enhancement 0002 ("Hard rename, no alias window; `semver: major` (resolves OQ3, OQ4)")).
 
 #### Scenario: Root command registers instance group
 

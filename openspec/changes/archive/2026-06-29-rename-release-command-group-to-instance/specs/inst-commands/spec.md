@@ -1,10 +1,10 @@
 ## ADDED Requirements
 
-<!-- Renamed from `rel-commands` (enhancement 0002 D6/D10). Spec dir is git mv'd at archive. The `BundleRelease file is rejected with clear error` scenario from the former `release command group is polymorphic` requirement is dropped here — X2 removed bundle support and its message (handoff recorded in X2 D-X2.3). -->
+<!-- Renamed from `rel-commands` (enhancement 0002, "The CLI user-facing command group `release` is renamed to `instance`" and "Every `release`-named file and directory is renamed on disk (extends D8 to the filesystem)"). Spec dir is git mv'd at archive. The `BundleRelease file is rejected with clear error` scenario from the former `release command group is polymorphic` requirement is dropped here — X2 removed bundle support and its message (handoff recorded in X2 D-X2.3). -->
 
 ### Requirement: instance command group exists as a top-level command
 
-The CLI SHALL expose `opm instance` (alias: `inst`) as a top-level command group registered in `internal/cmd/root.go`. The group SHALL contain subcommands for instance lifecycle management. Running `opm instance` without a subcommand SHALL display help. The former `release`/`rel` verb and alias are removed (no back-compat alias — enhancement 0002 D8).
+The CLI SHALL expose `opm instance` (alias: `inst`) as a top-level command group registered in `internal/cmd/root.go`. The group SHALL contain subcommands for instance lifecycle management. Running `opm instance` without a subcommand SHALL display help. The former `release`/`rel` verb and alias are removed (no back-compat alias — enhancement 0002 ("Hard rename, no alias window; `semver: major` (resolves OQ3, OQ4)")).
 
 #### Scenario: instance group registered at root level
 

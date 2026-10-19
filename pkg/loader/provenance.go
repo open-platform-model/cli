@@ -120,7 +120,7 @@ func targetVersion(target string, eff *modfile.File) string {
 // HasLocalModuleReplacement reports whether the module rooted at moduleRoot
 // carries a cue.mod/local-module.cue with at least one `replaceWith` entry.
 //
-// This is the render-provenance signal (0006:D7): when the main
+// This is the render-provenance signal (enhancement 0006): when the main
 // module's local-module.cue replaces any dependency, the rendered bytes did not
 // come from pure registry resolution. It is deliberately conservative — any
 // replacement (local directory or an alternative module@version fork) marks the

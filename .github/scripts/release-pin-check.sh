@@ -67,7 +67,7 @@ while IFS= read -r file; do
   fail "${file}: tracked local-module.cue (git rm --cached it; it redirects a module to a local path)"
 done < <(git ls-files '*cue.mod/local-module.cue')
 
-# 5. The controller module pin is served and consistent (0021:D11:R6): the
+# 5. The controller module pin is served and consistent (enhancement 0021): the
 # registry serves PinnedModuleVersion, and PinnedControllerVersion is the
 # controller release that module's controller package states. hack/controller-pin
 # reads it without a render; a lookup that fails is a failure, not a pass.

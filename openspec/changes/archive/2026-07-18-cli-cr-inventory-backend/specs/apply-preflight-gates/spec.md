@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The gate battery that runs on the CLI's real (non-dry-run) apply path before any resource is written: CRD presence, CRD field-presence floor, operator-version ceiling, and the status-RBAC pre-flight. Enhancement 0006 D24/D27/D23/D33 — these gates give the `ModuleInstance` CRD its role as a hard prerequisite for CLI apply.
+The gate battery that runs on the CLI's real (non-dry-run) apply path before any resource is written: CRD presence, CRD field-presence floor, operator-version ceiling, and the status-RBAC pre-flight. Enhancement 0006 ("CRD/operator version skew: CLI-≥-cluster invariant, gate-only (CRD field-presence floor + operator-version ceiling via `Platform.status`); resolves OQ4", "No `--install-crds` flag; missing CRDs fail with a hint to run `opm install crds`; resolves OQ7", "Status-subresource RBAC (opt-in `--rbac` emission + a pre-flight access check, both as edge-case safety nets); resolves OQ3" and "Slice B2 ships install/uninstall only: the missing-CRD apply gate moves to C1; the CLI-wide field manager constant becomes `opm-cli` in B2") — these gates give the `ModuleInstance` CRD its role as a hard prerequisite for CLI apply.
 
 ## ADDED Requirements
 

@@ -44,12 +44,12 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: open-platform-model/.github
-          ref: 0f9c6ac2c9b752a79f4874f637ef9955bcf00c13 # .github main
+          ref: a2a13733f34f952d81e6f08b84c743cc2efb86e9 # .github main
           path: org-github
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.26.8'
+          go-version: '1.26.9'
           cache-dependency-path: repo/go.sum
       - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
         with:

@@ -124,7 +124,7 @@ func platformBuildHint(dir, registry string, err error) string {
 	// does not resolve (an import no module provides, an ambiguous import,
 	// a dependency module file that does not parse) get
 	// this hint. Both are read from the library's typed classification,
-	// never from the message (0021:D8:R12). A failed import that is neither,
+	// never from the message (enhancement 0021). A failed import that is neither,
 	// such as a package-name mismatch, is a defect in the platform module's
 	// own files and takes the default hint. The switch picks a hint, never an
 	// exit code.
@@ -146,7 +146,7 @@ func platformBuildHint(dir, registry string, err error) string {
 const registrySelector = "#registry"
 
 // fileHasImports reports whether the parsed CUE file contains any import
-// declaration. The config file is data-only by contract (0006:D39).
+// declaration. The config file is data-only by contract (enhancement 0006).
 func fileHasImports(f *ast.File) bool {
 	for _, decl := range f.Decls {
 		if _, ok := decl.(*ast.ImportDecl); ok {

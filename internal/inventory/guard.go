@@ -82,7 +82,7 @@ func (e *GuardRefusalError) Has(reason ownership.ApplyRefusal) bool {
 
 // Guard is the apply guard: it reads every entry's live object and asks the
 // library's apply verdict (ownership.CanApply) whether this instance may
-// apply over it (0012:D4:R2, 0012:D8:R1). It writes nothing.
+// apply over it (enhancement 0012). It writes nothing.
 //
 // An object that does not exist, or whose kind the cluster does not serve
 // (typically the module renders its CustomResourceDefinition in the same

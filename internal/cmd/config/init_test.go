@@ -40,7 +40,7 @@ func TestNewConfigInitCmd(t *testing.T) {
 	assert.NotEmpty(t, cmd.Long)
 
 	// Check flags exist; --no-tidy is gone with the CUE-module retirement
-	// (0006:D39).
+	// (enhancement 0006).
 	assert.NotNil(t, cmd.Flags().Lookup("force"))
 	assert.Nil(t, cmd.Flags().Lookup("no-tidy"))
 }

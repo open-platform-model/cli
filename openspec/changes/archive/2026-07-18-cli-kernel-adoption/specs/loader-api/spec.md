@@ -1,6 +1,6 @@
 # Delta: loader-api (cli-kernel-adoption)
 
-The CLI loader API shrinks to what survives kernel adoption: `LoadInstanceFile` (instance-arg metadata extraction), `LoadValuesFile`, and provenance detection. Everything else is kernel surface (0006 D9).
+The CLI loader API shrinks to what survives kernel adoption: `LoadInstanceFile` (instance-arg metadata extraction), `LoadValuesFile`, and provenance detection. Everything else is kernel surface (enhancement 0006, "The CLI replaces its own render/match pipeline entirely with the `library` kernel").
 
 ## REMOVED Requirements
 
@@ -21,7 +21,7 @@ The CLI loader API shrinks to what survives kernel adoption: `LoadInstanceFile` 
 
 ### Requirement: LoadProvider loads a provider from CUE
 
-**Reason**: Providers are retired (0006 D39).
+**Reason**: Providers are retired (enhancement 0006, "`~/.opm` becomes two import-free data files: `config.cue` drops `providers`/`cacheDir`, D21's local default platform is the sibling `~/.opm/platform.cue`; folded into C2").
 **Migration**: `platform-resolution` capability.
 
 ### Requirement: finalizeValue strips CUE constraints

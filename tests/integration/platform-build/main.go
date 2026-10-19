@@ -1,7 +1,7 @@
 //go:build ignore
 
 // Integration test for platform resolution + kernel acquisition
-// (0019:D5 platform modules).
+// (platform modules, enhancement 0019).
 //
 // Verifies the repo's maintained platform module (hack/platform/, the module
 // the kind dev flow and the offline tests pass with --platform) resolves as a

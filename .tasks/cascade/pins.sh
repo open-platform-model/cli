@@ -44,7 +44,7 @@ fi
 
 # The controller module pin and the controller release it deploys, both from
 # internal/controller/pin.go: a module release that deploys the same controller
-# still shows as a moved pin (0021:D11:R3).
+# still shows as a moved pin (enhancement 0021).
 pin=internal/controller/pin.go
 if has "$pin"; then
   row github.com/open-platform-model/opm-controller opm-controller \

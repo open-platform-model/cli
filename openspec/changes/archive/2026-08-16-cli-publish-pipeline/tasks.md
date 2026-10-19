@@ -2,7 +2,7 @@
 
 > Grouped by package, tiny chunks, every group independently green. The pipeline package builds bottom-up (states → gates → plan → push) so each layer is unit-tested before the commands exist. Commit messages: glue majors to paths (bare-`@` ban).
 
-## 1. `internal/cueedit` — the D8 writer (shared with cli-authoring-commands later)
+## 1. `internal/cueedit` — the version writer of enhancement 0011 (shared with cli-authoring-commands later)
 
 - [x] 1.1 `SetIdentityVersion(dir, version string) error`: locate `Version` in `identity/identity.cue` by the schema-fixed path, surgical AST rewrite preserving comments/field order, rebuild the file; refuse (typed error) when the file does not match `#IdentityPackage`'s shape.
 - [x] 1.2 Table tests: literal value, defaulted value (`#VersionType | *"x"` — rewrite the default), open field (insert), absent file (typed refusal), comment/alignment preservation golden.
@@ -31,7 +31,7 @@
 - [x] 5.1 `internal/cmd/catalog/catalog.go` (new group, registered in root.go) + `publish.go`; `internal/cmd/module/publish.go`. Thin: flags (`--version`, `--dry-run`, module-only `--skip-override-check`), delegate to `internal/publish`, exit-code mapping. Constructor tests per house pattern.
 - [x] 5.2 E2E: refusal-shape assertions modeled on `vet_output_test.go` (msg 2's aligned columns, msg 4b's flag mention, dry-run GO exit 0 / REFUSED exit 2), against fixture trees.
 
-## 6. `opm module vet` (D16/D18/D21)
+## 6. `opm module vet` (enhancement 0011: the author's `cue.mod` is enforced, the tag names the declared version, identity is validated against the shipped identity package)
 
 - [x] 6.1 Thread `cfg` into vet; loads use the resolved registry (constructor + `runVet` signature; existing tests updated).
 - [x] 6.2 Insert the three checks between module load and the values stanza, rendering as `FormatVetCheck` lines; failures through `PrintValidationError` + exit 2. Tests: coordinate drift, derivation drift, non-conformant identity, all on a module with no `debugValues`.
@@ -44,4 +44,4 @@
 
 ## 8. Record
 
-- [x] 8.1 `enhancements/0011/`: slice → `done` + `openspec_ref` + history event, recording the three deviations (package-name refusal message drafted CLI-side; tidiness gate not reproduced — decode covers the load-failure class; `internal/cueedit` writer landed here for `cli-authoring-commands` to reuse) and the D4 evidence correction (catalog-vs-module `cue vet` asymmetry) so 03-decisions.md's stale sentence is not propagated.
+- [x] 8.1 enhancement 0011: slice → `done` + `openspec_ref` + history event, recording the three deviations (package-name refusal message drafted CLI-side; tidiness gate not reproduced — decode covers the load-failure class; `internal/cueedit` writer landed here for `cli-authoring-commands` to reuse) and the enhancement 0011 evidence correction (catalog-vs-module `cue vet` asymmetry) so 03-decisions.md's stale sentence is not propagated.

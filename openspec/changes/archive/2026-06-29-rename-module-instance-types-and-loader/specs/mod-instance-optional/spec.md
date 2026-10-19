@@ -1,6 +1,6 @@
 ## ADDED Requirements
 
-<!-- Renamed from `mod-release-optional` (enhancement 0002 D10). Spec dir is git mv'd at archive. -->
+<!-- Renamed from `mod-release-optional` (enhancement 0002, "Every `release`-named file and directory is renamed on disk (extends D8 to the filesystem)"). Spec dir is git mv'd at archive. -->
 
 ### Requirement: mod build and mod apply work without an instance.cue file
 `opm mod build` and `opm mod apply` SHALL produce correct output when run against a module directory that contains no `instance.cue` file, provided that either `debugValues` is defined in the module or an explicit `-f` values file is given.

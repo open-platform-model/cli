@@ -1,6 +1,6 @@
 # Delta: module-instance-processing (cli-kernel-adoption)
 
-The CLI's `ProcessModuleInstance` rendering entrypoint (pkg/render) is deleted; the kernel's compile pipeline is the rendering entrypoint (0006 D9).
+The CLI's `ProcessModuleInstance` rendering entrypoint (pkg/render) is deleted; the kernel's compile pipeline is the rendering entrypoint (enhancement 0006, "The CLI replaces its own render/match pipeline entirely with the `library` kernel").
 
 ## REMOVED Requirements
 

@@ -6,7 +6,7 @@ Defines the `opm instance events` command that aggregates Kubernetes events from
 
 ### Requirement: Events command discovers instance resources and their children
 
-The `opm instance events` command SHALL discover OPM-managed resources via `query.ResolveInventory` (inventory-based discovery from the instance's `ModuleInstance` record), then walk ownerReferences downward to find Kubernetes-owned children (ReplicaSets, Pods) of workload resources. The combined set of resource UIDs SHALL be used to filter events. <!-- Was: "discovers release resources" (0002 D9) -->
+The `opm instance events` command SHALL discover OPM-managed resources via `query.ResolveInventory` (inventory-based discovery from the instance's `ModuleInstance` record), then walk ownerReferences downward to find Kubernetes-owned children (ReplicaSets, Pods) of workload resources. The combined set of resource UIDs SHALL be used to filter events. <!-- Was: "discovers release resources" (enhancement 0002, "The instance-file naming convention moves: `release.cue` → `instance.cue`") -->
 
 #### Scenario: Events include Pod-level events from Deployment children
 

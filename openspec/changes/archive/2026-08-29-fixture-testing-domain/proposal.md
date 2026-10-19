@@ -18,7 +18,7 @@ shipped CLI default (`internal/config/templates.go:9`) and the pinned operator's
 default (`opm-operator` `v1.0.0-alpha.11`, `cmd/main.go`) already route `testing.opmodel.dev` to
 GHCR — only the developer-facing mappings still said localhost.
 
-This is enhancement 0011's `registry-cleanup` slice (D17 item 3) for the CLI's own fixture. The
+This is enhancement 0011's `registry-cleanup` slice (enhancement 0011 item 3) for the CLI's own fixture. The
 operator's fleet is a separate move on its own schedule.
 
 ## What Changes
@@ -31,7 +31,7 @@ operator's fleet is a separate move on its own schedule.
   fixture tree carrying an `identity/` package to GHCR through `opm module publish` — the same
   pipeline and the same gates the official templates go through. Triggers: push to `main` touching
   the fixtures, plus `workflow_dispatch` for the bootstrap/repair path. Idempotency is a caller-side
-  GHCR probe, because publish itself never skips an already-published tag (D15).
+  GHCR probe, because publish itself never skips an already-published tag (enhancement 0011).
 - **Both publish scripts export `OPM_REGISTRY`, not just `CUE_REGISTRY`.** `opm` resolves
   `--registry` > `OPM_REGISTRY` > `~/.opm/config.cue` and never consults `CUE_REGISTRY`, so the
   existing `publish-templates.sh` was silently running against whatever the caller's personal config

@@ -2,11 +2,11 @@
 
 ## Context
 
-See `proposal.md` § Why. The decision is `enhancements/0015` D6 (reproduce a cluster's render by pulling the operator-generated package), reframed: the package is a pure function of inputs that are all on the Platform CR, and the CLI already runs that function.
+See `proposal.md` § Why. The decision is in enhancement 0015 (reproduce a cluster's render by pulling the operator-generated package), reframed: the package is a pure function of inputs that are all on the Platform CR, and the CLI already runs that function.
 
 Current state, read 2026-09-18 against cli main (library `v1.0.0-alpha.32`):
 
-- `platform.ClusterSpecGetter` is `func(ctx) (spec map[string]any, name, unavailable string, err error)`; `ClusterSpecGetterFor(dyn)` reads the singleton and returns `spec` only, with NotFound and Forbidden as warn-fallback (D21). Three commands construct it (`module apply`, `instance apply`, `instance diff`) and hand it to `render.ModuleOpts`/`InstanceOpts.ClusterPlatform`.
+- `platform.ClusterSpecGetter` is `func(ctx) (spec map[string]any, name, unavailable string, err error)`; `ClusterSpecGetterFor(dyn)` reads the singleton and returns `spec` only, with NotFound and Forbidden as warn-fallback (enhancement 0015). Three commands construct it (`module apply`, `instance apply`, `instance diff`) and hand it to `render.ModuleOpts`/`InstanceOpts.ClusterPlatform`.
 - `Resolve` decodes the spec with `DecodeCRSpec` into `Spec{Name, Type, Entries, SkewPolicy}` and calls `GenerateClusterModule`, which feeds `platformmodule.Closure` and `platformmodule.Generate` under `ClusterPlatformModulePath = "opmodel.dev/platforms/cluster@v0"` and caches under `cache/platforms/<sha256 of files>/`. The operator's reconciler runs the same two library calls under the same path (`PlatformModulePath`), with entries from `platformEntries(spec, activeClaims)`: subscriptions first, then each active claim not already subscribed, enabled, sorted by path.
 - The operator writes `status.registry` as `resolvedRegistry(entries)`: one row per generator entry, `{catalog, version, enabled, source: Subscription|Registration}`; `status.packageIdentity` (`gen-N[-digest8]`, over generation plus every active claim coordinate); `status.observedGeneration`; `status.operatorVersion`; `Ready` with reasons `Generated`, `BuildFailed`, `GenerateFailed`, `OverSubscribedContracts`, `ComparablePredicates`. Status is rewritten only where the held package is the one under that identity, so after a refusal it describes the last good package.
 - `Resolution{Source, Location, Dir, SkewPolicy, Warning}` and `Describe()` carry provenance to the render output; `SpecFromPlatform` decodes the seed document from the built platform for write-if-absent, which runs only when no CR exists.
@@ -144,13 +144,13 @@ Error messages name the directory and the flag, the CR and the reason, or the fa
 
 ### Regenerate from the CR, not transfer bytes
 
-**Context**: D6 says "retrieves the operator-generated platform package"; 0019 D6 says the package is never published or served.
+**Context**: enhancement 0015 says "retrieves the operator-generated platform package"; enhancement 0019 ("The Platform CR keeps naming a catalog coordinate; the operator generates the platform package") says the package is never published or served.
 **Explored**:
 1. Serve the package from the operator (a ConfigMap, an OCI artifact, a subresource): new operator surface, a second copy of the bytes to keep consistent, and it contradicts the no-publish posture the reserved namespace exists for.
 2. Regenerate from `status.registry` with the shared generator: no new surface; byte-identical by construction when CLI and operator embed the same library release, because the generator, the closure derivation and the module path are the same code and the core pin follows the library.
 3. Regenerate from `spec.registry` plus a client-side read of active claims: re-derives the operator's arbitration (which subscription wins, which claim is active) on the client.
 **Decision**: 2.
-**Rationale**: D6 already conceded the shape ("the CR makes the effective set enumerable and therefore fetchable") and left the mechanics open; the operator writes `status.registry` for exactly this. Under 0026's draft, where the platform is generated per resolution, there is no single package to transfer at all, so 2 is the framing that survives. The enhancement entry gets a Revised line saying so.
+**Rationale**: enhancement 0015 already conceded the shape ("the CR makes the effective set enumerable and therefore fetchable") and left the mechanics open; the operator writes `status.registry` for exactly this. Under 0026's draft, where the platform is generated per resolution, there is no single package to transfer at all, so 2 is the framing that survives. The enhancement entry gets a Revised line saying so.
 
 ### No identity or byte verification here
 
@@ -164,11 +164,11 @@ Error messages name the directory and the flag, the CR and the reason, or the fa
 **Context**: after a spec edit the operator may not have generated yet, and after a refusal it has not.
 **Explored**: generating from the spec when status lags; asking the user; generating from the effective registry and warning.
 **Decision**: effective registry, warned.
-**Rationale**: D6's property is reproducing what the cluster renders, and that is the effective package in both cases; the spec is a proposal until the operator accepts it. The warning names both generations or the refusal reason, so an operator editing the spec knows the laptop is behind on purpose.
+**Rationale**: enhancement 0015's property is reproducing what the cluster renders, and that is the effective package in both cases; the spec is a proposal until the operator accepts it. The warning names both generations or the refusal reason, so an operator editing the spec knows the laptop is behind on purpose.
 
 ### pull has no local fallback
 
-**Context**: the render commands fall back to the local default platform when the CR is absent or unreadable (D21).
+**Context**: the render commands fall back to the local default platform when the CR is absent or unreadable (enhancement 0015).
 **Explored**: reusing the fallback; refusing.
 **Decision**: refuse with the not-found code.
 **Rationale**: a fallback would write the local default platform to `<dir>` and call it the cluster's; the command's one promise is that the directory is what the cluster renders against.

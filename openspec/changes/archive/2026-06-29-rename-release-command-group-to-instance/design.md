@@ -1,6 +1,6 @@
 ## Context
 
-Slice X3 of enhancement [0002](../../../../enhancements/0002/) (`Release` → `Instance` rename). X1 (committed on branch `0002-cli-x1-rename-module-instance`) renamed the `pkg/module` types, the loader, and the instance-file convention; X2 removed the dead bundle path. The user-facing command verb is still `opm release`, the cobra group still lives in `internal/cmd/release/`, and the command-target plumbing (`internal/cmdutil/release_{arg,target}.go`, `internal/workflow/query` call sites) still carries the `Release` name. X3 renames that surface to `instance`.
+Slice X3 of enhancement 0002 (`Release` → `Instance` rename). X1 (committed on branch `0002-cli-x1-rename-module-instance`) renamed the `pkg/module` types, the loader, and the instance-file convention; X2 removed the dead bundle path. The user-facing command verb is still `opm release`, the cobra group still lives in `internal/cmd/release/`, and the command-target plumbing (`internal/cmdutil/release_{arg,target}.go`, `internal/workflow/query` call sites) still carries the `Release` name. X3 renames that surface to `instance`.
 
 This lands in the single atomic per-repo CLI PR (X1–X4) and bulk-archives with the other cli slices. It depends on X1 (committed); it is not independently gated on `library`. It is co-implemented with X4 (label domain + inventory + example/fixture moves), which shares some files (`QUICKSTART.md`, `internal/workflow/query/inventory_test.go`) but no identifiers.
 
@@ -30,7 +30,7 @@ internal/workflow/query/status.go         command-target call sites only
 
 - Authoring `mod-status` / `mod-events` / `mod-list` / `mod-apply` deltas — deferred to X4 (D-X3.6).
 
-- Retaining `release`/`rel` as a back-compat alias. Dropped per D8 — see D-X3.1.
+- Retaining `release`/`rel` as a back-compat alias. Dropped per enhancement 0002 — see D-X3.1.
 - The label domain (`module-release.opmodel.dev/*`), `internal/inventory` record types (`ReleaseInventoryRecord`, `ReleaseMetadata`, `ReleaseName`), the `ReleaseSelectorFlags` flag bundle (`cmdutil/flags.go`, `--release-name`/`--release-id`), and `examples/releases/**` → `examples/instances/**` path moves — these are **X4**.
 - The physical `git mv` of `openspec/specs/rel-commands/` → `inst-commands/` — that is an archive-time spec-sync operation (D-X3.4).
 - Touching `release-workflow` (the CI/release-please capability — unrelated to the command).
@@ -40,7 +40,7 @@ internal/workflow/query/status.go         command-target call sites only
 
 ### D-X3.1 — Drop `rel`; do not keep it as a back-compat alias
 
-The cobra group changes `Use: "release"` → `"instance"` and `Aliases: ["rel"]` → `["inst"]`, with no `"release"`/`"rel"` retained for compatibility. Rationale: enhancement D8 is a hard rename (no alias), and the CLI has no external consumers, so there is no migration audience to cushion. Keeping `rel` would preserve the exact vocabulary the rename exists to retire and muddy `--help`. Trade-off accepted: existing muscle memory and any local scripts using `opm release …` break — acceptable for a pre-1.0 alpha with no external users. Source: enhancement 0002 D8; user direction 2026-06-28.
+The cobra group changes `Use: "release"` → `"instance"` and `Aliases: ["rel"]` → `["inst"]`, with no `"release"`/`"rel"` retained for compatibility. Rationale: enhancement 0002 is a hard rename (no alias), and the CLI has no external consumers, so there is no migration audience to cushion. Keeping `rel` would preserve the exact vocabulary the rename exists to retire and muddy `--help`. Trade-off accepted: existing muscle memory and any local scripts using `opm release …` break — acceptable for a pre-1.0 alpha with no external users. Source: enhancement 0002 ("Hard rename, no alias window; `semver: major` (resolves OQ3, OQ4)"); user direction 2026-06-28.
 
 ### D-X3.2 — Rename the X2-deferred `TestReleaseVetCmd_RejectsBundleRelease`
 
@@ -58,7 +58,7 @@ The delta is authored under the new capability name `inst-commands` (mirroring X
 
 ### D-X3.5 — Docs: live user docs in scope, frozen design docs excluded
 
-`README.md` (`### Release Operations`, prose, `opm release vet|build|apply`) and `QUICKSTART.md` (the `opm release …` command lines) are live user-facing and are updated to `opm instance …` with breadcrumbs (D11). In `QUICKSTART.md`, X3 edits only the command *verbs*; the `./examples/releases/**/release.cue` *paths* belong to X4 (the example-tree move) — X3 leaves them so X4 does not double-edit. `docs/roadmap.md`, `docs/rfc/0007-*`, and `docs/design/render-pipeline-*` are historical/frozen records (like enhancement 0001) and are left untouched.
+`README.md` (`### Release Operations`, prose, `opm release vet|build|apply`) and `QUICKSTART.md` (the `opm release …` command lines) are live user-facing and are updated to `opm instance …` with breadcrumbs (enhancement 0002). In `QUICKSTART.md`, X3 edits only the command *verbs*; the `./examples/releases/**/release.cue` *paths* belong to X4 (the example-tree move) — X3 leaves them so X4 does not double-edit. `docs/roadmap.md`, `docs/rfc/0007-*`, and `docs/design/render-pipeline-*` are historical/frozen records (like enhancement 0001) and are left untouched.
 
 ### D-X3.6 — Defer all `mod-*` spec deltas to X4 (single capability ownership)
 
@@ -85,4 +85,4 @@ Consequence: post-X3 the `instance` package still references many `Release`-name
 
 ## Migration Notes
 
-No external consumers (the CLI has no external API surface; D8 hard-rename, no shim). User-visible delta: replace `opm release <cmd>` / `opm rel <cmd>` with `opm instance <cmd>` / `opm inst <cmd>`. The subcommand names, flags, and behavior are unchanged — only the group verb and alias move.
+No external consumers (the CLI has no external API surface; enhancement 0002 hard-rename, no shim). User-visible delta: replace `opm release <cmd>` / `opm rel <cmd>` with `opm instance <cmd>` / `opm inst <cmd>`. The subcommand names, flags, and behavior are unchanged — only the group verb and alias move.

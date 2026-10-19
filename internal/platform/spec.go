@@ -1,6 +1,6 @@
 // Package platform resolves the platform module every render consumes, by
 // precedence: --platform <dir> > cluster Platform CR > a platform generated
-// from the render's own dependency pins (0006:D21/D22; 0019:D5/D7).
+// from the render's own dependency pins (enhancements 0006 and 0019).
 //
 // Every source resolves to a platform module directory the kernel acquires
 // with AcquirePlatformFromDir. The cluster CR and the deps are turned into
@@ -77,7 +77,7 @@ func (w wireSpec) toSpec(name string) Spec {
 }
 
 // wireFromSpec converts a Spec into the wire shape the CR carries — the
-// document the controller-install seed creates (0006:D22). Every entry's enable
+// document the controller-install seed creates (enhancement 0006). Every entry's enable
 // is written explicitly, so the CR states exactly what was subscribed.
 func wireFromSpec(s Spec) wireSpec {
 	w := wireSpec{Type: s.Type, SkewPolicy: s.SkewPolicy}
@@ -124,7 +124,7 @@ func DecodeCRSpec(spec map[string]any, name string) (Spec, error) {
 
 // Registry entry sources, as the controller records them on
 // status.registry[].source: an authored subscription, or a catalog an
-// accepted-and-active TransformerRegistration contributed (0015:D3).
+// accepted-and-active TransformerRegistration contributed (enhancement 0015).
 const (
 	EntrySourceSubscription = "Subscription"
 	EntrySourceRegistration = "Registration"
@@ -140,7 +140,7 @@ type ReadyState struct {
 }
 
 // Effective is the registry the controller generated the running package
-// from, decoded off the Platform CR's status (0015:D13/D17). Entries is
+// from, decoded off the Platform CR's status (enhancement 0015). Entries is
 // empty when the controller has recorded no registry - a solo cluster, or a
 // controller predating the field - and resolution then generates from the
 // spec.

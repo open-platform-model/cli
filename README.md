@@ -68,7 +68,7 @@ Use `opm catalog` when you are starting from catalog source: tidy its dependenci
 
 ### Instance Operations (`opm instance`)
 
-<!-- Renamed from `opm release` / `opm rel` (0002:D6). The old `release`/`rel` verb is removed — no back-compat alias (D8). -->
+<!-- Renamed from `opm release` / `opm rel` (enhancement 0002). The old `release`/`rel` verb is removed — no back-compat alias. -->
 
 `opm i`, `opm ins`, and `opm inst` are the short aliases.
 

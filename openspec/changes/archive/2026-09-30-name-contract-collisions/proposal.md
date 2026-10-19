@@ -1,6 +1,6 @@
 ## Why
 
-A platform that enables two majors of one catalog whose contract maps share keys makes core's `#Platform.#contracts` fold fail to evaluate today (enhancement 0026 OQ17, experiments 01 and 06). This is change D of a five-change set (`orchestration.md`): core (A) folds only single-definer keys and reports the rest as `collisions` and `collidingEntries` with `routable` false; the library (B) decodes them as `ContractInventory.Collisions` and `CollidingEntries` and refuses every render of such a platform with a typed `ContractCollisionsError`. This change makes `opm` name the collision instead of misreporting it.
+A platform that enables two majors of one catalog whose contract maps share keys makes core's `#Platform.#contracts` fold fail to evaluate today (enhancement 0026, experiments 01 and 06). This is change D of a five-change set (`orchestration.md`): core (A) folds only single-definer keys and reports the rest as `collisions` and `collidingEntries` with `routable` false; the library (B) decodes them as `ContractInventory.Collisions` and `CollidingEntries` and refuses every render of such a platform with a typed `ContractCollisionsError`. This change makes `opm` name the collision instead of misreporting it.
 
 Measured against `origin/main` 93d0bc3 (library `v1.0.0-alpha.35`), once a colliding platform evaluates the CLI words it wrong:
 

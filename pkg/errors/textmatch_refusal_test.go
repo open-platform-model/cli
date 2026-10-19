@@ -20,7 +20,7 @@ import (
 // test the text of an error, as "<path from the repo root>: <function>", each
 // with the typed cause that is missing. None of them is a registry fetch or
 // a dependency resolution failure: those are decided from the library's
-// typed errors (0021:D8:R12). A fifth entry needs the same kind of reason.
+// typed errors (enhancement 0021). A fifth entry needs the same kind of reason.
 var textMatchAllowed = map[string]string{
 	"internal/cuemod/tidy.go: classify":                            "cmd/cue prints CUE's internal modload.ErrModuleNotTidy; no public type reaches it",
 	"internal/publish/identity.go: conformIdentity":                "the public CUE API gives an incomplete-value error no type and no code",

@@ -2,7 +2,7 @@
 
 ## Context
 
-See `proposal.md` § Why. The enhancement is `enhancements/0015`; this command is the CLI consumer its `02-design.md` names for D1's inventory, D2's arity rule and D18's report-versus-gate split.
+See `proposal.md` § Why. The enhancement is enhancement 0015; this command is the CLI consumer its `02-design.md` names for the inventory, the arity rule and the report-versus-gate split of enhancement 0015.
 
 Current state, read 2026-09-15 against cli `v1.0.0-alpha.20` (library `v1.0.0-alpha.30`):
 
@@ -23,8 +23,8 @@ Current state, read 2026-09-15 against cli `v1.0.0-alpha.20` (library `v1.0.0-al
 
 **Non-Goals**
 
-- Enhancement 0015 D6, fetching a cluster's effective registry. It depends on the operator's registration acceptance and redefines what "which platform" means.
-- D5's comparable-predicate duplicates, still deferred by OQ9.
+- Enhancement 0015 ("A cluster's render is reproduced by pulling the operator-generated platform package"), fetching a cluster's effective registry. It depends on the operator's registration acceptance and redefines what "which platform" means.
+- enhancement 0015's comparable-predicate duplicates, still deferred by an open question of that entry.
 - A `--output json` mode. No command in this repo has a shared one, and adding a schema before a consumer asks for it is surface without a reader; the report is built as a value so a later flag is a rendering choice, not a rewrite.
 
 ## Decisions
@@ -52,7 +52,7 @@ type Report struct {
 func NewReport(res Resolution, inv *libplatform.ContractInventory) Report
 func (r Report) Render() string
 // Routable reports whether the platform may be generated from; it is the
-// only value that decides the command's exit status (0015 D18).
+// only value that decides the command's exit status (enhancement 0015).
 func (r Report) Routable() bool
 ```
 
@@ -64,11 +64,11 @@ The command builds the platform, reads `Contracts()`, constructs the report, pri
 
 Clean exits 0. Over-subscription exits `ExitValidationError`. An unfulfilled contract exits 0.
 
-This is the only interesting decision in the change, and it is deliberate rather than an oversight: D18 splits the inventory into a report (`fulfilled`) and a gate (`routable`), and puts the gate at platform-package generation. A pre-flight that failed on `unfulfilled` would refuse platforms the operator will happily generate, which teaches users to ignore it. A pre-flight that passed on `overSubscribed` would bless a platform the generation step refuses. The exit code therefore tracks `Routable` alone, and the report explains the other list in words.
+This is the only interesting decision in the change, and it is deliberate rather than an oversight: enhancement 0015 splits the inventory into a report (`fulfilled`) and a gate (`routable`), and puts the gate at platform-package generation. A pre-flight that failed on `unfulfilled` would refuse platforms the operator will happily generate, which teaches users to ignore it. A pre-flight that passed on `overSubscribed` would bless a platform the generation step refuses. The exit code therefore tracks `Routable` alone, and the report explains the other list in words.
 
 ### Resolution reuses the existing precedence, plus an optional argument
 
-The command takes an optional positional platform directory. Present, it wins; absent, `platform.Resolve` decides with the flag and the configured default. The cluster-CR arm is **not** wired in: this command reads a platform module, and a cluster's effective registry is D6's subject. `Resolution.Describe()` prints as the report's first line, so a report always says which platform it describes.
+The command takes an optional positional platform directory. Present, it wins; absent, `platform.Resolve` decides with the flag and the configured default. The cluster-CR arm is **not** wired in: this command reads a platform module, and a cluster's effective registry is enhancement 0015's subject. `Resolution.Describe()` prints as the report's first line, so a report always says which platform it describes.
 
 ### The formatter change is additive
 

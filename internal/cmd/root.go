@@ -88,7 +88,7 @@ func initializeConfig(cmd *cobra.Command, cfg *config.GlobalConfig, configFlag, 
 
 	// Load configuration — sets cfg.ConfigPath, cfg.Registry, cfg.Kubernetes,
 	// cfg.Log, cfg.CueContext based on flag > env > config precedence (single
-	// pass; no providers — 0006:D39).
+	// pass; no providers — enhancement 0006).
 	err := config.Load(cfg, config.LoaderOptions{
 		RegistryFlag: registryFlag,
 		ConfigFlag:   configFlag,

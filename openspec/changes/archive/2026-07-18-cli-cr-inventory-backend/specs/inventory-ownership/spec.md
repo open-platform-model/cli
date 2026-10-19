@@ -35,7 +35,7 @@ In this slice, `opm instance apply` against an operator-owned instance SHALL ref
 
 ### Requirement: Ownership mode resolution is a single branch point
 
-The mapping from `spec.owner` to a CLI execution mode SHALL be implemented in exactly one function that all mutating commands (`apply`, `delete`) consume, so a later slice can extend operator-owned handling (thin spec-editor mode, enhancement 0006 D18) without changing callers.
+The mapping from `spec.owner` to a CLI execution mode SHALL be implemented in exactly one function that all mutating commands (`apply`, `delete`) consume, so a later slice can extend operator-owned handling (thin spec-editor mode, enhancement 0006 ("After handoff the CLI may still edit the CR's spec; it writes only the CR and defers execution to the operator; refines D3's `EnsureCLIMutable` guard")) without changing callers.
 
 #### Scenario: Apply and delete share the resolver
 
@@ -46,7 +46,7 @@ The mapping from `spec.owner` to a CLI execution mode SHALL be implemented in ex
 
 ### Requirement: Ownership is exclusive across tools
 
-The CLI and the operator SHALL treat ownership as exclusive, coordinated through the `ModuleInstance` CR's `spec.owner` field. The CLI MUST NOT act as the resource reconciler (apply, prune, inventory write, status write) for an instance whose `spec.owner` is not `cli`. The operator skips render/apply/prune for `spec.owner: cli` instances (operator-side contract, enhancement 0006 D3/A4).
+The CLI and the operator SHALL treat ownership as exclusive, coordinated through the `ModuleInstance` CR's `spec.owner` field. The CLI MUST NOT act as the resource reconciler (apply, prune, inventory write, status write) for an instance whose `spec.owner` is not `cli`. The operator skips render/apply/prune for `spec.owner: cli` instances (operator-side contract, enhancement 0006 ("Explicit `spec.owner` marker; the operator skips CLI-owned CRs")/A4).
 
 #### Scenario: CLI sees operator-owned instance
 
@@ -62,7 +62,7 @@ The CLI and the operator SHALL treat ownership as exclusive, coordinated through
 
 ### Requirement: Inventory provenance defines release ownership
 
-**Reason**: The `createdBy` record field is replaced by the CR's `spec.owner` marker (enhancement 0006 D3); ownership is user-intent spec state, not status provenance.
+**Reason**: The `createdBy` record field is replaced by the CR's `spec.owner` marker (enhancement 0006, "Explicit `spec.owner` marker; the operator skips CLI-owned CRs"); ownership is user-intent spec state, not status provenance.
 **Migration**: Migrated CRs are written with `spec.owner: cli`. The `pkg/ownership` `createdBy` constants and record-based enforcement are deleted with the Secret record.
 
 ### Requirement: Legacy inventories are treated as CLI-owned

@@ -278,7 +278,7 @@ report library "$LIB_CUR" "$LIB_T"
 
 # The controller module: the newest published release in the pinned major whose
 # controller MAJOR.MINOR is not above the cli's, the rule install applies to a
-# target (0021:D9:R4). The resolver answers the newest release; controller-pin
+# target (enhancement 0021). The resolver answers the newest release; controller-pin
 # walks down from it, reading each candidate's controller package (no render).
 # controller-pin is built from the merge base, and also writes the pin in Phase C.
 MOD_CUR=$(sed -n 's/^const PinnedModuleVersion = "\(.*\)"$/\1/p' "$PIN")

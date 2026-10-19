@@ -1,6 +1,6 @@
 ## Context
 
-The library package `opm/k8s/lifecycle` (library `v1.0.0-beta.7`, `opm/k8s/lifecycle/doc.go`) is the deletion protocol of enhancement 0012:D4. It has three parts:
+The library package `opm/k8s/lifecycle` (library `v1.0.0-beta.7`, `opm/k8s/lifecycle/doc.go`) is the deletion protocol of enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply"). It has three parts:
 
 - `NewDeletionPlan(entries, policy, ownerUUID)` orders inventory entries by descending kind weight (stable) and marks every CustomResourceDefinition and Namespace as skipped before any read.
 - `Advance(plan, state, event)` names one action per call: `read`, `delete`, `skip` or `done`. The caller performs a read or a delete with its own client and hands back the object or the raw error. Every judged step goes through `ownership.CanDelete`. Every delete it names carries Foreground propagation and a precondition on the UID of the judged object. A failed step is recorded and the plan goes on.
@@ -28,7 +28,7 @@ Reversibility: two-way door. The change is internal to the cli, behind unchanged
 
 **Goals:**
 
-- Every delete of an instance's object is sent because `lifecycle.Advance` named it (0012:D4:R1).
+- Every delete of an instance's object is sent because `lifecycle.Advance` named it (enhancement 0012, "The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
 - The record of a deleted instance is removed only on a release verdict of `lifecycle.MayReleaseHold`.
 - One function in the cli sends those deletes.
 - Output, exit codes, the PersistentVolumeClaim rule (cli#345), the discovery resolver and its stop rule (cli#342), the failed-read rules (cli#332, cli#334, cli#338) and the typed error rule (cli#346) stay as they are.
@@ -51,7 +51,7 @@ Reversibility: two-way door. The change is internal to the cli, behind unchanged
 
 **Options considered**:
 
-1. Status quo: keep `JudgedDelete` and both loops. No work, but 0012:D4:R1 is not met and a rule added to the library plan never reaches the cli.
+1. Status quo: keep `JudgedDelete` and both loops. No work, but enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply") is not met and a rule added to the library plan never reaches the cli.
 2. Each loop calls `Advance` itself. Meets R1, but the read, the delete and the error mapping are written twice.
 3. One runner in `internal/kubernetes` that takes a plan and returns one result per step; the two callers only build the plan and report.
 
@@ -179,7 +179,7 @@ The runner sets no propagation and no precondition of its own: it passes the act
 
 **Decision**: option 2.
 
-**Rationale**: the preview lists what the real run would do by construction. The state is held in memory for one command (0012:D4) and thrown away; on a dry run the cli asks no hold verdict and deletes no record.
+**Rationale**: the preview lists what the real run would do by construction. The state is held in memory for one command (enhancement 0012, "The library owns the whole deletion sequence but only the per-object verdict and the order for apply") and thrown away; on a dry run the cli asks no hold verdict and deletes no record.
 
 ### The record delete follows the hold verdict
 
@@ -191,7 +191,7 @@ The runner sets no propagation and no precondition of its own: it passes the act
 
 **Decision**: `deleteProven` is unchanged and stays an allowed delete site.
 
-**Rationale**: 0012:D4:R1 names it as the one exception. Its objects are proven earlier-manifest objects, not inventory entries of an OPM instance; their verdict needs `ownership.DeleteInput.Admit`, which `NewDeletionPlan` does not take; and the verdict must be taken in the check phase, before the install's first write, so that a refusal changes nothing.
+**Rationale**: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply") names it as the one exception. Its objects are proven earlier-manifest objects, not inventory entries of an OPM instance; their verdict needs `ownership.DeleteInput.Admit`, which `NewDeletionPlan` does not take; and the verdict must be taken in the check phase, before the install's first write, so that a refusal changes nothing.
 
 ## Data flow
 
@@ -307,4 +307,4 @@ None. The proposal gate (2026-10-08) ruled on the three questions of the proposa
 
 1. `opm instance delete` does not wait for deleted objects in this change. The specs describe when a resource counts as deleted and do not forbid a later, bounded wait.
 2. An entry the discovery read could not read stays a failure, with no second read, as cli#338 specified.
-3. This change claims no decision of 0012 in the delivery log; 0012:D4 is claimed after the operator's deletion adoption.
+3. This change claims no decision of 0012 in the delivery log; enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply") is claimed after the operator's deletion adoption.

@@ -1,12 +1,12 @@
 # Capability: kernel-render (cli-kernel-adoption)
 
-The CLI renders every instance through the `library` kernel — the same kernel the operator runs — replacing the CLI's own render/match pipeline (enhancement 0006 D9).
+The CLI renders every instance through the `library` kernel — the same kernel the operator runs — replacing the CLI's own render/match pipeline (enhancement 0006, "The CLI replaces its own render/match pipeline entirely with the `library` kernel").
 
 ## ADDED Requirements
 
 ### Requirement: All renders go through the library kernel
 
-The CLI SHALL render instances exclusively through `github.com/open-platform-model/library`'s kernel: `Validate` → `Match` → `Plan` → `Compile` → `Finalize` against a materialized platform. The CLI MUST NOT carry its own component-matching, transformer-execution, or render-finalization implementation. The CLI MUST NOT import `opm-operator` Go packages (0006 D13).
+The CLI SHALL render instances exclusively through `github.com/open-platform-model/library`'s kernel: `Validate` → `Match` → `Plan` → `Compile` → `Finalize` against a materialized platform. The CLI MUST NOT carry its own component-matching, transformer-execution, or render-finalization implementation. The CLI MUST NOT import `opm-operator` Go packages (enhancement 0006, "The CLI imports `library` only; it does not import `opm-operator` (no controller-runtime, no Flux); supersedes D4's dependency direction").
 
 #### Scenario: Instance apply renders via the kernel
 
@@ -45,7 +45,7 @@ The CLI SHALL inject its runtime identity (`opm-cli`) into the kernel render con
 
 ### Requirement: Render digests are kernel-derived and operator-parity
 
-`status.lastAppliedRenderDigest` SHALL be computed over the kernel-finalized manifests using the same canonical serialization the operator uses. A registry-gated integration check SHALL verify that the CLI's local-dir staging path and the operator's registry-acquisition call sequence produce identical render digests for the same instance against the same Platform spec, with the runtime name held constant (0006 D30 gate; the runtime identity is stamped into rendered labels, so cross-actor digests differ by that label by construction). Evaluator-version skew reporting applies to the future cross-binary comparison (slice C3, where CLI and operator binaries embed separate CUE evaluators); the in-binary check compiles both paths with one evaluator and cannot exhibit skew.
+`status.lastAppliedRenderDigest` SHALL be computed over the kernel-finalized manifests using the same canonical serialization the operator uses. A registry-gated integration check SHALL verify that the CLI's local-dir staging path and the operator's registry-acquisition call sequence produce identical render digests for the same instance against the same Platform spec, with the runtime name held constant (enhancement 0006 ("The OQ1 render-digest parity experiment is deferred into the C2 kernel-adoption slice; closes the last `draft → accepted` gate") gate; the runtime identity is stamped into rendered labels, so cross-actor digests differ by that label by construction). Evaluator-version skew reporting applies to the future cross-binary comparison (slice C3, where CLI and operator binaries embed separate CUE evaluators); the in-binary check compiles both paths with one evaluator and cannot exhibit skew.
 
 #### Scenario: Parity for the same inputs
 

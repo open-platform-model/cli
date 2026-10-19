@@ -1,6 +1,6 @@
 # Delta: inventory-listing (cli-cr-inventory-backend)
 
-Listing moves from a Secret label-selector list to a native `ModuleInstance` CR list (enhancement 0006 D29).
+Listing moves from a Secret label-selector list to a native `ModuleInstance` CR list (enhancement 0006, "`instance list --all-namespaces` is a native cluster-wide CR list; clear error on insufficient RBAC; no label fallback; resolves OQ9").
 
 ## ADDED Requirements
 
@@ -37,7 +37,7 @@ Listing moves from a Secret label-selector list to a native `ModuleInstance` CR 
 
 ### Requirement: ListInventories discovers all inventory Secrets in a namespace
 
-**Reason**: Inventory Secrets no longer exist (enhancement 0006 D1/D8); the `ModuleInstance` CRs are the inventory, so listing CRs *is* the listing.
+**Reason**: Inventory Secrets no longer exist (enhancement 0006, "The CLI writes a `ModuleInstance` CR instead of a Secret" and "Migration of existing Secret inventories"); the `ModuleInstance` CRs are the inventory, so listing CRs *is* the listing.
 **Migration**: `opm instance list` lists `ModuleInstance` CRs (see ADDED requirements). Secret-tracked instances become visible after their one-time migration on next apply.
 
 ### Requirement: ListInventories uses existing label constants

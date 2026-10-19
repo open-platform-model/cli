@@ -2,8 +2,8 @@
 
 The library's `opm/k8s/inventory` (library PR 203, in `v1.0.0-beta.6`) was written from both frontends' copies, so for the cli this is mostly a move. Three things are not a plain move:
 
-- the two stored digests change encoding, once and on purpose (0012:D6, 0012:D7);
-- the stale set changes its relation from component-aware plus a rename filter to component-blind, which must not change a single prune decision (0012:D7:R1);
+- the two stored digests change encoding, once and on purpose (enhancement 0012, "Labels are stamped by the CUE render; the shared render digest ignores the runtime-name label value" and "The stale set is component-blind, and the inventory digest hashes a canonical field encoding");
+- the stale set changes its relation from component-aware plus a rename filter to component-blind, which must not change a single prune decision (enhancement 0012, "The stale set is component-blind, and the inventory digest hashes a canonical field encoding");
 - the library `Entry` carries no struct tags, while the cli's `InventoryEntry` carried JSON tags that the legacy inventory Secret reader depends on.
 
 State at the base of this change (`bc84595e`, cli PR 328 merged), re-checked by grep:
@@ -27,7 +27,7 @@ State at the base of this change (`bc84595e`, cli PR 328 merged), re-checked by 
 - The two stored digests are the library values, proven by tests that compare the stored value with the library function's result.
 
 **Non-Goals:**
-- The ownership verdict (`opm/k8s/ownership`, 0012:D8) and the deletion protocol (`opm/k8s/lifecycle`, 0012:D4). Later adoption changes replace `PreApplyExistenceCheck`, `AdmitSet` and `PruneStaleResources`.
+- The ownership verdict (`opm/k8s/ownership`, enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override")) and the deletion protocol (`opm/k8s/lifecycle`, enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply")). Later adoption changes replace `PreApplyExistenceCheck`, `AdmitSet` and `PruneStaleResources`.
 - Any user-visible change other than the two stored values.
 
 ## Decisions
@@ -94,11 +94,11 @@ The wrapper stays because the apply flow, the dry-run prune preview and their te
 
 ### KI5. Both digests are the library's, and the stored value changes once
 
-- **Render digest.** `renderInstance` computes `k8sinventory.RenderDigest(exported)` over the same single export. The export and the digest move into one small function, `exportAndDigest(resources []*object.Resource) ([]object.Exported, string, error)`, called with `object.Resources(out.Compiled)`, so a hermetic test can drive it with `object.Resource` values compiled from CUE source: its digest equals `k8sinventory.RenderDigest` of its export; two sets that differ only in the managed-by value (`opm-cli`, `opm-controller`) get the same digest (0012:D6:R2); a set that differs in another label gets a different one (0012:D6:R3). Errors keep the general exit code; a digest failure (an object whose JSON is not an object) is unreachable after a successful export, as before.
+- **Render digest.** `renderInstance` computes `k8sinventory.RenderDigest(exported)` over the same single export. The export and the digest move into one small function, `exportAndDigest(resources []*object.Resource) ([]object.Exported, string, error)`, called with `object.Resources(out.Compiled)`, so a hermetic test can drive it with `object.Resource` values compiled from CUE source: its digest equals `k8sinventory.RenderDigest` of its export; two sets that differ only in the managed-by value (`opm-cli`, `opm-controller`) get the same digest (enhancement 0012, "Labels are stamped by the CUE render; the shared render digest ignores the runtime-name label value"); a set that differs in another label gets a different one (enhancement 0012, "Labels are stamped by the CUE render; the shared render digest ignores the runtime-name label value"). Errors keep the general exit code; a digest failure (an object whose JSON is not an object) is unreachable after a successful export, as before.
 - **Inventory digest.** `WriteInstanceRecord` writes `k8sinventory.Digest(currentEntries)`. A test in `writerecord_test.go` captures the status patch and asserts `status.inventory.digest` equals `k8sinventory.Digest` of the written entries, and that the value differs from the digest the retired `ComputeDigest` gave for the same entries, recorded as a literal at the base of this change. The literal documents the one-time change, so a reviewer sees it in the test, not only in the release note.
 - `internal/inventory/digest.go` and its tests are deleted. The goldens recorded by cli PR 328 pinned the old algorithm until this change; the library's own goldens (`TestDigest_EncodingIsTheOneDefined`, `TestRenderDigest_EncodingIsTheOneDefined`) pin the new encodings.
 
-Alternative considered: keep the old values through a compatibility path. Rejected by 0012:D7: nothing in the cli compares a stored digest, so one change with a migration note costs less than two encodings.
+Alternative considered: keep the old values through a compatibility path. Rejected by enhancement 0012 ("The stale set is component-blind, and the inventory digest hashes a canonical field encoding"): nothing in the cli compares a stored digest, so one change with a migration note costs less than two encodings.
 
 ### KI6. Sections
 
@@ -109,7 +109,7 @@ Each ends green. Section 1 alone is releasable: the stored digests are the libra
 
 ### KI7. depguard
 
-The `retired-kubernetes-copies` rule gains `github.com/open-platform-model/cli/pkg/inventory` with the message `use github.com/open-platform-model/library/opm/k8s/inventory`. Its comment names 0012:D7 beside 0012:D1/D5:R2. The rule is proven to fire the way cli PR 328 proved it: a stub package under the old path in a scratch copy outside the repo, never committed.
+The `retired-kubernetes-copies` rule gains `github.com/open-platform-model/cli/pkg/inventory` with the message `use github.com/open-platform-model/library/opm/k8s/inventory`. Its comment names enhancement 0012 ("The stale set is component-blind, and the inventory digest hashes a canonical field encoding") beside enhancement 0012 ("The Kubernetes runtime surface homes in the library's Kubernetes tier (supersedes only the placement conclusion of the CLI inventory and handoff enhancement)" and "Ordering is kind-class order in the Kubernetes tier; no module-internal ordering is planned, and cross-module order belongs to a future Bundle"). The rule is proven to fire the way cli PR 328 proved it: a stub package under the old path in a scratch copy outside the repo, never committed.
 
 ## Risks / Trade-offs
 

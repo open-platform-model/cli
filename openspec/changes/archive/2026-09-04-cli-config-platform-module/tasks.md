@@ -1,6 +1,6 @@
 # Tasks: cli-config-platform-module
 
-Gate: implementation of tasks 2 onward needs the D5 core prerelease and both catalogs resolvable beside it (for the pinned template and the vet build tests).
+Gate: implementation of tasks 2 onward needs the enhancement 0019 core prerelease and both catalogs resolvable beside it (for the pinned template and the vet build tests).
 
 ## internal/config
 

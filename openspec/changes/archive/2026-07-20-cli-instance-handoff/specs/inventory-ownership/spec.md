@@ -1,6 +1,6 @@
 # Delta: inventory-ownership (cli-instance-handoff)
 
-The C1 refusal arm for operator-owned instances is replaced by D18's dual-mode contract: thin-editor `apply`, finalizer-delegating `delete`.
+The C1 refusal arm for operator-owned instances is replaced by enhancement 0006's dual-mode contract: thin-editor `apply`, finalizer-delegating `delete`.
 
 ## ADDED Requirements
 
@@ -76,5 +76,5 @@ The mapping from `spec.owner` to a CLI execution mode SHALL be implemented in ex
 
 ### Requirement: Operator-owned instances are refused with actionable errors
 
-**Reason**: The C1 refusal arm was an explicit placeholder for D18's dual-mode handling, which this change ships — refusing is replaced by thin-editor apply and finalizer-delegating delete.
-**Migration**: No user migration; previously-refused invocations now perform the D18 behaviors above.
+**Reason**: The C1 refusal arm was an explicit placeholder for enhancement 0006's dual-mode handling, which this change ships — refusing is replaced by thin-editor apply and finalizer-delegating delete.
+**Migration**: No user migration; previously-refused invocations now perform the enhancement 0006 behaviors above.

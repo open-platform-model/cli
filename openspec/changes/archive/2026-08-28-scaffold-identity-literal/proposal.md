@@ -28,4 +28,4 @@ None.
 - Commands: `opm module init` (scaffold and repair). Packages: `internal/scaffold` (`repair.go` template, `scaffold.go` `Reidentify`), `internal/cueedit` (delete `ResetIdentityVersion`), `templates/*`.
 - Tests: `tests/e2e/mod_init_test.go:164` (asserts `*"0.1.0"`), `internal/scaffold/repair_test.go`, `internal/cmd/module/init_test.go`, `internal/cueedit` reset tests.
 - SemVer: PATCH (`fix(scaffold)`): the scaffold emitted a form the kernel refuses. Complexity: net negative (one writer and its tests removed).
-- Enhancement: none; 0011 D3/D8/D12 (identity is written by `version set`, located by schema path) are unchanged.
+- Enhancement: none; enhancement 0011 ("Version authoring is a separate command; `--version` on publish is the only other writer", "The version writer locates its field by the schema-fixed path, not by a marker" and "Modules carry an identity subpackage and a version; `version set` and `--version` behave identically on both artifact types") (identity is written by `version set`, located by schema path) are unchanged.

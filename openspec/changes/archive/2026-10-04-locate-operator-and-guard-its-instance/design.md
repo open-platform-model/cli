@@ -6,7 +6,7 @@ See proposal.md (Why) for the two gaps. The code they live in today:
 - Its one caller is `deleteOperatorOwned` (`internal/cmd/instance/delete.go:140-149`), which fills the error's `Hint` and returns exit 2. A repository-wide search (`grep -rn CheckReady`, 2026-10-04) finds no other caller, so "every CLI command that checks for a running operator" is this one guard today.
 - `runInstanceDelete` (`delete.go:89-128`) resolves the target, builds its client through `cmdutil.NewK8sClient` (line 100, so a test cannot inject a fake), prompts unless `--force` or `--dry-run`, reads the record with `query.ResolveInventory` (which exits 5 when no record exists, `internal/workflow/query/status.go:52-60`), then branches on `inventory.ResolveOwnership`. Neither branch looks at other instances' finalizers. Today's tests call `deleteOperatorOwned` and `executeInstanceDelete` directly (`delete_test.go:51-200`).
 - On the operator-owned branch, a record with `spec.prune: true` makes the CLI print `Instance deleted — operator pruned N resources` once the CR is gone (`delete.go:188-190`).
-- `CheckFinalizerGuard`, `RemoveCleanupFinalizer` and `FinalizerGuardError` (`internal/operator/uninstall.go:47-142`) are uninstall's guard (archived 0006:D34). `FinalizerGuardError.Error()` hard-codes "refusing to uninstall" and "use --remove-finalizers to proceed".
+- `CheckFinalizerGuard`, `RemoveCleanupFinalizer` and `FinalizerGuardError` (`internal/operator/uninstall.go:47-142`) are uninstall's guard (archived enhancement 0006 ("`opm operator uninstall` preserves the namespace; refuses while cleanup finalizers are armed, with `--remove-finalizers` as the override")). `FinalizerGuardError.Error()` hard-codes "refusing to uninstall" and "use --remove-finalizers to proceed".
 - `inventory.Record` already carries `ModulePath` (`spec.module.path`) and the recorded inventory entries, so recognising the operator's instance needs no render.
 - The fixed names are what `dist/install.yaml` declares today: Namespace `opm-operator-system`, Deployment `opm-operator-controller-manager`, CRDs `moduleinstances`, `modulepackages`, `platforms`, `transformerregistrations` in `opmodel.dev`. `TestEmbeddedManifest_CRDNamesAreExpected` (`internal/operator/manifest_test.go:31-48`) already pins the four CRD names. The fourth CRD, `transformerregistrations`, first shipped in opm-operator `v1.0.0-alpha.18` (commit `06b197a`, 2026-09-15); every later release carries all four.
 - The operator's `refuse-own-instance` change (opm-operator) makes the operator never add its cleanup finalizer to the instance that deploys it, release a leftover one without pruning, and refuse an operator-owned one with reason `SelfManagementRefused` and the message "set `spec.owner` to `cli`".
@@ -97,7 +97,7 @@ func runInstanceDelete(...) error {
 }
 
 // deleteResolvedInstance guards an instance that deploys the operator, then
-// branches on ownership (0006:D18).
+// branches on ownership (enhancement 0006).
 func deleteResolvedInstance(ctx context.Context, c *kubernetes.Client, rsf *cmdutil.InstanceSelectorFlags, namespace string,
     inv *inventory.Record, live []*unstructured.Unstructured, timeout time.Duration, dryRun bool, log *log.Logger) error {
     if err := guardOperatorInstanceDelete(ctx, c, inv); err != nil {

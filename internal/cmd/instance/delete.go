@@ -263,7 +263,7 @@ func claimsToDelete(inv *inventory.Record, live []*unstructured.Unstructured, de
 
 // deleteResolvedInstance deletes an instance whose record has been read. It
 // first guards an instance that deploys the controller, on both branches and on
-// a dry run alike. Ownership is then the single branch point (0006:D18): a
+// a dry run alike. Ownership is then the single branch point (enhancement 0006): a
 // controller-owned instance is deleted by deleting its CR and letting the
 // controller's finalizer prune the workloads.
 //

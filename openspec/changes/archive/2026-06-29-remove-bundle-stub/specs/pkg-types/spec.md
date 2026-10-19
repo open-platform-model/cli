@@ -9,7 +9,7 @@ All shared domain types SHALL be exported under `pkg/` for reuse by external too
 - `pkg/loader/` — loading functions
 - `pkg/render/` — rendering engine (matching, execution, validation)
 
-There SHALL be no `pkg/bundle/` package — bundle support is not implemented (enhancement 0002 D15 removed the bundle path; D15 supersedes D7).
+There SHALL be no `pkg/bundle/` package — bundle support is not implemented (enhancement 0002 ("The `BundleRelease` stub is removed, not renamed (supersedes D7)") removed the bundle path).
 
 #### Scenario: External tool imports pkg/core
 - **WHEN** an external Go module imports `github.com/opmodel/cli/pkg/core`
@@ -26,5 +26,5 @@ There SHALL be no `pkg/bundle/` package — bundle support is not implemented (e
 ## REMOVED Requirements
 
 ### Requirement: Bundle and Release types
-**Reason**: The bundle path is removed (enhancement 0002 D15, supersedes D7). The `pkg/bundle` package — `Bundle`, `BundleMetadata`, `Release`, `ReleaseMetadata`, and the `Releases map[string]*module.Instance` field — is deleted; it was unreachable dead code with no production caller.
+**Reason**: The bundle path is removed (enhancement 0002 ("The `BundleRelease` stub is removed, not renamed (supersedes D7)")). The `pkg/bundle` package — `Bundle`, `BundleMetadata`, `Release`, `ReleaseMetadata`, and the `Releases map[string]*module.Instance` field — is deleted; it was unreachable dead code with no production caller.
 **Migration**: None. External tools never consumed `pkg/bundle` in a supported flow. Bundle types are reintroduced under the Instance vocabulary only if bundle support is built.

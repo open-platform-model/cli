@@ -8,7 +8,7 @@ import (
 
 // The ModuleInstance and Platform CRD coordinates. These are hardcoded rather
 // than imported from opm-controller's types package — the CLI has no Go module
-// dependency on opm-controller (0006:D13). This package is the single
+// dependency on opm-controller (enhancement 0006). This package is the single
 // definition; other CLI packages (e.g. internal/controller) consume it from here
 // instead of keeping private copies.
 const (
@@ -38,7 +38,7 @@ const (
 	// CleanupFinalizer is the controller's finalizer on the ModuleInstance CR. It
 	// blocks the CR's removal until the controller has pruned the instance's
 	// workloads — which is what makes a controller-owned delete a CR delete
-	// (0006:D18), and what wedges the CR if no controller is running.
+	// (enhancement 0006), and what wedges the CR if no controller is running.
 	CleanupFinalizer = GroupOpmodel + "/cleanup"
 )
 

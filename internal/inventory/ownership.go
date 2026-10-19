@@ -15,7 +15,7 @@ const (
 	// empty owner, which is controller-managed by the controller's defaulting
 	// contract). In this mode the CLI edits the spec and observes, but writes
 	// no resources of its own: apply becomes a thin spec editor and delete
-	// delegates to the controller's cleanup finalizer (0006:D18).
+	// delegates to the controller's cleanup finalizer (enhancement 0006).
 	ModeControllerOwned
 )
 

@@ -1,7 +1,7 @@
 ## REMOVED Requirements
 
 ### Requirement: Health status type is exported
-**Reason**: The cli no longer declares a health status type. Readiness is the library's `opm/k8s/health`, whose `Status` type and constants carry the same strings, and a frontend that adopts a tier package keeps no copy and no alias (0012:D3:R6).
+**Reason**: The cli no longer declares a health status type. Readiness is the library's `opm/k8s/health`, whose `Status` type and constants carry the same strings, and a frontend that adopts a tier package keeps no copy and no alias (enhancement 0012, "The Kubernetes runtime decisions live in a fenced tier, `opm/k8s`, beside the kernel and inside the library module").
 **Migration**: Use `health.Status` and `health.Ready`, `health.NotReady`, `health.Complete`, `health.Unknown`, `health.Missing`, `health.Applied`, `health.Bound` from `github.com/open-platform-model/library/opm/k8s/health`. The cli's rule is `health-evaluation`.
 
 ### Requirement: EvaluateHealth is exported

@@ -31,7 +31,7 @@ The scenario "The library table equals the table the CLI applied by" cannot stay
 
 ### No enhancement declaration
 
-The decision this follows (0012:D5:R1) was delivered by the library change. The cli change only takes the release, so it writes no `enhancement.yaml`.
+The decision this follows (enhancement 0012, "Ordering is kind-class order in the Kubernetes tier; no module-internal ordering is planned, and cross-module order belongs to a future Bundle") was delivered by the library change. The cli change only takes the release, so it writes no `enhancement.yaml`.
 
 ## Research & Decisions
 

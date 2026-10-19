@@ -2,13 +2,13 @@
 
 ## Overview
 
-One crossing with a decoupling seam. The Go retarget, fixture crossing, coordinate collapse, D19 warning, and file-based platform surface land together and are green immediately. Two joints decouple the change from the operator track: CR-read tolerance (permanent) plus CR-write refusal (transitional), and skip-gated registry-pulling tests whose pins are pre-authored for the `examples-fleet-core-v2` republish (`podinfo v0.1.4`). Both joints tighten mechanically when operator `v1.0.0-alpha.9` ships; no second design pass is needed.
+One crossing with a decoupling seam. The Go retarget, fixture crossing, coordinate collapse, the local-replacement warning (enhancement 0010), and file-based platform surface land together and are green immediately. Two joints decouple the change from the operator track: CR-read tolerance (permanent) plus CR-write refusal (transitional), and skip-gated registry-pulling tests whose pins are pre-authored for the `examples-fleet-core-v2` republish (`podinfo v0.1.4`). Both joints tighten mechanically when operator `v1.0.0-alpha.9` ships; no second design pass is needed.
 
 ## Research & Decisions
 
 ### The spec.module write stays declared, verified downstream
 
-**Context**: 0010 02-design:213 says the apply sites "write the coordinate actually fetched". Explored against the actual paths: `opm module apply` renders a local directory and fetches nothing (0006 D7; D9's own rationale cites this line); `opm instance apply` loads through `LoadInstancePackage`, which performs no identity verification; the only CLI registry fetch is handoff verification.
+**Context**: 0010 02-design:213 says the apply sites "write the coordinate actually fetched". Explored against the actual paths: `opm module apply` renders a local directory and fetches nothing (enhancement 0006 ("`opm instance handoff`, the migration feature"); enhancement 0006's own rationale cites this line); `opm instance apply` loads through `LoadInstancePackage`, which performs no identity verification; the only CLI registry fetch is handoff verification.
 **Options considered**:
 1. Plumb the CUE resolution (the instance `cue.mod` deps pin) up to the write — fragile (MVS may resolve above the pin; multiple module imports), and still unavailable on the module-apply path.
 2. Write the declared coordinate, rely on the library's acquire-time verification (alpha.13) at every point the coordinate is later *consumed* (handoff verify, operator acquire), plus 0011's publish gates preventing lying artifacts at the source.
@@ -18,7 +18,7 @@ One crossing with a decoupling seam. The Go retarget, fixture crossing, coordina
 ### `CanonicalModuleRef` keeps its name, loses its arithmetic
 
 **Context**: both call sites (`apply.go:273`, `thineditor.go:112`) want exactly `(path, v-prefixed version)`. Under v2 the path is `metadata.modulePath` verbatim; the version prefix is still needed (`#VersionType` is bare; the operator's `module.NewVersion` rejects bare — the prefix is load-bearing, per the method's existing doc).
-**Decision**: body becomes `return m.ModulePath, ensureVPrefix(m.Version)`; delete `majorVersionTag`, `hasVPrefix` (fold into `ensureVPrefix` if still needed), the snake-leaf fallback, and the `NameSnakeCase`/`DefaultNamespace` fields (the former no longer exists in core v2 — D8; the latter never did and has zero readers). No v1 tolerance branch: a v1-authored module fails core-v2 schema validation before metadata is ever read, so a dual-line fallback (the library's loader keeps one) would be dead code here.
+**Decision**: body becomes `return m.ModulePath, ensureVPrefix(m.Version)`; delete `majorVersionTag`, `hasVPrefix` (fold into `ensureVPrefix` if still needed), the snake-leaf fallback, and the `NameSnakeCase`/`DefaultNamespace` fields (the former no longer exists in core v2 — enhancement 0010; the latter never did and has zero readers). No v1 tolerance branch: a v1-authored module fails core-v2 schema validation before metadata is ever read, so a dual-line fallback (the library's loader keeps one) would be dead code here.
 **Rationale**: keeping the method name keeps the two call sites and the SSA-completeness story (`SpecInput` docs) untouched; the five-case unit table is rewritten to pin the new contract (verbatim path; bare→prefixed version; empty version stays empty).
 
 ### CR tolerance split: read forever, write until the CRD knows `version`
@@ -31,15 +31,15 @@ One crossing with a decoupling seam. The Go retarget, fixture crossing, coordina
 
 ### Seed version: hardcoded pin, three-way mirror
 
-**Context**: `DefaultPlatformTemplate` is a Go constant reachable by no automation (root `deps:update` skips it). `opm config init` is normatively forbidden registry access (`config-commands` spec, 0006 D39); a non-concrete placeholder fails `opm config vet` and three test consumers.
+**Context**: `DefaultPlatformTemplate` is a Go constant reachable by no automation (root `deps:update` skips it). `opm config init` is normatively forbidden registry access (`config-commands` spec, enhancement 0006 ("`~/.opm` becomes two import-free data files: `config.cue` drops `providers`/`cacheDir`, D21's local default platform is the sibling `~/.opm/platform.cue`; folded into C2")); a non-concrete placeholder fails `opm config vet` and three test consumers.
 **Options considered**: (1) hardcode + hand-bump; (2) resolve at init (needs a spec delta and new network surface in a command defined by its offline-ness); (3) placeholder forcing user edit (breaks unattended consumers).
 **Decision**: Option 1 — `version: "2.0.0-alpha.3"`. The mirror set is `internal/config/templates.go` + `hack/platform.cue` (same-commit contract, existing header) + the operator's `config/samples` Platform (recorded alignment, bumped on catalog releases as ordinary fixture updates). No new task (Principle VII): the drift mode is "old but resolvable" (immutable tags never dangle), caught when anyone bumps one peer.
 **Rationale**: matches the library's load-bearing-pin precedent and the operator track's identical choice; the failure mode of a stale pin under v2 (an old catalog) is strictly milder than the v1 template's measured failure (a stale range selecting nothing).
 
-### D19 trigger: the existing replacement predicate, on both render entries
+### Trigger of the local-module warning (enhancement 0010): the existing replacement predicate, on both render entries
 
-**Context**: D19's text says file presence of `cue.mod/local-module.cue`; the repo's `loader.HasLocalModuleReplacement` requires a local-path `replaceWith` entry, and the `instance-inventory` spec's source-local annotation is already defined by that same predicate.
-**Decision**: reuse `HasLocalModuleReplacement` (refinement recorded: a replacement-free `local-module.cue` carries none of D19's false-conclusion risk, and two predicates for one file invite drift). Instance-file entry: warn when the already-computed `SourceLocal` is true (`render.go:88-94` — the boolean is in hand). Module-directory entry: compute `HasLocalModuleReplacement(moduleRoot)` from the staged module root (distinct from that path's hardcoded `SourceLocal = true`, which means "local main module", not "replaced dependency"). Surface: direct `output.Warn` at render time (the repo's convention for pre-output warnings), one line: `module context carries cue.mod/local-module.cue replacements: demanded keys may not correspond to published bytes`.
+**Context**: enhancement 0010's text says file presence of `cue.mod/local-module.cue`; the repo's `loader.HasLocalModuleReplacement` requires a local-path `replaceWith` entry, and the `instance-inventory` spec's source-local annotation is already defined by that same predicate.
+**Decision**: reuse `HasLocalModuleReplacement` (refinement recorded: a replacement-free `local-module.cue` carries none of the false-conclusion risk that enhancement 0010 names, and two predicates for one file invite drift). Instance-file entry: warn when the already-computed `SourceLocal` is true (`render.go:88-94` — the boolean is in hand). Module-directory entry: compute `HasLocalModuleReplacement(moduleRoot)` from the staged module root (distinct from that path's hardcoded `SourceLocal = true`, which means "local main module", not "replaced dependency"). Surface: direct `output.Warn` at render time (the repo's convention for pre-output warnings), one line: `module context carries cue.mod/local-module.cue replacements: demanded keys may not correspond to published bytes`.
 
 ### New-error surfacing: one branch, one message fix
 

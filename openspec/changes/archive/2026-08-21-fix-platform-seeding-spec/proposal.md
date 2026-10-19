@@ -1,6 +1,6 @@
 ## Why
 
-The D12 solo-cluster Platform seeding is broken: `render.Result.PlatformSpec` is declared as the carrier for the resolved platform spec but is never assigned, so `opm instance apply`'s write-if-absent seeding (`platform.EnsureClusterPlatform`) always receives a zero `synth.PlatformInput`. The resulting create document carries `spec.type: ""` and no registry, the CRD rejects it, and the seeding fails with a warning on every apply where it should fire. The `platform-resolution` spec's "Absent Platform is seeded" scenario is silently unmet.
+The enhancement 0006 solo-cluster Platform seeding is broken: `render.Result.PlatformSpec` is declared as the carrier for the resolved platform spec but is never assigned, so `opm instance apply`'s write-if-absent seeding (`platform.EnsureClusterPlatform`) always receives a zero `synth.PlatformInput`. The resulting create document carries `spec.type: ""` and no registry, the CRD rejects it, and the seeding fails with a warning on every apply where it should fire. The `platform-resolution` spec's "Absent Platform is seeded" scenario is silently unmet.
 
 ## What Changes
 

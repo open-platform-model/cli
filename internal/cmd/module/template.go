@@ -12,7 +12,7 @@ import (
 
 // NewModuleTemplateCmd creates the module template command group. The
 // official templates live in the reserved opmodel.dev/templates segment
-// (0011:D25).
+// (enhancement 0011).
 func NewModuleTemplateCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "template",

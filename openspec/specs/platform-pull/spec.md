@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`opm platform pull`: reproducing a cluster's platform package on the laptop from the Platform CR's effective inputs, so a local build renders what the cluster renders (enhancement 0015 D6).
+`opm platform pull`: reproducing a cluster's platform package on the laptop from the Platform CR's effective inputs, so a local build renders what the cluster renders (enhancement 0015, "A cluster's render is reproduced by pulling the controller-generated platform package").
 
 ## Requirements
 

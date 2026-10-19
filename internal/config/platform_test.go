@@ -127,7 +127,7 @@ func TestBuildPlatformModule_NotAModule(t *testing.T) {
 func TestBuildPlatformModule_HackPlatformBuilds(t *testing.T) {
 	// Registry-backed: the maintained hack/platform/ module must build
 	// against the published core and catalogs, and each entry's version
-	// must be the build its cue.mod pins (derived readout, 0019:D5).
+	// must be the build its cue.mod pins (derived readout, enhancement 0019).
 	dir := copyHackPlatform(t)
 	pins := hackCatalogPins(t, dir)
 
@@ -173,7 +173,7 @@ func TestBuildPlatformModule_UnpublishedPinNamesTheDependency(t *testing.T) {
 
 func TestBuildPlatformModule_KeyImportDriftNamesTheEntry(t *testing.T) {
 	// Registry-backed: an entry keyed at a path other than the embedded
-	// catalog's module path fails the 0019:D5 binding at a path naming the
+	// catalog's module path fails the catalog binding (enhancement 0019) at a path naming the
 	// entry.
 	dir := copyHackPlatform(t)
 	cuePath := filepath.Join(dir, "platform.cue")

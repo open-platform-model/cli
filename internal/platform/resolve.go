@@ -47,7 +47,7 @@ const (
 )
 
 // Resolution reports where the platform came from — the provenance every
-// render-bearing command surfaces (0006:D21: the fallback warns, it never
+// render-bearing command surfaces (enhancement 0006: the fallback warns, it never
 // silently swaps platforms).
 type Resolution struct {
 	// Source is the precedence step that produced the platform.
@@ -155,7 +155,7 @@ type ClusterPlatform struct {
 // ClusterPlatformGetter fetches the cluster Platform CR. It returns
 // (doc, "", nil) on success and (nil, unavailable-reason, nil) when the CR
 // is absent or unreadable in a way that permits warn-fallback (NotFound,
-// Forbidden — 0006:D21). Any other error is fatal to resolution.
+// Forbidden — enhancement 0006). Any other error is fatal to resolution.
 type ClusterPlatformGetter func(ctx context.Context) (doc *ClusterPlatform, unavailable string, err error)
 
 // ErrClusterRead marks a fatal failure to read the cluster Platform: the
@@ -315,7 +315,7 @@ func (k DepsKind) owner() string {
 // The registry the controller recorded on status wins over the authored spec
 // whenever it holds entries: it is the union the controller resolved from the
 // subscriptions and the active TransformerRegistration claims, and it is what
-// the running package was generated from (0015:D13/D17). The spec is the
+// the running package was generated from (enhancement 0015). The spec is the
 // fallback for a cluster no controller has generated for.
 //
 // Two divergences between spec and effective package are warned, never

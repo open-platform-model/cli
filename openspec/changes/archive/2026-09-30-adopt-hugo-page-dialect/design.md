@@ -2,7 +2,7 @@
 
 See proposal.md, "Why". The facts below shape the approach.
 
-- **The pages.** cli owns five leaf pages in four sections: `authoring`, `diagnostics`, `extending` and `reference`. Every one of those sections also holds pages from other repositories, because the site is assembled by section (0018:D8).
+- **The pages.** cli owns five leaf pages in four sections: `authoring`, `diagnostics`, `extending` and `reference`. Every one of those sections also holds pages from other repositories, because the site is assembled by section (enhancement 0018, "A page lives in the repository whose change would make it wrong; the site is assembled by section").
 - **The dialect.** The contract is `orchestration.md` section 4. The lint is section 4.1: `opm-dialect-lint.sh`, sha256 `dae9717af0c43fc3bdc29a9e730fd171fe7541dab35a9625a35efb1682973c6b`, byte-identical to A's `site/scripts/lint-sources.sh`.
 - **Baseline.** On `origin/main` at `93d0bc3` (2026-09-30), the lint over `docs/site` prints five findings and exits 1. Each finding is `<page>:5: sidebar: is Starlight front matter; write weight: N`, one for each of the five pages. This matches the count in `orchestration.md` 4.1 ("cli 5").
 - **Dry run.** On 2026-09-30 the recipe below was applied to a copy of that tree (`git archive`). The lint then printed `opm-dialect-lint: OK`. The page-order helper (sha256 `edc62591...`) printed the same output before and after.

@@ -2,7 +2,7 @@
 
 ## 1. Live coverage additions (kind + CRDs; existing integration tier)
 
-- [x] 1.1 `tests/integration/ssa-ownership/main.go`: new step pair — `ApplySpec` with `SourceLocal: true` → assert `module-instance.opmodel.dev/source: local` on the live object; re-apply with `false` → assert annotation removed by SSA (closes the open C1 VERIFICATION-NOTES item; 0006 D38 gate input)
+- [x] 1.1 `tests/integration/ssa-ownership/main.go`: new step pair — `ApplySpec` with `SourceLocal: true` → assert `module-instance.opmodel.dev/source: local` on the live object; re-apply with `false` → assert annotation removed by SSA (closes the open C1 VERIFICATION-NOTES item; enhancement 0006 ("The provenance annotation is kept and promoted to a fail-closed handoff pre-gate; the handoff verification render MUST bypass local replacements (resolves OQ17)") gate input)
 - [x] 1.2 `tests/integration/migration/main.go`: idempotence scenario — CR present + leftover legacy Secret → apply → Secret deleted without being read as inventory, no duplicate migration, single clean end state
 
 ## 2. Unit coverage additions
@@ -10,7 +10,7 @@
 - [x] 2.1 Migration failure ordering: fake-client `PrependReactor` fails the status-subresource apply → assert legacy Secret retained and no delete action recorded (delete-after-status contract)
 - [x] 2.2 `RunClusterGates` probe-order assertion (CRD presence → field floor → ceiling) via reactor-recorded probe sequence
 - [x] 2.3 Dry-run exemption: dry-run `Execute` against a CRD-less fake → succeeds with zero gate probes recorded
-- [x] 2.4 Platform-fallback banner: capture output during apply-path resolution with failing cluster getter → assert the D21 provenance warning is emitted (add a test-only writer seam in `internal/output` only if none exists; keep minimal)
+- [x] 2.4 Platform-fallback banner: capture output during apply-path resolution with failing cluster getter → assert the enhancement 0006 provenance warning is emitted (add a test-only writer seam in `internal/output` only if none exists; keep minimal)
 
 ## 3. Fixture hygiene
 

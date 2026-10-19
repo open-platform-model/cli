@@ -1,7 +1,7 @@
 ## REMOVED Requirements
 
 ### Requirement: Public resource ordering API
-**Reason**: The weight table moved to the library's Kubernetes tier, `opm/k8s/object`, so both frontends order by one definition (0012:D5:R2). The cli deletes its copy.
+**Reason**: The weight table moved to the library's Kubernetes tier, `opm/k8s/object`, so both frontends order by one definition (enhancement 0012, "Ordering is kind-class order in the Kubernetes tier; no module-internal ordering is planned, and cross-module order belongs to a future Bundle"). The cli deletes its copy.
 **Migration**: Use `object.Weight` from `github.com/open-platform-model/library/opm/k8s/object`; the values are unchanged. The cli's ordering rule is the `resource-conversion` requirement "Object order comes from the library weight table".
 
 ### Requirement: No CLI dependencies

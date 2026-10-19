@@ -40,7 +40,7 @@ type Record struct {
 
 	// SpecValues is the CR's spec.values block — the unified values the last
 	// apply consumed, recorded so a future ownership transfer can replay them
-	// against the registry-resolved module (0006:D38).
+	// against the registry-resolved module (enhancement 0006).
 	SpecValues map[string]any
 
 	// Prune is the CR's spec.prune marker, which governs whether the controller

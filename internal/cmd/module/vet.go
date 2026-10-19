@@ -88,7 +88,7 @@ func runVet(ctx context.Context, cfg *config.GlobalConfig, args []string, rf *cm
 
 // runVetModuleOnly validates a module directory without an instance.cue.
 // It loads the module CUE package with the resolved registry, runs the
-// identity/coordinate checks (0011:D16/D18/D21), then resolves the values (-f
+// identity/coordinate checks (enhancement 0011), then resolves the values (-f
 // files, else the debugValues field) as kernel sources exactly as `opm
 // module build` does and validates them against #config through the
 // kernel's layered validation. Once those pass it renders the synthesized

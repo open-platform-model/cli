@@ -45,7 +45,7 @@ and read the library's classification (library v1.0.0-beta.7):
 **Decision**: the cli MUST branch on `cuemod.IsUnauthorized(err)`, the existing reader of the
 kind `FetchUnauthorized`. The last three rows keep the pin hint and exit 2, and a test pins
 each as a known limit that fails when the library closes it.
-**Rationale**: the reading of registry error text is the library's alone (0021:D8:R12).
+**Rationale**: the reading of registry error text is the library's alone (enhancement 0021, "A beta line reaches GA only when its exit criteria hold").
 
 ### Which host the hint names
 

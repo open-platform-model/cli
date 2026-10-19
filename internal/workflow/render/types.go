@@ -16,7 +16,7 @@ type Result struct {
 	Resources []*unstructured.Unstructured
 	// Instance is the acquired instance's metadata as the kernel decoded it,
 	// the library's type; only Namespace may differ, when the --namespace
-	// flag or env override applied. Was: Release (0002:D8/D9).
+	// flag or env override applied. Was: Release (enhancement 0002).
 	Instance module.InstanceMetadata
 	// Module is the embedded module's metadata, the library's type, decoded
 	// from the instance package (the canonical spec.module reference is
@@ -34,24 +34,24 @@ type Result struct {
 	// not failure; every entry is shown to the user.
 	Warnings []string
 
-	// Platform is the resolved platform-source provenance (0006:D21).
+	// Platform is the resolved platform-source provenance (enhancement 0006).
 	Platform platform.Resolution
 
 	// RenderDigest is the library's shared render digest
 	// (opm/k8s/inventory.RenderDigest) over the render's single export. It
 	// leaves the managed-by value out, so the CLI and the controller digest one
-	// render equally (0012:D6). Written verbatim to
+	// render equally (enhancement 0012). Written verbatim to
 	// status.lastAppliedRenderDigest so a future ownership transfer has a
-	// recorded value to verify against (0006:D9/D30).
+	// recorded value to verify against (enhancement 0006).
 	RenderDigest string
 
 	// Values is the single unified values blob the render consumed, decoded to
 	// a JSON-shaped map. The apply workflow writes it verbatim to the
-	// ModuleInstance CR's spec.values (0006:D19). Nil when the
+	// ModuleInstance CR's spec.values (enhancement 0006). Nil when the
 	// instance carries no values or they could not be decoded.
 	Values map[string]any
 
-	// SourceLocal is the render-provenance signal (0006:D7): true
+	// SourceLocal is the render-provenance signal (enhancement 0006): true
 	// when the module bytes did not come from pure registry resolution — the
 	// main module is a local directory, or its cue.mod/local-module.cue carries
 	// a replaceWith. The apply workflow stamps
@@ -86,7 +86,7 @@ type InstanceFileOpts struct {
 	// values sources, in order.
 	ValuesFiles []string
 
-	// PlatformFlag is the --platform platform module directory (0006:D21;
+	// PlatformFlag is the --platform platform module directory (enhancement 0006;
 	// highest platform-source precedence).
 	PlatformFlag string
 	// ClusterPlatform reads the cluster Platform CR. nil skips the cluster:
@@ -138,7 +138,7 @@ type ModuleOpts struct {
 	// "<module.metadata.name>-debug".
 	Name string
 
-	// PlatformFlag is the --platform platform module directory (0006:D21;
+	// PlatformFlag is the --platform platform module directory (enhancement 0006;
 	// highest platform-source precedence).
 	PlatformFlag string
 	// ClusterPlatform reads the cluster Platform CR. nil (module build and

@@ -55,7 +55,7 @@ type Request struct {
 }
 
 // Resolve lists the module's published versions across every major and picks
-// one by the selector (0016:D5:R2/R3). A transport failure is a
+// one by the selector (enhancement 0016). A transport failure is a
 // *publish.ConnectivityError; anything the user must fix is a *RefusalError.
 func Resolve(ctx context.Context, src Source, req Request) (*Resolution, error) {
 	versions, err := src.ModuleVersions(ctx, req.Path)
@@ -189,7 +189,7 @@ func coreMajorOf(ctx context.Context, src Source, req Request, major, version st
 	return "", nil
 }
 
-// Newest is the float rule (0016:D5:R2): the newest stable version, else the
+// Newest is the float rule (enhancement 0016): the newest stable version, else the
 // newest prerelease that is not a development build. A float never selects a
 // development build; "" when versions holds nothing else. versions is
 // SemVer-sorted ascending, as the registry lists them.

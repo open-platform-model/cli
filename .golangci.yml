@@ -35,8 +35,8 @@ linters:
     depguard:
       rules:
         # The Kubernetes object wrapper, the OPM label vocabulary and the
-        # kind-class weight table are the library's (0012:D1/D5:R2), and so
-        # are the inventory entry, stale set and digests (0012:D7).
+        # kind-class weight table are the library's (enhancement 0012), and so
+        # are the inventory entry, stale set and digests (enhancement 0012).
         # The cli deleted its copies; this rule stops one coming back under
         # the old import paths. No allow list: nothing else is denied.
         retired-kubernetes-copies:
@@ -135,14 +135,6 @@ linters:
       - linters:
           - gochecknoinits
         path: internal/cmd/
-      # The core sub-packages (component, module, modulerelease, provider, transformer)
-      # use type names that include the package-context prefix (e.g. TransformerContext,
-      # ComponentMetadata) for clarity and migration compatibility. These names are
-      # intentional and are not considered stutters in this project.
-      - linters:
-          - revive
-        text: "stutters; consider"
-        path: internal/core/(component|module|modulerelease|provider|transformer)/
       # internal/compat arrived byte-for-byte from library/opm/compat when the
       # comparator moved to the home of its only callers. The files are kept
       # identical to that history so the move reviews as a move and so a future
@@ -162,7 +154,6 @@ linters:
       - third_party$
       - builtin$
       - examples$
-      - ^experiments/
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
@@ -176,4 +167,3 @@ formatters:
       - third_party$
       - builtin$
       - examples$
-      - experiments$

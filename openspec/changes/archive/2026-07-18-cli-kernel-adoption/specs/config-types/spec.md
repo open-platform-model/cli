@@ -1,6 +1,6 @@
 # Delta: config-types (cli-kernel-adoption)
 
-`GlobalConfig` drops `Providers` and `CueContext`; the resolver drops provider auto-resolution (enhancement 0006 D39). The kernel owns the CUE context (see `kernel-render`).
+`GlobalConfig` drops `Providers` and `CueContext`; the resolver drops provider auto-resolution (enhancement 0006, "`~/.opm` becomes two import-free data files: `config.cue` drops `providers`/`cacheDir`, D21's local default platform is the sibling `~/.opm/platform.cue`; folded into C2"). The kernel owns the CUE context (see `kernel-render`).
 
 ## MODIFIED Requirements
 

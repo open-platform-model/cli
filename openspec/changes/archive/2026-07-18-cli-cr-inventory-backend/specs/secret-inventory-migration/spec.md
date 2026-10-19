@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The one-time, delete-after-success migration of legacy Secret inventories onto the `ModuleInstance` CR, performed on apply. Enhancement 0006 D8 as amended by D14 — no deprecation window; apply is the only command that reads Secrets, and only to migrate them.
+The one-time, delete-after-success migration of legacy Secret inventories onto the `ModuleInstance` CR, performed on apply. Enhancement 0006 ("Migration of existing Secret inventories") as amended by enhancement 0006 — no deprecation window; apply is the only command that reads Secrets, and only to migrate them.
 
 ## ADDED Requirements
 

@@ -4,7 +4,7 @@
 
 ## 1. Template module trees
 
-- [x] 1.1 `cli/templates/standard/` — real module at `opmodel.dev/templates/standard@v1`: identity subpackage (defaulted `1.0.0`-line version + marker), D12 wiring, D49 catalog imports, `source: {kind: "self"}`, snake package == leaf.
+- [x] 1.1 `cli/templates/standard/` — real module at `opmodel.dev/templates/standard@v1`: identity subpackage (defaulted `1.0.0`-line version + marker), enhancement 0011 wiring, enhancement 0010 catalog imports, `source: {kind: "self"}`, snake package == leaf.
 - [x] 1.2 `cli/templates/minimal/` — same shape, smallest useful module (replaces `simple`).
 - [x] 1.3 `cli/templates/advanced/` — the showcase tree: multiple components, trait attachments, values plumbing.
 - [x] 1.4 All three pass `opm module vet` and `publish --dry-run` locally against GHCR; root `deps:update:templates` retargeted to the real `cue.mod` files and run once.
@@ -43,4 +43,4 @@
 
 ## 8. Record
 
-- [x] 8.1 `enhancements/0011/`: history event — the `cli-authoring-commands` slice lands as two changes (`openspec_ref` cites both); `HighestStable` disposition resolved (float selector; first caller is template resolution — update the cli-catalog-gates task note); templates DN implemented by tasks 1/3/6.
+- [x] 8.1 enhancement 0011: history event — the `cli-authoring-commands` slice lands as two changes (`openspec_ref` cites both); `HighestStable` disposition resolved (float selector; first caller is template resolution — update the cli-catalog-gates task note); templates DN implemented by tasks 1/3/6.

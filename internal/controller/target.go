@@ -82,7 +82,7 @@ func imageTag(image string) string {
 }
 
 // CheckTarget applies install's target rules to a rendered module version
-// before anything is written (0021:D9:R4):
+// before anything is written (enhancement 0021):
 //
 //   - V1: the controller's MAJOR.MINOR is not above the cli's; a cli whose own
 //     version is not a released SemVer skips the rule with a warning;

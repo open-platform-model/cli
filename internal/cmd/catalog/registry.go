@@ -13,7 +13,7 @@ import (
 	"github.com/open-platform-model/cli/internal/publish"
 )
 
-// AidSentence is 0010:D35's framing, carried in the check command's help text
+// AidSentence is the framing of enhancement 0010 (an aid, not a guarantee), carried in the check command's help text
 // verbatim (graduation-gated): publish-side enforcement is the whole of the
 // guarantee, and this command is the out-of-band aid beside it.
 const AidSentence = "This check is an aid, not a guarantee: nothing requires it to have been run, and enforcement exists only at publish — it does not make an unchecked catalog trustworthy; it makes it checkable."
@@ -35,7 +35,7 @@ verify a build out of band, after the fact, from the consumer's side.`,
 	return c
 }
 
-// NewCatalogRegistryCheckCmd creates the catalog registry check command (0011:D7).
+// NewCatalogRegistryCheckCmd creates the catalog registry check command (enhancement 0011).
 func NewCatalogRegistryCheckCmd(cfg *config.GlobalConfig) *cobra.Command {
 	var compat bool
 

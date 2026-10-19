@@ -6,7 +6,7 @@ Defines how `opm instance list` discovers deployed instances from persisted inst
 
 ### Requirement: List command discovers instances via persisted ownership inventory
 
-The `opm instance list` command SHALL discover all deployed module instances by listing persisted instance inventory records in the target namespace. It SHALL use the `ListRecords` function from the inventory package. It MUST NOT require module source, re-rendering, knowledge of specific instance names, or inventory change-history fields to identify the current owned resource set for an instance. <!-- Was: "discovers releases", "release inventory records", "release names" (0002 D9) -->
+The `opm instance list` command SHALL discover all deployed module instances by listing persisted instance inventory records in the target namespace. It SHALL use the `ListRecords` function from the inventory package. It MUST NOT require module source, re-rendering, knowledge of specific instance names, or inventory change-history fields to identify the current owned resource set for an instance. <!-- Was: "discovers releases", "release inventory records", "release names" (enhancement 0002) -->
 
 #### Scenario: List discovers via ListRecords
 
@@ -152,7 +152,7 @@ The command SHALL evaluate instance health concurrently using a bounded worker p
 
 ### Requirement: List metadata extraction does not depend on inventory change history
 
-The command SHALL extract display metadata from each persisted instance inventory record: instance name from `instanceMetadata.name`, module name from `moduleMetadata.name`, version from `moduleMetadata.version`, instance ID from `instanceMetadata.uuid`, last applied time from `instanceMetadata.lastTransitionTime`, and age computed from `lastTransitionTime`. Owner display metadata SHALL come from the top-level `createdBy` field, defaulting to `cli` when that field is omitted for legacy inventories. The command SHALL NOT require inventory change-history metadata such as latest change source version, raw values, or per-change timestamps. <!-- Was: release inventory record, releaseMetadata (0002 D8/D9) -->
+The command SHALL extract display metadata from each persisted instance inventory record: instance name from `instanceMetadata.name`, module name from `moduleMetadata.name`, version from `moduleMetadata.version`, instance ID from `instanceMetadata.uuid`, last applied time from `instanceMetadata.lastTransitionTime`, and age computed from `lastTransitionTime`. Owner display metadata SHALL come from the top-level `createdBy` field, defaulting to `cli` when that field is omitted for legacy inventories. The command SHALL NOT require inventory change-history metadata such as latest change source version, raw values, or per-change timestamps. <!-- Was: release inventory record, releaseMetadata (enhancement 0002: hard rename with no alias window; instance files are `instance.cue`) -->
 
 #### Scenario: Display metadata sourced from persisted inventory
 

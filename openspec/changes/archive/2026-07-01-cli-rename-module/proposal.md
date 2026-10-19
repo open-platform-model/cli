@@ -1,10 +1,10 @@
 ## Why
 
-Enhancement [0006](../../../../enhancements/0006/) (D15, `enhancements/0006/03-decisions.md`) requires the CLI's Go module path to align with the org namespace (`github.com/open-platform-model/*`) before any slice adds the `library` edge (D9/D13). `library` and `opm-operator` already live at `github.com/open-platform-model/*`; the CLI alone sits at `github.com/opmodel/cli`. Renaming now — before B2 (`cli-operator-install-command`), C1 (`cli-cr-inventory-backend`), and C2 (`cli-kernel-adoption`) start writing new cross-repo imports — means those imports are written once, under the final name. Renaming after would mean a second break, on top of whatever those slices already touched. The CLI has a single user and owes no backwards-compatibility (D14), so the import-path break itself costs nothing; the only cost worth managing is doing the rename completely.
+Enhancement 0006 requires the CLI's Go module path to align with the org namespace (`github.com/open-platform-model/*`) before any slice adds the `library` edge. `library` and `opm-operator` already live at `github.com/open-platform-model/*`; the CLI alone sits at `github.com/opmodel/cli`. Renaming now — before B2 (`cli-operator-install-command`), C1 (`cli-cr-inventory-backend`), and C2 (`cli-kernel-adoption`) start writing new cross-repo imports — means those imports are written once, under the final name. Renaming after would mean a second break, on top of whatever those slices already touched. The CLI has a single user and owes no backwards-compatibility, so the import-path break itself costs nothing; the only cost worth managing is doing the rename completely.
 
 ## What Changes
 
-- Rename the Go module: `go.mod`'s `module` line, `github.com/opmodel/cli` → `github.com/open-platform-model/cli`. **BREAKING** (import path change) — accepted under D14, no external consumers.
+- Rename the Go module: `go.mod`'s `module` line, `github.com/opmodel/cli` → `github.com/open-platform-model/cli`. **BREAKING** (import path change) — accepted under enhancement 0006, no external consumers.
 - Rewrite every internal `github.com/opmodel/cli/...` import statement across the codebase (~114 `.go` files) to the new path. Compiler-checked; low risk on its own.
 - Update the two build-tooling files that embed the import path as **ldflags string literals**, not import statements: `Taskfile.yml` and `.goreleaser.yml` (`-X github.com/opmodel/cli/internal/version.Version=...` and the matching `GitCommit`/`BuildDate` flags). These are invisible to `go build`/`go vet` — a `.go`-only sweep would compile and test clean while silently breaking `opm version`'s output. Verified as a separate, explicit step from the Go-file rewrite.
 - Update `CLAUDE.md`'s `oerrors "github.com/opmodel/cli/pkg/errors"` alias reference.
@@ -35,6 +35,6 @@ None.
 - **Code**: every package under `cmd/`, `internal/`, `pkg/` — import statements only, no logic changes.
 - **Build tooling**: `Taskfile.yml`, `.goreleaser.yml` — ldflags string literals for version injection.
 - **Docs**: `CLAUDE.md` (one reference), 9 `openspec/specs/*/spec.md` files (text-only).
-- **Downstream**: unblocks enhancement 0006 slices B2 → C1 → C2, none of which may add the `library`/CRD cross-repo imports until this lands (D15's stated ordering rationale).
+- **Downstream**: unblocks enhancement 0006 slices B2 → C1 → C2, none of which may add the `library`/CRD cross-repo imports until this lands (enhancement 0006's stated ordering rationale).
 - **External consumers**: none. Verified `opm-operator/go.sum` and `library/go.sum` do not import `opmodel/cli`; no `.github/` CI workflows reference the path.
 - **Existing in-progress change**: `openspec/changes/cue-binary-integration/` (0/72 tasks, stale since 2026-02-15) is out of scope for this change and is left untouched.

@@ -9,7 +9,7 @@ vars:
   CLUSTER_NAME: opm-dev
   K8S_NODE_IMAGE: "kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
   REGISTRY_CONTAINER: '{{.REGISTRY_CONTAINER | default "opm-registry"}}'
-  # Canonical mapping (Registry Policy, root AGENTS.md): both opmodel.dev/* and
+  # Canonical mapping (workspace references/registry.md): both opmodel.dev/* and
   # testing.opmodel.dev/* read from GHCR. The testing domain carries this repo's
   # fixture modules, published by .github/workflows/publish-fixtures.yml — it is
   # a GHCR-backed domain, not a local-registry alias. An exported OPM_REGISTRY
@@ -263,7 +263,7 @@ tasks:
     deps: [build]
     cmds:
       # --config keeps this hermetic: the dev-cluster tooling must not depend on
-      # a developer's personal ~/.opm being present or in the 0006:D39 format.
+      # a developer's personal ~/.opm being present or in the data-only format of enhancement 0006.
       # --skip-platform: hack/kind-platform.yaml below is the Platform. The
       # local-registry opt-in is an instance value, never a Deployment patch.
       - |
@@ -396,6 +396,16 @@ tasks:
     cmds:
       - golangci-lint run --fix ./...
 
+  cite-lint:
+    desc: Check the comment rule (no decision number, no lone enhancement id) in Go and CUE comments, as CI does
+    # The tool runs at the commit that .github's cite-lint.yml uses by default
+    # (its enh-ref input); move this commit with the .github pin. The excludes
+    # equal the exclude input of .github/workflows/cite-lint.yml: change one,
+    # change the other. tests/fixtures/ holds fixture modules (most are published) that
+    # keep old citations on purpose; they change in the next fixture bump.
+    cmds:
+      - go run github.com/open-platform-model/enhancements/tools/enh@e0335b2ec44e659c0191bc3523d79d17f26f8e7d cite-lint --exclude tests/fixtures/ .
+
   #########################
   ## OpenSpec tasks
   #########################
@@ -440,11 +450,12 @@ tasks:
       - go install -ldflags "{{.LDFLAGS}}" ./cmd/opm
 
   check:
-    desc: Run all checks (fmt, vet, lint, openspec, docs bundle, test, cascade wiring)
+    desc: Run all checks (fmt, vet, lint, cite-lint, openspec, docs bundle, test, cascade wiring)
     cmds:
       - task: fmt
       - task: vet
       - task: lint
+      - task: cite-lint
       - task: openspec:check
       - task: docs:bundle:check
       - task: test

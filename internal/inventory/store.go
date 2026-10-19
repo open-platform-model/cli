@@ -183,7 +183,7 @@ func specAnnotations(in SpecInput) map[string]string {
 
 // StatusInput is the CLI-owned status subset written on the status subresource.
 // The CLI never writes conditions, observedGeneration, lastAttempted*,
-// failureCounters, history, or nextRetryAt (0006:D2/D25).
+// failureCounters, history, or nextRetryAt (enhancement 0006).
 type StatusInput struct {
 	Name                    string
 	Namespace               string

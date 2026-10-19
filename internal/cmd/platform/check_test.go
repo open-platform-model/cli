@@ -150,7 +150,7 @@ _veleroMirrorCatalog: c.#Catalog & {
 // the required label. mirror requires the container alone and schedule
 // requires the container plus the backup trait, so mirror's predicate
 // contains schedule's: every component schedule matches, mirror matches too,
-// and no component's shape tells them apart (0015:D5). Still
+// and no component's shape tells them apart (enhancement 0015). Still
 // routable — the container is catalog-fulfilled, so nothing is
 // over-subscribed.
 const undiscriminatedPlatform = routablePlatform + `
@@ -598,7 +598,7 @@ func TestPlatformCheck_DefinerAbsentOverSubscriptionIsNotVacuous(t *testing.T) {
 		"testing.opmodel.dev/catalogs/k8up@v2, testing.opmodel.dev/catalogs/velero@v1", true)
 }
 
-// An unfulfilled contract is a report and never a gate (0015:D18): the command
+// An unfulfilled contract is a report and never a gate (enhancement 0015): the command
 // names it and still exits zero, because the refusal for an unmet demand
 // belongs to the render that demands it.
 func TestPlatformCheck_UnfulfilledPlatformExitsZero(t *testing.T) {
@@ -632,13 +632,13 @@ func TestPlatformCheck_CatalogFulfilledPluralityIsNotOverSubscription(t *testing
 	assert.Contains(t, report, "routable:  yes")
 	// The suppliers are told apart by mirror's required label, so the
 	// platform this assertion is made on is one the controller generates from
-	// (0015:D5).
+	// (enhancement 0015).
 	assert.Contains(t, report, "discriminated: yes")
 	assert.NotContains(t, report, "comparable transformer pairs")
 }
 
 // A comparable pair is what platform-package generation refuses on
-// (0015:D5), so the pre-flight refuses it too — even though every
+// (enhancement 0015), so the pre-flight refuses it too — even though every
 // contract here has exactly one supplier and the platform is routable.
 func TestPlatformCheck_UndiscriminatedPlatformExitsValidation(t *testing.T) {
 	dir := writePlatformModuleDir(t, fixtureModule, undiscriminatedPlatform)

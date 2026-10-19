@@ -1,5 +1,5 @@
 // Platform module for the kind dev cluster tooling and the offline tests
-// (module form, 0019:D5), passed explicitly with --platform. Nothing
+// (module form, enhancement 0019), passed explicitly with --platform. Nothing
 // resolves it implicitly: renders resolve --platform, else the cluster
 // Platform (hack/kind-platform.yaml), else their own dependency pins.
 //

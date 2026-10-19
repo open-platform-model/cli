@@ -1,12 +1,12 @@
 # Delta: engine-rendering (cli-kernel-adoption)
 
-The CLI-side module renderer is deleted; the kernel compiles/executes transformers (0006 D9). Capability retired wholesale — successor requirements live in `kernel-render`.
+The CLI-side module renderer is deleted; the kernel compiles/executes transformers (enhancement 0006, "The CLI replaces its own render/match pipeline entirely with the `library` kernel"). Capability retired wholesale — successor requirements live in `kernel-render`.
 
 ## REMOVED Requirements
 
 ### Requirement: Module renderer renders a Release into resources
 
-**Reason**: `pkg/render`'s module renderer is deleted (0006 D9).
+**Reason**: `pkg/render`'s module renderer is deleted (enhancement 0006, "The CLI replaces its own render/match pipeline entirely with the `library` kernel").
 **Migration**: Kernel `Compile`/`Finalize` via `kernel-render`.
 
 ### Requirement: Transform execution injects context and component

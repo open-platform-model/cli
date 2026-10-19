@@ -1,6 +1,6 @@
 ## Why
 
-Library v1.0.0-beta.7 is released and the release cascade proposed the pin bump, but the bump fails the cli's unit tests: `internal/kubernetes/order_parity_test.go` pins the kind-class weight table on purpose, and beta.7 moves thirteen weights so that the library's order agrees with Flux's staged apply (library ADR-013, decision e5 as amended; 0012:D5:R1). The owner decided that the new order ships as a breaking change. The pinned literals are the reviewed edit that lets the bump land.
+Library v1.0.0-beta.7 is released and the release cascade proposed the pin bump, but the bump fails the cli's unit tests: `internal/kubernetes/order_parity_test.go` pins the kind-class weight table on purpose, and beta.7 moves thirteen weights so that the library's order agrees with Flux's staged apply (library ADR-013, decision e5 as amended; enhancement 0012 ("Ordering is kind-class order in the Kubernetes tier; no module-internal ordering is planned, and cross-module order belongs to a future Bundle")). The owner decided that the new order ships as a breaking change. The pinned literals are the reviewed edit that lets the bump land.
 
 ## What Changes
 

@@ -33,7 +33,7 @@ The requirement "Release runs from pushes to main through release-please" has fo
 
 Keeping the trigger, App, draft and outputs text unchanged in the re-added requirement means archive replaces only the release-as clause in substance. OpenSpec applies ADDED requirements last, so archive moves the release-please requirement from the top of `openspec/specs/release-workflow/spec.md` to the end, after "Commit types decide whether a release is cut". That is accepted: requirement order carries no meaning, and reordering by hand at archive time would be an edit the delta does not describe.
 
-The re-added release-please requirement keeps `Source: 0021:D10:R8`, which covers the workflow trigger and draft-first release. The new release-as requirement cites workspace RELEASING.md, section "Owner settings", because the owner decision of 2026-10-02 is its source, not 0021.
+The re-added release-please requirement keeps `Source: enhancement 0021`, which covers the workflow trigger and draft-first release. The new release-as requirement cites workspace RELEASING.md, section "Owner settings", because the owner decision of 2026-10-02 is its source, not 0021.
 
 ### D2: The wording needs an interim clause until the Phase 0 settings land
 
@@ -102,4 +102,4 @@ release-please 17.11.2 (`strategies/base`, the `changelogEmpty` check after `bui
 
 ## Open Questions
 
-- Enhancement 0021 (`enhancements/0021/policy/01-core-schema.md:8,22,70,74,165,167,169,173-183`) still requires a `BREAKING CHANGE:` footer and a `Release-As:` footer and forbids a `release-as` key (167), including for a prerelease-type flip and a post-GA major crossing. Reconciling it with `BLANK` is a SUPERVISOR follow-up in tasks.md; whether the crossing procedure becomes "the `module:` line edit and a `release-as` key in one releasable PR" is the owner's call there.
+- Enhancement 0021 (the core-schema policy page of enhancement 0021 (lines 8, 22, 70, 74, 165, 167, 169, 173-183)) still requires a `BREAKING CHANGE:` footer and a `Release-As:` footer and forbids a `release-as` key (167), including for a prerelease-type flip and a post-GA major crossing. Reconciling it with `BLANK` is a SUPERVISOR follow-up in tasks.md; whether the crossing procedure becomes "the `module:` line edit and a `release-as` key in one releasable PR" is the owner's call there.
