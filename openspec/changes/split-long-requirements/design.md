@@ -472,7 +472,7 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "The running-operat
 | The operator's objects SHALL be its fixed names, which every install o... | body of "The running-operator check locates the operator by its fixed names", verbatim |
 | The `Namespace` is checked only as the `Deployment`'s namespace; the c... | body of "The running-operator check reads no Namespace and reports a missing CRD as not ready"; "the `Deployment`'s namespace" reads "the namespace of the `Deployment` `opm-operator-controller-manager`", the name from the old second sentence |
 | Otherwise the check SHALL report the operator as not ready, name each ... | body of "The operator counts as running only on a positive finding", verbatim |
-| An operator that lacks one of these CRDs SHALL be reported as not read... | reworded, nearest body: "The running-operator check reads no Namespace and reports a missing CRD as not ready"; the subject or a condition is restated so that the body reads alone, no rule changed |
+| An operator that lacks one of these CRDs SHALL be reported as not read... | body of "The running-operator check reads no Namespace and reports a missing CRD as not ready", old words "these CRDs"; the parenthesis names the sibling requirement that lists the CRDs (16:55 ruling) |
 | The operator SHALL count as running only when every one of these `Cust... | reworded, nearest body: "The operator counts as running only on a positive finding"; the subject or a condition is restated so that the body reads alone, no rule changed |
 | A read of any of these objects that fails SHALL count that object as n... | reworded, nearest body: "The operator counts as running only on a positive finding"; the subject or a condition is restated so that the body reads alone, no rule changed |
 
@@ -500,27 +500,27 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "Stale resources ar
 
 ### Ledger: apply-pruning, Unreadable instance record stops the apply
 
-Form: c2 (REMOVED, ADDED under new names). New requirements: "A failed read of the instance record stops the apply before any change"; "A failed record read names its cause and exits by it"; "A missing namespace is not read for an instance record"; "Operator install does not say nothing changed after its CRD step".
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A failed read of the instance record stops the apply before any change"; "A failed record read names its cause"; "A failed record read exits by the answer of the API server"; "A missing namespace is not read for an instance record"; "Operator install does not say nothing changed after its CRD step".
 
 | Old scenario name | New place (requirement, scenario name) | Changed text? |
 | --- | --- | --- |
 | Read error on a real apply | "A failed read of the instance record stops the apply before any change", "Read error on a real apply" | No (byte equal, checked) |
-| Read denied | "A failed record read names its cause and exits by it", "Read denied" | No (byte equal, checked) |
+| Read denied | "A failed record read exits by the answer of the API server", "Read denied" | No (byte equal, checked) |
 | Read error on a dry run | "A failed read of the instance record stops the apply before any change", "Read error on a dry run" | No (byte equal, checked) |
-| Missing record is still a first install | "A failed record read names its cause and exits by it", "Missing record is still a first install" | No (byte equal, checked) |
+| Missing record is still a first install | "A failed record read exits by the answer of the API server", "Missing record is still a first install" | No (byte equal, checked) |
 | A missing namespace is not read for a record | "A missing namespace is not read for an instance record", "A missing namespace is not read for a record" | No (byte equal, checked) |
 | Read denied inside operator install after its CRD step | "Operator install does not say nothing changed after its CRD step", "Read denied inside operator install after its CRD step" | No (byte equal, checked) |
 
 | Old clause | New place |
 | --- | --- |
-| The exit code SHALL be 4 when the API server denied the read (Forbidde... | body of "A failed record read names its cause and exits by it", verbatim |
-| A NotFound answer SHALL still mean that no record exists. | body of "A failed record read names its cause and exits by it", verbatim |
+| The exit code SHALL be 4 when the API server denied the read (Forbidde... | body of "A failed record read exits by the answer of the API server", verbatim, led by the condition of the first old sentence |
+| A NotFound answer SHALL still mean that no record exists. | body of "A failed record read exits by the answer of the API server", verbatim, led by the condition of the first old sentence |
 | With `--create-namespace` and a missing namespace the record SHALL NOT... | body of "A missing namespace is not read for an instance record", verbatim |
 | `opm operator install` SHALL NOT say that nothing was changed when the... | body of "Operator install does not say nothing changed after its CRD step", verbatim except "the read" reads "the read of the instance's `ModuleInstance` record" (the subject of the first old sentence) |
 | When the read of the instance's `ModuleInstance` record fails with any... | reworded, nearest body: "A failed read of the instance record stops the apply before any change"; the subject or a condition is restated so that the body reads alone, no rule changed |
 | The system SHALL NOT treat the failed read as a first install: it SHAL... | reworded, nearest body: "A failed read of the instance record stops the apply before any change"; the subject or a condition is restated so that the body reads alone, no rule changed |
 | This SHALL hold for a dry run too, which SHALL NOT print a preview bui... | reworded, nearest body: "A failed read of the instance record stops the apply before any change"; the subject or a condition is restated so that the body reads alone, no rule changed |
-| The error SHALL name the instance and its namespace, carry the cause o... | reworded, nearest body: "A failed record read names its cause and exits by it"; the condition is "When the read of the record fails with any error other than NotFound": "fails with any error other than NotFound" is copied from the first old sentence, "the read of the record" is the subject of the old text without its qualifier (500-character limit); the rest is the old sentence |
+| The error SHALL name the instance and its namespace, carry the cause o... | body of "A failed record read names its cause", verbatim, led by the condition "When the read of the instance's `ModuleInstance` record fails with any error other than NotFound," copied from the first old sentence; its scenario "A failed record read names the instance and its cause" restates the clause (14:48 ruling, no new case) |
 | The error of `opm instance apply` and `opm module apply` SHALL say tha... | reworded, nearest body: "A failed read of the instance record stops the apply before any change"; the subject or a condition is restated so that the body reads alone, no rule changed |
 | (detail) Stop with an error; do not treat the failed read as a first install; apply, prune and write nothing | body of "A failed read of the instance record stops the apply before any change"; two sentences joined, "it SHALL NOT apply any resource, SHALL NOT prune, and SHALL NOT write the record" reads "they SHALL NOT apply any resource, prune, or write the record" |
 | (detail) This holds for a dry run, which prints no preview built without the record | same body, "built" reads "made" |
@@ -546,7 +546,7 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "A failed stale del
 
 ### Ledger: apply-pruning, Apply flow orchestration
 
-Form: c2 (REMOVED, ADDED under new names). New requirements: "The apply flow reads, checks and applies before it prunes"; "The apply flow prunes only after every apply succeeded"; "The apply flow writes the record last".
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The apply flow reads, checks and applies before it prunes"; "The apply flow prunes only after every apply succeeded"; "No step of the apply flow filters the stale set"; "The apply flow writes the record last".
 
 | Old scenario name | New place (requirement, scenario name) | Changed text? |
 | --- | --- | --- |
@@ -559,11 +559,11 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "The apply flow rea
 | Old clause | New place |
 | --- | --- |
 | The apply flow SHALL follow this sequence: | body of "The apply flow reads, checks and applies before it prunes", verbatim |
-| No step SHALL filter the stale set after it is computed: the stale set... | body of "The apply flow prunes only after every apply succeeded", verbatim |
+| No step SHALL filter the stale set after it is computed: the stale set... | body of "No step of the apply flow filters the stale set", verbatim; its scenario restates the clause (14:48 ruling) |
 | (1) render resources, (2) compute manifest digest, (3) compute change ... | reworded, nearest body: "The apply flow reads, checks and applies before it prunes"; the subject or a condition is restated so that the body reads alone, no rule changed |
 | (detail) Steps (1) to (6) of the sequence | body of "The apply flow reads, checks and applies before it prunes", step text verbatim |
-| (detail) Steps (7a), (7b) and (9), and the rule that no step filters the stale set | body of "The apply flow prunes only after every apply succeeded"; step numbers kept, "step 4" reads "step (4)"; the old sentence "The apply flow SHALL follow this sequence" supplies the keyword: "the apply SHALL follow this sequence" |
-| (detail) Step (8) | body of "The apply flow writes the record last"; "SHALL" added in front of the verb because every ADDED body needs one (the old sequence was one SHALL sentence) |
+| (detail) Steps (7a), (7b) and (9) | body of "The apply flow prunes only after every apply succeeded"; the old sentence "The apply flow SHALL follow this sequence" supplies the keyword and the subject, step numbers and "step 4", "step 7a" as in the old text; the parenthesis "(steps 1 to 6 as listed in requirement ...)" names the sibling that holds steps 1 to 6 (16:55 ruling) |
+| (detail) Step (8) | body of "The apply flow writes the record last"; "SHALL" added in front of the verb because every ADDED body needs one (the old sequence was one SHALL sentence) |; "step (7a)" reads "step 7a" as in the old text
 
 ### Ledger: apply-pruning, Dry-run prune preview lists left-behind resources
 

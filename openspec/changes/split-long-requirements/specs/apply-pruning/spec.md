@@ -6,7 +6,7 @@
 
 ### Requirement: Unreadable instance record stops the apply
 **Reason**: Split into requirements that each state one behavior.
-**Migration**: See "A failed read of the instance record stops the apply before any change", "A failed record read names its cause and exits by it", "A missing namespace is not read for an instance record", "Operator install does not say nothing changed after its CRD step".
+**Migration**: See "A failed read of the instance record stops the apply before any change", "A failed record read names its cause", "A failed record read exits by the answer of the API server", "A missing namespace is not read for an instance record", "Operator install does not say nothing changed after its CRD step".
 
 ### Requirement: Failed prune keeps the entry and fails the command
 **Reason**: Split into requirements that each state one behavior.
@@ -14,7 +14,7 @@
 
 ### Requirement: Apply flow orchestration
 **Reason**: Split into requirements that each state one behavior.
-**Migration**: See "The apply flow reads, checks and applies before it prunes", "The apply flow prunes only after every apply succeeded", "The apply flow writes the record last".
+**Migration**: See "The apply flow reads, checks and applies before it prunes", "The apply flow prunes only after every apply succeeded", "No step of the apply flow filters the stale set", "The apply flow writes the record last".
 
 ### Requirement: Dry-run prune preview lists left-behind resources
 **Reason**: Split into requirements that each state one behavior.
@@ -103,9 +103,18 @@ When the read of the instance's `ModuleInstance` record fails with any error oth
 - **THEN** the command SHALL exit with an error
 - **AND** it SHALL NOT print a dry-run summary
 
-### Requirement: A failed record read names its cause and exits by it
+### Requirement: A failed record read names its cause
 
-When the read of the record fails with any error other than NotFound, the error SHALL name the instance and its namespace, carry the cause of the failed read, and tell the user to check access to the record and run the command again. The exit code SHALL be 4 when the API server denied the read (Forbidden or Unauthorized), 3 when it answered with a server timeout or service unavailable, and 1 for any other failure. A NotFound answer SHALL still mean that no record exists.
+When the read of the instance's `ModuleInstance` record fails with any error other than NotFound, the error SHALL name the instance and its namespace, carry the cause of the failed read, and tell the user to check access to the record and run the command again.
+
+#### Scenario: A failed record read names the instance and its cause
+
+- **WHEN** the read of the instance's `ModuleInstance` record fails with any error other than NotFound
+- **THEN** the error SHALL name the instance and its namespace, carry the cause of the failed read, and tell the user to check access to the record and run the command again
+
+### Requirement: A failed record read exits by the answer of the API server
+
+When the read of the instance's `ModuleInstance` record fails with any error other than NotFound, the exit code SHALL be 4 when the API server denied the read (Forbidden or Unauthorized), 3 when it answered with a server timeout or service unavailable, and 1 for any other failure. A NotFound answer SHALL still mean that no record exists.
 
 #### Scenario: Read denied
 
@@ -177,16 +186,25 @@ The apply flow SHALL follow this sequence: (1) render resources, (2) compute man
 
 ### Requirement: The apply flow prunes only after every apply succeeded
 
-After step (6) of the apply flow, the apply SHALL follow this sequence: (7a) if all applied successfully, read each stale resource and prune those the delete verdict allows, judged with the instance identity the record held when step (4) read it, (7b) skip prune and inventory write if any apply failed, (9) exit with an error if step (7a) failed to delete a stale resource. No step SHALL filter the stale set after it is computed: the stale set is already component-blind.
+The apply flow SHALL follow this sequence (steps 1 to 6 as listed in requirement "The apply flow reads, checks and applies before it prunes"): (7a) if all applied successfully, read each stale resource and prune those the delete verdict allows, judged with the instance identity the record held when step 4 read it, (7b) skip prune and inventory write if any apply failed, (9) exit with an error if step 7a failed to delete a stale resource.
 
 #### Scenario: Normal apply with pruning
 
 - **WHEN** a module is applied with changes from a previous apply
 - **THEN** the system SHALL render, compute digest and change ID, read inventory, compute stale, run the ownership guard, apply resources, prune stale, and write inventory in order
 
+### Requirement: No step of the apply flow filters the stale set
+
+No step SHALL filter the stale set after it is computed: the stale set is already component-blind.
+
+#### Scenario: The stale set is not filtered after it is computed
+
+- **WHEN** the apply flow has computed the stale set
+- **THEN** no step SHALL filter the stale set after it is computed
+
 ### Requirement: The apply flow writes the record last
 
-After step (7) of the apply flow, the apply SHALL (8) write the inventory record, with every stale entry that step (7a) failed to delete kept in it, without any resource the guard let go, and with the instance identity of this render.
+After step (7) of the apply flow, the apply SHALL (8) write the inventory record, with every stale entry that step 7a failed to delete kept in it, without any resource the guard let go, and with the instance identity of this render.
 
 #### Scenario: Record write follows a failed prune
 

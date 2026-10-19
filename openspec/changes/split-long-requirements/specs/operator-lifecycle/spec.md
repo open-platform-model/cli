@@ -675,7 +675,7 @@ Every CLI command that checks for a running operator before it acts SHALL locate
 
 ### Requirement: The running-operator check reads no Namespace and reports a missing CRD as not ready
 
-The `Namespace` is checked only as the namespace of the `Deployment` `opm-operator-controller-manager`; the check reads no `Namespace` object and no instance record. An operator that lacks one of its four fixed CRDs SHALL be reported as not ready.
+The `Namespace` is checked only as the namespace of the `Deployment` `opm-operator-controller-manager`; the check reads no `Namespace` object and no instance record. An operator that lacks one of these CRDs (as listed in requirement "The running-operator check locates the operator by its fixed names") SHALL be reported as not ready.
 
 #### Scenario: Operator older than the fourth CRD is not ready
 
