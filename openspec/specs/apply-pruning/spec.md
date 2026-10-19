@@ -236,7 +236,7 @@ The apply flow SHALL follow this sequence: (1) render resources, (2) compute man
 
 ### Requirement: The apply flow prunes only after every apply succeeded
 
-The apply flow SHALL follow this sequence (steps 1 to 6 as listed in requirement "The apply flow reads, checks and applies before it prunes"): (7a) if all applied successfully, read each stale resource and prune those the delete verdict allows, judged with the instance identity the record held when step 4 read it, (7b) skip prune and inventory write if any apply failed, (9) exit with an error if step 7a failed to delete a stale resource.
+The apply flow SHALL follow this sequence (steps 1 to 6 as listed in requirement "The apply flow reads, checks and applies before it prunes"): (7a) if all applied successfully, read each stale resource and prune those the delete verdict allows, judged with the instance identity the record held when step 4 read it, (7b) skip prune and inventory write if any apply failed, (8) (Requirement: The apply flow writes the record last), (9) exit with an error if step 7a failed to delete a stale resource.
 
 #### Scenario: Normal apply with pruning
 
@@ -245,7 +245,7 @@ The apply flow SHALL follow this sequence (steps 1 to 6 as listed in requirement
 
 ### Requirement: No step of the apply flow filters the stale set
 
-No step SHALL filter the stale set after it is computed: the stale set is already component-blind.
+No step of the apply flow SHALL filter the stale set after it is computed: the stale set is already component-blind.
 
 #### Scenario: The stale set is not filtered after it is computed
 
@@ -254,7 +254,7 @@ No step SHALL filter the stale set after it is computed: the stale set is alread
 
 ### Requirement: The apply flow writes the record last
 
-After step (7) of the apply flow, the apply SHALL (8) write the inventory record, with every stale entry that step 7a failed to delete kept in it, without any resource the guard let go, and with the instance identity of this render.
+After step (7) of the apply flow, the apply SHALL (8) write the inventory record, with every stale entry that step 7a failed to delete kept in it, without any resource the guard let go, and with the instance identity of this render. (Requirement: The apply flow prunes only after every apply succeeded)
 
 #### Scenario: Record write follows a failed prune
 
@@ -475,7 +475,7 @@ A stale claim that is no longer in the cluster (its read answers NotFound) SHALL
 
 ### Requirement: `--delete-data` on an operator-managed instance only warns
 
-On an operator-managed instance `--delete-data` SHALL NOT change what the operator does and SHALL NOT fail the command: the command SHALL print a warning that says so, names `spec.dataPolicy` of the `ModuleInstance` as the setting that an operator with that field obeys for PersistentVolumeClaims, and says that an older operator deletes them.
+The prune of `opm instance apply` and `opm module apply`: on an operator-managed instance `--delete-data` SHALL NOT change what the operator does and SHALL NOT fail the command: the command SHALL print a warning that says so, names `spec.dataPolicy` of the `ModuleInstance` as the setting that an operator with that field obeys for PersistentVolumeClaims, and says that an older operator deletes them.
 
 #### Scenario: Delete-data on an operator-managed instance
 
@@ -504,7 +504,7 @@ The prune SHALL NOT delete a resource whose live `opmodel.dev/adopt` annotation 
 
 ### Requirement: The verdict is asked with the identity stored in the instance record
 
-The verdict SHALL be asked with the instance identity stored in the instance's `ModuleInstance` record (`status.instanceUUID`), which is the identity that applied the stale resources, also when the identity of the current render differs from it. An object with no UUID label SHALL be judged without the UUID comparison, and so SHALL every object when the record holds no identity.
+The delete verdict the CLI shares with the operator SHALL be asked with the instance identity stored in the instance's `ModuleInstance` record (`status.instanceUUID`), which is the identity that applied the stale resources, also when the identity of the current render differs from it. An object with no UUID label SHALL be judged without the UUID comparison, and so SHALL every object when the record holds no identity.
 
 #### Scenario: Stale object that carries neither identity
 
@@ -514,7 +514,7 @@ The verdict SHALL be asked with the instance identity stored in the instance's `
 
 ### Requirement: A resource that fails the verdict is left behind and not kept
 
-A resource that fails the verdict SHALL NOT be deleted: it SHALL be listed with the status `left behind` and the reason, SHALL NOT count as a failure, and SHALL NOT be kept in the written inventory. The stale set itself SHALL NOT change: it stays every recorded resource the render no longer names. Source: enhancement 0012 ("The stale set is component-blind, and the inventory digest hashes a canonical field encoding").
+A resource that fails the delete verdict the CLI shares with the operator SHALL NOT be deleted: it SHALL be listed with the status `left behind` and the reason, SHALL NOT count as a failure, and SHALL NOT be kept in the written inventory. The stale set itself SHALL NOT change: it stays every recorded resource the render no longer names. Source: enhancement 0012 ("The stale set is component-blind, and the inventory digest hashes a canonical field encoding").
 
 #### Scenario: Stale name taken by a user's object
 
@@ -705,7 +705,7 @@ On every apply in CLI-executor mode, the first as well as every later one, `opm 
 
 ### Requirement: The ownership guard refuses an unlisted resource that is foreign or owned by another instance
 
-An existing resource that the instance's `ModuleInstance` record does not list SHALL be refused when it carries no OPM managed-by label, or when its `module-instance.opmodel.dev/uuid` label names another instance. Source: enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override").
+On every apply in CLI-executor mode, an existing resource that the instance's `ModuleInstance` record does not list SHALL be refused when it carries no OPM managed-by label, or when its `module-instance.opmodel.dev/uuid` label names another instance. Source: enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override").
 
 #### Scenario: Foreign resource refused on a later apply
 
@@ -727,7 +727,7 @@ An existing resource that the instance's `ModuleInstance` record does not list S
 
 ### Requirement: The ownership guard refuses a terminating resource whether or not the record lists it
 
-An existing resource with a `deletionTimestamp` SHALL be refused whether or not the record lists it. The adopt annotation SHALL NOT override the refusal of a terminating resource.
+On every apply in CLI-executor mode, an existing resource with a `deletionTimestamp` SHALL be refused whether or not the record lists it. The adopt annotation SHALL NOT override the refusal of a terminating resource.
 
 #### Scenario: Terminating resource refused on every apply
 

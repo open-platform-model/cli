@@ -222,7 +222,7 @@ No other job in the repository SHALL declare `environment: cascade`, and `releas
 
 ### Requirement: The release and receiver workflows name the same full SHA of a .github main commit
 
-Every reference this repository makes to the cascade code SHALL name the same full 40-character SHA of a commit on `open-platform-model/.github` `main`, followed by the comment ` # .github main`, never a branch or a tag: the `cascade-notify` action in `release.yml`, the `cascade-receive.yml` workflow and the `cascade-publish` action in `deps-cascade.yml`.
+Every reference this repository makes to the cascade code SHALL name the same full 40-character SHA of a commit on `open-platform-model/.github` `main`, followed by the comment ` # .github main`, never a branch or a tag: the `cascade-notify` action in `release.yml`, the `cascade-receive.yml` workflow and the `cascade-publish` action in `deps-cascade.yml`. (Requirement: The gates workflow and the resolver checkout name the same full SHA of a .github main commit)
 
 **Source**: owner decision 24 and the supervisor's extension to the reusable workflows and the resolver checkout; owner decision 29; workspace RELEASING.md, sections "Pinning the cascade code", "Two-job split" and "Moving the cascade pin"; Phase 3 wiring contract (version 3.1) §2.4 and §10.1 items 2, 3, 6 and 7; `open-platform-model/.github` README at `6df4000`, "The wiring check".
 
@@ -233,7 +233,7 @@ Every reference this repository makes to the cascade code SHALL name the same fu
 
 ### Requirement: The gates workflow and the resolver checkout name the same full SHA of a .github main commit
 
-Every reference this repository makes to the cascade code SHALL name the same full 40-character SHA of a commit on `open-platform-model/.github` `main`, followed by the comment ` # .github main`, never a branch or a tag: the `cascade-gates.yml` workflow in `cascade-gates.yml`, and the `ref:` of the `open-platform-model/.github` resolver checkout in `cascade-task.yml`.
+Every reference this repository makes to the cascade code SHALL name the same full 40-character SHA of a commit on `open-platform-model/.github` `main`, followed by the comment ` # .github main`, never a branch or a tag: the `cascade-gates.yml` workflow in `cascade-gates.yml`, and the `ref:` of the `open-platform-model/.github` resolver checkout in `cascade-task.yml`. (Requirement: The release and receiver workflows name the same full SHA of a .github main commit)
 
 **Source**: owner decision 24 and the supervisor's extension to the reusable workflows and the resolver checkout; owner decision 29; workspace RELEASING.md, sections "Pinning the cascade code", "Two-job split" and "Moving the cascade pin"; Phase 3 wiring contract (version 3.1) §2.4 and §10.1 items 2, 3, 6 and 7; `open-platform-model/.github` README at `6df4000`, "The wiring check".
 

@@ -519,7 +519,7 @@ The `--provider` flag SHALL NOT exist (superseded by `--platform`, enhancement 0
 
 ### Requirement: Operator install reports the provenance it resolved and no other source
 
-The reported provenance SHALL name the catalog coordinate and version the install resolved and SHALL NOT claim any other source.
+The reported provenance SHALL name the catalog coordinate and version the install resolved and SHALL NOT claim any other source. (Requirement: Operator install seeds the cluster Platform with a plain create)
 
 #### Scenario: Install reports its own provenance
 

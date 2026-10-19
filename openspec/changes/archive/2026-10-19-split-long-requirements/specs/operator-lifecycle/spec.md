@@ -97,7 +97,7 @@ When `opm operator uninstall` deleted every recorded object and the delete of th
 
 ### Requirement: Install runs every refusing check before its first write
 **Reason**: Split into requirements that each state one behavior.
-**Migration**: See "Install runs every check that can refuse it before it writes", "Install runs its status-subresource permission check and the apply guard before it writes", "Install writes in a fixed order after every check passed", "The apply guard runs on every install", "Install passes the guard no admission set and no proof of origin", "The guard judges an object the record lists as recorded", "The guard judges an existing object the record does not list", "Install refuses an object adopted by another instance", "Every refusal of the guard exits 2 and names the object, the instance and the annotation", "Install waits out terminating objects before the guard runs", "A failed read refuses the install in the check that made it", "A failed read in the wait for terminating objects exits by the read error".
+**Migration**: See "Install runs every check that can refuse it before it writes", "Install checks status-subresource permission and the guard first", "Install writes in a fixed order after every check passed", "The apply guard runs on every install", "Install passes the guard no admission set and no proof of origin", "The guard judges an object the record lists as recorded", "The guard judges an existing object the record does not list", "Install refuses an object adopted by another instance", "Every refusal of the guard exits 2 and names the object, the instance and the annotation", "Install waits out terminating objects before the guard runs", "A failed read refuses the install in the check that made it", "A failed read in the wait for terminating objects exits by the read error".
 
 ### Requirement: Install resolves another module version as the registry serves it
 **Reason**: Split into requirements that each state one behavior.
@@ -279,7 +279,9 @@ Before any object changes, install SHALL refuse a target module version whose re
 
 ### Requirement: A newer running operator does not block install
 
-Install SHALL NOT be refused because the operator the cluster Platform reports has a `MAJOR.MINOR` above the CLI's, since install replaces the running operator rather than driving it. A target below the recorded module version or the running operator SHALL NOT be refused by the target-version rules of install. Source: enhancement 0021 ("The CLI's ceiling on operator versions compares `MAJOR.MINOR` only").
+Install SHALL NOT be refused because the operator the cluster Platform reports has a `MAJOR.MINOR` above the CLI's, since install replaces the running operator rather than driving it. A target below the recorded module version or the running operator SHALL NOT be refused by "Install refuses a target operator newer than the CLI", "Install refuses a target whose render disagrees with its stated operator version" or "Install refuses a target whose ModuleInstance CRD lacks the required fields".
+
+**Source**: enhancement 0021 ("The CLI's ceiling on operator versions compares `MAJOR.MINOR` only").
 
 #### Scenario: Newer running operator does not block repair
 
@@ -397,7 +399,9 @@ A later full install of the same module version SHALL record those CRDs without 
 
 ### Requirement: Uninstall deletes the recorded objects except the CRDs and the Namespace
 
-After the finalizer guard, `opm operator uninstall` SHALL delete every object the record's inventory lists except CRDs and the Namespace, in descending resource-weight order, then, when no object failed, delete the record. Source: enhancement 0006 ("`opm operator uninstall` preserves the namespace; refuses while cleanup finalizers are armed, with `--remove-finalizers` as the override").
+After the finalizer guard, `opm operator uninstall` SHALL delete every object the record's inventory lists except CRDs and the Namespace, in descending resource-weight order, leaving behind any object that the delete verdict of `opm instance delete` leaves behind (capability `deploy`, "Instance delete re-checks live ownership before each delete"), then, when no object failed, delete the record. (Requirement: Uninstall leaves behind what the instance delete verdict leaves behind)
+
+**Source**: enhancement 0006 ("`opm operator uninstall` preserves the namespace; refuses while cleanup finalizers are armed, with `--remove-finalizers` as the override").
 
 #### Scenario: Uninstall after a module install
 
@@ -493,16 +497,16 @@ The finalizer guard and the no-record refusal of `opm operator uninstall` SHALL 
 
 ### Requirement: Install runs every check that can refuse it before it writes
 
-Install SHALL run, before it writes any object, every check that can refuse it: resolving the module and reading the operator version it deploys, rendering it, the check of the values against the target version's `#config`, the target rules of install (the operator version against the CLI's, the rendered image against the module's stated operator version, and the rendered ModuleInstance CRD against the CLI's floor).
+Install SHALL run, before it writes any object, every check that can refuse it: resolving the module and reading the operator version it deploys, rendering it, the check of the values against the target version's `#config`, the target rules of install (the operator version against the CLI's, the rendered image against the module's stated operator version, and the rendered ModuleInstance CRD against the CLI's floor). (Requirement: Install checks status-subresource permission and the guard first)
 
 #### Scenario: The module, render, values and target rules are checked before the first write
 
 - **WHEN** install runs
 - **THEN** it SHALL run the resolving of the module, the rendering, the check of the values against the target version's `#config` and the target rules of install before it writes any object
 
-### Requirement: Install runs its status-subresource permission check and the apply guard before it writes
+### Requirement: Install checks status-subresource permission and the guard first
 
-Install SHALL run, before it writes any object, every check that can refuse it: the status-subresource permission check, and the apply guard over every object the render names (capability `apply-pruning`, "The ownership guard judges every apply"). An install that refuses SHALL change no object in the cluster.
+Install SHALL run, before it writes any object, every check that can refuse it: the status-subresource permission check, and the apply guard over every object the render names (capability `apply-pruning`, "The ownership guard judges every apply"). An install that refuses SHALL change no object in the cluster. (Requirement: Install runs every check that can refuse it before it writes)
 
 #### Scenario: A refused install leaves the CRDs untouched
 
@@ -529,7 +533,7 @@ The apply guard over every object the render names (capability `apply-pruning`, 
 
 ### Requirement: Install passes the guard no admission set and no proof of origin
 
-Install SHALL pass the guard no admission set and SHALL run no proof of where an existing object came from: an object that an earlier opm-operator release manifest created is judged as any other existing object.
+Install SHALL pass the guard no admission set and SHALL run no proof of where an existing object came from: an object that an earlier opm-operator release manifest created is judged as any other existing object. (Requirement: The apply guard runs on every install)
 
 #### Scenario: Unlabelled CRDs of an earlier manifest install are refused
 
@@ -554,7 +558,7 @@ An object the record lists is judged as recorded and SHALL pass whatever its UUI
 
 ### Requirement: The guard judges an existing object the record does not list
 
-An existing object the record does not list SHALL pass when its `opmodel.dev/adopt` annotation holds the UUID of the operator's instance, or when it carries an OPM managed-by label and no UUID label of another instance; it SHALL refuse the install when OPM does not manage it or when it carries another instance's identity.
+An existing object the record does not list SHALL pass when its `opmodel.dev/adopt` annotation holds the UUID of the operator's instance, or when it carries an OPM managed-by label and no UUID label of another instance; it SHALL refuse the install when OPM does not manage it or when it carries another instance's identity. (Requirement: The apply guard runs on every install)
 
 #### Scenario: Annotated objects that carry another identity are applied
 
@@ -598,7 +602,7 @@ Install needs every object its render names, so, unlike any other apply, it SHAL
 
 ### Requirement: Every refusal of the guard exits 2 and names the object, the instance and the annotation
 
-Every refusal of the guard before the first write SHALL exit 2, SHALL name the object and the instance that owns or adopts it, SHALL name the `opmodel.dev/adopt` annotation and the UUID to set where the annotation lifts the refusal, and SHALL leave the cluster unchanged; that includes a failed read by the guard, with or without a record. No refusal of install SHALL tell the user to delete or rename an object.
+Every refusal of the guard in this phase SHALL exit 2, SHALL name the object and the instance that owns or adopts it, SHALL name the `opmodel.dev/adopt` annotation and the UUID to set where the annotation lifts the refusal, and SHALL leave the cluster unchanged; that includes a failed read by the guard, with or without a record. No refusal of install SHALL tell the user to delete or rename an object. (Requirement: Install checks status-subresource permission and the guard first)
 
 #### Scenario: Objects that carry another identity, with no record and no annotation, are refused
 
@@ -656,7 +660,7 @@ When the wait for terminating objects fails a read with an error other than NotF
 
 ### Requirement: Install refuses a selector the registry cannot satisfy before any cluster call
 
-A selector the registry cannot satisfy, or that is not a version selector, SHALL refuse before any cluster call; a selector that has the shape of an opm-operator release tag SHALL get no message of its own.
+A selector the registry cannot satisfy, or that is not a version selector, SHALL refuse before any cluster call; a selector that has the shape of an opm-operator release tag SHALL get no message of its own. (Requirement: `--version` resolves the operator module through the configured registry)
 
 #### Scenario: Unserved version
 

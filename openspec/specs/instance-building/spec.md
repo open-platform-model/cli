@@ -95,7 +95,7 @@ The CLI SHALL produce validated, concrete instances exclusively through the `lib
 
 ### Requirement: Every synthesis path lets CUE derive the uuid, components, auto-secrets and standard labels
 
-In every synthesis path the kernel SHALL unify inputs against the resolved `#ModuleInstance` schema and let CUE derive uuid, components, auto-secrets, and standard labels. (Requirements: The module-directory path acquires a directory with kernel AcquireModuleFromDir and SynthesizeInstance; The published-module path acquires a module with kernel AcquireModuleFromRegistry and SynthesizeInstance; The instance-package path acquires an instance package directory with kernel AcquireInstanceFromDir)
+In every synthesis path the kernel SHALL unify inputs against the resolved `#ModuleInstance` schema and let CUE derive uuid, components, auto-secrets, and standard labels. (Requirements: The module-directory path acquires a directory with kernel AcquireModuleFromDir and SynthesizeInstance; The published-module path acquires a module with kernel AcquireModuleFromRegistry and SynthesizeInstance)
 
 #### Scenario: Synthesis derives uuid, components, auto-secrets and standard labels
 
