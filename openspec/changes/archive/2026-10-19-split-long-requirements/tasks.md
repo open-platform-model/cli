@@ -60,7 +60,7 @@
 - [x] 9.2 In `AGENTS.md`, drop "`--strict` is off until the long-requirement rewrite lands" from the `task openspec:check` row and show `--strict` in its command
 - [x] 9.3 In `openspec/config.yaml`, drop the same text from Validation Gates line 4
 - [x] 9.4 Confirm `ci.yml` and `pr.yml` call `task openspec:check` and need no edit; confirm no other file in the repo says that `--strict` is off (grep outside `openspec/changes/archive/`)
-- [x] 9.5 `task openspec:check`, `task lint` and `task test` green, then commit `ci(openspec): validate with --strict again`
+- [x] 9.5 `task openspec:check`, `task lint` and `task test` green, then commit `ci(openspec): validate with --strict again` (Note: `openspec:check` is green only after the archive. `task test` stopped at `test:integration` on a local kind cluster without the StagingTest kind; this change touches no code.)
 
 ## 10. Final gate
 
