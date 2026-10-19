@@ -661,7 +661,7 @@ When `opm instance build`, `opm instance vet`, `opm instance diff`, `opm instanc
 
 ### Requirement: The operator render narrows the platform-source precedence for the operator's own instance only
 
-`opm operator install`, the CRDs-only form included, SHALL render the operator module against a platform generated from the module's own committed dependency pins, and SHALL NOT read the cluster `Platform` or accept a `--platform` directory for that render. This narrows the platform-source precedence of enhancement 0006 for the operator's own instance only, so repairing the operator never depends on the Platform it serves. Source: enhancement 0021.
+`opm operator install`, the CRDs-only form included, SHALL render the operator module as listed in requirement "Operator install renders the operator module against a platform of its own pins". This narrows the platform-source precedence of enhancement 0006 for the operator's own instance only, so repairing the operator never depends on the Platform it serves. Source: enhancement 0021 ("The operator's install artifact is a registry module on its own version train").
 
 #### Scenario: The narrowing is for the operator's own instance only
 

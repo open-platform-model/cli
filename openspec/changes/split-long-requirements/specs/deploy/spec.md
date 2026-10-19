@@ -213,7 +213,7 @@ Before deleting each tracked resource, `opm instance delete` SHALL read the live
 
 ### Requirement: An object with no UUID label is judged without the UUID comparison
 
-Before deleting each tracked resource, `opm instance delete` SHALL delete the resource only when the live `app.kubernetes.io/managed-by` label carries an OPM value, its `module-instance.opmodel.dev/uuid` label matches the instance's recorded UUID, and its `opmodel.dev/adopt` annotation does not name another instance. An object with no UUID label SHALL be judged without the UUID comparison, and so SHALL every object when the instance has no recorded UUID. Source: enhancement 0012.
+Before deleting each tracked resource, `opm instance delete` SHALL read the live object again. An object with no UUID label SHALL be judged without the UUID comparison, and so SHALL every object when the instance has no recorded UUID. Source: enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override").
 
 #### Scenario: No UUID comparison without a UUID
 
@@ -222,12 +222,21 @@ Before deleting each tracked resource, `opm instance delete` SHALL delete the re
 
 ### Requirement: A resource that fails the ownership check is left behind and does not fail the delete
 
-Before deleting each tracked resource, `opm instance delete` SHALL delete the resource only as listed in requirement "A tracked resource is deleted only when its live labels and annotation show the instance owns it". A resource that fails the check SHALL be left behind and listed with the reason, and SHALL NOT count as a failure; the closing line SHALL give the number of resources left behind. Source: enhancement 0012.
+Before deleting each tracked resource, `opm instance delete` SHALL delete the resource only as listed in requirement "A tracked resource is deleted only when its live labels and annotation show the instance owns it". A resource that fails the check SHALL be left behind and listed with the reason, and SHALL NOT count as a failure. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
 
 #### Scenario: A resource that fails the check is listed with the reason
 
 - **WHEN** a tracked resource fails the check
-- **THEN** it SHALL be left behind and listed with the reason, and SHALL NOT count as a failure; the closing line SHALL give the number of resources left behind
+- **THEN** it SHALL be left behind and listed with the reason, and SHALL NOT count as a failure
+
+### Requirement: The closing line of a delete gives the number of resources left behind
+
+Before deleting each tracked resource, `opm instance delete` SHALL delete the resource only as listed in requirement "A tracked resource is deleted only when its live labels and annotation show the instance owns it". The closing line SHALL give the number of resources left behind. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
+
+#### Scenario: The closing line gives the number of resources left behind
+
+- **WHEN** a tracked resource fails the check
+- **THEN** the closing line SHALL give the number of resources left behind
 
 ### Requirement: Each delete carries a precondition on the UID of the object that was read
 
@@ -921,7 +930,7 @@ Every check that can refuse the delete SHALL run before the prompt: the guard fo
 
 ### Requirement: A recorded resource that the command did not find is not in the deletion plan
 
-`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the operator, built from the resources of the instance's `ModuleInstance` record that the command found in the cluster or could not read, and from the instance identity stored in the record. A recorded resource that the command did not find when it read the instance SHALL NOT be in the plan: it is not read again and not deleted. Source: enhancement 0012.
+`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the operator. A recorded resource that the command did not find when it read the instance SHALL NOT be in the plan: it is not read again and not deleted. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
 
 #### Scenario: A resource not found is not in the plan
 
