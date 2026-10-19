@@ -5800,7 +5800,7 @@ Lengths (old, new): old 1701; new "The `lint` job of `pr.yml` runs the step "Doc
 
 ### Words changed or added in unit 7b
 
-- Named references: a body ends with "(Requirement: <exact header>)" or "(Requirements: <exact header>; <exact header>)", the named reference that gives it its referent ("the package", "such an object", "the same codes", "the failure", "those cases", "Otherwise", "the same check", "the same script", "the exemptions named in the previous requirement", "the module-directory path", "the subcommand", "all failures"). The bodies are: `health-evaluation` "The library health decisions cover instance status, list and tree and the apply wait", "The Established wait and the operator install dispatch by kind stay in the cli", "The tree child rows and the status colouring stay in the cli" and "No non-test Go file in the cli declares a copy of the library health package's decisions" (to "The cli takes every readiness decision from the library health package"), "The readiness exemptions are not copies" (to the two exemption requirements; its sentence keeps the words "the previous requirement" of the old text); `instance-building` "The published-module path acquires a module with kernel AcquireModuleFromRegistry and SynthesizeInstance" (to the module-directory path requirement); `k8s-helpers` "`opm instance delete` and the stale-resource prune do not count an object of an unserved kind as already gone" (to the unserved-kind requirement) and the last body of "A failed discovery request is an error" (to the apply requirement and the first body); `mod-apply` "The `module apply` subcommand accepts only directory inputs" and "The `module apply` subcommand produces the same cluster-side effects as `opm instance apply` after the render stage" (to the first body); `module-synthetic-instance` "Values selection, metadata defaults and the output banner of a published module are the same as for a module-package directory" (to the published-module body and to the three live requirements of the same spec that it names); `release-gates` "The release-pin check reports all failures in one run and exits zero when none holds" (to the three pin-check bodies), "`task deps:release-check` runs the release-pin check locally on any branch" (to the step requirement), the docs bundle bodies "checks nothing when ..." and "bounds each GHCR request ..." (to the first docs bundle body, which names the step "Docs bundles for moved pins"), the docs bundle bodies "runs the dump program on the tree and looks up each printed pin anonymously" and "prints a GitHub warning annotation ..." (to the check-nothing body), "exits zero in every case that prints a warning and so never fails the job" (to the warning body) and "G1 runs the docs pins script without `--warn` and counts each printed line as a violation" (to the first docs bundle body).
+- Named references: a body ends with "(Requirement: <exact header>)" or "(Requirements: <exact header>; <exact header>)", the named reference that gives it its referent ("the package", "such an object", "the same codes", "the failure", "those cases", "Otherwise", "the same check", "the same script", "the exemptions named in the previous requirement", "the module-directory path", "the subcommand", "all failures"). The bodies are: `health-evaluation` "The library health decisions cover instance status, list and tree and the apply wait", "The Established wait and the operator install dispatch by kind stay in the cli", "The tree child rows and the status colouring stay in the cli" and "No non-test Go file in the cli declares a copy of the library health package's decisions" (to "The cli takes every readiness decision from the library health package"), "The readiness exemptions are not copies" (to the two exemption requirements; its sentence names their exact headers in place of "the previous requirement", changed after unit 7b, see "Words changed or added in unit 8a"); `instance-building` "The published-module path acquires a module with kernel AcquireModuleFromRegistry and SynthesizeInstance" (to the module-directory path requirement); `k8s-helpers` "`opm instance delete` and the stale-resource prune do not count an object of an unserved kind as already gone" (to the unserved-kind requirement) and the last body of "A failed discovery request is an error" (to the apply requirement and the first body); `mod-apply` "The `module apply` subcommand accepts only directory inputs" and "The `module apply` subcommand produces the same cluster-side effects as `opm instance apply` after the render stage" (to the first body); `module-synthetic-instance` "Values selection, metadata defaults and the output banner of a published module are the same as for a module-package directory" (to the published-module body and to the three live requirements of the same spec that it names); `release-gates` "The release-pin check reports all failures in one run and exits zero when none holds" (to the three pin-check bodies), "`task deps:release-check` runs the release-pin check locally on any branch" (to the step requirement), the docs bundle bodies "checks nothing when ..." and "bounds each GHCR request ..." (to the first docs bundle body, which names the step "Docs bundles for moved pins"), the docs bundle bodies "runs the dump program on the tree and looks up each printed pin anonymously" and "prints a GitHub warning annotation ..." (to the check-nothing body), "exits zero in every case that prints a warning and so never fails the job" (to the warning body) and "G1 runs the docs pins script without `--warn` and counts each printed line as a violation" (to the first docs bundle body).
 - `health-evaluation`, "The cli takes every readiness decision from the library health package" and "The library health decisions cover instance status, list and tree and the apply wait": the old sentence "This covers ..." has its own body and reads "This SHALL cover ..." (keyword, see the strength table).
 - `health-evaluation`, "The Established wait and the operator install dispatch by kind stay in the cli" and "The tree child rows and the status colouring stay in the cli": the old sentence "Three readiness checks are not decisions of the package and stay in the cli: ..." is cut at the list boundary after "once they exist)". The first part ends with a period in place of the comma. The second part repeats the opening "Three readiness checks are not decisions of the package and ... stay in the cli:". Both read "and SHALL stay in the cli" (keyword).
 - `health-evaluation`, "The readiness exemptions are not copies": "are not copies" reads "SHALL NOT be copies" (keyword).
@@ -5837,3 +5837,249 @@ Plain sentences copied unchanged, with no keyword, into a body that carries a ke
 | The step runs with the job's read-only token. | "The `lint` job of `pr.yml` runs the step \"Docs bundles for moved pins\" on every pull request and fetches the base commit" |
 | Only the `opm module` commands (`build`, `apply` and `vet`) synthesize; `opm instance build` never does. | "The CLI synthesizes a concrete instance from a module CUE package directory via kernel `SynthesizeInstance`" |
 | The table rows of the flags | the flag body whose intro line carries the keyword |
+
+## Ledger entries of cli-B8, unit 8a (repo-automation, resource-conversion, resource-discovery, status-verbose, workflow-security)
+
+### Ledger: repo-automation, The label sync keeps bot-managed and cascade labels
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`.github/labels.yml` lists every label that a tool applies to this repository's pull requests", "`.github/labels.yml` lists the release-please, Dependabot and release-cascade labels", "Bot-managed labels keep the color and description they carry in the repository today".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Sync after a labels.yml change deletes no bot label | "Bot-managed labels keep the color and description they carry in the repository today", "Sync after a labels.yml change deletes no bot label" | No (byte equal, checked) |
+| Cascade labels exist before the cascade runs | "`.github/labels.yml` lists the release-please, Dependabot and release-cascade labels", "Cascade labels exist before the cascade runs" | No (byte equal, checked) |
+| Pull-request dry run shows no deletion | "`.github/labels.yml` lists every label that a tool applies to this repository's pull requests", "Pull-request dry run shows no deletion" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| `.github/labels.yml` SHALL list every label that a tool applies to t... | body of "`.github/labels.yml` lists every label that a tool applies to this repository's pull requests", verbatim |
+| It SHALL list the release-please labels `autorelease: pending` and `... | body of "`.github/labels.yml` lists the release-please, Dependabot and release-cascade labels", with the word change of the list "Words changed or added in unit 8a" |
+| Bot-managed labels SHALL keep the color and description they carry i... | body of "Bot-managed labels keep the color and description they carry in the repository today", verbatim |
+| Source: workspace RELEASING.md, section "The cascade" (subsection La... | the `**Source**:` line of each of the three new requirements, whole |
+
+Lengths (old, new): old 677; new "`.github/labels.yml` lists every label that a tool applies to this repository's pull requests" 175; "`.github/labels.yml` lists the release-please, Dependabot and release-cascade labels" 314; "Bot-managed labels keep the color and description they carry in the repository today" 129.
+
+### Ledger: repo-automation, Dependabot leaves cuelang.org/go to library releases
+
+Form: b (MODIFIED parent, ADDED split-offs). New requirements: "The cli's CUE version moves only through a library release", "Other third-party Go modules keep their weekly Dependabot updates". The parent "Dependabot leaves cuelang.org/go to library releases" stays, with a shorter body.
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| New CUE release | "Dependabot leaves cuelang.org/go to library releases", "New CUE release" | No (byte equal, checked) |
+| CUE arrives with a library release | "Dependabot leaves cuelang.org/go to library releases", "CUE arrives with a library release" | No (byte equal, checked) |
+| Other third-party modules still update | "Dependabot leaves cuelang.org/go to library releases", "Other third-party modules still update" | No (byte equal, checked) |
+| (new) | "The cli's CUE version moves only through a library release", "A library release moves CUE in the cli" | New restatement scenario: its WHEN and THEN lines are those of the old scenario "CUE arrives with a library release", byte for byte; only the name differs |
+| (new) | "Other third-party Go modules keep their weekly Dependabot updates", "A newer k8s.io/client-go is still proposed" | New restatement scenario: its WHEN and THEN lines are those of the old scenario "Other third-party modules still update", byte for byte; only the name differs |
+
+| Old clause | New place |
+| --- | --- |
+| The Dependabot `gomod` update SHALL ignore the dependencies `cuelang... | body of the parent "Dependabot leaves cuelang.org/go to library releases", with the word change of the list "Words changed or added in unit 8a" |
+| the cli's CUE version moves only through a library release: the libr... | body of "The cli's CUE version moves only through a library release", with the word changes of the list "Words changed or added in unit 8a" |
+| Other third-party Go modules SHALL keep their weekly updates. | body of "Other third-party Go modules keep their weekly Dependabot updates", verbatim, with a named reference to the parent |
+| Source: library ADR-013, decision j4 (`adr/013-kernel-plan-walkthrou... | the `**Source**:` line of the parent and of both split-offs, whole |
+
+Lengths (old, new): old 952; new "The cli's CUE version moves only through a library release" 346; "Other third-party Go modules keep their weekly Dependabot updates" 129; "Dependabot leaves cuelang.org/go to library releases" 304.
+
+### Ledger: resource-conversion, Object order follows the library weight table
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "Every CLI path orders objects by the library's kind-class weight", "Apply, delete, prune and the tree view sort through `object.Sort` and keep objects of equal weight in input order", "The `module build` and `instance build` output breaks equal weights by namespace, then name", "The library weight table orders the classes from CustomResourceDefinition to RoleBinding", "The library weight table orders the classes from Secret to the webhook configurations", "The CLI pins the library weight order in a unit test of its own".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Ascending order for apply | "Every CLI path orders objects by the library's kind-class weight", "Ascending order for apply" | No (byte equal, checked) |
+| Descending order for delete | "Apply, delete, prune and the tree view sort through `object.Sort` and keep objects of equal weight in input order", "Descending order for delete" | No (byte equal, checked) |
+| Equal weights keep input order | "Apply, delete, prune and the tree view sort through `object.Sort` and keep objects of equal weight in input order", "Equal weights keep input order" | No (byte equal, checked) |
+| A claim and a Job apply after the workloads | "The library weight table orders the classes from Secret to the webhook configurations", "A claim and a Job apply after the workloads" | No (byte equal, checked) |
+| Webhook configurations apply last and delete first | "The library weight table orders the classes from Secret to the webhook configurations", "Webhook configurations apply last and delete first" | No (byte equal, checked) |
+| A class kind applies before the bindings and the namespaced objects | "The library weight table orders the classes from CustomResourceDefinition to RoleBinding", "A class kind applies before the bindings and the namespaced objects" | No (byte equal, checked) |
+| A moved weight fails the CLI's order test | "The CLI pins the library weight order in a unit test of its own", "A moved weight fails the CLI's order test" | No (byte equal, checked) |
+| (new) | "The `module build` and `instance build` output breaks equal weights by namespace, then name", "Build output breaks equal weights by namespace, then name" | New restatement scenario: only words of the old clause, no new case. |
+
+| Old clause | New place |
+| --- | --- |
+| Every CLI path that orders Kubernetes objects (apply, delete, prune,... | body of "Every CLI path orders objects by the library's kind-class weight", verbatim |
+| Apply, delete, prune and the tree view SHALL sort through `object.So... | body of "Apply, delete, prune and the tree view sort through `object.Sort` and keep objects of equal weight in input order", verbatim |
+| The `module build` and `instance build` output SHALL break equal wei... | body of "The `module build` and `instance build` output breaks equal weights by namespace, then name", verbatim |
+| The CLI SHALL NOT keep its own weight table. | body of "Every CLI path orders objects by the library's kind-class weight", verbatim |
+| The order follows Flux's staged apply (enhancement 0012, "Ordering i... | body of "Apply, delete, prune and the tree view sort through `object.Sort` and keep objects of equal weight in input order", verbatim (a plain sentence, no keyword; see the strength table) |
+| Ascending, the classes are: CustomResourceDefinition of `apiextensio... | body of "The library weight table orders the classes from CustomResourceDefinition to RoleBinding", with the word changes of the list "Words changed or added in unit 8a" |
+| ... Secret and ConfigMap; Service; LimitRange; ... and last Validati... | body of "The library weight table orders the classes from Secret to the webhook configurations", with the word changes of the list "Words changed or added in unit 8a" |
+| The CLI SHALL pin this order in a unit test of its own, holding ever... | body of "The CLI pins the library weight order in a unit test of its own", verbatim |
+| The library's own weight-table guard test covers rows the library ad... | body of "The CLI pins the library weight order in a unit test of its own", verbatim (a plain sentence, no keyword; see the strength table) |
+
+Lengths (old, new): old 1934; new "Every CLI path orders objects by the library's kind-class weight" 347; "Apply, delete, prune and the tree view sort through `object.Sort` and keep objects of equal weight in input order" 394; "The `module build` and `instance build` output breaks equal weights by namespace, then name" 161; "The library weight table orders the classes from CustomResourceDefinition to RoleBinding" 463; "The library weight table orders the classes from Secret to the webhook configurations" 475; "The CLI pins the library weight order in a unit test of its own" 412.
+
+### Ledger: resource-conversion, One export feeds the apply objects and the shared render digest
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The CLI exports a render's compiled objects once", "The applied objects and the render digest come from the same exported set", "An export failure exits with the general error code and names the failing resource".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| The digest and the apply objects come from one export | "The CLI exports a render's compiled objects once", "The digest and the apply objects come from one export" | No (byte equal, checked) |
+| The render digest is the library's | "The applied objects and the render digest come from the same exported set", "The render digest is the library's" | No (byte equal, checked) |
+| (new) | "An export failure exits with the general error code and names the failing resource", "A failed export names the resource" | New restatement scenario: only words of the old clause, no new case. |
+
+| Old clause | New place |
+| --- | --- |
+| The CLI SHALL convert a render's compiled objects with the library's... | body of "The CLI exports a render's compiled objects once", verbatim |
+| The objects the CLI applies SHALL be the exported objects, in render... | body of "The applied objects and the render digest come from the same exported set", with a named reference to "The CLI exports a render's compiled objects once" |
+| An export failure SHALL exit with the general error code and name th... | body of "An export failure exits with the general error code and names the failing resource", with a named reference to "The CLI exports a render's compiled objects once" |
+
+Lengths (old, new): old 691; new "The CLI exports a render's compiled objects once" 195; "The applied objects and the render digest come from the same exported set" 471; "An export failure exits with the general error code and names the failing resource" 151.
+
+### Ledger: resource-discovery, Child resource discovery via ownerReference traversal
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The resource discovery package provides `DiscoverChildren`", "`DiscoverChildren` returns children as `[]*unstructured.Unstructured` and differs from the tree ownership walk in its return contract", "The traversal of `DiscoverChildren` is targeted, not generic", "`DiscoverChildren` skips non-workload parent kinds", "`DiscoverChildren` matches children by ownerReference uid".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Deployment children discovered | "The traversal of `DiscoverChildren` is targeted, not generic", "Deployment children discovered" | No (byte equal, checked) |
+| StatefulSet children discovered | "`DiscoverChildren` matches children by ownerReference uid", "StatefulSet children discovered" | No (byte equal, checked) |
+| Non-workload parents skipped | "`DiscoverChildren` skips non-workload parent kinds", "Non-workload parents skipped" | No (byte equal, checked) |
+| No children exist | "The resource discovery package provides `DiscoverChildren`", "No children exist" | No (byte equal, checked) |
+| API errors during child listing are non-fatal | "`DiscoverChildren` returns children as `[]*unstructured.Unstructured` and differs from the tree ownership walk in its return contract", "API errors during child listing are non-fatal" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The resource discovery package SHALL provide a `DiscoverChildren` fu... | body of "The resource discovery package provides `DiscoverChildren`", verbatim |
+| It returns children as `[]*unstructured.Unstructured` for UID extrac... | body of "`DiscoverChildren` returns children as `[]*unstructured.Unstructured` and differs from the tree ownership walk in its return contract", with the word change of the list "Words changed or added in unit 8a" |
+| Note: `internal/kubernetes/tree.go` already implements equivalent ow... | body of "`DiscoverChildren` returns children as `[]*unstructured.Unstructured` and differs from the tree ownership walk in its return contract", with the word change of the list "Words changed or added in unit 8a" |
+| The traversal SHALL be targeted, not generic. It SHALL use knowledge... | body of "The traversal of `DiscoverChildren` is targeted, not generic", verbatim, with a named reference to "The resource discovery package provides `DiscoverChildren`" |
+| \| Parent Kind \| Child Kind(s) \| Grandchild Kind(s) \| \|---------... | body of "The traversal of `DiscoverChildren` is targeted, not generic", verbatim |
+| Non-workload parent kinds (ConfigMap, Secret, Service, etc.) SHALL b... | body of "`DiscoverChildren` skips non-workload parent kinds", with the word change of the list "Words changed or added in unit 8a" |
+| Child matching SHALL be performed by comparing `ownerReferences[].ui... | body of "`DiscoverChildren` matches children by ownerReference uid", verbatim, with a named reference to "The resource discovery package provides `DiscoverChildren`" |
+
+Lengths (old, new): old 1312; new "The resource discovery package provides `DiscoverChildren`" 223; "`DiscoverChildren` returns children as `[]*unstructured.Unstructured` and differs from the tree ownership walk in its return contract" 484; "The traversal of `DiscoverChildren` is targeted, not generic" 436; "`DiscoverChildren` skips non-workload parent kinds" 194; "`DiscoverChildren` matches children by ownerReference uid" 212.
+
+### Ledger: resource-discovery, Inventory discovery reports tracked resources it could not read
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "An inventory entry lands in exactly one of three groups and none is dropped", "Every command that reads an instance by its inventory tells the user about each unreadable entry", "`opm instance diff` says that orphan detection could not check an unreadable resource", "A warning about an unreadable entry does not change the exit code of `diff`, `tree` or `events`", "`opm instance tree` exits 5 with `no resources found` when it can read none of the tracked resources".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| A forbidden read is reported as unreadable | "An inventory entry lands in exactly one of three groups and none is dropped", "A forbidden read is reported as unreadable" | No (byte equal, checked) |
+| NotFound is still missing | "An inventory entry lands in exactly one of three groups and none is dropped", "NotFound is still missing" | No (byte equal, checked) |
+| Tree warns about an unreadable resource | "Every command that reads an instance by its inventory tells the user about each unreadable entry", "Tree warns about an unreadable resource" | No (byte equal, checked) |
+| Tree with every tracked resource unreadable | "`opm instance tree` exits 5 with `no resources found` when it can read none of the tracked resources", "Tree with every tracked resource unreadable" | No (byte equal, checked) |
+| Diff warns that orphan detection is incomplete | "`opm instance diff` says that orphan detection could not check an unreadable resource", "Diff warns that orphan detection is incomplete" | No (byte equal, checked) |
+| (new) | "A warning about an unreadable entry does not change the exit code of `diff`, `tree` or `events`", "A forbidden read of one tracked resource does not make tree exit 4" | New restatement scenario: the case "a Forbidden read of one tracked resource does not make `tree` exit 4" is in the old clause |
+
+| Old clause | New place |
+| --- | --- |
+| When the CLI reads the live objects an instance's inventory tracks (... | body of "An inventory entry lands in exactly one of three groups and none is dropped", verbatim |
+| No entry SHALL be dropped. | body of "An inventory entry lands in exactly one of three groups and none is dropped", verbatim |
+| Every command that reads an instance this way (`opm instance delete`... | body of "Every command that reads an instance by its inventory tells the user about each unreadable entry", verbatim, with a named reference to "An inventory entry lands in exactly one of three groups and none is dropped" |
+| For `diff`, the warning SHALL also say that orphan detection could n... | body of "`opm instance diff` says that orphan detection could not check an unreadable resource", verbatim, with a named reference to "Every command that reads an instance by its inventory tells the user about each unreadable entry" |
+| A warning SHALL NOT change the exit code of `diff`, `tree` or `event... | body of "A warning about an unreadable entry does not change the exit code of `diff`, `tree` or `events`", verbatim, with a named reference to "Every command that reads an instance by its inventory tells the user about each unreadable entry" |
+| When `tree` can read none of the tracked resources, it SHALL print t... | body of "`opm instance tree` exits 5 with `no resources found` when it can read none of the tracked resources", verbatim, with a named reference to "Every command that reads an instance by its inventory tells the user about each unreadable entry" |
+
+Lengths (old, new): old 1276; new "An inventory entry lands in exactly one of three groups and none is dropped" 403; "Every command that reads an instance by its inventory tells the user about each unreadable entry" 469; "`opm instance diff` says that orphan detection could not check an unreadable resource" 205; "A warning about an unreadable entry does not change the exit code of `diff`, `tree` or `events`" 333; "`opm instance tree` exits 5 with `no resources found` when it can read none of the tracked resources" 289.
+
+### Ledger: status-verbose, Verbose mode shows pod details for unhealthy workloads
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`--details` shows a pod detail block for a NotReady workload", "The pod detail block lists each pod of the unhealthy workload with name, phase and detail", "Pods of the unhealthy workload are discovered by its `.spec.selector.matchLabels`".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Verbose shows pod details for NotReady Deployment | "`--details` shows a pod detail block for a NotReady workload", "Verbose shows pod details for NotReady Deployment" | No (byte equal, checked) |
+| Verbose omits pod details for Ready workloads | "`--details` shows a pod detail block for a NotReady workload", "Verbose omits pod details for Ready workloads" | No (byte equal, checked) |
+| Verbose omits pod details for non-workload resources | "`--details` shows a pod detail block for a NotReady workload", "Verbose omits pod details for non-workload resources" | No (byte equal, checked) |
+| (new) | "The pod detail block lists each pod of the unhealthy workload with name, phase and detail", "A healthy pod reads (ready)" | New restatement scenario: the case is in the old clause (For healthy pods, "(ready)") |
+| (new) | "Pods of the unhealthy workload are discovered by its `.spec.selector.matchLabels`", "Pods are listed by the workload's selector" | New restatement scenario: only words of the old clause, no new case. |
+
+| Old clause | New place |
+| --- | --- |
+| The command SHALL accept a `--details` flag. When `--details` is set... | body of "`--details` shows a pod detail block for a NotReady workload", verbatim |
+| The pod detail block SHALL list each pod belonging to the unhealthy ... | body of "The pod detail block lists each pod of the unhealthy workload with name, phase and detail", verbatim, with a named reference to "`--details` shows a pod detail block for a NotReady workload" |
+| Pods SHALL be discovered by listing pods in the workload's namespace... | body of "Pods of the unhealthy workload are discovered by its `.spec.selector.matchLabels`", verbatim, with a named reference to "`--details` shows a pod detail block for a NotReady workload" |
+
+Lengths (old, new): old 893; new "`--details` shows a pod detail block for a NotReady workload" 252; "The pod detail block lists each pod of the unhealthy workload with name, phase and detail" 483; "Pods of the unhealthy workload are discovered by its `.spec.selector.matchLabels`" 308.
+
+### Ledger: status-verbose, Verbose pod detail block format
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The pod detail block has a fixed layout", "The pod detail block is colour-coded by ready ratio, phase, detail text and restart count".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Pod detail block format | "The pod detail block has a fixed layout", "Pod detail block format" | No (byte equal, checked) |
+| (new) | "The pod detail block is colour-coded by ready ratio, phase, detail text and restart count", "The ready ratio is red when no pod is ready" | New restatement scenario: the case is in the old clause (red (none ready)) |
+
+| Old clause | New place |
+| --- | --- |
+| The pod detail block SHALL be rendered below the resource table, sep... | body of "The pod detail block has a fixed layout", verbatim, with a named reference to "`--details` shows a pod detail block for a NotReady workload" |
+| The format SHALL be: ``` <Kind>/<Name> (<ready>/<total> ready):     ... | body of "The pod detail block has a fixed layout", verbatim (the format block is the old block unchanged) |
+| The ready ratio SHALL be color-coded: green (all ready), yellow (par... | body of "The pod detail block is colour-coded by ready ratio, phase, detail text and restart count", verbatim, with a named reference to "The pod detail block has a fixed layout" |
+
+Lengths (old, new): old 635; new "The pod detail block has a fixed layout" 294; "The pod detail block is colour-coded by ready ratio, phase, detail text and restart count" 471.
+
+### Ledger: workflow-security, Every workflow declares least-privilege permissions
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "Every workflow file declares `permissions` at workflow level and each job grants exactly the scopes its steps use", "`release.yml` declares `permissions: {}` and grants each job the scopes it lists".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| The default token turns read-only | "Every workflow file declares `permissions` at workflow level and each job grants exactly the scopes its steps use", "The default token turns read-only" | No (byte equal, checked) |
+| A workflow without a permissions key | "Every workflow file declares `permissions` at workflow level and each job grants exactly the scopes its steps use", "A workflow without a permissions key" | No (byte equal, checked) |
+| (new) | "`release.yml` declares `permissions: {}` and grants each job the scopes it lists", "A release job holds only its listed scopes" | New restatement scenario: only the words and values of the old clause on `release.yml` |
+
+| Old clause | New place |
+| --- | --- |
+| Every file under `.github/workflows/` SHALL declare `permissions` at... | body of "Every workflow file declares `permissions` at workflow level and each job grants exactly the scopes its steps use", verbatim |
+| `release.yml` SHALL declare `permissions: {}` at workflow level, and... | body of "`release.yml` declares `permissions: {}` and grants each job the scopes it lists", verbatim |
+| Source: owner decision 30 (2026-10-04); security pass finding GOV-3. | the `**Source**:` line of both new requirements, whole |
+
+Lengths (old, new): old 676; new "Every workflow file declares `permissions` at workflow level and each job grants exactly the scopes its steps use" 277; "`release.yml` declares `permissions: {}` and grants each job the scopes it lists" 329.
+
+### Ledger: workflow-security, Publishing jobs run only from main and only on a tag
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The publish-templates job and the publish job of `publish-fixtures.yml` run only from main", "publish-templates and goreleaser check out the release tag as `refs/tags/<tag>`".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| A manual release run from a branch | "The publish-templates job and the publish job of `publish-fixtures.yml` run only from main", "A manual release run from a branch" | No (byte equal, checked) |
+| A branch name as the tag input | "publish-templates and goreleaser check out the release tag as `refs/tags/<tag>`", "A branch name as the tag input" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The publish-templates job of `release.yml` and the publish job of `p... | body of "The publish-templates job and the publish job of `publish-fixtures.yml` run only from main", verbatim |
+| publish-templates and goreleaser SHALL check out the release tag as ... | body of "publish-templates and goreleaser check out the release tag as `refs/tags/<tag>`", verbatim |
+| These guards stop a mistaken or bot-branch dispatch; a person with w... | body of "publish-templates and goreleaser check out the release tag as `refs/tags/<tag>`", verbatim, with a named reference to "The publish-templates job and the publish job of `publish-fixtures.yml` run only from main" (a plain sentence, no keyword; see the strength table) |
+| Source: security pass review of cli PR 306. | the `**Source**:` line of both new requirements, whole |
+
+Lengths (old, new): old 618; new "The publish-templates job and the publish job of `publish-fixtures.yml` run only from main" 245; "publish-templates and goreleaser check out the release tag as `refs/tags/<tag>`" 434.
+
+### Words changed or added in unit 8a
+
+- Named references: a body ends with "(Requirement: <exact header>)" or "(Requirements: <exact header>; <exact header>)", the named reference that gives it its referent. The bodies are: `repo-automation` "Other third-party Go modules keep their weekly Dependabot updates" (to the parent "Dependabot leaves cuelang.org/go to library releases", for "Other"); `resource-conversion` the two class bodies (to each other, for the intro "Ascending, the classes"), "The CLI pins the library weight order in a unit test of its own" (to the first order body, for "this order") and "The applied objects and the render digest come from the same exported set" and "An export failure exits with the general error code and names the failing resource" (to the export body, for "the exported objects" and "the failing resource"); `resource-discovery` the traversal, skip and match bodies of `DiscoverChildren` (to the body that provides it, for "The traversal", "Non-workload parent kinds" and "Child matching") and the four later bodies of the unreadable-entry set (to the groups body and to the command body, for "this way", "the warning", "A warning" and "the tracked resources"); `status-verbose` the pod list, pod discovery, layout and colour bodies (to the `--details` body and the layout body, for "the pod detail block" and "the unhealthy workload"); `workflow-security` "publish-templates and goreleaser check out the release tag as `refs/tags/<tag>`" (to the first publishing body, for "These guards").
+- `repo-automation`, "`.github/labels.yml` lists the release-please, Dependabot and release-cascade labels": "It SHALL list" reads "`.github/labels.yml` SHALL list" (the subject of the first sentence of the same old requirement).
+- `repo-automation`, parent "Dependabot leaves cuelang.org/go to library releases" and "The cli's CUE version moves only through a library release": the old sentence is cut at ", so". The parent part ends with a period in place of the comma. The second part drops "so" at the cut, starts with a capital letter and reads "SHALL move" in place of "moves" (keyword).
+- `repo-automation`, the three label bodies, the three cuelang.org/go bodies, the two `workflow-security` permission bodies and the two publishing bodies: the old `Source:` line is whole in a `**Source**:` line of each new block (the citation ruling of 2026-10-20 00:40); the inline `Source:` sentence leaves the body.
+- `resource-conversion`, the two class bodies: the old sentence "Ascending, the classes are: ..." is cut at a list boundary (after "ServiceAccount, Role and RoleBinding"). The intro reads "Ascending, the classes SHALL be:" in both (keyword, subject repeated). The first part ends with a period in place of the semicolon.
+- `resource-discovery`, "`DiscoverChildren` returns children as `[]*unstructured.Unstructured` and differs from the tree ownership walk in its return contract": "It returns" reads "`DiscoverChildren` SHALL return" (subject copied from the old text, keyword). The em-dash of the Note reads a colon.
+- `resource-discovery`, "`DiscoverChildren` skips non-workload parent kinds": the em-dash reads a colon.
+- `workflow-security`, "publish-templates and goreleaser check out the release tag as `refs/tags/<tag>`": the old sentences 2 and 3 are in one body, unchanged.
+- `status-verbose`, "The pod detail block has a fixed layout": the old paragraph and the old format block (a fenced block of the old text) are in one body, unchanged.
+- The `health-evaluation` body "The readiness exemptions are not copies" (first commit of unit 8a): "the previous requirement" reads the exact headers of the two requirements that name the exemptions (DECISIONS.md 2026-10-20 09:50).
+
+### Strength table of cli-B8 unit 8a
+
+Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text:
+
+| Old sentence | New body | Word added |
+| --- | --- | --- |
+| Ascending, the classes are: ... | "The library weight table orders the classes from CustomResourceDefinition to RoleBinding"; "The library weight table orders the classes from Secret to the webhook configurations" | "SHALL be" |
+| ... so the cli's CUE version moves only through a library release: ... | "The cli's CUE version moves only through a library release" | "SHALL move" |
+| It returns children as `[]*unstructured.Unstructured` for UID extraction (used by the events command to match `event.involvedObject.uid`). | "`DiscoverChildren` returns children as `[]*unstructured.Unstructured` and differs from the tree ownership walk in its return contract" | "SHALL return" |
+
+Plain sentences copied unchanged, with no keyword, into a body that carries a keyword in another sentence:
+
+| Old sentence | New body |
+| --- | --- |
+| The order follows Flux's staged apply (enhancement 0012, "..."). | "Apply, delete, prune and the tree view sort through `object.Sort` and keep objects of equal weight in input order" |
+| The library's own weight-table guard test covers rows the library adds. | "The CLI pins the library weight order in a unit test of its own" |
+| Note: `internal/kubernetes/tree.go` already implements equivalent ownership walking ... | "`DiscoverChildren` returns children as `[]*unstructured.Unstructured` and differs from the tree ownership walk in its return contract" |
+| The table rows of the traversal | "The traversal of `DiscoverChildren` is targeted, not generic" |
+| The three list items of the pod detail block | "The pod detail block lists each pod of the unhealthy workload with name, phase and detail" |
+| (The global `--verbose` flag controls log verbosity only and does not affect status output.) | "Pods of the unhealthy workload are discovered by its `.spec.selector.matchLabels`" |
+| The detail text `(ready)` and `(not ready)` ... | "The pod detail block is colour-coded by ready ratio, phase, detail text and restart count" |
+| These guards stop a mistaken or bot-branch dispatch; a person with write access can still change the workflow on a branch, ... | "publish-templates and goreleaser check out the release tag as `refs/tags/<tag>`" |
