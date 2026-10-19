@@ -28,10 +28,10 @@
 
 ## 5. cli-B5: test-fixture-lineage (5), cmd-structure (4), e2e-cluster-preconditions (4), inst-commands (4), kind-cluster-tasks (4), mod-vet (4), catalog-compatibility (3), 28 requirements
 
-- [ ] 5.1 List the 28 long requirements of the seven specs and confirm the count
-- [ ] 5.2 Write the delta files for the seven specs and append their ledger subsections
-- [ ] 5.3 Grep for old headers; run the byte check per rewritten requirement
-- [ ] 5.4 Run the gate with N=140 and the per-spec validation; `task lint` and `task test` green, then commit `docs(openspec): split the long requirements of seven test, command and compatibility specs`
+- [x] 5.1 List the 28 long requirements of the seven specs and confirm the count (unit 5a, `test-fixture-lineage` 5, `cmd-structure` 4 and `e2e-cluster-preconditions` 4: 13 long requirements)
+- [x] 5.2 Write the delta files for the seven specs and append their ledger subsections (unit 5a, `test-fixture-lineage`, `cmd-structure` and `e2e-cluster-preconditions`)
+- [x] 5.3 Grep for old headers; run the byte check per rewritten requirement (unit 5a, `test-fixture-lineage`, `cmd-structure` and `e2e-cluster-preconditions`)
+- [x] 5.4 Run the gate with N=140 and the per-spec validation; `task lint` and `task test` green, then commit `docs(openspec): split the long requirements of seven test, command and compatibility specs` (unit 5a ran the gate with N=125, the per-spec validation of `test-fixture-lineage`, `cmd-structure` and `e2e-cluster-preconditions`, `task lint` and `task test:unit`, and committed `docs(openspec): split the long requirements of test-fixture-lineage, cmd-structure and e2e-cluster-preconditions`; the gate with N=140 and the commit of the other four specs are left to unit 5b)
 
 ## 6. cli-B6: published-module-resolution (4), template-modules (4), dependency-tidy (3), e2e-cluster-workflow (3), errors-domain (3), flag-conventions (3), inventory-ownership (3), log-output-style (3), apply-preflight-gates (2), 28 requirements
 

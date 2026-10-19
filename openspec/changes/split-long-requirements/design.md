@@ -3405,3 +3405,455 @@ Plain sentences copied unchanged, with no keyword, into a body that carries a ke
 | This mirrors where the refusal lives in the system: `Routable: false` is the condition a platform-package gener... | "An over-subscribed contract is reported with its providing registry keys and fails the command" |
 | Two majors of one catalog are two registry entries and so two providers; two transformers of one entry are one ... | "Providers are counted per enabled registry entry and the command computes no count of its own" |
 | A disabled entry never defines a key. | "The colliding heading states what is left out and tells the reader to keep one defining entry enabled" |
+
+## Ledger entries of cli-B5, unit 5a (test-fixture-lineage, cmd-structure, e2e-cluster-preconditions)
+
+Unit 5a rewrites 13 long requirements (test-fixture-lineage 5, cmd-structure 4, e2e-cluster-preconditions 4), all by form c2. Unit 5b rewrites the other 15 of section 5 (inst-commands, kind-cluster-tasks, mod-vet, catalog-compatibility). The running N after unit 5a is 125.
+
+Notes for the whole unit:
+
+- The old `Operator applier grant is verified before operator-owned tests` and `A cluster-required run fails instead of skipping` of `e2e-cluster-preconditions` cite each other by header. Both are removed, so each new body that cited the other cites the new header of the requirement that now holds the cited rule (see the words changed below). `grep -rn --exclude-dir=archive` on 2026-10-19 finds no other reference to a removed header outside the rewritten requirements.
+- `cmd-structure` has the scenario names `Default to current directory`, `Explicit module directory` and `File argument rejected` under both `module build` and `module apply`, as `main` has. Each stays with its own command (checked against the requirement block of `origin/main`, not by name alone).
+- No old `Source:` line exists in these 13 bodies, so no `**Source**:` line is written.
+- A new scenario restates only a case the old text names.
+
+### Ledger: test-fixture-lineage, Maintained fixtures track the current schema line
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "Maintained fixtures and examples import only the current published schema line", "A maintained module fixture's identity package declares Version as a plain string literal", "A fixture does not depend on a catalog mechanism the catalog has withdrawn".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| No retired-schema imports outside legacy | "Maintained fixtures and examples import only the current published schema line", "No retired-schema imports outside legacy" | No (byte equal, checked) |
+| Vet fixtures exercise current schema | "Maintained fixtures and examples import only the current published schema line", "Vet fixtures exercise current schema" | No (byte equal, checked) |
+| No fixture exercises a withdrawn catalog mechanism | "A fixture does not depend on a catalog mechanism the catalog has withdrawn", "No fixture exercises a withdrawn catalog mechanism" | No (byte equal, checked) |
+| Fixture identity is a literal | "A maintained module fixture's identity package declares Version as a plain string literal", "Fixture identity is a literal" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| Fixtures and examples consumed by tests or presented as current docume... | body of "Maintained fixtures and examples import only the current published schema line" |
+| Artifacts kept for a retired line SHALL live under an explicitly marke... | body of "Maintained fixtures and examples import only the current published schema line" |
+| A maintained module fixture's identity package SHALL declare `Version`... | body of "A maintained module fixture's identity package declares Version as a plain string literal" |
+| A fixture SHALL load through the kernel's module loader with no interp... | body of "A maintained module fixture's identity package declares Version as a plain string literal" |
+| A fixture SHALL NOT depend on a catalog mechanism the catalog has with... | body of "A fixture does not depend on a catalog mechanism the catalog has withdrawn" |
+| When a catalog member or contract type a fixture exercises is removed ... | body of "A fixture does not depend on a catalog mechanism the catalog has withdrawn" |
+
+Words changed or added: none.
+
+Lengths (old, new): old 1009; new "Maintained fixtures and examples import only the current published schema line" 381; "A maintained module fixture's identity package declares Version as a plain string literal" 324; "A fixture does not depend on a catalog mechanism the catalog has withdrawn" 302.
+
+### Ledger: test-fixture-lineage, Fixtures live on the testing domain and are published
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A test fixture module declares its path under the testing domain", "Each fixture tree carries an identity package and is published to GHCR by repository CI", "A consumer that names a fixture version pins every shared dependency as CUE resolves it".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| No fixture occupies the production namespace | "A test fixture module declares its path under the testing domain", "No fixture occupies the production namespace" | No (byte equal, checked) |
+| A fixture passes the publish gates | "Each fixture tree carries an identity package and is published to GHCR by repository CI", "A fixture passes the publish gates" | No (byte equal, checked) |
+| Consumers resolve fixtures without a local registry | "Each fixture tree carries an identity package and is published to GHCR by repository CI", "Consumers resolve fixtures without a local registry" | No (byte equal, checked) |
+| A version bump is an identity edit | "A consumer that names a fixture version pins every shared dependency as CUE resolves it", "A version bump is an identity edit" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| A test fixture module SHALL declare a module path under `testing.opmod... | body of "A test fixture module declares its path under the testing domain" |
+| Each fixture tree SHALL carry an `identity/` package as the single sou... | body of "Each fixture tree carries an identity package and is published to GHCR by repository CI" |
+| Fixture trees SHALL be published to GHCR by repository CI through `opm... | body of "Each fixture tree carries an identity package and is published to GHCR by repository CI" |
+| A consumer that names a fixture version SHALL pin every dependency it ... | body of "A consumer that names a fixture version pins every shared dependency as CUE resolves it" |
+| CUE keeps a dependency the consumer already lists at its listed versio... | body of "A consumer that names a fixture version pins every shared dependency as CUE resolves it" |
+| The rule is mechanical, not stylistic: CUE resolves modules by longest... | body of "A test fixture module declares its path under the testing domain" |
+
+Words changed or added: none. Order: "The rule is mechanical, not stylistic: ..." now follows the first sentence it explains.
+
+Lengths (old, new): old 1246; new "A test fixture module declares its path under the testing domain" 388; "Each fixture tree carries an identity package and is published to GHCR by repository CI" 421; "A consumer that names a fixture version pins every shared dependency as CUE resolves it" 435.
+
+### Ledger: test-fixture-lineage, Consumer pins are checked against CUE's resolver
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`hack/fixtures.sh consumers` checks each named consumer in a scratch copy against CUE's resolution", "`hack/fixtures.sh consumers` checks every named consumer, prints a FAIL line for each failure and exits non-zero", "A tracked cue.mod/module.cue that pins a fixture and is not named fails the check", "With FIX=1 `hack/fixtures.sh consumers` writes the resolved pins and does not fail", "`hack/fixtures.sh` stays byte-identical with opm-operator's copy".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Consumers that follow their fixture pass | "`hack/fixtures.sh consumers` checks each named consumer in a scratch copy against CUE's resolution", "Consumers that follow their fixture pass" | No (byte equal, checked) |
+| Stale shared pin is reported with the diff | "`hack/fixtures.sh consumers` checks each named consumer in a scratch copy against CUE's resolution", "Stale shared pin is reported with the diff" | No (byte equal, checked) |
+| Unresolvable fixture version is a named failure | "`hack/fixtures.sh consumers` checks every named consumer, prints a FAIL line for each failure and exits non-zero", "Unresolvable fixture version is a named failure" | No (byte equal, checked) |
+| Unlisted consumer | "A tracked cue.mod/module.cue that pins a fixture and is not named fails the check", "Unlisted consumer" | No (byte equal, checked) |
+| Fix mode writes the resolved pins | "With FIX=1 `hack/fixtures.sh consumers` writes the resolved pins and does not fail", "Fix mode writes the resolved pins" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "The script is byte-identical with opm-operator's copy" in "`hack/fixtures.sh` stays byte-identical with opm-operator's copy"
+
+| Old clause | New place |
+| --- | --- |
+| `hack/fixtures.sh consumers <dir>...` SHALL check each named consumer ... | body of "`hack/fixtures.sh consumers` checks each named consumer in a scratch copy against CUE's resolution" |
+| It SHALL resolve through `CUE_REGISTRY`, defaulting to GHCR. | body of "`hack/fixtures.sh consumers` checks each named consumer in a scratch copy against CUE's resolution" |
+| It SHALL check every named consumer before it exits, SHALL print a `FA... | body of "`hack/fixtures.sh consumers` checks every named consumer, prints a FAIL line for each failure and exits non-zero" |
+| A git-tracked `cue.mod/module.cue` outside the fixtures directory that... | body of "A tracked cue.mod/module.cue that pins a fixture and is not named fails the check" |
+| The scratch copies SHALL be removed on every exit path. | body of "`hack/fixtures.sh consumers` checks every named consumer, prints a FAIL line for each failure and exits non-zero" |
+| With `FIX=1` a differing consumer's `module.cue` SHALL be overwritten ... | body of "With FIX=1 `hack/fixtures.sh consumers` writes the resolved pins and does not fail" |
+| The script SHALL stay byte-identical with opm-operator's copy; each re... | body of "`hack/fixtures.sh` stays byte-identical with opm-operator's copy" |
+
+Words changed or added:
+- "It SHALL resolve" and "It SHALL check" read "`hack/fixtures.sh consumers <dir>...` SHALL resolve" and "`hack/fixtures.sh consumers <dir>...` SHALL check", the subject of the first sentence
+- "The script SHALL stay" reads "`hack/fixtures.sh` SHALL stay"
+- Two bodies end with "(Requirement: <header>)", the named reference that gives "also fail" and "With `FIX=1` a differing consumer" their referent: the unlisted-consumer body names the check-and-report requirement, the `FIX=1` body names the first requirement
+- Order: "The scratch copies SHALL be removed on every exit path." now follows the sentence on the exit, because the body that reports and exits holds it
+
+Lengths (old, new): old 998; new "`hack/fixtures.sh consumers` checks each named consumer in a scratch copy against CUE's resolution" 357; "`hack/fixtures.sh consumers` checks every named consumer, prints a FAIL line for each failure and exits non-zero" 355; "A tracked cue.mod/module.cue that pins a fixture and is not named fails the check" 272; "With FIX=1 `hack/fixtures.sh consumers` writes the resolved pins and does not fail" 225; "`hack/fixtures.sh` stays byte-identical with opm-operator's copy" 105.
+
+### Ledger: test-fixture-lineage, Old test pins are current or frozen with a reason
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A test pin is moved to the release cascade's target unless `.cascade-frozen` lists it with a reason", "The target of a catalog pin is the newest published release in its major", "A core pin already newer than the cascade target stays", "A `cue.mod` pin moves by `cue mod get` then `cue mod tidy` and is never bumped by a hand edit", "A `.cascade-frozen` entry names the file or directory, the frozen module paths and a one-sentence reason", "A pin is frozen only when the test depends on that exact old version", "A pin that is old only because a tree was copied or an upstream release moved on is not frozen".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Every old core or catalog pin in a test module is accounted for | "A test pin is moved to the release cascade's target unless `.cascade-frozen` lists it with a reason", "Every old core or catalog pin in a test module is accounted for" | No (byte equal, checked) |
+| A deliberately old pin carries its reason | "A `.cascade-frozen` entry names the file or directory, the frozen module paths and a one-sentence reason", "A deliberately old pin carries its reason" | No (byte equal, checked) |
+| Bumped test trees still pass | "A test pin is moved to the release cascade's target unless `.cascade-frozen` lists it with a reason", "Bumped test trees still pass" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "The target of a catalog pin is the newest published release in its major" in "The target of a catalog pin is the newest published release in its major"
+- "A core pin newer than its target stays" in "A core pin already newer than the cascade target stays"
+- "A cue.mod pin moves by cue mod get then cue mod tidy" in "A `cue.mod` pin moves by `cue mod get` then `cue mod tidy` and is never bumped by a hand edit"
+- "A golden may be listed with a reason" in "A `.cascade-frozen` entry names the file or directory, the frozen module paths and a one-sentence reason"
+- "A frozen pin is one the test needs at that old version" in "A pin is frozen only when the test depends on that exact old version"
+- "A pin that is old only because a tree was copied is not frozen" in "A pin that is old only because a tree was copied or an upstream release moved on is not frozen"
+
+| Old clause | New place |
+| --- | --- |
+| Each `opmodel.dev/core@v2` or `opmodel.dev/catalogs/*` pin in a test i... | body of "A test pin is moved to the release cascade's target unless `.cascade-frozen` lists it with a reason" |
+| - **The target.** A catalog pin's target is the newest published relea... | body of "The target of a catalog pin is the newest published release in its major" |
+| A core pin's target is the core version that the input's catalog pins,... | body of "The target of a catalog pin is the newest published release in its major" |
+| The source is workspace RELEASING.md, section "The cascade", "Consiste... | body of "The target of a catalog pin is the newest published release in its major" |
+| - **No backwards moves.** A core pin already newer than that target st... | body of "A core pin already newer than the cascade target stays" |
+| - **How a pin moves.** A `cue.mod` file moves by `cue mod get` then `c... | body of "A `cue.mod` pin moves by `cue mod get` then `cue mod tidy` and is never bumped by a hand edit" |
+| A Go literal moves by editing the literal. | body of "A `cue.mod` pin moves by `cue mod get` then `cue mod tidy` and is never bumped by a hand edit" |
+| A `cue.mod` file SHALL NOT be bumped by a hand edit. | body of "A `cue.mod` pin moves by `cue mod get` then `cue mod tidy` and is never bumped by a hand edit" |
+| - **Test inputs** include a test module's `cue.mod/module.cue` and a m... | body of "A test pin is moved to the release cascade's target unless `.cascade-frozen` lists it with a reason" |
+| - **`.cascade-frozen` entries.** Each entry names the repo-relative fi... | body of "A `.cascade-frozen` entry names the file or directory, the frozen module paths and a one-sentence reason" |
+| The file uses the format in workspace RELEASING.md, section "Cascade f... | body of "A `.cascade-frozen` entry names the file or directory, the frozen module paths and a one-sentence reason" |
+| A pin is frozen only when the test depends on that exact old version. | body of "A pin is frozen only when the test depends on that exact old version" |
+| Examples: | body of "A pin is frozen only when the test depends on that exact old version" |
+| - a platform that must be refused as too old; | body of "A pin is frozen only when the test depends on that exact old version" |
+| - a platform that must show catalog version skew; | body of "A pin is frozen only when the test depends on that exact old version" |
+| - a floor that the test re-pins up to. | body of "A pin is frozen only when the test depends on that exact old version" |
+| A pin that is old only because a tree was copied from an older tree, o... | body of "A pin that is old only because a tree was copied or an upstream release moved on is not frozen" |
+| Between an upstream release and the release cascade that follows it, a... | body of "A pin that is old only because a tree was copied or an upstream release moved on is not frozen" |
+| A literal that a test only compares as expected output and never resol... | body of "A `.cascade-frozen` entry names the file or directory, the frozen module paths and a one-sentence reason" |
+
+Words changed or added:
+- Keyword added where the sentence had none (strength table): "A catalog pin's target is" reads "SHALL be"; "stays" reads "SHALL stay"; "Each entry names" reads "Each entry SHALL name"; "A pin is frozen only when" reads "A pin SHALL be frozen only when"; "is not frozen" reads "SHALL NOT be frozen"
+- Every body but the first and the `.cascade-frozen` entries body ends with "(Requirement: <header>)", the named reference that gives "that target", "a pin" and "frozen" their referent
+- The bullet markers and the bold labels of the old body stay on the lines they head; the "Test inputs" bullet sits with the rule it defines
+
+Lengths (old, new): old 1846; new "A test pin is moved to the release cascade's target unless `.cascade-frozen` lists it with a reason" 320; "The target of a catalog pin is the newest published release in its major" 446; "A core pin already newer than the cascade target stays" 167; "A `cue.mod` pin moves by `cue mod get` then `cue mod tidy` and is never bumped by a hand edit" 350; "A `.cascade-frozen` entry names the file or directory, the frozen module paths and a one-sentence reason" 449; "A pin is frozen only when the test depends on that exact old version" 335; "A pin that is old only because a tree was copied or an upstream release moved on is not frozen" 349.
+
+### Ledger: test-fixture-lineage, The shared fixture flow publishes catalog fixtures
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`hack/fixtures.sh` treats each directory under a catalog fixture root as a catalog fixture", "A catalog fixture goes through `opm catalog publish` wherever a module fixture goes through `opm module publish`", "`hack/fixtures.sh consumers` does not report a `cue.mod` under the catalog root as an unlisted consumer", "`tests/fixtures/fixtures.go` reads a catalog fixture's coordinate from its identity package".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| No catalog root leaves the module flow unchanged | "`hack/fixtures.sh` treats each directory under a catalog fixture root as a catalog fixture", "No catalog root leaves the module flow unchanged" | No (byte equal, checked) |
+| A catalog fixture publishes through the catalog pipeline | "A catalog fixture goes through `opm catalog publish` wherever a module fixture goes through `opm module publish`", "A catalog fixture publishes through the catalog pipeline" | No (byte equal, checked) |
+| A changed catalog fixture must be bumped | "A catalog fixture goes through `opm catalog publish` wherever a module fixture goes through `opm module publish`", "A changed catalog fixture must be bumped" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "A cue.mod under the catalog root is not an unlisted consumer" in "`hack/fixtures.sh consumers` does not report a `cue.mod` under the catalog root as an unlisted consumer"
+- "A catalog fixture's coordinate comes from its identity package" in "`tests/fixtures/fixtures.go` reads a catalog fixture's coordinate from its identity package"
+- "The fixture files are byte-identical with opm-operator's copies" in "`tests/fixtures/fixtures.go` reads a catalog fixture's coordinate from its identity package"
+
+| Old clause | New place |
+| --- | --- |
+| `hack/fixtures.sh` SHALL treat each directory under a catalog fixture ... | body of "`hack/fixtures.sh` treats each directory under a catalog fixture root as a catalog fixture" |
+| root is `CATALOGS_DIR`, defaulting to the `catalogs/` sibling of the m... | body of "`hack/fixtures.sh` treats each directory under a catalog fixture root as a catalog fixture" |
+| directory exists, and absent otherwise. | body of "`hack/fixtures.sh` treats each directory under a catalog fixture root as a catalog fixture" |
+| A catalog fixture SHALL go through `opm catalog publish` | body of "A catalog fixture goes through `opm catalog publish` wherever a module fixture goes through `opm module publish`" |
+| (and `opm catalog version set` for a pre-release tag) wherever a modul... | body of "A catalog fixture goes through `opm catalog publish` wherever a module fixture goes through `opm module publish`" |
+| `opm module publish`, so `check` runs every catalog publish gate and e... | body of "A catalog fixture goes through `opm catalog publish` wherever a module fixture goes through `opm module publish`" |
+| `seed` and `publish` push it, and `pins` lists it, catalogs before mod... | body of "A catalog fixture goes through `opm catalog publish` wherever a module fixture goes through `opm module publish`" |
+| `consumers` SHALL NOT | body of "`hack/fixtures.sh consumers` does not report a `cue.mod` under the catalog root as an unlisted consumer" |
+| report a `cue.mod` under the catalog root as an unlisted consumer. | body of "`hack/fixtures.sh consumers` does not report a `cue.mod` under the catalog root as an unlisted consumer" |
+| With no catalog root the script | body of "`hack/fixtures.sh` treats each directory under a catalog fixture root as a catalog fixture" |
+| SHALL behave as it does for module fixtures alone. | body of "`hack/fixtures.sh` treats each directory under a catalog fixture root as a catalog fixture" |
+| `tests/fixtures/fixtures.go` SHALL read a catalog | body of "`tests/fixtures/fixtures.go` reads a catalog fixture's coordinate from its identity package" |
+| fixture's coordinate from its identity package through `LoadCatalog` a... | body of "`tests/fixtures/fixtures.go` reads a catalog fixture's coordinate from its identity package" |
+| Both files | body of "`tests/fixtures/fixtures.go` reads a catalog fixture's coordinate from its identity package" |
+| SHALL stay byte-identical with opm-operator's copies. | body of "`tests/fixtures/fixtures.go` reads a catalog fixture's coordinate from its identity package" |
+
+Words changed or added: four bodies end with "(Requirement: <header>)", the named reference that gives `check`, `consumers` and "Both files" their referent (the first requirement names `hack/fixtures.sh`).
+
+Lengths (old, new): old 942; new "`hack/fixtures.sh` treats each directory under a catalog fixture root as a catalog fixture" 322; "A catalog fixture goes through `opm catalog publish` wherever a module fixture goes through `opm module publish`" 433; "`hack/fixtures.sh consumers` does not report a `cue.mod` under the catalog root as an unlisted consumer" 194; "`tests/fixtures/fixtures.go` reads a catalog fixture's coordinate from its identity package" 308.
+
+### Ledger: cmd-structure, `opm module build` output format, split files and ordering
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`opm module build` accepts only `yaml` or `json` as its output format", "`opm module build --split` writes one file per resource named by kind and name", "`opm module build` emits resources in a deterministic order".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Unsupported output format | "`opm module build` accepts only `yaml` or `json` as its output format", "Unsupported output format" | No (byte equal, checked) |
+| Split output names files by kind and name | "`opm module build --split` writes one file per resource named by kind and name", "Split output names files by kind and name" | No (byte equal, checked) |
+| Split output disambiguates colliding names | "`opm module build --split` writes one file per resource named by kind and name", "Split output disambiguates colliding names" | No (byte equal, checked) |
+| Output order is deterministic | "`opm module build` emits resources in a deterministic order", "Output order is deterministic" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The `opm module build` subcommand SHALL accept `--output`/`-o` with ex... | body of "`opm module build` accepts only `yaml` or `json` as its output format" |
+| With `--split`, it SHALL write one file per resource into `--out-dir` ... | body of "`opm module build --split` writes one file per resource named by kind and name" |
+| Resources SHALL be emitted in a deterministic order, by apply weight (... | body of "`opm module build` emits resources in a deterministic order" |
+
+Words changed or added: "it SHALL write" reads "the `opm module build` subcommand SHALL write"; the ordering body ends with "(Requirement: <header of the output-format requirement>)", the named reference that gives "Resources" their command.
+
+Lengths (old, new): old 666; new "`opm module build` accepts only `yaml` or `json` as its output format" 225; "`opm module build --split` writes one file per resource named by kind and name" 283; "`opm module build` emits resources in a deterministic order" 272.
+
+### Ledger: cmd-structure, `opm instance build` accepts only instance packages
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`opm instance build` takes one positional argument naming an instance", "`opm instance build` acquires the instance package through the library kernel and does not synthesize an instance from a module", "`opm instance build` exits 2 when the package is a module".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Argument is an instance file | "`opm instance build` acquires the instance package through the library kernel and does not synthesize an instance from a module", "Argument is an instance file" | No (byte equal, checked) |
+| Argument is an instance package directory | "`opm instance build` acquires the instance package through the library kernel and does not synthesize an instance from a module", "Argument is an instance package directory" | No (byte equal, checked) |
+| Argument is a module directory | "`opm instance build` exits 2 when the package is a module", "Argument is a module directory" | No (byte equal, checked) |
+| Argument does not exist | "`opm instance build` takes one positional argument naming an instance", "Argument does not exist" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The `opm instance build` subcommand SHALL take one positional argument... | body of "`opm instance build` takes one positional argument naming an instance" |
+| The directory may be a standalone CUE module or a package inside anoth... | body of "`opm instance build` takes one positional argument naming an instance" |
+| The subcommand SHALL acquire that package through the library kernel a... | body of "`opm instance build` acquires the instance package through the library kernel and does not synthesize an instance from a module" |
+| What the package is decides the outcome, not whether the argument is a... | body of "`opm instance build` exits 2 when the package is a module" |
+
+Words changed or added: "The subcommand SHALL acquire" and "the subcommand SHALL exit 2" read "The `opm instance build` subcommand" and "the `opm instance build` subcommand"; both bodies end with "(Requirement: <header of the first requirement>)", the named reference that gives "that package" and "the package" their referent.
+
+Lengths (old, new): old 822; new "`opm instance build` takes one positional argument naming an instance" 359; "`opm instance build` acquires the instance package through the library kernel and does not synthesize an instance from a module" 340; "`opm instance build` exits 2 when the package is a module" 333.
+
+### Ledger: cmd-structure, `opm module build` (alias `opm mod build`) accepts a module directory or a published module
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The `module` command group registers `opm module build` (alias `opm mod build`) with an optional positional argument", "`opm module build` classifies its argument as a local directory or a published module path before any registry access", "`opm module build` refuses a published module path that also names an existing local directory", "`opm module build --version` selects the published version and is refused with a local directory", "`opm module build` acquires a published module from the registry and renders it as it renders a local module".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Default to current directory | "The `module` command group registers `opm module build` (alias `opm mod build`) with an optional positional argument", "Default to current directory" | No (byte equal, checked) |
+| Explicit module directory | "The `module` command group registers `opm module build` (alias `opm mod build`) with an optional positional argument", "Explicit module directory" | No (byte equal, checked) |
+| File argument rejected | "The `module` command group registers `opm module build` (alias `opm mod build`) with an optional positional argument", "File argument rejected" | No (byte equal, checked) |
+| Published module without a version | "`opm module build` acquires a published module from the registry and renders it as it renders a local module", "Published module without a version" | No (byte equal, checked) |
+| Published module with a pinned version | "`opm module build --version` selects the published version and is refused with a local directory", "Published module with a pinned version" | No (byte equal, checked) |
+| Version flag with a local directory | "`opm module build --version` selects the published version and is refused with a local directory", "Version flag with a local directory" | No (byte equal, checked) |
+| Dotted argument that is also a local directory | "`opm module build` refuses a published module path that also names an existing local directory", "Dotted argument that is also a local directory" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "A leading dot or an absolute path is a local directory" in "`opm module build` classifies its argument as a local directory or a published module path before any registry access"
+- "A dotted first element is a published module path" in "`opm module build` classifies its argument as a local directory or a published module path before any registry access"
+- "Any other argument is a local directory" in "`opm module build` classifies its argument as a local directory or a published module path before any registry access"
+
+| Old clause | New place |
+| --- | --- |
+| The `module` command group SHALL register a `build` subcommand with an... | body of "The `module` command group registers `opm module build` (alias `opm mod build`) with an optional positional argument" |
+| The argument SHALL be classified before any registry access: | body of "`opm module build` classifies its argument as a local directory or a published module path before any registry access" |
+| 1. | body of "`opm module build` classifies its argument as a local directory or a published module path before any registry access" |
+| `.`, a path starting with `./` or `../`, or an absolute path is a loca... | body of "`opm module build` classifies its argument as a local directory or a published module path before any registry access" |
+| 2. | body of "`opm module build` classifies its argument as a local directory or a published module path before any registry access" |
+| Otherwise, an argument whose first element contains a dot is a publish... | body of "`opm module build` classifies its argument as a local directory or a published module path before any registry access" |
+| 3. | body of "`opm module build` classifies its argument as a local directory or a published module path before any registry access" |
+| Anything else is a local directory. | body of "`opm module build` classifies its argument as a local directory or a published module path before any registry access" |
+| An argument classified as a published module path that also names an e... | body of "`opm module build` refuses a published module path that also names an existing local directory" |
+| A new `--version` flag (string, default empty) selects the published v... | body of "`opm module build --version` selects the published version and is refused with a local directory" |
+| A published module SHALL be acquired from the registry and synthesized... | body of "`opm module build` acquires a published module from the registry and renders it as it renders a local module" |
+
+Words changed or added: four bodies end with "(Requirement: <header>)", the named reference that gives "The argument", "An argument", "A new `--version` flag" and "A published module" their command (the first requirement names `build`; the other three name the first or the classification requirement). The alias `opm mod build` stays in the header of the first requirement.
+
+Lengths (old, new): old 1131; new "The `module` command group registers `opm module build` (alias `opm mod build`) with an optional positional argument" 246; "`opm module build` classifies its argument as a local directory or a published module path before any registry access" 406; "`opm module build` refuses a published module path that also names an existing local directory" 314; "`opm module build --version` selects the published version and is refused with a local directory" 317; "`opm module build` acquires a published module from the registry and renders it as it renders a local module" 373.
+
+### Ledger: cmd-structure, `opm module apply` (alias `opm mod apply`) accepts a module directory or a published module
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The `module` command group registers `opm module apply` (alias `opm mod apply`) with an optional positional argument and the `--version` flag", "`opm module apply` synthesizes a `#ModuleInstance` from the module and applies the rendered resources with the semantics of `opm instance apply`", "`opm module apply` completes version resolution before any cluster contact", "`opm module apply` records the module path and version of a published module and carries no local-render provenance annotation", "`opm module apply` warns once on standard error when it applies the values of `debugValues`", "`opm module build` prints no `debugValues` warning".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Default to current directory | "`opm module apply` synthesizes a `#ModuleInstance` from the module and applies the rendered resources with the semantics of `opm instance apply`", "Default to current directory" | No (byte equal, checked) |
+| Apply warns when it deploys debugValues | "`opm module apply` warns once on standard error when it applies the values of `debugValues`", "Apply warns when it deploys debugValues" | No (byte equal, checked) |
+| No warning with values files | "`opm module apply` warns once on standard error when it applies the values of `debugValues`", "No warning with values files" | No (byte equal, checked) |
+| Explicit module directory | "`opm module apply` synthesizes a `#ModuleInstance` from the module and applies the rendered resources with the semantics of `opm instance apply`", "Explicit module directory" | No (byte equal, checked) |
+| File argument rejected | "The `module` command group registers `opm module apply` (alias `opm mod apply`) with an optional positional argument and the `--version` flag", "File argument rejected" | No (byte equal, checked) |
+| Alias `mod apply` resolves to `module apply` | "The `module` command group registers `opm module apply` (alias `opm mod apply`) with an optional positional argument and the `--version` flag", "Alias `mod apply` resolves to `module apply`" | No (byte equal, checked) |
+| Apply a published module | "`opm module apply` records the module path and version of a published module and carries no local-render provenance annotation", "Apply a published module" | No (byte equal, checked) |
+| Resolution failure exits before cluster contact | "`opm module apply` completes version resolution before any cluster contact", "Resolution failure exits before cluster contact" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "The module build prints no debugValues warning" in "`opm module build` prints no `debugValues` warning"
+
+| Old clause | New place |
+| --- | --- |
+| The `module` command group SHALL register an `apply` subcommand with a... | body of "The `module` command group registers `opm module apply` (alias `opm mod apply`) with an optional positional argument and the `--version` flag" |
+| The subcommand SHALL synthesize a `#ModuleInstance` from the module (r... | body of "`opm module apply` synthesizes a `#ModuleInstance` from the module and applies the rendered resources with the semantics of `opm instance apply`" |
+| Version resolution SHALL complete before any cluster contact. | body of "`opm module apply` completes version resolution before any cluster contact" |
+| An apply from a published module SHALL record the module's declared pa... | body of "`opm module apply` records the module path and version of a published module and carries no local-render provenance annotation" |
+| When the values come from the module's `debugValues` (no `-f`/`--value... | body of "`opm module apply` warns once on standard error when it applies the values of `debugValues`" |
+| `opm module build` SHALL NOT print this warning, because it changes no... | body of "`opm module build` prints no `debugValues` warning" |
+
+Words changed or added:
+- "The subcommand SHALL synthesize" and "the subcommand SHALL print" read "The `opm module apply` subcommand" and "the `opm module apply` subcommand"
+- Four bodies end with "(Requirement: <header of the first requirement>)", the named reference that gives them the command
+- "`opm module build` SHALL NOT print this warning, because it changes nothing." is its own requirement, which ends with "(Requirement: <header of the warning requirement>)", the referent of "this warning"
+
+Lengths (old, new): old 1256; new "The `module` command group registers `opm module apply` (alias `opm mod apply`) with an optional positional argument and the `--version` flag" 218; "`opm module apply` synthesizes a `#ModuleInstance` from the module and applies the rendered resources with the semantics of `opm instance apply`" 485; "`opm module apply` completes version resolution before any cluster contact" 218; "`opm module apply` records the module path and version of a published module and carries no local-render provenance annotation" 392; "`opm module apply` warns once on standard error when it applies the values of `debugValues`" 371; "`opm module build` prints no `debugValues` warning" 183.
+
+### Ledger: e2e-cluster-preconditions, Operator applier grant is verified before operator-owned tests
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "Operator-owned e2e tests verify the operator's applier grant", "The effective applier identity is the ServiceAccount named by --default-service-account when that argument is present", "A denied applier check fails the test before any cluster mutation", "An applier check that could not be performed skips the test".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Operator installed without the dev grant | "A denied applier check fails the test before any cluster mutation", "Operator installed without the dev grant" | No (byte equal, checked) |
+| Check cannot be performed | "An applier check that could not be performed skips the test", "Check cannot be performed" | No (byte equal, checked) |
+| Cluster prepared by task cluster:operator | "Operator-owned e2e tests verify the operator's applier grant", "Cluster prepared by task cluster:operator" | No (byte equal, checked) |
+| Lifecycle test is exempt | "Operator-owned e2e tests verify the operator's applier grant", "Lifecycle test is exempt" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "The default ServiceAccount argument names the applier identity" in "The effective applier identity is the ServiceAccount named by --default-service-account when that argument is present"
+- "Without the argument the controller ServiceAccount is the applier identity" in "The effective applier identity is the ServiceAccount named by --default-service-account when that argument is present"
+
+| Old clause | New place |
+| --- | --- |
+| Every e2e test that relies on the operator applying workload resources... | body of "Operator-owned e2e tests verify the operator's applier grant" |
+| The effective applier identity is the ServiceAccount named by the cont... | body of "The effective applier identity is the ServiceAccount named by --default-service-account when that argument is present" |
+| If the check reports denial, the test SHALL fail before performing any... | body of "A denied applier check fails the test before any cluster mutation" |
+| A denial SHALL be distinguished from a check that could not be perform... | body of "A denied applier check fails the test before any cluster mutation" |
+| If the check itself cannot be performed (no cluster, kubectl failure, ... | body of "An applier check that could not be performed skips the test" |
+
+Words changed or added:
+- Keyword added where the sentence had none (strength table): "The effective applier identity is" reads "SHALL be"; "the test skips as it does today" reads "the test SHALL skip as it does today"
+- The skip body names the requirement it cited, which was removed here: "(`A cluster-required run fails instead of skipping`)" reads "(`A cluster-required run fails every precondition that would skip`)", the header of the first requirement of that split
+- Two bodies end with "(Requirement: <header of the first requirement>)", the named reference that gives "the check" and "the identity probed" their referent
+
+Lengths (old, new): old 1312; new "Operator-owned e2e tests verify the operator's applier grant" 306; "The effective applier identity is the ServiceAccount named by --default-service-account when that argument is present" 243; "A denied applier check fails the test before any cluster mutation" 444; "An applier check that could not be performed skips the test" 494.
+
+### Ledger: e2e-cluster-preconditions, The e2e suite resolves modules through the shipped default registry
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The cluster-backed e2e suite resolves published modules through the registry mapping the CLI ships as its default", "The e2e suite's stub home configuration takes its registry from the shipped default by reference", "A test that needs to write to a registry provides one it owns for the duration of that test".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| A test that chooses no registry uses the shipped default | "The cluster-backed e2e suite resolves published modules through the registry mapping the CLI ships as its default", "A test that chooses no registry uses the shipped default" | No (byte equal, checked) |
+| The operator lifecycle test seeds a Platform | "The cluster-backed e2e suite resolves published modules through the registry mapping the CLI ships as its default", "The operator lifecycle test seeds a Platform" | No (byte equal, checked) |
+| A publishing test owns its registry | "A test that needs to write to a registry provides one it owns for the duration of that test", "A publishing test owns its registry" | No (byte equal, checked) |
+| No unreachable registry address is named | "The e2e suite's stub home configuration takes its registry from the shipped default by reference", "No unreachable registry address is named" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The cluster-backed e2e suite SHALL resolve published modules through t... | body of "The cluster-backed e2e suite resolves published modules through the registry mapping the CLI ships as its default" |
+| ships as its default, and SHALL NOT depend on a registry process that ... | body of "The cluster-backed e2e suite resolves published modules through the registry mapping the CLI ships as its default" |
+| The suite's stub home configuration SHALL take its registry from that ... | body of "The e2e suite's stub home configuration takes its registry from the shipped default by reference" |
+| rather than restating an address, so that an invocation which does not... | body of "The e2e suite's stub home configuration takes its registry from the shipped default by reference" |
+| resolves exactly as an end user's would and the suite cannot drift fro... | body of "The e2e suite's stub home configuration takes its registry from the shipped default by reference" |
+| A test that needs to write to a registry , publishing a module, or sca... | body of "A test that needs to write to a registry provides one it owns for the duration of that test" |
+| publishes first , SHALL provide one it owns for the duration of that t... | body of "A test that needs to write to a registry provides one it owns for the duration of that test" |
+| it writes to at that registry and leaving `opmodel.dev` resolving from... | body of "A test that needs to write to a registry provides one it owns for the duration of that test" |
+| Such a | body of "A test that needs to write to a registry provides one it owns for the duration of that test" |
+| registry SHALL require no external process, port reservation or contai... | body of "A test that needs to write to a registry provides one it owns for the duration of that test" |
+| when the test ends. | body of "A test that needs to write to a registry provides one it owns for the duration of that test" |
+| A registry that a test does not itself provide SHALL NOT be a precondi... | body of "The cluster-backed e2e suite resolves published modules through the registry mapping the CLI ships as its default" |
+| require a developer to start one by hand. | body of "The cluster-backed e2e suite resolves published modules through the registry mapping the CLI ships as its default" |
+
+Words changed or added: the stub-configuration body ends with "(Requirement: <header of the first requirement>)", the named reference that gives "that shipped default" its referent; the em-dashes of the second paragraph read as commas ("A test that needs to write to a registry, publishing a module, or scaffolding from a template it publishes first, SHALL provide"). The sentence order is the old order except that the last paragraph follows the first.
+
+Lengths (old, new): old 1044; new "The cluster-backed e2e suite resolves published modules through the registry mapping the CLI ships as its default" 339; "The e2e suite's stub home configuration takes its registry from the shipped default by reference" 419; "A test that needs to write to a registry provides one it owns for the duration of that test" 411.
+
+### Ledger: e2e-cluster-preconditions, A destructive test that cannot restore the cluster fails its own run
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A destructive test restores the dev cluster's operator before the run ends and fails the run when it cannot", "The failure of a destructive test names the restore step, the underlying error and the repair command".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Restore fails | "A destructive test restores the dev cluster's operator before the run ends and fails the run when it cannot", "Restore fails" | No (byte equal, checked) |
+| Restore succeeds | "A destructive test restores the dev cluster's operator before the run ends and fails the run when it cannot", "Restore succeeds" | No (byte equal, checked) |
+| A poisoned cluster is never reported as success | "A destructive test restores the dev cluster's operator before the run ends and fails the run when it cannot", "A poisoned cluster is never reported as success" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "The failure message names the restore step, the error and the repair command" in "The failure of a destructive test names the restore step, the underlying error and the repair command"
+
+| Old clause | New place |
+| --- | --- |
+| An e2e test that tears down the shared dev cluster's operator SHALL re... | body of "A destructive test restores the dev cluster's operator before the run ends and fails the run when it cannot" |
+| and SHALL fail the run when it cannot. | body of "A destructive test restores the dev cluster's operator before the run ends and fails the run when it cannot" |
+| Reporting the failure without failing SHALL NOT satisfy this | body of "A destructive test restores the dev cluster's operator before the run ends and fails the run when it cannot" |
+| requirement: a run that leaves the cluster unable to serve the operato... | body of "A destructive test restores the dev cluster's operator before the run ends and fails the run when it cannot" |
+| successfully, because the next run's failure would otherwise appear as... | body of "A destructive test restores the dev cluster's operator before the run ends and fails the run when it cannot" |
+| far from its cause. | body of "A destructive test restores the dev cluster's operator before the run ends and fails the run when it cannot" |
+| The failure message SHALL name the restore step that did not complete,... | body of "The failure of a destructive test names the restore step, the underlying error and the repair command" |
+| the command a developer runs to repair the cluster by hand. | body of "The failure of a destructive test names the restore step, the underlying error and the repair command" |
+
+Words changed or added: the failure-message body ends with "(Requirement: <header of the first requirement>)", the named reference that gives "The failure message" its referent.
+
+Lengths (old, new): old 572; new "A destructive test restores the dev cluster's operator before the run ends and fails the run when it cannot" 415; "The failure of a destructive test names the restore step, the underlying error and the repair command" 279.
+
+### Ledger: e2e-cluster-preconditions, A cluster-required run fails instead of skipping
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A cluster-required run fails every precondition that would skip", "The failure of a cluster-required run starts with OPM_E2E_REQUIRE_CLUSTER=1: and names the cause", "Precondition messages read correctly as either a skip or a failure", "OPM_E2E_REQUIRE_CLUSTER changes no test that does not use the cluster and takes precedence over the skip clause of the grant check".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Required cluster has no kubeconfig | "The failure of a cluster-required run starts with OPM_E2E_REQUIRE_CLUSTER=1: and names the cause", "Required cluster has no kubeconfig" | No (byte equal, checked) |
+| Required cluster unreachable | "The failure of a cluster-required run starts with OPM_E2E_REQUIRE_CLUSTER=1: and names the cause", "Required cluster unreachable" | No (byte equal, checked) |
+| Developer machine without a cluster | "A cluster-required run fails every precondition that would skip", "Developer machine without a cluster" | No (byte equal, checked) |
+| Grant check cannot be performed in a required run | "OPM_E2E_REQUIRE_CLUSTER changes no test that does not use the cluster and takes precedence over the skip clause of the grant check", "Grant check cannot be performed in a required run" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "No precondition message says skipping" in "Precondition messages read correctly as either a skip or a failure"
+- "A precondition that already fails keeps its outcome" in "OPM_E2E_REQUIRE_CLUSTER changes no test that does not use the cluster and takes precedence over the skip clause of the grant check"
+- "A test that does not use the cluster is unchanged" in "OPM_E2E_REQUIRE_CLUSTER changes no test that does not use the cluster and takes precedence over the skip clause of the grant check"
+
+| Old clause | New place |
+| --- | --- |
+| When the environment variable `OPM_E2E_REQUIRE_CLUSTER` is set to `1`,... | body of "A cluster-required run fails every precondition that would skip" |
+| This covers a missing kubeconfig, an unreachable `kind-opm-dev` contex... | body of "A cluster-required run fails every precondition that would skip" |
+| The failure message SHALL start with `OPM_E2E_REQUIRE_CLUSTER=1:` and ... | body of "The failure of a cluster-required run starts with OPM_E2E_REQUIRE_CLUSTER=1: and names the cause" |
+| Precondition messages SHALL read correctly as either a skip or a failu... | body of "Precondition messages read correctly as either a skip or a failure" |
+| When the variable is unset or has any other value, those preconditions... | body of "A cluster-required run fails every precondition that would skip" |
+| The variable SHALL NOT change any test that does not use the cluster, ... | body of "OPM_E2E_REQUIRE_CLUSTER changes no test that does not use the cluster and takes precedence over the skip clause of the grant check" |
+| When the variable is `1`, this requirement takes precedence over the s... | UNMAPPED |
+
+Words changed or added:
+- "The variable SHALL NOT" reads "The environment variable `OPM_E2E_REQUIRE_CLUSTER` SHALL NOT", the subject of the first sentence
+- "this requirement takes precedence over the skip clause of `Operator applier grant is verified before operator-owned tests`" reads "the requirement `A cluster-required run fails every precondition that would skip` takes precedence over the skip clause of `An applier check that could not be performed skips the test`": both names are the new headers of the two requirements those words pointed at
+- Three bodies end with "(Requirement: <header of the first requirement>)", the named reference that gives "The failure message" and "Precondition messages" their referent
+- The first body keeps "as they do without this requirement" unchanged; there "this requirement" is the first requirement of the split
+
+Lengths (old, new): old 1221; new "A cluster-required run fails every precondition that would skip" 446; "The failure of a cluster-required run starts with OPM_E2E_REQUIRE_CLUSTER=1: and names the cause" 388; "Precondition messages read correctly as either a skip or a failure" 185; "OPM_E2E_REQUIRE_CLUSTER changes no test that does not use the cluster and takes precedence over the skip clause of the grant check" 457.
+
+### Strength table of cli-B5 unit 5a
+
+Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text:
+
+| Old sentence | New body | Word added |
+| --- | --- | --- |
+| A catalog pin's target is the newest published release in its major. | "The target of a catalog pin is the newest published release in its major" | "is" reads "SHALL be" |
+| A core pin already newer than that target stays. | "A core pin already newer than the cascade target stays" | "stays" reads "SHALL stay" |
+| Each entry names the repo-relative file or directory, the module paths frozen there, and a one-sentence reason saying why the pin must stay old. | "A `.cascade-frozen` entry names the file or directory, the frozen module paths and a one-sentence reason" | "Each entry names" reads "Each entry SHALL name" |
+| A pin is frozen only when the test depends on that exact old version. | "A pin is frozen only when the test depends on that exact old version" | "A pin is frozen" reads "A pin SHALL be frozen" |
+| A pin that is old only because a tree was copied from an older tree, or because an upstream release moved on, is not frozen. | "A pin that is old only because a tree was copied or an upstream release moved on is not frozen" | "is not frozen" reads "SHALL NOT be frozen" |
+| The effective applier identity is the ServiceAccount named by the controller Deployment's `--default-service-account` argument, ... | "The effective applier identity is the ServiceAccount named by --default-service-account when that argument is present" | "is" reads "SHALL be" |
+| ... the existing cluster-reachability precondition applies and the test skips as it does today, ... | "An applier check that could not be performed skips the test" | "the test skips" reads "the test SHALL skip" |
+
+Plain sentences copied unchanged, with no keyword, into a body that carries a keyword in another sentence:
+
+| Old sentence | New body |
+| --- | --- |
+| When a catalog member or contract type a fixture exercises is removed from the published catalog, the fixture is removed with it rather than kept unvetted; a replacement fixture is added when the replacement mechanism exists. | "A fixture does not depend on a catalog mechanism the catalog has withdrawn" |
+| The rule is mechanical, not stylistic: CUE resolves modules by longest-prefix match on the module path, ... | "A test fixture module declares its path under the testing domain" |
+| CUE keeps a dependency the consumer already lists at its listed version, so a consumer re-pinned to a new fixture version but left on an older core still passes `cue mod tidy --check` ... | "A consumer that names a fixture version pins every shared dependency as CUE resolves it" |
+| A core pin's target is the core version that the input's catalog pins, ... The source is workspace RELEASING.md, section "The cascade", "Consistent set". | "The target of a catalog pin is the newest published release in its major" |
+| A `cue.mod` file moves by `cue mod get` then `cue mod tidy`, ... A Go literal moves by editing the literal. | "A `cue.mod` pin moves by `cue mod get` then `cue mod tidy` and is never bumped by a hand edit" |
+| Test inputs include a test module's `cue.mod/module.cue` and a module file a test writes from a Go literal. | "A test pin is moved to the release cascade's target unless `.cascade-frozen` lists it with a reason" |
+| The file uses the format in workspace RELEASING.md, section "Cascade files". | "A `.cascade-frozen` entry names the file or directory, the frozen module paths and a one-sentence reason" |
+| Between an upstream release and the release cascade that follows it, a pin is behind but not in breach. | "A pin that is old only because a tree was copied or an upstream release moved on is not frozen" |
+| The directory may be a standalone CUE module or a package inside another CUE module, such as an instance directory within a module tree. | "`opm instance build` takes one positional argument naming an instance" |
+| 2. Otherwise, an argument whose first element contains a dot is a published module path. (and list items 1 and 3) | "`opm module build` classifies its argument as a local directory or a published module path before any registry access" |
+| This covers a missing kubeconfig, an unreachable `kind-opm-dev` context, and an applier-grant check that could not be performed. | "A cluster-required run fails every precondition that would skip" |
+
