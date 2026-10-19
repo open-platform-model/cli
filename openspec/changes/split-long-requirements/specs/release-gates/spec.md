@@ -111,6 +111,7 @@ A release-pin check (G1) SHALL run as a step inside the existing `lint` job of b
 ### Requirement: The docs bundle step checks nothing when the library version and `PinnedOperatorVersion` equal the base's
 
 When the `github.com/open-platform-model/library` version in `go.mod` and `PinnedOperatorVersion` in `internal/operator/pin.go` (in `internal/operator/manifest.go` at a base from before the operator module pin) both equal the base's, the step SHALL check nothing and say so; a move of `PinnedModuleVersion` alone changes no docs pin.
+(Requirement: The `lint` job of `pr.yml` runs the step "Docs bundles for moved pins" on every pull request and fetches the base commit)
 
 **Source**: security pass 2026-10-04, finding CAS-R2 (the check left the cascade task).
 
@@ -151,6 +152,7 @@ Otherwise the step SHALL print a GitHub warning annotation, also written to the 
 ### Requirement: The docs bundle step bounds each GHCR request and has a timeout and `continue-on-error: true`
 
 Each GHCR request SHALL be bounded (`--connect-timeout 10 --max-time 30`) and the step SHALL have `timeout-minutes: 10` and `continue-on-error: true`, because the `lint` job is a required check.
+(Requirement: The `lint` job of `pr.yml` runs the step "Docs bundles for moved pins" on every pull request and fetches the base commit)
 
 **Source**: security pass 2026-10-04, finding CAS-R2 (the check left the cascade task).
 

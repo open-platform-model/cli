@@ -63,7 +63,7 @@ The CLI SHALL synthesize a concrete instance from a published module without a l
 ### Requirement: Values selection, metadata defaults and the output banner of a published module are the same as for a module-package directory
 
 Values selection, metadata defaults and the output banner SHALL be the same as for a module-package directory.
-(Requirements: Values selection mirrors `opm module vet`; Synthetic instance metadata defaults; Output banner distinguishes synthetic builds)
+(Requirements: The CLI synthesizes a concrete instance from a published module through the kernel and writes nothing to disk but CUE's module cache; Values selection mirrors `opm module vet`; Synthetic instance metadata defaults; Output banner distinguishes synthetic builds)
 
 #### Scenario: debugValues of a published module
 
