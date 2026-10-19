@@ -14,7 +14,7 @@
 
 ### Requirement: Local-replacement renders warn
 **Reason**: Split into requirements that each state one behavior.
-**Migration**: See "Every render enables the kernel's local replacements", "A platform generated from the render's own deps carries the module's replacements", "The kernel replacement rows are worded as warnings, one per honoured replacement", "A module redirect of a path the platform names is reported inert", "The warnings do not block the render and a context without the file produces none", "Both render entry points enable the local replacements", "Both render entry points perform the local-replacement warnings", "The provenance signal keeps its file-presence rule".
+**Migration**: See "Every render enables the kernel's local replacements", "A platform generated from the render's own deps carries the module's replacements", "The kernel replacement rows are worded as warnings, one per honoured replacement", "A module redirect of a path the platform names is reported inert", "The warnings do not block the render and a context without the file produces none", "Both render entry points enable the local replacements and word the row warnings", "Both render entry points perform the local-replacement warnings", "The provenance signal keeps its file-presence rule".
 
 ### Requirement: Unprovided provider-fulfilled demands are skipped on request
 **Reason**: Split into requirements that each state one behavior.
@@ -254,11 +254,11 @@ The local-replacement warnings SHALL NOT block the render or alter its output. A
 - **WHEN** neither the module context nor the platform module carries a `local-module.cue` with a `replaceWith`
 - **THEN** no such warning is emitted and the output is identical to a render without the opt-in
 
-### Requirement: Both render entry points enable the local replacements
+### Requirement: Both render entry points enable the local replacements and word the row warnings
 
 Both render entry points SHALL perform this, as the requirements "Every render enables the kernel's local replacements", "A platform generated from the render's own deps carries the module's replacements" and "The kernel replacement rows are worded as warnings, one per honoured replacement" state it. Source: enhancement 0010 (a moved-ahead dev checkout is accepted and warned about).
 
-#### Scenario: Both entry points enable the replacements
+#### Scenario: Both entry points enable the replacements and word the row warnings
 - **WHEN** a render runs from either render entry point
 - **THEN** both render entry points SHALL perform this
 
