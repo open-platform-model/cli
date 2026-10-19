@@ -266,8 +266,6 @@ The root `pipeline.go` SHALL contain the full pipeline orchestration logic, dire
 
 Internal Go identifiers (function names, type names, field names, variable names) SHALL accurately reflect whether they operate on a Module (a CUE definition directory) or a ModuleInstance (a concrete deployed instance). Identifiers that represent instance concepts SHALL use "Instance" in their name, not "Module". <!-- Was: ModuleRelease / "Release" (renamed to instance, #97) -->
 
-This requirement applies to internal packages only. User-facing terminal output (success messages, log prefixes, command descriptions) is governed by the UX principle that users think in terms of modules and is explicitly excluded.
-
 #### Scenario: Instance-scoped function names
 
 - **WHEN** a function operates on or returns ModuleInstance data (instance name, instance UUID, instance namespace, instance status)
@@ -292,3 +290,13 @@ This requirement applies to internal packages only. User-facing terminal output 
 
 - **WHEN** a Go field is renamed for clarity
 - **THEN** its JSON struct tag SHALL remain unchanged to preserve deserialization of existing serialized data (e.g., existing `ModuleInstance` records on clusters)
+
+### Requirement: The identifier rule applies to internal packages only
+
+This requirement SHALL apply to internal packages only. User-facing terminal output (success messages, log prefixes, command descriptions) is governed by the UX principle that users think in terms of modules and is explicitly excluded.
+(Requirement: Module and ModuleInstance identifiers are distinct)
+
+#### Scenario: User-facing terminal output is excluded
+
+- **WHEN** user-facing terminal output (success messages, log prefixes, command descriptions) is written
+- **THEN** it is governed by the UX principle that users think in terms of modules and is explicitly excluded

@@ -152,7 +152,7 @@ The command SHALL evaluate instance health concurrently using a bounded worker p
 
 ### Requirement: List metadata extraction does not depend on inventory change history
 
-The command SHALL extract display metadata from each persisted instance inventory record: instance name from `instanceMetadata.name`, module name from `moduleMetadata.name`, version from `moduleMetadata.version`, instance ID from `instanceMetadata.uuid`, last applied time from `instanceMetadata.lastTransitionTime`, and age computed from `lastTransitionTime`. Owner display metadata SHALL come from the top-level `createdBy` field, defaulting to `cli` when that field is omitted for legacy inventories. The command SHALL NOT require inventory change-history metadata such as latest change source version, raw values, or per-change timestamps. <!-- Was: release inventory record, releaseMetadata (enhancement 0002: hard rename with no alias window; instance files are `instance.cue`) -->
+`opm instance list` SHALL extract display metadata from each persisted instance inventory record: instance name from `instanceMetadata.name`, module name from `moduleMetadata.name`, version from `moduleMetadata.version`, instance ID from `instanceMetadata.uuid`, last applied time from `instanceMetadata.lastTransitionTime`, and age computed from `lastTransitionTime`.
 
 #### Scenario: Display metadata sourced from persisted inventory
 
@@ -169,3 +169,23 @@ When a tracked resource of a listed instance cannot be read (its GET fails with 
 - **WHEN** an instance tracks 5 resources, 4 are healthy and the read of the fifth fails with Forbidden
 - **THEN** the STATUS column SHALL display `NotReady (4/5)`
 - **AND** one warning SHALL name the instance and say that 1 tracked resource could not be read
+
+### Requirement: Owner display metadata comes from the top-level `createdBy` field
+
+Owner display metadata SHALL come from the top-level `createdBy` field, defaulting to `cli` when that field is omitted for legacy inventories.
+(Requirement: List metadata extraction does not depend on inventory change history)
+
+#### Scenario: Owner defaults to cli for legacy inventories
+
+- **WHEN** a persisted instance inventory record omits the top-level `createdBy` field (a legacy inventory)
+- **THEN** owner display metadata SHALL come from the top-level `createdBy` field, defaulting to `cli`
+
+### Requirement: `opm instance list` does not require inventory change-history metadata
+
+`opm instance list` SHALL NOT require inventory change-history metadata such as latest change source version, raw values, or per-change timestamps. <!-- Was: release inventory record, releaseMetadata (enhancement 0002: hard rename with no alias window; instance files are `instance.cue`) -->
+(Requirement: List metadata extraction does not depend on inventory change history)
+
+#### Scenario: List works without change-history metadata
+
+- **WHEN** `opm instance list` reads a persisted instance inventory record that holds no inventory change-history metadata such as latest change source version, raw values, or per-change timestamps
+- **THEN** `opm instance list` SHALL NOT require that metadata

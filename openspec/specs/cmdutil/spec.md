@@ -44,7 +44,7 @@ The `K8sFlags` struct SHALL provide an `AddTo(*cobra.Command)` method that regis
 
 ### Requirement: InstanceSelectorFlags carries and validates the resolved instance selector
 
-The `InstanceSelectorFlags` struct SHALL carry the resolved instance selector (`InstanceName` or `InstanceID`, plus `Namespace`). Commands SHALL build it from their positional `<file|name|uuid>` argument through `InstanceArg.ToSelectorFlags`; no command registers `--instance-name`/`--instance-id` flags for cluster queries. It SHALL provide a `Validate()` method that enforces mutual exclusivity between `InstanceName` and `InstanceID`, and requires exactly one to be present. <!-- Was: ReleaseSelectorFlags, --release-name/--release-id (enhancement 0002 ("Every `release`-named file and directory is renamed on disk (extends D8 to the filesystem)")) -->
+The `InstanceSelectorFlags` struct SHALL carry the resolved instance selector (`InstanceName` or `InstanceID`, plus `Namespace`). It SHALL provide a `Validate()` method that enforces mutual exclusivity between `InstanceName` and `InstanceID`, and requires exactly one to be present.
 
 #### Scenario: Both selectors set is rejected
 
@@ -74,38 +74,6 @@ The `InstanceSelectorFlags` struct SHALL provide a `LogName()` method that retur
 
 - **WHEN** `LogName()` is called with `InstanceName` set to `""` and `InstanceID` set to `"a1b2c3d4-e5f6-7890-abcd"`
 - **THEN** it SHALL return `"instance:a1b2c3d4"`
-
-### Requirement: ShowRenderOutput checks for errors, shows transformer matches, and logs warnings
-
-The render output function (`render.ShowOutput`) SHALL accept a render result and output options (verbose flag). It SHALL:
-
-1. Check for render errors — if present, format and print render errors via `printValidationError`, then return an `*ExitError` with `ExitValidationError`.
-2. Show transformer match output — verbose mode shows module metadata and match reasons; default mode shows compact match lines.
-3. Log any warnings from the render result via the module-scoped logger. The warnings are worded by the CLI from the kernel's advisory diagnostic rows (unhandled optional traits, and resolved-versions rows marked newer); the render result carries no kernel-authored message strings to pass through.
-
-#### Scenario: ShowRenderOutput returns error when render has errors
-
-- **WHEN** `render.ShowOutput` is called with a result containing errors
-- **THEN** it SHALL call `printValidationError` with the errors
-- **AND** it SHALL return an `*ExitError` with `Code` equal to `ExitValidationError`
-
-#### Scenario: ShowRenderOutput shows compact matches in default mode
-
-- **WHEN** `render.ShowOutput` is called with verbose set to `false` and a result containing transformer matches
-- **THEN** it SHALL print one line per match using `FormatTransformerMatch`
-- **AND** it SHALL print a warning for each unmatched component using `FormatTransformerUnmatched`
-
-#### Scenario: ShowRenderOutput shows detailed matches in verbose mode
-
-- **WHEN** `render.ShowOutput` is called with verbose set to `true`
-- **THEN** it SHALL print module metadata (name, namespace, version, components)
-- **AND** it SHALL print match details including the match reason
-- **AND** it SHALL print per-resource validation lines
-
-#### Scenario: ShowRenderOutput logs warnings
-
-- **WHEN** `render.ShowOutput` is called with a result that has warnings
-- **THEN** each warning SHALL be logged via the module-scoped logger at warn level
 
 ### Requirement: NewK8sClient creates a Kubernetes client or returns a connectivity ExitError
 
@@ -144,7 +112,7 @@ Multiple flag group structs SHALL be usable on the same cobra command without fl
 
 ### Requirement: PrintValidationError groups CUE positions on any error
 
-The `PrintValidationError` function SHALL accept a message string and an error. When the error chain carries CUE errors with at least one valid source position, it SHALL print a summary line counting the distinct issues followed by the grouped CUE details (each distinct message once, with every source position that reports it). Typed kernel refusals (unresolved demands) and `ValidationError` values with details keep their dedicated formats. For other errors, it SHALL use the standard key-value log format.
+When the error chain carries CUE errors with at least one valid source position, `PrintValidationError` SHALL print a summary line counting the distinct issues followed by the grouped CUE details (each distinct message once, with every source position that reports it). Typed kernel refusals (unresolved demands) and `ValidationError` values with details keep their dedicated formats. For other errors, `PrintValidationError` SHALL use the standard key-value log format.
 
 #### Scenario: Kernel validation error with CUE positions
 
@@ -157,9 +125,90 @@ The `PrintValidationError` function SHALL accept a message string and an error. 
 - **WHEN** `PrintValidationError` is called with a plain `error`
 - **THEN** the output SHALL use the standard error log format with the message and error key-value pair
 
-### Requirement: PrintRenderErrors formats render errors with diagnostic detail
+### Requirement: Positional instance arguments preserve the selector semantics
 
-The render refusal printer (`printValidationError`, funnelling into `cmdutil.PrintValidationError`) SHALL accept a render error and print it with appropriate diagnostic information. For an unmatched-components refusal it SHALL print the component names; in verbose mode it SHALL additionally print, for each, the candidate transformers the render build evaluated with the required labels each was found to lack (or the primitive FQNs its bodies conflicted at), while the default output stays one line per component. For an over-subscription refusal it SHALL print every contract key and the catalogs competing for it from the single typed cause that carries them all. For transform errors, it SHALL print the component name, transformer FQN, and cause. Unresolved demands SHALL be rendered from the demand rows themselves, without reconstructing an aggregate error to reach the formatter, and each row SHALL name the catalog that defines the demanded contract when the row carries one.
+The `instance` subcommands that consume `InstanceSelectorFlags` SHALL resolve their positional `<file|name|uuid>` argument to the same selector the former `--instance-name`/`--instance-id` flags carried: identical resolution, output, and exit codes for equivalent inputs. <!-- Was: --release-name/--release-id (0002 D-X4.2), then --instance-name/--instance-id flags -->
+
+#### Scenario: instance delete resolves a name argument
+
+- **WHEN** `opm instance delete my-app -n production` is run
+- **THEN** it SHALL resolve and delete the instance exactly as a name selector for `my-app` in `production`
+
+#### Scenario: instance status resolves a name argument
+
+- **WHEN** `opm instance status my-app -n production` is run
+- **THEN** it SHALL produce the same status output a name selector for `my-app` in `production` produces
+
+### Requirement: Commands build the instance selector from their positional argument
+
+Commands SHALL build the resolved instance selector from their positional `<file|name|uuid>` argument through `InstanceArg.ToSelectorFlags`; no command registers `--instance-name`/`--instance-id` flags for cluster queries. <!-- Was: ReleaseSelectorFlags, --release-name/--release-id (enhancement 0002 ("Every `release`-named file and directory is renamed on disk (extends D8 to the filesystem)")) -->
+
+#### Scenario: A command builds its selector from the positional argument
+- **WHEN** a command builds the resolved instance selector
+- **THEN** it builds it from its positional `<file|name|uuid>` argument through `InstanceArg.ToSelectorFlags`, and registers no `--instance-name`/`--instance-id` flags for cluster queries
+
+### Requirement: ShowRenderOutput returns an ExitError with ExitValidationError when the render has errors
+
+The render output function (`render.ShowOutput`) SHALL accept a render result and output options (verbose flag). It SHALL:
+
+1. Check for render errors: if present, format and print render errors via `printValidationError`, then return an `*ExitError` with `ExitValidationError`.
+
+#### Scenario: ShowRenderOutput returns error when render has errors
+
+- **WHEN** `render.ShowOutput` is called with a result containing errors
+- **THEN** it SHALL call `printValidationError` with the errors
+- **AND** it SHALL return an `*ExitError` with `Code` equal to `ExitValidationError`
+
+### Requirement: ShowRenderOutput shows compact transformer matches by default and detailed matches in verbose mode
+
+The render output function (`render.ShowOutput`) SHALL accept a render result and output options (verbose flag). It SHALL:
+
+2. Show transformer match output: verbose mode shows module metadata and match reasons; default mode shows compact match lines.
+
+#### Scenario: ShowRenderOutput shows compact matches in default mode
+
+- **WHEN** `render.ShowOutput` is called with verbose set to `false` and a result containing transformer matches
+- **THEN** it SHALL print one line per match using `FormatTransformerMatch`
+- **AND** it SHALL print a warning for each unmatched component using `FormatTransformerUnmatched`
+
+#### Scenario: ShowRenderOutput shows detailed matches in verbose mode
+
+- **WHEN** `render.ShowOutput` is called with verbose set to `true`
+- **THEN** it SHALL print module metadata (name, namespace, version, components)
+- **AND** it SHALL print match details including the match reason
+- **AND** it SHALL print per-resource validation lines
+
+### Requirement: ShowRenderOutput logs the render warnings via the module-scoped logger
+
+The render output function (`render.ShowOutput`) SHALL accept a render result and output options (verbose flag). It SHALL:
+
+3. Log any warnings from the render result via the module-scoped logger. The warnings are worded by the CLI from the kernel's advisory diagnostic rows (unhandled optional traits, and resolved-versions rows marked newer); the render result carries no kernel-authored message strings to pass through.
+
+#### Scenario: ShowRenderOutput logs warnings
+
+- **WHEN** `render.ShowOutput` is called with a result that has warnings
+- **THEN** each warning SHALL be logged via the module-scoped logger at warn level
+
+### Requirement: PrintValidationError accepts a message string and an error
+
+The `PrintValidationError` function SHALL accept a message string and an error.
+
+#### Scenario: PrintValidationError is called with a message and an error
+- **WHEN** `PrintValidationError` is called
+- **THEN** it accepts a message string and an error
+
+### Requirement: The render refusal printer accepts a render error and prints the component name, transformer FQN and cause of a transform error
+
+The render refusal printer (`printValidationError`, funnelling into `cmdutil.PrintValidationError`) SHALL accept a render error and print it with appropriate diagnostic information. For transform errors, it SHALL print the component name, transformer FQN, and cause.
+
+#### Scenario: Transform error
+
+- **WHEN** `printValidationError` is called with a transform error
+- **THEN** the output SHALL include the component name, transformer FQN, and the cause error
+
+### Requirement: The render refusal printer prints the component names of an unmatched-components refusal and the candidate transformers in verbose mode
+
+For an unmatched-components refusal the render refusal printer SHALL print the component names; in verbose mode it SHALL additionally print, for each, the candidate transformers the render build evaluated with the required labels each was found to lack (or the primitive FQNs its bodies conflicted at), while the default output stays one line per component.
 
 #### Scenario: Unmatched components error with diagnostics
 
@@ -168,15 +217,18 @@ The render refusal printer (`printValidationError`, funnelling into `cmdutil.Pri
 - **AND** in verbose mode, for each, the candidate transformers evaluated for it with the labels the predicate found missing
 - **AND** in default mode, one line per component and no candidate rows
 
+### Requirement: The render refusal printer prints every contract key and the competing catalogs of an over-subscription refusal
+
+For an over-subscription refusal the render refusal printer SHALL print every contract key and the catalogs competing for it from the single typed cause that carries them all.
+
 #### Scenario: Over-subscribed contracts print once
 
 - **WHEN** `printValidationError` is called with a refusal carrying two over-subscribed contract keys
 - **THEN** both keys and their competing catalogs SHALL be printed, read from one typed cause rather than from two separately joined errors
 
-#### Scenario: Transform error
+### Requirement: Unresolved demands are rendered from the demand rows and name the defining catalog
 
-- **WHEN** `printValidationError` is called with a transform error
-- **THEN** the output SHALL include the component name, transformer FQN, and the cause error
+Unresolved demands SHALL be rendered from the demand rows themselves, without reconstructing an aggregate error to reach the formatter, and each row SHALL name the catalog that defines the demanded contract when the row carries one.
 
 #### Scenario: Unresolved demands format from rows
 
@@ -193,23 +245,9 @@ The render refusal printer (`printValidationError`, funnelling into `cmdutil.Pri
 - **WHEN** an unresolved-demand row carries no defining catalog
 - **THEN** the output SHALL keep the nothing-implements line unchanged, naming no catalog
 
-### Requirement: Positional instance arguments preserve the selector semantics
+### Requirement: ResolveInventory resolves the record by instance ID or by instance name
 
-The `instance` subcommands that consume `InstanceSelectorFlags` SHALL resolve their positional `<file|name|uuid>` argument to the same selector the former `--instance-name`/`--instance-id` flags carried: identical resolution, output, and exit codes for equivalent inputs. <!-- Was: --release-name/--release-id (0002 D-X4.2), then --instance-name/--instance-id flags -->
-
-#### Scenario: instance delete resolves a name argument
-
-- **WHEN** `opm instance delete my-app -n production` is run
-- **THEN** it SHALL resolve and delete the instance exactly as a name selector for `my-app` in `production`
-
-#### Scenario: instance status resolves a name argument
-
-- **WHEN** `opm instance status my-app -n production` is run
-- **THEN** it SHALL produce the same status output a name selector for `my-app` in `production` produces
-
-### Requirement: Shared inventory resolution helper in the query workflow
-
-`query.ResolveInventory` (in `internal/workflow/query`) SHALL resolve a `ModuleInstance` record from an `*InstanceSelectorFlags`. If `InstanceID` is non-empty, it SHALL resolve via `inventory.FindRecordByInstanceUUID` (list the namespace's CRs, match `status.instanceUUID`); otherwise it SHALL resolve via `inventory.GetRecord` (direct GET by `InstanceName`). When no record is found, it SHALL return an `InstanceNotFoundError` with exit code 5. On success it SHALL also return the live resources and the missing entries from `inventory.DiscoverResourcesFromInventory`. <!-- Was: cmdutil.ResolveInventory over *ReleaseSelectorFlags, ReleaseID/ReleaseName, ReleaseNotFoundError (enhancement 0002, "Every `release`-named file and directory is renamed on disk (extends D8 to the filesystem)") -->
+`query.ResolveInventory` (in `internal/workflow/query`) SHALL resolve a `ModuleInstance` record from an `*InstanceSelectorFlags`. If `InstanceID` is non-empty, it SHALL resolve via `inventory.FindRecordByInstanceUUID` (list the namespace's CRs, match `status.instanceUUID`); otherwise it SHALL resolve via `inventory.GetRecord` (direct GET by `InstanceName`).
 
 #### Scenario: Resolve by instance name
 
@@ -221,7 +259,19 @@ The `instance` subcommands that consume `InstanceSelectorFlags` SHALL resolve th
 - **WHEN** `InstanceSelectorFlags.InstanceID` is set and a `ModuleInstance` in the namespace carries that `status.instanceUUID`
 - **THEN** `ResolveInventory` SHALL return the matching inventory record with its live resources
 
+### Requirement: ResolveInventory returns an InstanceNotFoundError with exit code 5 when no record is found
+
+When no record is found, `query.ResolveInventory` SHALL return an `InstanceNotFoundError` with exit code 5. <!-- Was: cmdutil.ResolveInventory over *ReleaseSelectorFlags, ReleaseID/ReleaseName, ReleaseNotFoundError (enhancement 0002, "Every `release`-named file and directory is renamed on disk (extends D8 to the filesystem)") -->
+
 #### Scenario: Instance not found
 
 - **WHEN** the underlying lookup finds no `ModuleInstance` record
 - **THEN** `ResolveInventory` SHALL return an `InstanceNotFoundError` carrying exit code 5
+
+### Requirement: ResolveInventory returns the live resources and the missing entries on success
+
+On success `query.ResolveInventory` SHALL also return the live resources and the missing entries from `inventory.DiscoverResourcesFromInventory`.
+
+#### Scenario: A successful resolution returns the live resources and the missing entries
+- **WHEN** `query.ResolveInventory` resolves a record
+- **THEN** it also returns the live resources and the missing entries from `inventory.DiscoverResourcesFromInventory`
