@@ -84,7 +84,7 @@ The package's own module path SHALL default to `instance.local/<instance-name>@v
 
 ### Requirement: Init takes the positionals and flags of module init
 
-The command SHALL take `[instance-name] [module-path]` positionals and the flags `--from <module-path>`, `--version <vN | X.Y.Z>`, `--namespace`/`-n <ns>`, `--dir <dir>` and `--module-path <path>`. Source: enhancement 0016 (a published module floats to the highest core-compatible major).
+The command (`opm instance init`) SHALL take `[instance-name] [module-path]` positionals and the flags `--from <module-path>`, `--version <vN | X.Y.Z>`, `--namespace`/`-n <ns>`, `--dir <dir>` and `--module-path <path>`. Source: enhancement 0016 (a published module floats to the highest core-compatible major).
 
 #### Scenario: Positionals and flags
 - **WHEN** `opm instance init` is run
@@ -155,7 +155,7 @@ A prompted value SHALL pass the same checks as the flag or positional it replace
 
 ### Requirement: values.cue is filled from the first applicable source and the report names it
 
-`values.cue` SHALL be filled from the first applicable source in this order, and the report SHALL name the source used.
+`values.cue` SHALL be filled from the first applicable source in this order (requirements "The initValues source", "The debugValues source" and "With no usable source values.cue holds an empty struct and the report warns"), and the report SHALL name the source used.
 
 #### Scenario: The report names the source
 - **WHEN** `opm instance init` fills `values.cue`
@@ -233,7 +233,7 @@ When the chosen source renders as an empty struct, the report SHALL still name t
 
 ### Requirement: An existing target directory is refused with exit 2 before any registry access
 
-The command SHALL refuse with exit 2, before any registry access, when the target directory already exists (whether empty or holding a module or instance package). Source: enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-free module path, and floats to the highest core-compatible major when no version is given" and "Init refuses a target directory inside an existing CUE module").
+The command (`opm instance init`) SHALL refuse with exit 2, before any registry access, when the target directory already exists (whether empty or holding a module or instance package). Source: enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-free module path, and floats to the highest core-compatible major when no version is given" and "Init refuses a target directory inside an existing CUE module").
 
 #### Scenario: Existing directory refused
 
@@ -242,7 +242,7 @@ The command SHALL refuse with exit 2, before any registry access, when the targe
 
 ### Requirement: A target inside an existing CUE module is refused with exit 2 before any registry access
 
-The command SHALL refuse with exit 2, before any registry access, when the target directory would sit inside an existing CUE module (a parent directory holds `cue.mod/module.cue`). Source: enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-free module path, and floats to the highest core-compatible major when no version is given" and "Init refuses a target directory inside an existing CUE module").
+The command (`opm instance init`) SHALL refuse with exit 2, before any registry access, when the target directory would sit inside an existing CUE module (a parent directory holds `cue.mod/module.cue`). Source: enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-free module path, and floats to the highest core-compatible major when no version is given" and "Init refuses a target directory inside an existing CUE module").
 
 #### Scenario: Inside a CUE module refused
 

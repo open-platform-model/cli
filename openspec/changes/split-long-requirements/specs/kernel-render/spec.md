@@ -14,7 +14,7 @@
 
 ### Requirement: Local-replacement renders warn
 **Reason**: Split into requirements that each state one behavior.
-**Migration**: See "Every render enables the kernel's local replacements", "A platform generated from the render's own deps carries the module's replacements", "The kernel replacement rows are worded as warnings, one per honoured replacement", "A module redirect of a path the platform names is reported inert", "The warnings do not block the render and a context without the file produces none", "Both render entry points enable the local replacements", "The provenance signal keeps its file-presence rule".
+**Migration**: See "Every render enables the kernel's local replacements", "A platform generated from the render's own deps carries the module's replacements", "The kernel replacement rows are worded as warnings, one per honoured replacement", "A module redirect of a path the platform names is reported inert", "The warnings do not block the render and a context without the file produces none", "Both render entry points enable the local replacements", "Both render entry points perform the local-replacement warnings", "The provenance signal keeps its file-presence rule".
 
 ### Requirement: Unprovided provider-fulfilled demands are skipped on request
 **Reason**: Split into requirements that each state one behavior.
@@ -256,9 +256,17 @@ The local-replacement warnings SHALL NOT block the render or alter its output. A
 
 ### Requirement: Both render entry points enable the local replacements
 
-Both render entry points SHALL enable the kernel's local replacements. Source: enhancement 0010 (a moved-ahead dev checkout is accepted and warned about).
+Both render entry points SHALL perform this, as the requirements "Every render enables the kernel's local replacements", "A platform generated from the render's own deps carries the module's replacements" and "The kernel replacement rows are worded as warnings, one per honoured replacement" state it. Source: enhancement 0010 (a moved-ahead dev checkout is accepted and warned about).
 
 #### Scenario: Both entry points enable the replacements
+- **WHEN** a render runs from either render entry point
+- **THEN** both render entry points SHALL perform this
+
+### Requirement: Both render entry points perform the local-replacement warnings
+
+Both render entry points SHALL perform this, as the requirements "A module redirect of a path the platform names is reported inert" and "The warnings do not block the render and a context without the file produces none" state it. Source: enhancement 0010 (a moved-ahead dev checkout is accepted and warned about).
+
+#### Scenario: Both entry points perform the replacement warnings
 - **WHEN** a render runs from either render entry point
 - **THEN** both render entry points SHALL perform this
 
@@ -282,7 +290,7 @@ Every render-bearing command (`opm module build`, `module vet`, `module apply`, 
 
 ### Requirement: Without --skip-unprovided a render behaves as before
 
-Without the flag, a render SHALL behave exactly as before this change.
+Without the flag (`--skip-unprovided`), a render SHALL behave exactly as before this change.
 
 #### Scenario: Default render still refuses
 
@@ -292,7 +300,7 @@ Without the flag, a render SHALL behave exactly as before this change.
 
 ### Requirement: With --skip-unprovided a skipped trait is worded as a warning naming the alternatives
 
-With the flag, the CLI SHALL print one warning per skipped demand after the render. A skipped trait SHALL be worded as `component "<c>": skipped provider-fulfilled trait "<fqn>" (no provider on this platform)`. When the kernel reports alternatives, the warning SHALL name them.
+With the flag (`--skip-unprovided`), the CLI SHALL print one warning per skipped demand after the render. A skipped trait SHALL be worded as `component "<c>": skipped provider-fulfilled trait "<fqn>" (no provider on this platform)`. When the kernel reports alternatives, the warning SHALL name them.
 
 #### Scenario: A skipped trait renders the rest
 
@@ -302,7 +310,7 @@ With the flag, the CLI SHALL print one warning per skipped demand after the rend
 
 ### Requirement: With --skip-unprovided an omitted component is worded once as a warning
 
-With the flag, the CLI SHALL print one warning per skipped demand after the render. A component the kernel omitted SHALL be worded once as `component "<c>" not rendered: provider-fulfilled resource "<fqn>" has no provider on this platform`, naming every skipped resource of that component.
+With the flag (`--skip-unprovided`), the CLI SHALL print one warning per skipped demand after the render. A component the kernel omitted SHALL be worded once as `component "<c>" not rendered: provider-fulfilled resource "<fqn>" has no provider on this platform`, naming every skipped resource of that component.
 
 #### Scenario: A skipped resource drops its component
 

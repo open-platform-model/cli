@@ -2,7 +2,7 @@
 
 ### Requirement: The cascade task moves the cli's upstream pins to published versions
 **Reason**: Split into requirements that each state one behavior.
-**Migration**: See "The cascade task moves pins in the working tree only", "The library pin moves to the newest version the Go proxy serves in its major", "The operator module pin moves only through hack/operator-pin", "The operator module target is the newest release whose operator version is not above the cli's own", "The catalog and core pins cover a fixed set of cue.mod/module.cue files", "The catalog pin moves to the newest published catalog in its major", "The core pin moves to the core that the file's resulting catalog pins", "The kind platform catalog is raised to hack/platform's catalog", "No pin moves backwards, past a hold, or holds a catalog back by a lower core hold", "No pin moves to a version that is tagged but not yet published", "A pin listed in .cascade-frozen does not change", "cue mod get names only the moved keys and runs only where a pin moved", "Third-party pins are not named and a raised one is reported as a warning", "The task uses its own registry mapping".
+**Migration**: See "The cascade task moves pins in the working tree only", "The library pin moves to the newest version the Go proxy serves in its major", "The operator module pin moves only through hack/operator-pin", "The operator module target is the newest release whose operator version is not above the cli's own", "The catalog and core pins cover a fixed set of cue.mod/module.cue files", "The catalog and core pins also cover the remaining cue.mod/module.cue files of the fixed set", "The catalog pin moves to the newest published catalog in its major", "The core pin moves to the core that the file's resulting catalog pins", "The kind platform catalog is raised to hack/platform's catalog", "No pin moves backwards, past a hold, or holds a catalog back by a lower core hold", "No pin moves to a version that is tagged but not yet published", "A pin listed in .cascade-frozen does not change", "cue mod get names only the moved keys and runs only where a pin moved", "Third-party pins are not named and a raised one is reported as a warning", "The task uses its own registry mapping".
 
 ### Requirement: The cascade task resolves before it edits and reports by exit code
 **Reason**: Split into requirements that each state one behavior.
@@ -67,11 +67,19 @@
 
 ### Requirement: The catalog and core pins cover a fixed set of cue.mod/module.cue files
 
-**Catalog and core as a consistent set.** The consistent set SHALL cover the `cue.mod/module.cue` files of the three templates, `hack/platform`, `examples`, `tests/fixtures/modules/podinfo`, `tests/e2e/testdata/operator-owned`, `internal/instinit/testdata/initvalues`, `internal/workflow/render/testdata/skip-unprovided`, `tests/e2e/testdata/duplicate-identities`, `tests/integration/module-apply/testdata`, `tests/fixtures/valid/simple-module` and `tests/fixtures/valid/module-with-debug-values`.
+**Catalog and core as a consistent set.** The consistent set SHALL cover the `cue.mod/module.cue` files of the three templates, `hack/platform`, `examples`, `tests/fixtures/modules/podinfo`, `tests/e2e/testdata/operator-owned`, `internal/instinit/testdata/initvalues`. The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves".
 
 #### Scenario: The set of files
 - **WHEN** the task moves the catalog and core as a consistent set
 - **THEN** it SHALL cover the `cue.mod/module.cue` files of the three templates, `hack/platform`, `examples`, `tests/fixtures/modules/podinfo` and the other listed test trees
+
+### Requirement: The catalog and core pins also cover the remaining cue.mod/module.cue files of the fixed set
+
+**Catalog and core as a consistent set.** The consistent set SHALL cover the `cue.mod/module.cue` files of `internal/workflow/render/testdata/skip-unprovided`, `tests/e2e/testdata/duplicate-identities`, `tests/integration/module-apply/testdata`, `tests/fixtures/valid/simple-module` and `tests/fixtures/valid/module-with-debug-values`. The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves".
+
+#### Scenario: The remaining files of the set
+- **WHEN** the task moves the catalog and core as a consistent set
+- **THEN** it SHALL cover the `cue.mod/module.cue` files of `internal/workflow/render/testdata/skip-unprovided`, `tests/e2e/testdata/duplicate-identities`, `tests/integration/module-apply/testdata`, `tests/fixtures/valid/simple-module` and `tests/fixtures/valid/module-with-debug-values`
 
 ### Requirement: The catalog pin moves to the newest published catalog in its major
 
@@ -145,7 +153,7 @@ Third-party pins, including `cue.dev/x/k8s.io@v0`, SHALL NOT be named. A third-p
 
 ### Requirement: The task uses its own registry mapping
 
-The task SHALL use its own registry mapping, `testing.opmodel.dev=ghcr.io/open-platform-model,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works`, for both `CUE_REGISTRY` and `OPM_REGISTRY`, whatever the environment sets. The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves".
+The task (`task -x deps:cascade`) SHALL use its own registry mapping, `testing.opmodel.dev=ghcr.io/open-platform-model,opmodel.dev=ghcr.io/open-platform-model,registry.cue.works`, for both `CUE_REGISTRY` and `OPM_REGISTRY`, whatever the environment sets. The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves".
 
 #### Scenario: The mapping holds whatever the environment sets
 - **WHEN** the environment sets `CUE_REGISTRY` or `OPM_REGISTRY`
@@ -196,7 +204,7 @@ Exit codes SHALL be: 0 when the working tree changed; 3 when it did not; any oth
 
 ### Requirement: The cascade task does not turn a failure into a fallback version
 
-The task SHALL NOT turn a failure into a fallback version. Source: workspace RELEASING.md, section "The cascade", "The receiver".
+The task (`task -x deps:cascade`) SHALL NOT turn a failure into a fallback version. Source: workspace RELEASING.md, section "The cascade", "The receiver".
 
 #### Scenario: No fallback version
 - **WHEN** the task meets a failure
@@ -214,7 +222,7 @@ The three templates (`opmodel.dev/templates/<name>@v1`) and the podinfo fixture 
 
 ### Requirement: The new version is one patch above the merge base's, or the merge base's when unpublished
 
-The new version SHALL be one patch above the merge base's declared version when that version is published. It SHALL be the merge base's version when that version is not yet published. Source: workspace RELEASING.md, section "The cascade", "The receiver" ("Version advances happen once per PR").
+The new version of the three templates (`opmodel.dev/templates/<name>@v1`) and the podinfo fixture (`testing.opmodel.dev/modules/cli/podinfo@v0`) SHALL be one patch above the merge base's declared version when that version is published. It SHALL be the merge base's version when that version is not yet published. Source: workspace RELEASING.md, section "The cascade", "The receiver" ("Version advances happen once per PR").
 
 #### Scenario: The target version
 - **WHEN** a template tree differs from the merge base
@@ -231,7 +239,7 @@ A second run in the same pull request SHALL NOT advance any version again. Sourc
 
 ### Requirement: A version is written only when it is greater than the file version
 
-The task SHALL write a version only when it is greater than the file's. A file version above the target SHALL stay, with a warning. Source: workspace RELEASING.md, section "The cascade", "The receiver" ("Version advances happen once per PR").
+The task (`task -x deps:cascade`) SHALL write a version only when it is greater than the file's. A file version above the target SHALL stay, with a warning. Source: workspace RELEASING.md, section "The cascade", "The receiver" ("Version advances happen once per PR").
 
 #### Scenario: A higher file version stays
 - **WHEN** a file version is above the target
@@ -330,7 +338,7 @@ The full set of `task -x deps:cascade:test` SHALL add: the older-pins scenario, 
 
 ### Requirement: The offline set also checks a core ahead of its catalog and a hold on core
 
-The offline set SHALL also check that a core ahead of its catalog's pin stays with a warning, and that a hold on core holds the catalog.
+The offline set of `task -x deps:cascade:test` SHALL also check that a core ahead of its catalog's pin stays with a warning, and that a hold on core holds the catalog.
 
 #### Scenario: Offline checks on core
 - **WHEN** the offline set runs
@@ -338,7 +346,7 @@ The offline set SHALL also check that a core ahead of its catalog's pin stays wi
 
 ### Requirement: The full set also checks a second catalog move on a branch pinning the unpublished fixture
 
-The full set SHALL also check a second catalog move on a branch whose consumers already pin the unpublished fixture.
+The full set of `task -x deps:cascade:test` SHALL also check a second catalog move on a branch whose consumers already pin the unpublished fixture.
 
 #### Scenario: Full check on a second move
 - **WHEN** the full set runs
@@ -355,7 +363,7 @@ The setup of the older-pins, frozen-file and second-move scenarios SHALL lower t
 
 ### Requirement: The offline set runs as a step of the Lint job in pr.yml
 
-The offline set SHALL run as a step of the `Lint` job in `.github/workflows/pr.yml`, the job workspace RELEASING.md "Rulesets on main" names as the cli's required check.
+The offline set of `task -x deps:cascade:test` SHALL run as a step of the `Lint` job in `.github/workflows/pr.yml`, the job workspace RELEASING.md "Rulesets on main" names as the cli's required check.
 
 #### Scenario: Offline set runs on every pull request
 
@@ -364,7 +372,7 @@ The offline set SHALL run as a step of the `Lint` job in `.github/workflows/pr.y
 
 ### Requirement: The full set runs in cascade-task.yml and is not a required check
 
-The full set SHALL run in `.github/workflows/cascade-task.yml`, job `Cascade task (network)`, which is not a required check.
+The full set of `task -x deps:cascade:test` SHALL run in `.github/workflows/cascade-task.yml`, job `Cascade task (network)`, which is not a required check.
 
 #### Scenario: The network job runs the full set
 - **WHEN** the workflow `cascade-task.yml` runs

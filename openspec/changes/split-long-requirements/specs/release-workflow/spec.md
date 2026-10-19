@@ -184,7 +184,7 @@ Before the `publish-templates` job publishes any template, the script SHALL run 
 
 ### Requirement: A failed gate publishes nothing and otherwise the script acts on each gate verdict
 
-If any template fails a gate, or a fetch, listing, verification or comparison fails, the script SHALL publish nothing and fail. Otherwise it SHALL act on each template's gate verdict without reading GHCR again: it SHALL publish every template whose version the gates found unpublished, and skip every template found published and identical.
+If any template fails a gate, or a fetch, listing, verification or comparison fails, the script (`.github/scripts/publish-templates.sh`) SHALL publish nothing and fail. Otherwise it SHALL act on each template's gate verdict without reading GHCR again: it SHALL publish every template whose version the gates found unpublished, and skip every template found published and identical.
 
 #### Scenario: Template fails a gate
 - **WHEN** a template tree violates a publish gate
@@ -196,7 +196,7 @@ If any template fails a gate, or a fetch, listing, verification or comparison fa
 
 ### Requirement: A version published between the gates and the push is not skipped unchecked
 
-A version that becomes published between the gates and the push SHALL make `opm module publish` refuse and the job fail, never be skipped unchecked.
+A version that becomes published between the gates and the push SHALL make `opm module publish` refuse and the job (`publish-templates`) fail, never be skipped unchecked.
 
 #### Scenario: A version published during the run is not skipped
 - **WHEN** the gates found a template version unpublished and another run publishes that version before this run pushes it
