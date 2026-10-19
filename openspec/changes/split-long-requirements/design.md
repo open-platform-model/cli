@@ -1649,3 +1649,916 @@ Plain sentences that carry an RFC 2119 keyword in the new text and had none in t
 | - `opm instance diff`, `opm instance apply` and `opm module apply` keep failing on an unreachable cluster: the... | "Instance diff, instance apply and module apply keep failing on an unreachable cluster" | "keep failing" reads "SHALL keep failing" |
 | A registry that hands out bearer tokens and whose token endpoint refuses the caller is a refused credential li... | "A refusing token endpoint is a refused credential" | "is a refused credential" reads "SHALL be a refused credential" |
 | The gates: kernel loadability (modules only: ...) ... already-published tag. | "Publish evaluates the gates of the gate list (THEN line of the scenario "The ten gates of the gate list")" | "The gates:" reads "The gates SHALL be:"; the body sentence "The gates SHALL be those listed in scenario ..." is added |
+
+## Ledger entries of cli-B3 (release-workflow, kernel-render, deps-cascade, instance-init, authoring-commands)
+
+One subsection per rewritten requirement, 28 in all. Every new body is built from whole sentences of the old body, copied unchanged (swarm DECISIONS.md 2026-10-19 15:50). A clause row names where a sentence of the old body appears; the list "Words changed or added" under a requirement names each substitution, as the rulings allow: a pronoun ("It", "That job", "Its") read as the subject copied from the same old requirement, a lowered or raised first letter, a closing period where a list marker or a semicolon stood, and an RFC 2119 keyword where the old sentence had none (also listed in the strength table). All 28 are form c2, because the old scenarios of each requirement belong to different new behaviors; no other change of the repo cites an old header (checked with `grep -rn --exclude-dir=archive` over the repo on 2026-10-19), except where this section says so. Old scenario names are all kept; the byte check ran once per rewritten requirement and printed no `DIFF` and no `LOST`.
+
+Rules applied beyond unit cli-B2:
+
+- A `Source:` line is repeated whole on each split block. Six blocks of `instance-init` carry a shortened line that drops whole titles only and keeps the id: the four blocks that split "Init reports what it wrote and does not validate it", "The initValues source" and "No debugValues content reaches the package" (each keeps the one title that supports its rule). The `deps-cascade` sentence "The source is workspace RELEASING.md, sections ..." is not a `Source:` line; it stands in the block "The pin rules take their source from workspace RELEASING.md".
+- A sentence over 500 characters, or a sentence that cannot hold its `Source:` line, is cut at a list or clause boundary, each part verbatim, the subject or condition repeated: `release-workflow` "Template modules publish on release" (the gate list, 555), "A breaking change is marked by a bang in the pull request title" (the footer sentence, 568), "Downstream repos are notified after a release is published" (the caller-owned list); `kernel-render` "All renders go through the library kernel" (the identity check, 546) and "A colliding platform is refused naming the entries to disable" (the first sentence with its `Source:` line); `deps-cascade` "Title and body tasks describe the cascade diff" (the `pins.sh` list, 552); `instance-init` "Init writes all or nothing, and only where a standalone package belongs" (the two conditions); `authoring-commands` (the semicolon sentence). The supervisor is asked to rule on these cuts.
+- Where "Otherwise" or "Both warnings" had its antecedent in a sibling, the body names that sibling by its exact header ("In every other case than ...", 16:55): `release-workflow` "The goreleaser job checks out the tag and runs goreleaser", `kernel-render` two blocks, `instance-init` three blocks.
+- `instance-init` "The values.cue file declares one values field" cited the removed header "Values start from the author's intended source" and now cites "values.cue is filled from the first applicable source and the report names it" (grep over the repo outside `openspec/changes/archive/` on 2026-10-19 found no other reference).
+- `release-workflow` "The script runs the identity, layout, tidy, vet and zip gates on every template tree" cites the `pr-workflow` requirement "Template publish gates run dry-run" by name, as the old text did. That header is in the unit cli-B7 batch; unit cli-B7 must keep the cite true if it renames that header.
+
+### Ledger: release-workflow, Binaries publish only when a release was created
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The goreleaser job runs only for a created release or a manual run", "The goreleaser job needs a draft release", "The goreleaser job fails without a release for the tag", "A failed draft lookup is no published release", "The goreleaser job needs publish-templates to succeed", "The goreleaser job runs in a concurrency group per tag", "The goreleaser job checks out the tag and runs goreleaser", "A manual run recovers a draft release and never changes a published one".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Skipped on a non-release push | "The goreleaser job runs only for a created release or a manual run", "Skipped on a non-release push" | No (byte equal, checked) |
+| Runs on the release tag | "The goreleaser job checks out the tag and runs goreleaser", "Runs on the release tag" | No (byte equal, checked) |
+| Manual recovery builds an existing tag | "A manual run recovers a draft release and never changes a published one", "Manual recovery builds an existing tag" | No (byte equal, checked) |
+| Manual recovery refuses a published release | "The goreleaser job needs a draft release", "Manual recovery refuses a published release" | No (byte equal, checked) |
+| Manual recovery for a tag without a release | "The goreleaser job fails without a release for the tag", "Manual recovery for a tag without a release" | No (byte equal, checked) |
+| Template failure keeps the release a draft | "The goreleaser job needs publish-templates to succeed", "Template failure keeps the release a draft" | No (byte equal, checked) |
+| (new) | "A failed draft lookup is no published release", "A failed lookup is not reported as published" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The goreleaser job runs in a concurrency group per tag", "The job runs in a concurrency group per tag" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| The `goreleaser` job SHALL `need` release-please and publish-templates... | body of "The goreleaser job runs only for a created release or a manual run", verbatim |
+| Before building it SHALL read the draft state of the GitHub Release fo... | body of "The goreleaser job needs a draft release", the part of this sentence it holds, verbatim or as the words changed below say |
+| When the release is published it SHALL fail with a message that the re... | body of "The goreleaser job needs a draft release", the part of this sentence it holds, verbatim or as the words changed below say |
+| When no GitHub Release exists for the tag it SHALL fail with a message... | body of "The goreleaser job fails without a release for the tag", the part of this sentence it holds, verbatim or as the words changed below say |
+| When the lookup itself fails for any other reason it SHALL fail with t... | body of "A failed draft lookup is no published release", the part of this sentence it holds, verbatim or as the words changed below say |
+| After the draft check and before building, it SHALL fail unless the pu... | body of "The goreleaser job needs publish-templates to succeed", the part of this sentence it holds, verbatim or as the words changed below say |
+| It SHALL run in a concurrency group per tag that never cancels a runni... | body of "The goreleaser job runs in a concurrency group per tag", the part of this sentence it holds, verbatim or as the words changed below say |
+| Otherwise it SHALL check out `tag_name`, or the `tag` input on a manua... | body of "The goreleaser job checks out the tag and runs goreleaser", the part of this sentence it holds, verbatim or as the words changed below say |
+| The manual run is the recovery for a draft release whose tag exists wi... | body of "A manual run recovers a draft release and never changes a published one", verbatim |
+| Source: enhancement 0021 ("Release tags are immutable"). | body of "The goreleaser job runs only for a created release or a manual run", verbatim; body of "The goreleaser job needs a draft release", verbatim; body of "The goreleaser job fails without a release for the tag", verbatim; body of "A failed draft lookup is no published release", verbatim; body of "The goreleaser job needs publish-templates to succeed", verbatim; body of "The goreleaser job runs in a concurrency group per tag", verbatim; body of "The goreleaser job checks out the tag and runs goreleaser", verbatim; body of "A manual run recovers a draft release and never changes a published one", verbatim |
+
+Words changed or added:
+- "The goreleaser job needs a draft release": "Before building it SHALL read the draft state of the GitHub Release for the tag and SHALL ..." reads "Before building, the `goreleaser` job SHALL read the draft state of the GitHub Release for..." ("it" reads "the `goreleaser` job")
+- "The goreleaser job needs a draft release": "When the release is published it SHALL fail with a message that the release is already pub..." reads "When the release is published the `goreleaser` job SHALL fail with a message that the rele..." ("it" reads "the `goreleaser` job")
+- "The goreleaser job fails without a release for the tag": "When no GitHub Release exists for the tag it SHALL fail with a message that names the tag ..." reads "When no GitHub Release exists for the tag the `goreleaser` job SHALL fail with a message t..." ("it" reads "the `goreleaser` job")
+- "A failed draft lookup is no published release": "Before building it SHALL read the draft state of the GitHub Release for the tag and SHALL ..." reads "Before building, the `goreleaser` job SHALL read the draft state of the GitHub Release for..." (the first clause of the sentence up to "and", with a period; "it" reads "the `goreleaser` job")
+- "A failed draft lookup is no published release": "When the lookup itself fails for any other reason it SHALL fail with that error and SHALL ..." reads "When the lookup itself fails for any other reason the `goreleaser` job SHALL fail with tha..." ("it" reads "the `goreleaser` job")
+- "The goreleaser job needs publish-templates to succeed": "After the draft check and before building, it SHALL fail unless the publish-templates job ..." reads "After the draft check and before building, the `goreleaser` job SHALL fail unless the publ..." ("it" reads "the `goreleaser` job")
+- "The goreleaser job runs in a concurrency group per tag": "It SHALL run in a concurrency group per tag that never cancels a running job." reads "The `goreleaser` job SHALL run in a concurrency group per tag that never cancels a running..." ("It" reads "The `goreleaser` job")
+- "The goreleaser job checks out the tag and runs goreleaser": "Otherwise it SHALL check out `tag_name`, or the `tag` input on a manual run, with `fetch-d..." reads "In every other case than those of requirements "The goreleaser job needs a draft release",..." ("Otherwise it" reads the quoted case (16:55))
+
+Lengths (old, new): old 1585; new "The goreleaser job runs only for a created release or a manual run" 378; "The goreleaser job needs a draft release" 370; "The goreleaser job fails without a release for the tag" 245; "A failed draft lookup is no published release" 301; "The goreleaser job needs publish-templates to succeed" 279; "The goreleaser job runs in a concurrency group per tag" 152; "The goreleaser job checks out the tag and runs goreleaser" 478; "A manual run recovers a draft release and never changes a published one" 249.
+
+### Ledger: release-workflow, Goreleaser produces per-platform archives, checksums and changelog
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "Goreleaser builds five platform archives and attaches them with the checksums", "Goreleaser groups the changelog by commit type", "Goreleaser attaches to release-please's draft release and publishes it last", "The goreleaser configuration sets no draft, no renamed release and no replaced draft", "Goreleaser sets the prerelease flag from the tag", "Goreleaser keeps the release notes release-please wrote".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Five archives and checksums attached | "Goreleaser builds five platform archives and attaches them with the checksums", "Five archives and checksums attached" | No (byte equal, checked) |
+| Changelog grouped by type | "Goreleaser groups the changelog by commit type", "Changelog grouped by type" | No (byte equal, checked) |
+| Beta tag flagged as a pre-release | "Goreleaser sets the prerelease flag from the tag", "Beta tag flagged as a pre-release" | No (byte equal, checked) |
+| Release published only with all assets | "Goreleaser attaches to release-please's draft release and publishes it last", "Release published only with all assets" | No (byte equal, checked) |
+| (new) | "The goreleaser configuration sets no draft, no renamed release and no replaced draft", "The configuration leaves the draft, name and replace keys unset" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "Goreleaser keeps the release notes release-please wrote", "Release-please notes are kept" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| Goreleaser SHALL build `opm` for linux/amd64, linux/arm64, darwin/amd6... | body of "Goreleaser builds five platform archives and attaches them with the checksums", verbatim |
+| Its changelog SHALL group commits into Features, Bug Fixes, Performanc... | body of "Goreleaser groups the changelog by commit type", verbatim |
+| Goreleaser SHALL attach to release-please's draft release (`release.us... | body of "Goreleaser attaches to release-please's draft release and publishes it last", verbatim |
+| The configuration SHALL NOT set `release.draft`, a `release.name_templ... | body of "The goreleaser configuration sets no draft, no renamed release and no replaced draft", the part of this sentence it holds, verbatim or as the words changed below say |
+| Goreleaser SHALL set the GitHub Release's prerelease flag from the tag... | body of "Goreleaser sets the prerelease flag from the tag", verbatim |
+| It SHALL keep the release notes release-please already wrote on the ex... | body of "Goreleaser keeps the release notes release-please wrote", the part of this sentence it holds, verbatim or as the words changed below say |
+| Source: enhancement 0021 ("Release tags are immutable"). | body of "Goreleaser builds five platform archives and attaches them with the checksums", verbatim; body of "Goreleaser groups the changelog by commit type", verbatim; body of "Goreleaser attaches to release-please's draft release and publishes it last", verbatim; body of "The goreleaser configuration sets no draft, no renamed release and no replaced draft", verbatim; body of "Goreleaser sets the prerelease flag from the tag", verbatim; body of "Goreleaser keeps the release notes release-please wrote", verbatim |
+
+Words changed or added:
+- "The goreleaser configuration sets no draft, no renamed release and no replaced draft": "The configuration SHALL NOT set `release.draft`, a `release.name_template` that departs fr..." reads "The goreleaser configuration SHALL NOT set `release.draft`, a `release.name_template` that..." (subject made explicit)
+- "Goreleaser keeps the release notes release-please wrote": "It SHALL keep the release notes release-please already wrote on the existing GitHub Releas..." reads "Goreleaser SHALL keep the release notes release-please already wrote on the existing GitHu..." ("It" reads "Goreleaser")
+
+Lengths (old, new): old 1342; new "Goreleaser builds five platform archives and attaches them with the checksums" 352; "Goreleaser groups the changelog by commit type" 222; "Goreleaser attaches to release-please's draft release and publishes it last" 395; "The goreleaser configuration sets no draft, no renamed release and no replaced draft" 206; "Goreleaser sets the prerelease flag from the tag" 277; "Goreleaser keeps the release notes release-please wrote" 189.
+
+### Ledger: release-workflow, Template modules publish on release
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The publish-templates job runs the publish script before goreleaser builds", "The script runs the identity, layout, tidy, vet and zip gates on every template tree", "The script runs the dry-run publish gates, the version order and the content check on every template tree", "A failed gate publishes nothing and otherwise the script acts on each gate verdict", "A version published between the gates and the push is not skipped unchecked", "A release with no template changed publishes nothing", "A change to a template's files bumps its identity Version".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| No template version bumped | "A release with no template changed publishes nothing", "No template version bumped" | No (byte equal, checked) |
+| Template fails a gate | "A failed gate publishes nothing and otherwise the script acts on each gate verdict", "Template fails a gate" | No (byte equal, checked) |
+| Bumped template publishes | "A failed gate publishes nothing and otherwise the script acts on each gate verdict", "Bumped template publishes" | No (byte equal, checked) |
+| A template that does not vet blocks every template publish | "The script runs the identity, layout, tidy, vet and zip gates on every template tree", "A template that does not vet blocks every template publish" | No (byte equal, checked) |
+| Changed template at a published version fails before any publish | "The script runs the dry-run publish gates, the version order and the content check on every template tree", "Changed template at a published version fails before any publish" | No (byte equal, checked) |
+| Re-run after a partial publish completes | "A release with no template changed publishes nothing", "Re-run after a partial publish completes" | No (byte equal, checked) |
+| A version published during the run is not skipped | "A version published between the gates and the push is not skipped unchecked", "A version published during the run is not skipped" | No (byte equal, checked) |
+| A template whose zip omits a file publishes nothing | "The script runs the identity, layout, tidy, vet and zip gates on every template tree", "A template whose zip omits a file publishes nothing" | No (byte equal, checked) |
+| A prerelease or older template version publishes nothing | "The script runs the dry-run publish gates, the version order and the content check on every template tree", "A prerelease or older template version publishes nothing" | No (byte equal, checked) |
+| (new) | "The publish-templates job runs the publish script before goreleaser builds", "The job finishes before goreleaser builds" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "A change to a template's files bumps its identity Version", "A changed template without a bump fails the release" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| The `publish-templates` job SHALL `need` release-please, run only when... | body of "The publish-templates job runs the publish script before goreleaser builds", verbatim |
+| It SHALL finish before the goreleaser job builds. | body of "The publish-templates job runs the publish script before goreleaser builds", verbatim |
+| Before it publishes any template, the script SHALL run every gate of t... | body of "The script runs the dry-run publish gates, the version order and the content check on every template tree", the part of this sentence it holds, verbatim or as the words changed below say |
+| If any template fails a gate, or a fetch, listing, verification or com... | body of "A failed gate publishes nothing and otherwise the script acts on each gate verdict", verbatim |
+| Otherwise it SHALL act on each template's gate verdict without reading... | body of "A failed gate publishes nothing and otherwise the script acts on each gate verdict", verbatim |
+| A version that becomes published between the gates and the push SHALL ... | body of "A version published between the gates and the push is not skipped unchecked", verbatim |
+| A release with no template changed publishes nothing and succeeds, and... | body of "A release with no template changed publishes nothing", with the keyword words changed as the list below says |
+| A change to a template's files, its `cue.mod` pins included, SHALL the... | body of "A change to a template's files bumps its identity Version", verbatim |
+
+Words changed or added:
+- "The script runs the identity, layout, tidy, vet and zip gates on every template tree": "Before it publishes any template, the script SHALL run every gate of the pr-workflow requi..." reads "Before the `publish-templates` job publishes any template, the script SHALL run every gate..." (the first two list items of the gate list; the final semicolon reads a period; the "it" of the intro reads "the `publish-templates` job")
+- "The script runs the dry-run publish gates, the version order and the content check on every template tree": "Before it publishes any template, the script SHALL run every gate of the pr-workflow requi..." reads "Before the `publish-templates` job publishes any template, the script SHALL run every gate..." (the last two list items of the gate list; the "it" of the intro reads "the `publish-templates` job")
+- "A release with no template changed publishes nothing": "A release with no template changed publishes nothing and succeeds, and a re-run after a pa..." reads "A release with no template changed SHALL publish nothing and succeed, and a re-run after a..." ("publishes" reads "SHALL publish", "succeeds" reads "succeed", "skips" reads "SHALL skip")
+
+Lengths (old, new): old 1912; new "The publish-templates job runs the publish script before goreleaser builds" 474; "The script runs the identity, layout, tidy, vet and zip gates on every template tree" 328; "The script runs the dry-run publish gates, the version order and the content check on every template tree" 469; "A failed gate publishes nothing and otherwise the script acts on each gate verdict" 340; "A version published between the gates and the push is not skipped unchecked" 148; "A release with no template changed publishes nothing" 150; "A change to a template's files bumps its identity Version" 240.
+
+### Ledger: release-workflow, Release-please runs on pushes to main
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The release workflow triggers on push to main and on manual dispatch with a tag", "On a push the release-please job runs first as the opm-release-please App", "The release-please configuration sets draft and force-tag-creation", "The release-please job exposes releases_created and tag_name as outputs", "On a manual run the release-please job is skipped".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Release-please on a push without a merged release PR | "On a push the release-please job runs first as the opm-release-please App", "Release-please on a push without a merged release PR" | No (byte equal, checked) |
+| Release-please on a merged release PR | "The release-please configuration sets draft and force-tag-creation", "Release-please on a merged release PR" | No (byte equal, checked) |
+| Releases without a release-as key stay on the beta line | "On a push the release-please job runs first as the opm-release-please App", "Releases without a release-as key stay on the beta line" | No (byte equal, checked) |
+| (new) | "The release workflow triggers on push to main and on manual dispatch with a tag", "Triggers of the release workflow" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The release-please job exposes releases_created and tag_name as outputs", "Outputs for the downstream jobs" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "On a manual run the release-please job is skipped", "Manual run skips release-please" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| The release workflow SHALL trigger on `push` to `main` and on `workflo... | body of "The release workflow triggers on push to main and on manual dispatch with a tag", verbatim |
+| On a push, the `release-please` job SHALL run first, authenticated as ... | body of "On a push the release-please job runs first as the opm-release-please App", verbatim |
+| The configuration SHALL set `draft: true` and `force-tag-creation: tru... | body of "The release-please configuration sets draft and force-tag-creation", verbatim |
+| The job SHALL expose `releases_created` and `tag_name` as outputs for ... | body of "The release-please job exposes releases_created and tag_name as outputs", the part of this sentence it holds, verbatim or as the words changed below say |
+| On a manual run the `release-please` job SHALL be skipped. | body of "On a manual run the release-please job is skipped", verbatim |
+| Source: enhancement 0021 ("Release tags are immutable"). | body of "The release workflow triggers on push to main and on manual dispatch with a tag", verbatim; body of "On a push the release-please job runs first as the opm-release-please App", verbatim; body of "The release-please configuration sets draft and force-tag-creation", verbatim; body of "The release-please job exposes releases_created and tag_name as outputs", verbatim; body of "On a manual run the release-please job is skipped", verbatim |
+
+Words changed or added:
+- "The release-please job exposes releases_created and tag_name as outputs": "The job SHALL expose `releases_created` and `tag_name` as outputs for the downstream jobs...." reads "The `release-please` job SHALL expose `releases_created` and `tag_name` as outputs for the..." ("The job" reads "The `release-please` job")
+
+Lengths (old, new): old 881; new "The release workflow triggers on push to main and on manual dispatch with a tag" 194; "On a push the release-please job runs first as the opm-release-please App" 375; "The release-please configuration sets draft and force-tag-creation" 274; "The release-please job exposes releases_created and tag_name as outputs" 164; "On a manual run the release-please job is skipped" 115.
+
+### Ledger: release-workflow, A version line moves only through a release-as key
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A forced version is a release-as value set by a normal pull request", "The release-as key takes effect only with a releasable commit", "The release-as key is removed before any later release PR merges", "A Release-As footer is not relied on", "A BEGIN_COMMIT_OVERRIDE block is not used".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| A release-as key forces the line change | "A forced version is a release-as value set by a normal pull request", "A release-as key forces the line change" | No (byte equal, checked) |
+| A key pull request of a hidden type alone opens no release PR | "The release-as key takes effect only with a releasable commit", "A key pull request of a hidden type alone opens no release PR" | No (byte equal, checked) |
+| The key is removed once its release is cut | "The release-as key is removed before any later release PR merges", "The key is removed once its release is cut" | No (byte equal, checked) |
+| A footer forces nothing | "A Release-As footer is not relied on", "A footer forces nothing" | No (byte equal, checked) |
+| (new) | "A BEGIN_COMMIT_OVERRIDE block is not used", "An override block is not used" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| A forced version, such as a move to a new version line (for example `1... | body of "A forced version is a release-as value set by a normal pull request", verbatim |
+| The key SHALL take effect only together with a releasable commit (a vi... | body of "The release-as key takes effect only with a releasable commit", verbatim |
+| Because release-please re-applies a configured `release-as` on every r... | body of "The release-as key is removed before any later release PR merges", verbatim |
+| Outside the span from the key pull request to the pull request that re... | body of "The release-as key is removed before any later release PR merges", verbatim |
+| A `Release-As:` footer in a pull request body or a branch commit messa... | body of "A Release-As footer is not relied on", verbatim |
+| A `BEGIN_COMMIT_OVERRIDE` block in a pull request body SHALL NOT be us... | body of "A BEGIN_COMMIT_OVERRIDE block is not used", verbatim |
+| Source: workspace RELEASING.md, section "Owner settings" (owner decisi... | body of "A forced version is a release-as value set by a normal pull request", verbatim; body of "The release-as key takes effect only with a releasable commit", verbatim; body of "The release-as key is removed before any later release PR merges", verbatim; body of "A Release-As footer is not relied on", verbatim; body of "A BEGIN_COMMIT_OVERRIDE block is not used", verbatim |
+
+Lengths (old, new): old 1267; new "A forced version is a release-as value set by a normal pull request" 302; "The release-as key takes effect only with a releasable commit" 473; "The release-as key is removed before any later release PR merges" 353; "A Release-As footer is not relied on" 238; "A BEGIN_COMMIT_OVERRIDE block is not used" 241.
+
+### Ledger: release-workflow, A breaking change is marked by a bang in the pull request title
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A breaking change is marked by a bang in the pull request title or the one commit subject", "A BREAKING CHANGE footer is not relied on", "The migration note goes in the pull request body", "The release pull request CHANGELOG is edited by hand and the edit is redone", "A BEGIN_COMMIT_OVERRIDE block is not used for a breaking change".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Breaking change marked in the title | "A breaking change is marked by a bang in the pull request title or the one commit subject", "Breaking change marked in the title" | No (byte equal, checked) |
+| A breaking footer alone marks nothing | "A BREAKING CHANGE footer is not relied on", "A breaking footer alone marks nothing" | No (byte equal, checked) |
+| (new) | "The migration note goes in the pull request body", "Migration note placement" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The release pull request CHANGELOG is edited by hand and the edit is redone", "A hand edit of the release pull request's changelog" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "A BEGIN_COMMIT_OVERRIDE block is not used for a breaking change", "An override block marks nothing" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| A breaking change SHALL be marked by `!` in the pull request title (`f... | body of "A breaking change is marked by a bang in the pull request title or the one commit subject", verbatim |
+| Until that owner setting lands, a one-commit pull request squashes und... | body of "A breaking change is marked by a bang in the pull request title or the one commit subject", verbatim |
+| A `BREAKING CHANGE:` footer in a pull request body or a branch commit ... | body of "A BREAKING CHANGE footer is not relied on", the part of this sentence it holds, verbatim or as the words changed below say; body of "The release pull request CHANGELOG is edited by hand and the edit is redone", the part of this sentence it holds, verbatim or as the words changed below say |
+| A `BEGIN_COMMIT_OVERRIDE` block in a pull request body SHALL NOT be us... | body of "A BEGIN_COMMIT_OVERRIDE block is not used for a breaking change", verbatim |
+| Source: workspace RELEASING.md, section "Owner settings" (owner decisi... | body of "A breaking change is marked by a bang in the pull request title or the one commit subject", verbatim; body of "A BREAKING CHANGE footer is not relied on", verbatim; body of "The migration note goes in the pull request body", verbatim; body of "The release pull request CHANGELOG is edited by hand and the edit is redone", verbatim; body of "A BEGIN_COMMIT_OVERRIDE block is not used for a breaking change", verbatim |
+
+Words changed or added:
+- "A BREAKING CHANGE footer is not relied on": "A `BREAKING CHANGE:` footer in a pull request body or a branch commit message SHALL NOT be..." reads "A `BREAKING CHANGE:` footer in a pull request body or a branch commit message SHALL NOT be..." (the first clause of the sentence up to the semicolon; the semicolon reads a period)
+- "The migration note goes in the pull request body": "A `BREAKING CHANGE:` footer in a pull request body or a branch commit message SHALL NOT be..." reads "The migration note of a breaking change SHALL go in the pull request body, and in the user..." ("the migration note goes" reads "The migration note of a breaking change SHALL go"; the trailing comma reads a period)
+- "The release pull request CHANGELOG is edited by hand and the edit is redone": "A `BREAKING CHANGE:` footer in a pull request body or a branch commit message SHALL NOT be..." reads "The release pull request's `CHANGELOG.md` SHALL be edited by hand to carry the migration n..." ("and" dropped before "the release" and "the edit"; "it" reads "the migration note"; the two clauses stand as two sentences)
+
+Lengths (old, new): old 1098; new "A breaking change is marked by a bang in the pull request title or the one commit subject" 395; "A BREAKING CHANGE footer is not relied on" 243; "The migration note goes in the pull request body" 212; "The release pull request CHANGELOG is edited by hand and the edit is redone" 401; "A BEGIN_COMMIT_OVERRIDE block is not used for a breaking change" 219.
+
+### Ledger: release-workflow, Downstream repos are notified after a release is published
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The release workflow ends with a notify-downstream job", "The notify job runs only after goreleaser succeeded, on main, unless notifying is switched off", "The notify job runs on a manual recovery run and does not depend on the docs bundle job", "The notify job is caller-owned with a fixed runner, Environment, timeout and permission", "The notify job has exactly one step, the shared cascade-notify action", "The cascade-notify action mints the dispatch token and chooses the targets".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Release run notifies after publishing | "The release workflow ends with a notify-downstream job", "Release run notifies after publishing" | No (byte equal, checked) |
+| A release left a draft notifies nothing | "The notify job runs only after goreleaser succeeded, on main, unless notifying is switched off", "A release left a draft notifies nothing" | No (byte equal, checked) |
+| Manual recovery that finishes a draft notifies once | "The notify job runs on a manual recovery run and does not depend on the docs bundle job", "Manual recovery that finishes a draft notifies once" | No (byte equal, checked) |
+| Manual run on a published release does not notify again | "The notify job runs on a manual recovery run and does not depend on the docs bundle job", "Manual run on a published release does not notify again" | No (byte equal, checked) |
+| Manual run from another branch does not notify | "The notify job runs only after goreleaser succeeded, on main, unless notifying is switched off", "Manual run from another branch does not notify" | No (byte equal, checked) |
+| A push without a release does not notify | "The notify job runs only after goreleaser succeeded, on main, unless notifying is switched off", "A push without a release does not notify" | No (byte equal, checked) |
+| Notify switched off | "The notify job runs only after goreleaser succeeded, on main, unless notifying is switched off", "Notify switched off" | No (byte equal, checked) |
+| A failed docs bundle does not suppress the notify | "The notify job runs on a manual recovery run and does not depend on the docs bundle job", "A failed docs bundle does not suppress the notify" | No (byte equal, checked) |
+| (new) | "The notify job is caller-owned with a fixed runner, Environment, timeout and permission", "The notify job is caller-owned" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The notify job has exactly one step, the shared cascade-notify action", "The notify job has one step" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The cascade-notify action mints the dispatch token and chooses the targets", "The action chooses the targets" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| `.github/workflows/release.yml` SHALL have a `notify-downstream` job, ... | body of "The release workflow ends with a notify-downstream job", verbatim |
+| It SHALL run only when goreleaser succeeded, the run's ref is `main`, ... | body of "The notify job runs only after goreleaser succeeded, on main, unless notifying is switched off", the part of this sentence it holds, verbatim or as the words changed below say |
+| It SHALL run on a release run and on a manual recovery run alike, beca... | body of "The notify job runs on a manual recovery run and does not depend on the docs bundle job", the part of this sentence it holds, verbatim or as the words changed below say |
+| It SHALL NOT depend on the docs bundle job. | body of "The notify job runs on a manual recovery run and does not depend on the docs bundle job", the part of this sentence it holds, verbatim or as the words changed below say |
+| It is a caller-owned job: it SHALL run on `ubuntu-latest`, declare `en... | body of "The notify job is caller-owned with a fixed runner, Environment, timeout and permission", the part of this sentence it holds, verbatim or as the words changed below say; body of "The notify job has exactly one step, the shared cascade-notify action", the part of this sentence it holds, verbatim or as the words changed below say |
+| The action mints the dispatch token and chooses the targets: catalog_o... | body of "The cascade-notify action mints the dispatch token and chooses the targets", the part of this sentence it holds, verbatim or as the words changed below say |
+| Source: workspace RELEASING.md, sections "Notify after publish" and "S... | body of "The release workflow ends with a notify-downstream job", verbatim; body of "The notify job runs only after goreleaser succeeded, on main, unless notifying is switched off", verbatim; body of "The notify job runs on a manual recovery run and does not depend on the docs bundle job", verbatim; body of "The notify job is caller-owned with a fixed runner, Environment, timeout and permission", verbatim; body of "The notify job has exactly one step, the shared cascade-notify action", verbatim; body of "The cascade-notify action mints the dispatch token and chooses the targets", verbatim |
+
+Words changed or added:
+- "The notify job runs only after goreleaser succeeded, on main, unless notifying is switched off": "It SHALL run only when goreleaser succeeded, the run's ref is `main`, and the repository v..." reads "The `notify-downstream` job SHALL run only when goreleaser succeeded, the run's ref is `ma..." ("It" reads "The `notify-downstream` job")
+- "The notify job runs on a manual recovery run and does not depend on the docs bundle job": "It SHALL run on a release run and on a manual recovery run alike, because release-please i..." reads "The `notify-downstream` job SHALL run on a release run and on a manual recovery run alike,..." ("It" reads "The `notify-downstream` job")
+- "The notify job runs on a manual recovery run and does not depend on the docs bundle job": "It SHALL NOT depend on the docs bundle job." reads "The `notify-downstream` job SHALL NOT depend on the docs bundle job." ("It" reads "The `notify-downstream` job")
+- "The notify job is caller-owned with a fixed runner, Environment, timeout and permission": "It is a caller-owned job: it SHALL run on `ubuntu-latest`, declare `environment: cascade`,..." reads "It is a caller-owned job: it SHALL run on `ubuntu-latest`, declare `environment: cascade`,..." (the first part of the sentence up to the list boundary before "and have exactly one step"; the end reads a period)
+- "The notify job has exactly one step, the shared cascade-notify action": "It is a caller-owned job: it SHALL run on `ubuntu-latest`, declare `environment: cascade`,..." reads "The caller-owned job SHALL have exactly one step, the shared `open-platform-model/.github`..." (the second part of the sentence from the list boundary; the subject "It is a caller-owned job: it SHALL" reads "The caller-owned job SHALL", "and have" reads "have")
+- "The cascade-notify action mints the dispatch token and chooses the targets": "The action mints the dispatch token and chooses the targets: catalog_opm and opm-operator,..." reads "The action SHALL mint the dispatch token and choose the targets: catalog_opm and opm-opera..." ("mints" reads "SHALL mint", "chooses" reads "choose")
+
+Lengths (old, new): old 1148; new "The release workflow ends with a notify-downstream job" 261; "The notify job runs only after goreleaser succeeded, on main, unless notifying is switched off" 291; "The notify job runs on a manual recovery run and does not depend on the docs bundle job" 350; "The notify job is caller-owned with a fixed runner, Environment, timeout and permission" 283; "The notify job has exactly one step, the shared cascade-notify action" 495; "The cascade-notify action mints the dispatch token and chooses the targets" 255.
+
+### Ledger: release-workflow, Only the release-please job reads the release App key, inside the release Environment
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "Only the release-please job reads the release App key", "The release Environment is declared by the release-please job alone, on pushes to main", "The release-please job grants the GITHUB_TOKEN no permission".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| A push to main mints the token inside the Environment | "The release Environment is declared by the release-please job alone, on pushes to main", "A push to main mints the token inside the Environment" | No (byte equal, checked) |
+| A manual run does not reach the key | "Only the release-please job reads the release App key", "A manual run does not reach the key" | No (byte equal, checked) |
+| (new) | "The release-please job grants the GITHUB_TOKEN no permission", "The job grants the GITHUB_TOKEN nothing" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| The `release-please` job of `release.yml` SHALL be the only job in the... | body of "Only the release-please job reads the release App key", verbatim |
+| That job SHALL declare `environment: release`, the Environment whose d... | body of "The release Environment is declared by the release-please job alone, on pushes to main", the part of this sentence it holds, verbatim or as the words changed below say |
+| It SHALL grant the `GITHUB_TOKEN` no permission (`permissions: {}`), b... | body of "The release-please job grants the GITHUB_TOKEN no permission", the part of this sentence it holds, verbatim or as the words changed below say |
+| No other job SHALL declare the `release` Environment. | body of "The release Environment is declared by the release-please job alone, on pushes to main", verbatim |
+| Source: owner decision 29 (2026-10-04); security pass finding GOV-2. | body of "Only the release-please job reads the release App key", verbatim; body of "The release Environment is declared by the release-please job alone, on pushes to main", verbatim; body of "The release-please job grants the GITHUB_TOKEN no permission", verbatim |
+
+Words changed or added:
+- "The release Environment is declared by the release-please job alone, on pushes to main": "That job SHALL declare `environment: release`, the Environment whose deployment branch pol..." reads "The `release-please` job SHALL declare `environment: release`, the Environment whose deplo..." ("That job" reads "The `release-please` job")
+- "The release-please job grants the GITHUB_TOKEN no permission": "It SHALL grant the `GITHUB_TOKEN` no permission (`permissions: {}`), because it acts only ..." reads "The `release-please` job SHALL grant the `GITHUB_TOKEN` no permission (`permissions: {}`),..." ("It" reads "The `release-please` job")
+
+Lengths (old, new): old 645; new "Only the release-please job reads the release App key" 284; "The release Environment is declared by the release-please job alone, on pushes to main" 332; "The release-please job grants the GITHUB_TOKEN no permission" 203.
+
+### Ledger: kernel-render, All renders go through the library kernel
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The CLI renders instances through one Kernel.Render call", "The CLI carries no matching, execution or finalization of its own and imports no opm-operator package", "The CLI checks the compiled objects for shared apply identities", "A shared apply identity is refused as a validation failure", "The refusal of a shared identity prints the library header line and each shared identity", "The CLI words the advisory facts of the kernel as warnings", "The kernel-derived warnings name the same facts as before".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Instance apply renders via the kernel | "The CLI renders instances through one Kernel.Render call", "Instance apply renders via the kernel" | No (byte equal, checked) |
+| No CLI-side match implementation | "The CLI carries no matching, execution or finalization of its own and imports no opm-operator package", "No CLI-side match implementation" | No (byte equal, checked) |
+| Render warnings reach the user | "The CLI words the advisory facts of the kernel as warnings", "Render warnings reach the user" | No (byte equal, checked) |
+| Unhandled optional trait warns | "The CLI words the advisory facts of the kernel as warnings", "Unhandled optional trait warns" | No (byte equal, checked) |
+| Skew refusal is a validation failure | "The kernel-derived warnings name the same facts as before", "Skew refusal is a validation failure" | No (byte equal, checked) |
+| Typed render causes keep their exit codes | "The CLI renders instances through one Kernel.Render call", "Typed render causes keep their exit codes" | No (byte equal, checked) |
+| Two registrations in one module are refused by every render | "A shared apply identity is refused as a validation failure", "Two registrations in one module are refused by every render" | No (byte equal, checked) |
+| Distinct identities render as before | "The CLI checks the compiled objects for shared apply identities", "Distinct identities render as before" | No (byte equal, checked) |
+| (new) | "The refusal of a shared identity prints the library header line and each shared identity", "The refusal prints each shared identity" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| The CLI SHALL render instances exclusively through `github.com/open-pl... | body of "The CLI renders instances through one Kernel.Render call", verbatim |
+| The CLI MUST NOT carry its own component-matching, transformer-executi... | body of "The CLI carries no matching, execution or finalization of its own and imports no opm-operator package", verbatim |
+| The rendered resource set is the render result's compiled objects. | body of "The CLI renders instances through one Kernel.Render call", verbatim |
+| After a successful render and before any resource, digest or output is... | body of "The CLI checks the compiled objects for shared apply identities", the part of this sentence it holds, verbatim or as the words changed below say; body of "A shared apply identity is refused as a validation failure", the part of this sentence it holds, verbatim or as the words changed below say |
+| The refusal SHALL print the library's header line under the render-fai... | body of "The refusal of a shared identity prints the library header line and each shared identity", the part of this sentence it holds, verbatim or as the words changed below say |
+| The kernel reports advisory facts as structured rows and attaches no m... | body of "The CLI words the advisory facts of the kernel as warnings", the part of this sentence it holds, verbatim or as the words changed below say |
+| The CLI SHALL word them itself and surface them to the user as warning... | body of "The CLI words the advisory facts of the kernel as warnings", verbatim |
+| Both warnings SHALL name the same facts the kernel previously named — ... | body of "The kernel-derived warnings name the same facts as before", the part of this sentence it holds, verbatim or as the words changed below say |
+
+Words changed or added:
+- "The CLI checks the compiled objects for shared apply identities": "After a successful render and before any resource, digest or output is built, the CLI SHAL..." reads "After a successful render and before any resource, digest or output is built, the CLI SHAL..." (the first clause of the sentence up to the helper, with a period; the clause "and SHALL refuse" follows in another requirement)
+- "A shared apply identity is refused as a validation failure": "After a successful render and before any resource, digest or output is built, the CLI SHAL..." reads "After a successful render and before any resource, digest or output is built, the CLI SHAL..." (the condition of the sentence repeated, then the clause "SHALL refuse the render ..." to the end; "and" dropped)
+- "The refusal of a shared identity prints the library header line and each shared identity": "The refusal SHALL print the library's header line under the render-failed header and each ..." reads "The refusal of requirement "A shared apply identity is refused as a validation failure" SH..." ("The refusal" reads the quoted requirement (16:55))
+- "The CLI words the advisory facts of the kernel as warnings": "The kernel reports advisory facts as structured rows and attaches no message strings to a ..." reads "The kernel SHALL report advisory facts as structured rows and attaches no message strings ..." ("reports" reads "SHALL report")
+- "The kernel-derived warnings name the same facts as before": "Both warnings SHALL name the same facts the kernel previously named — for skew, the path a..." reads "Both warnings of the requirement "The CLI words the advisory facts of the kernel as warnin..." ("Both warnings" reads the quoted requirement (16:55))
+
+Lengths (old, new): old 2018; new "The CLI renders instances through one Kernel.Render call" 404; "The CLI carries no matching, execution or finalization of its own and imports no opm-operator package" 375; "The CLI checks the compiled objects for shared apply identities" 245; "A shared apply identity is refused as a validation failure" 382; "The refusal of a shared identity prints the library header line and each shared identity" 242; "The CLI words the advisory facts of the kernel as warnings" 420; "The kernel-derived warnings name the same facts as before" 187.
+
+### Ledger: kernel-render, CLI entry points map onto kernel entry points
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "Each CLI loading path uses its kernel acquire verb", "No acquire call passes per-call load options", "The CLI uses no raw-value loading tier and builds no artifact from a value of its own", "One kernel is constructed per command invocation", "The CLI does not fill values into an evaluated instance from Go".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Module build synthesizes through the kernel | "Each CLI loading path uses its kernel acquire verb", "Module build synthesizes through the kernel" | No (byte equal, checked) |
+| Registry mapping is supplied once | "No acquire call passes per-call load options", "Registry mapping is supplied once" | No (byte equal, checked) |
+| Single kernel per invocation | "One kernel is constructed per command invocation", "Single kernel per invocation" | No (byte equal, checked) |
+| Instance file with extra values | "Each CLI loading path uses its kernel acquire verb", "Instance file with extra values" | No (byte equal, checked) |
+| Publish gate acquires through the kernel | "Each CLI loading path uses its kernel acquire verb", "Publish gate acquires through the kernel" | No (byte equal, checked) |
+| (new) | "The CLI uses no raw-value loading tier and builds no artifact from a value of its own", "A caller reads the acquired artifact" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The CLI does not fill values into an evaluated instance from Go", "No value is filled from Go" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| Each CLI loading path SHALL use the corresponding kernel acquire verb:... | body of "Each CLI loading path uses its kernel acquire verb", verbatim |
+| No acquire call SHALL pass per-call load options: the registry mapping... | body of "No acquire call passes per-call load options", verbatim |
+| The CLI MUST NOT reach for a raw-value loading tier or construct an ar... | body of "The CLI uses no raw-value loading tier and builds no artifact from a value of its own", verbatim |
+| One `kernel.Kernel` SHALL be constructed per command invocation and th... | body of "One kernel is constructed per command invocation", verbatim |
+| The CLI MUST NOT fill values into an evaluated instance from Go. | body of "The CLI does not fill values into an evaluated instance from Go", verbatim |
+
+Lengths (old, new): old 1122; new "Each CLI loading path uses its kernel acquire verb" 438; "No acquire call passes per-call load options" 187; "The CLI uses no raw-value loading tier and builds no artifact from a value of its own" 202; "One kernel is constructed per command invocation" 227; "The CLI does not fill values into an evaluated instance from Go" 64.
+
+### Ledger: kernel-render, Render digests are kernel-derived and operator-parity
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The last applied render digest is the library's shared render digest", "The digest leaves out the value of the managed-by label", "A registry-gated check verifies that the CLI and operator render digests are identical", "Evaluator-version skew applies to a future cross-binary comparison".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Parity for the same inputs | "A registry-gated check verifies that the CLI and operator render digests are identical", "Parity for the same inputs" | No (byte equal, checked) |
+| Skew reported explicitly (cross-binary check, slice C3) | "Evaluator-version skew applies to a future cross-binary comparison", "Skew reported explicitly (cross-binary check, slice C3)" | No (byte equal, checked) |
+| The runtime name does not move the digest | "The digest leaves out the value of the managed-by label", "The runtime name does not move the digest" | No (byte equal, checked) |
+| (new) | "The last applied render digest is the library's shared render digest", "The digest is computed by the shared function" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| `status.lastAppliedRenderDigest` SHALL be computed over the kernel's r... | body of "The last applied render digest is the library's shared render digest", verbatim |
+| The digest leaves the value of the `app.kubernetes.io/managed-by` labe... | body of "The digest leaves out the value of the managed-by label", the part of this sentence it holds, verbatim or as the words changed below say |
+| A registry-gated integration check SHALL verify that the CLI's local-d... | body of "A registry-gated check verifies that the CLI and operator render digests are identical", verbatim |
+| Evaluator-version skew reporting applies to a future cross-binary comp... | body of "Evaluator-version skew applies to a future cross-binary comparison", the part of this sentence it holds, verbatim or as the words changed below say |
+
+Words changed or added:
+- "The digest leaves out the value of the managed-by label": "The digest leaves the value of the `app.kubernetes.io/managed-by` label out, so the CLI (`..." reads "`status.lastAppliedRenderDigest` SHALL leave the value of the `app.kubernetes.io/managed-b..." ("The digest leaves" reads "`status.lastAppliedRenderDigest` SHALL leave")
+- "Evaluator-version skew applies to a future cross-binary comparison": "Evaluator-version skew reporting applies to a future cross-binary comparison, where the CL..." reads "Evaluator-version skew reporting SHALL apply to a future cross-binary comparison, where th..." ("applies" reads "SHALL apply")
+
+Lengths (old, new): old 1212; new "The last applied render digest is the library's shared render digest" 190; "The digest leaves out the value of the managed-by label" 403; "A registry-gated check verifies that the CLI and operator render digests are identical" 416; "Evaluator-version skew applies to a future cross-binary comparison" 231.
+
+### Ledger: kernel-render, Local-replacement renders warn
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "Every render enables the kernel's local replacements", "A platform generated from the render's own deps carries the module's replacements", "The kernel replacement rows are worded as warnings, one per honoured replacement", "A module redirect of a path the platform names is reported inert", "The warnings do not block the render and a context without the file produces none", "Both render entry points enable the local replacements", "The provenance signal keeps its file-presence rule".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Replaced dependency warns | "The kernel replacement rows are worded as warnings, one per honoured replacement", "Replaced dependency warns" | No (byte equal, checked) |
+| Platform replacement of its catalog is honoured and warns | "Every render enables the kernel's local replacements", "Platform replacement of its catalog is honoured and warns" | No (byte equal, checked) |
+| Module-side replacement of a platform path is reported inert | "A module redirect of a path the platform names is reported inert", "Module-side replacement of a platform path is reported inert" | No (byte equal, checked) |
+| Clean context stays silent | "The warnings do not block the render and a context without the file produces none", "Clean context stays silent" | No (byte equal, checked) |
+| A malformed local file is a validation failure | "Every render enables the kernel's local replacements", "A malformed local file is a validation failure" | No (byte equal, checked) |
+| Module deps platform honours the module's replacement | "A platform generated from the render's own deps carries the module's replacements", "Module deps platform honours the module's replacement" | No (byte equal, checked) |
+| Instance deps platform honours the instance package's replacement | "A platform generated from the render's own deps carries the module's replacements", "Instance deps platform honours the instance package's replacement" | No (byte equal, checked) |
+| (new) | "Both render entry points enable the local replacements", "Both entry points enable the replacements" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The provenance signal keeps its file-presence rule", "The provenance signal follows the file" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| Every render SHALL enable the kernel's local replacements, so a `cue.m... | body of "Every render enables the kernel's local replacements", verbatim |
+| When the platform is generated from the render's own deps (`opm module... | body of "A platform generated from the render's own deps carries the module's replacements", the part of this sentence it holds, verbatim or as the words changed below say |
+| The CLI SHALL word the kernel's replacement rows as warnings, one per ... | body of "The kernel replacement rows are worded as warnings, one per honoured replacement", verbatim |
+| For each `replaceWith` in the module context's own `cue.mod/local-modu... | body of "A module redirect of a path the platform names is reported inert", verbatim |
+| The warnings SHALL NOT block the render or alter its output. | body of "The warnings do not block the render and a context without the file produces none", verbatim |
+| A context without the file SHALL produce no such warning. | body of "The warnings do not block the render and a context without the file produces none", verbatim |
+| Both render entry points SHALL perform this. | body of "Both render entry points enable the local replacements", "perform this" reads "enable the kernel's local replacements" |
+| The provenance signal (`SourceLocal`, the `module-instance.opmodel.dev... | body of "The provenance signal keeps its file-presence rule", the part of this sentence it holds, verbatim or as the words changed below say |
+| Source: enhancement 0010 (a moved-ahead dev checkout is accepted and w... | body of "Every render enables the kernel's local replacements", verbatim; body of "A platform generated from the render's own deps carries the module's replacements", verbatim; body of "The kernel replacement rows are worded as warnings, one per honoured replacement", verbatim; body of "A module redirect of a path the platform names is reported inert", verbatim; body of "The warnings do not block the render and a context without the file produces none", verbatim; body of "Both render entry points enable the local replacements", verbatim; body of "The provenance signal keeps its file-presence rule", verbatim |
+
+Words changed or added:
+- "A platform generated from the render's own deps carries the module's replacements": "When the platform is generated from the render's own deps (`opm module build` and `opm mod..." reads "When the platform is generated from the render's own deps (`opm module build` and `opm mod..." ("are carried" reads "SHALL be carried")
+- "Both render entry points enable the local replacements": "Both render entry points SHALL perform this." reads "Both render entry points SHALL enable the kernel's local replacements." ("perform this" reads "enable the kernel's local replacements", words of the first sentence)
+- "The provenance signal keeps its file-presence rule": "The provenance signal (`SourceLocal`, the `module-instance.opmodel.dev/source: local` anno..." reads "The provenance signal (`SourceLocal`, the `module-instance.opmodel.dev/source: local` anno..." ("keeps" reads "SHALL keep")
+
+Lengths (old, new): old 1728; new "Every render enables the kernel's local replacements" 486; "A platform generated from the render's own deps carries the module's replacements" 433; "The kernel replacement rows are worded as warnings, one per honoured replacement" 432; "A module redirect of a path the platform names is reported inert" 339; "The warnings do not block the render and a context without the file produces none" 202; "Both render entry points enable the local replacements" 154; "The provenance signal keeps its file-presence rule" 216.
+
+### Ledger: kernel-render, Unprovided provider-fulfilled demands are skipped on request
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "Render-bearing commands accept --skip-unprovided and pass it to the kernel", "Without --skip-unprovided a render behaves as before", "With --skip-unprovided a skipped trait is worded as a warning naming the alternatives", "With --skip-unprovided an omitted component is worded once as a warning", "The skipped-demand warnings go to the log stream", "A refusal for unprovided demands adds a hint naming the three ways out", "Instance apply and module apply refuse --skip-unprovided for an operator-managed instance".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Default render still refuses | "Without --skip-unprovided a render behaves as before", "Default render still refuses" | No (byte equal, checked) |
+| A skipped trait renders the rest | "With --skip-unprovided a skipped trait is worded as a warning naming the alternatives", "A skipped trait renders the rest" | No (byte equal, checked) |
+| A skipped resource drops its component | "With --skip-unprovided an omitted component is worded once as a warning", "A skipped resource drops its component" | No (byte equal, checked) |
+| A catalog-fulfilled gap still refuses | "Render-bearing commands accept --skip-unprovided and pass it to the kernel", "A catalog-fulfilled gap still refuses" | No (byte equal, checked) |
+| A cluster without the provider names the flag | "A refusal for unprovided demands adds a hint naming the three ways out", "A cluster without the provider names the flag" | No (byte equal, checked) |
+| An operator-managed instance refuses the flag | "Instance apply and module apply refuse --skip-unprovided for an operator-managed instance", "An operator-managed instance refuses the flag" | No (byte equal, checked) |
+| (new) | "The skipped-demand warnings go to the log stream", "Warnings stay out of the manifest" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| Every render-bearing command (`opm module build`, `module vet`, `modul... | body of "Render-bearing commands accept --skip-unprovided and pass it to the kernel", verbatim |
+| The switch is the only thing the flag does: which demands are skippabl... | body of "Render-bearing commands accept --skip-unprovided and pass it to the kernel", the part of this sentence it holds, verbatim or as the words changed below say |
+| Without the flag, a render SHALL behave exactly as before this change. | body of "Without --skip-unprovided a render behaves as before", verbatim |
+| With the flag, the CLI SHALL print one warning per skipped demand afte... | body of "With --skip-unprovided a skipped trait is worded as a warning naming the alternatives", verbatim; body of "With --skip-unprovided an omitted component is worded once as a warning", verbatim |
+| A skipped trait SHALL be worded as `component "<c>": skipped provider-... | body of "With --skip-unprovided a skipped trait is worded as a warning naming the alternatives", verbatim |
+| A component the kernel omitted SHALL be worded once as `component "<c>... | body of "With --skip-unprovided an omitted component is worded once as a warning", verbatim |
+| When the kernel reports alternatives, the warning SHALL name them. | body of "With --skip-unprovided a skipped trait is worded as a warning naming the alternatives", verbatim |
+| The skipped-demand warnings SHALL go to the log stream, never to the r... | body of "The skipped-demand warnings go to the log stream", verbatim |
+| When a render is refused for unresolved demands and at least one of th... | body of "A refusal for unprovided demands adds a hint naming the three ways out", verbatim |
+| `opm instance apply` and `opm module apply` SHALL refuse `--skip-unpro... | body of "Instance apply and module apply refuse --skip-unprovided for an operator-managed instance", verbatim |
+
+Words changed or added:
+- "Render-bearing commands accept --skip-unprovided and pass it to the kernel": "The switch is the only thing the flag does: which demands are skippable, and what a skip d..." reads "The switch SHALL be the only thing the flag does: which demands are skippable, and what a ..." ("is" reads "SHALL be")
+
+Lengths (old, new): old 1674; new "Render-bearing commands accept --skip-unprovided and pass it to the kernel" 451; "Without --skip-unprovided a render behaves as before" 70; "With --skip-unprovided a skipped trait is worded as a warning naming the alternatives" 277; "With --skip-unprovided an omitted component is worded once as a warning" 289; "The skipped-demand warnings go to the log stream" 105; "A refusal for unprovided demands adds a hint naming the three ways out" 332; "Instance apply and module apply refuse --skip-unprovided for an operator-managed instance" 224.
+
+### Ledger: kernel-render, A platform pinning an older core is refused as a re-pin
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A platform pinning an older core fails as a validation failure with the library message", "A --platform directory with an older core gets a hint with the re-pin command", "The CLI does not fall back or retry after an older-core refusal", "A platform the CLI generates is never refused for its core".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| An older-core --platform directory is refused with the re-pin command | "A --platform directory with an older core gets a hint with the re-pin command", "An older-core --platform directory is refused with the re-pin command" | No (byte equal, checked) |
+| A generated platform is never refused for its core | "A platform the CLI generates is never refused for its core", "A generated platform is never refused for its core" | No (byte equal, checked) |
+| (new) | "A platform pinning an older core fails as a validation failure with the library message", "The older-core refusal prints the library message" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The CLI does not fall back or retry after an older-core refusal", "No fallback after the refusal" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| When the kernel refuses a render because the platform module pins a co... | body of "A platform pinning an older core fails as a validation failure with the library message", verbatim |
+| When the platform is a directory the user named with `--platform`, the... | body of "A --platform directory with an older core gets a hint with the re-pin command", verbatim |
+| The CLI SHALL NOT fall back to another platform source, retry against ... | body of "The CLI does not fall back or retry after an older-core refusal", verbatim |
+| A platform the CLI generates (from the cluster Platform or from the re... | body of "A platform the CLI generates is never refused for its core", the part of this sentence it holds, verbatim or as the words changed below say |
+
+Words changed or added:
+- "A platform the CLI generates is never refused for its core": "A platform the CLI generates (from the cluster Platform or from the render's own dependenc..." reads "A platform the CLI generates (from the cluster Platform or from the render's own dependenc..." ("pins" reads "SHALL pin")
+
+Lengths (old, new): old 1003; new "A platform pinning an older core fails as a validation failure with the library message" 382; "A --platform directory with an older core gets a hint with the re-pin command" 329; "The CLI does not fall back or retry after an older-core refusal" 126; "A platform the CLI generates is never refused for its core" 168.
+
+### Ledger: kernel-render, A colliding platform is refused naming the entries to disable
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A colliding platform fails as a validation failure whatever the instance", "A collision refusal lists one row per colliding contract before every other row", "An unresolved demand on a colliding key names the collision", "A platform that is not routable with no explaining row fails with the kernel message", "The CLI does not compute collisions of its own".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| A colliding --platform directory is refused with its rows | "A collision refusal lists one row per colliding contract before every other row", "A colliding --platform directory is refused with its rows" | No (byte equal, checked) |
+| Skipping unprovided demands does not skip a collision | "A colliding platform fails as a validation failure whatever the instance", "Skipping unprovided demands does not skip a collision" | No (byte equal, checked) |
+| An unresolved demand on a colliding key names the collision | "An unresolved demand on a colliding key names the collision", "An unresolved demand on a colliding key names the collision" | No (byte equal, checked) |
+| (new) | "A platform that is not routable with no explaining row fails with the kernel message", "A platform not routable with no row" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The CLI does not compute collisions of its own", "The CLI trusts the kernel for collisions" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| When the kernel refuses a render because more than one enabled registr... | body of "A colliding platform fails as a validation failure whatever the instance", the part of this sentence it holds, verbatim or as the words changed below say; body of "A collision refusal lists one row per colliding contract before every other row", the part of this sentence it holds, verbatim or as the words changed below say |
+| The refusal applies whatever the instance and whether or not `--skip-u... | body of "A colliding platform fails as a validation failure whatever the instance", verbatim |
+| An unresolved demand on a colliding key SHALL be worded as defined by ... | body of "An unresolved demand on a colliding key names the collision", verbatim |
+| When the kernel refuses a platform as not routable with no row explain... | body of "A platform that is not routable with no explaining row fails with the kernel message", verbatim |
+| The CLI SHALL NOT compute collisions of its own. | body of "The CLI does not compute collisions of its own", verbatim |
+| Source: enhancement 0026 (interim safety net until side-by-side majors... | body of "A colliding platform fails as a validation failure whatever the instance", verbatim; body of "A collision refusal lists one row per colliding contract before every other row", verbatim; body of "An unresolved demand on a colliding key names the collision", verbatim; body of "A platform that is not routable with no explaining row fails with the kernel message", verbatim; body of "The CLI does not compute collisions of its own", verbatim |
+
+Words changed or added:
+- "A colliding platform fails as a validation failure whatever the instance": "When the kernel refuses a render because more than one enabled registry entry of the platf..." reads "When the kernel refuses a render because more than one enabled registry entry of the platf..." (the first part of the sentence up to the render-failed header, with a period)
+- "A collision refusal lists one row per colliding contract before every other row": "When the kernel refuses a render because more than one enabled registry entry of the platf..." reads "When the kernel refuses a render because more than one enabled registry entry of the platf..." (the condition and the clause "every render-bearing command SHALL fail as a validation failure" repeated, then the part from "followed by one row" on; the part about the message under the header stays in the other requirement)
+
+Lengths (old, new): old 1064; new "A colliding platform fails as a validation failure whatever the instance" 408; "A collision refusal lists one row per colliding contract before every other row" 480; "An unresolved demand on a colliding key names the collision" 298; "A platform that is not routable with no explaining row fails with the kernel message" 228; "The CLI does not compute collisions of its own" 121.
+
+### Ledger: deps-cascade, The cascade task moves the cli's upstream pins to published versions
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The cascade task moves pins in the working tree only", "The library pin moves to the newest version the Go proxy serves in its major", "The operator module pin moves only through hack/operator-pin", "The operator module target is the newest release whose operator version is not above the cli's own", "The catalog and core pins cover a fixed set of cue.mod/module.cue files", "The catalog pin moves to the newest published catalog in its major", "The core pin moves to the core that the file's resulting catalog pins", "The kind platform catalog is raised to hack/platform's catalog", "No pin moves backwards, past a hold, or holds a catalog back by a lower core hold", "No pin moves to a version that is tagged but not yet published", "A pin listed in .cascade-frozen does not change", "cue mod get names only the moved keys and runs only where a pin moved", "Third-party pins are not named and a raised one is reported as a warning", "The task uses its own registry mapping", "The pin rules take their source from workspace RELEASING.md".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Older pins move to the published set | "The cascade task moves pins in the working tree only", "Older pins move to the published set" | No (byte equal, checked) |
+| Core already ahead of the catalog's pin stays | "The core pin moves to the core that the file's resulting catalog pins", "Core already ahead of the catalog's pin stays" | No (byte equal, checked) |
+| A kind catalog ahead of hack/platform stays | "The kind platform catalog is raised to hack/platform's catalog", "A kind catalog ahead of hack/platform stays" | No (byte equal, checked) |
+| A hold on core holds the catalog | "No pin moves backwards, past a hold, or holds a catalog back by a lower core hold", "A hold on core holds the catalog" | No (byte equal, checked) |
+| An unpublished newest tag leaves the pin | "No pin moves to a version that is tagged but not yet published", "An unpublished newest tag leaves the pin" | No (byte equal, checked) |
+| A frozen file is left byte-unchanged | "A pin listed in .cascade-frozen does not change", "A frozen file is left byte-unchanged" | No (byte equal, checked) |
+| The third-party k8s pin is never named | "Third-party pins are not named and a raised one is reported as a warning", "The third-party k8s pin is never named" | No (byte equal, checked) |
+| (new) | "The cascade task moves pins in the working tree only", "The task edits the tree and nothing else" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The library pin moves to the newest version the Go proxy serves in its major", "The library pin moves" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The operator module pin moves only through hack/operator-pin", "The operator pin moves through the program" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The operator module target is the newest release whose operator version is not above the cli's own", "The target stays within the cli MAJOR.MINOR" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The catalog and core pins cover a fixed set of cue.mod/module.cue files", "The set of files" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The catalog pin moves to the newest published catalog in its major", "The catalog pin moves" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "cue mod get names only the moved keys and runs only where a pin moved", "cue mod get and tidy run only where a pin moved" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The task uses its own registry mapping", "The mapping holds whatever the environment sets" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The pin rules take their source from workspace RELEASING.md", "The source of the rules" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| `task -x deps:cascade` SHALL move the following pins in the working tr... | body of "The cascade task moves pins in the working tree only", verbatim; body of "The library pin moves to the newest version the Go proxy serves in its major", verbatim; body of "The operator module pin moves only through hack/operator-pin", verbatim; body of "The operator module target is the newest release whose operator version is not above the cli's own", verbatim; body of "The catalog pin moves to the newest published catalog in its major", verbatim; body of "The core pin moves to the core that the file's resulting catalog pins", verbatim; body of "The kind platform catalog is raised to hack/platform's catalog", verbatim |
+| It SHALL NOT commit, branch or push. | body of "The cascade task moves pins in the working tree only", verbatim |
+| **library.** `github.com/open-platform-model/library` in `go.mod` SHAL... | body of "The library pin moves to the newest version the Go proxy serves in its major", verbatim |
+| **opm-operator module.** The operator module pin in `internal/operator... | body of "The operator module pin moves only through hack/operator-pin", verbatim |
+| The target is the newest published release of `opmodel.dev/modules/opm... | body of "The operator module target is the newest release whose operator version is not above the cli's own", verbatim |
+| **Catalog and core as a consistent set.** This covers the `cue.mod/mod... | body of "The catalog and core pins cover a fixed set of cue.mod/module.cue files", the part of this sentence it holds, verbatim or as the words changed below say; body of "The catalog pin moves to the newest published catalog in its major", the part of this sentence it holds, verbatim or as the words changed below say; body of "The core pin moves to the core that the file's resulting catalog pins", the part of this sentence it holds, verbatim or as the words changed below say |
+| `opmodel.dev/catalogs/opm@v4` SHALL move to the newest published catal... | body of "The catalog pin moves to the newest published catalog in its major", verbatim |
+| `opmodel.dev/core@v2` SHALL move to the core version that the file's r... | body of "The core pin moves to the core that the file's resulting catalog pins", verbatim |
+| A file without a catalog SHALL use `templates/minimal`'s resulting cat... | body of "The core pin moves to the core that the file's resulting catalog pins", verbatim |
+| **Kind Platform.** The bare `version:` under `opmodel.dev/catalogs/opm... | body of "The kind platform catalog is raised to hack/platform's catalog", verbatim |
+| A version above it SHALL stay, with a warning, since no pin moves back... | body of "The kind platform catalog is raised to hack/platform's catalog", verbatim |
+| How every move behaves: No pin SHALL move backwards. | body of "No pin moves backwards, past a hold, or holds a catalog back by a lower core hold", verbatim |
+| No pin SHALL move past an in-date `.cascade-hold` `max`. | body of "No pin moves backwards, past a hold, or holds a catalog back by a lower core hold", verbatim |
+| When a hold on core is below the core a newer catalog pins, the catalo... | body of "No pin moves backwards, past a hold, or holds a catalog back by a lower core hold", verbatim |
+| No pin SHALL move to a version that is tagged but not yet published. | body of "No pin moves to a version that is tagged but not yet published", verbatim |
+| No pin listed for a file in `.cascade-frozen` SHALL change in that fil... | body of "A pin listed in .cascade-frozen does not change", verbatim |
+| If `cue mod tidy` raises such a pin, the task SHALL fail, naming the f... | body of "A pin listed in .cascade-frozen does not change", verbatim |
+| `cue mod get` SHALL name only the moved `opmodel.dev` keys, at exact v... | body of "cue mod get names only the moved keys and runs only where a pin moved", verbatim |
+| It and `cue mod tidy` SHALL run only in a module where a pin moved. | body of "cue mod get names only the moved keys and runs only where a pin moved", verbatim |
+| Third-party pins, including `cue.dev/x/k8s.io@v0`, SHALL NOT be named. | body of "Third-party pins are not named and a raised one is reported as a warning", verbatim |
+| A third-party pin that `tidy` or `go mod tidy` raised SHALL be reporte... | body of "Third-party pins are not named and a raised one is reported as a warning", verbatim |
+| The task SHALL use its own registry mapping, `testing.opmodel.dev=ghcr... | body of "The task uses its own registry mapping", verbatim |
+| The source is workspace RELEASING.md, sections "The cascade" and "What... | body of "The pin rules take their source from workspace RELEASING.md", the part of this sentence it holds, verbatim or as the words changed below say |
+
+Words changed or added:
+- "The operator module target is the newest release whose operator version is not above the cli's own": "The target is the newest published release of `opmodel.dev/modules/opm_operator` in the pi..." reads "**opm-operator module.** The target is the newest published release of `opmodel.dev/module..." (the list label copied in front of the sentence)
+- "The catalog and core pins cover a fixed set of cue.mod/module.cue files": "**Catalog and core as a consistent set.** This covers the `cue.mod/module.cue` files of th..." reads "**Catalog and core as a consistent set.** This SHALL cover the `cue.mod/module.cue` files ..." ("covers" reads "SHALL cover")
+- "The catalog pin moves to the newest published catalog in its major": "`opmodel.dev/catalogs/opm@v4` SHALL move to the newest published catalog in its major, res..." reads "**Catalog and core as a consistent set.** `opmodel.dev/catalogs/opm@v4` SHALL move to the ..." (the list label copied in front of the sentence)
+- "The core pin moves to the core that the file's resulting catalog pins": "`opmodel.dev/core@v2` SHALL move to the core version that the file's resulting catalog pin..." reads "**Catalog and core as a consistent set.** `opmodel.dev/core@v2` SHALL move to the core ver..." (the list label copied in front of the sentence)
+- "The pin rules take their source from workspace RELEASING.md": "The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task mo..." reads "The source SHALL be workspace RELEASING.md, sections "The cascade" and "What each repo's t..." ("is" reads "SHALL be")
+
+Lengths (old, new): old 3012; new "The cascade task moves pins in the working tree only" 115; "The library pin moves to the newest version the Go proxy serves in its major" 280; "The operator module pin moves only through hack/operator-pin" 348; "The operator module target is the newest release whose operator version is not above the cli's own" 386; "The catalog and core pins cover a fixed set of cue.mod/module.cue files" 483; "The catalog pin moves to the newest published catalog in its major" 255; "The core pin moves to the core that the file's resulting catalog pins" 289; "The kind platform catalog is raised to hack/platform's catalog" 338; "No pin moves backwards, past a hold, or holds a catalog back by a lower core hold" 213; "No pin moves to a version that is tagged but not yet published" 68; "A pin listed in .cascade-frozen does not change" 159; "cue mod get names only the moved keys and runs only where a pin moved" 146; "Third-party pins are not named and a raised one is reported as a warning" 156; "The task uses its own registry mapping" 229; "The pin rules take their source from workspace RELEASING.md" 101.
+
+### Ledger: deps-cascade, The cascade task resolves before it edits and reports by exit code
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A dirty working tree is refused with exit 1", "The frozen and hold files are validated before anything else", "Every target-deciding resolver call runs before the first file edit", "A failure after the first edit ends the task with an error code", "Exit 0 means the working tree changed and exit 3 means it did not", "The cascade task does not turn a failure into a fallback version".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Nothing to move | "Exit 0 means the working tree changed and exit 3 means it did not", "Nothing to move" | No (byte equal, checked) |
+| A resolver error leaves the tree clean | "Every target-deciding resolver call runs before the first file edit", "A resolver error leaves the tree clean" | No (byte equal, checked) |
+| A dirty tree is refused | "A dirty working tree is refused with exit 1", "A dirty tree is refused" | No (byte equal, checked) |
+| (new) | "The frozen and hold files are validated before anything else", "The files are validated first" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "A failure after the first edit ends the task with an error code", "A late failure may leave a partly edited tree" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The cascade task does not turn a failure into a fallback version", "No fallback version" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| `task -x deps:cascade` SHALL refuse with exit 1 when the working tree ... | body of "A dirty working tree is refused with exit 1", verbatim |
+| It SHALL validate `.cascade-frozen` and `.cascade-hold` through the re... | body of "The frozen and hold files are validated before anything else", verbatim |
+| Order of work: Every resolver call that decides a target SHALL run bef... | body of "Every target-deciding resolver call runs before the first file edit", verbatim |
+| A failing target-deciding call, or any answer other than "move" or "st... | body of "Every target-deciding resolver call runs before the first file edit", verbatim |
+| A failure after the first edit (a tool, or a resolver call that decide... | body of "A failure after the first edit ends the task with an error code", verbatim |
+| The tree may then be partly edited; callers discard it. | body of "A failure after the first edit ends the task with an error code", verbatim |
+| Exit codes: 0 when the working tree changed; 3 when it did not; any ot... | body of "Exit 0 means the working tree changed and exit 3 means it did not", the part of this sentence it holds, verbatim or as the words changed below say |
+| The task SHALL NOT turn a failure into a fallback version. | body of "The cascade task does not turn a failure into a fallback version", verbatim |
+| Source: workspace RELEASING.md, section "The cascade", "The receiver". | body of "A dirty working tree is refused with exit 1", verbatim; body of "The frozen and hold files are validated before anything else", verbatim; body of "Every target-deciding resolver call runs before the first file edit", verbatim; body of "A failure after the first edit ends the task with an error code", verbatim; body of "Exit 0 means the working tree changed and exit 3 means it did not", verbatim; body of "The cascade task does not turn a failure into a fallback version", verbatim |
+
+Words changed or added:
+- "Exit 0 means the working tree changed and exit 3 means it did not": "Exit codes: 0 when the working tree changed; 3 when it did not; any other code on error." reads "Exit codes SHALL be: 0 when the working tree changed; 3 when it did not; any other code on..." ("Exit codes:" reads "Exit codes SHALL be:")
+
+Lengths (old, new): old 963; new "A dirty working tree is refused with exit 1" 213; "The frozen and hold files are validated before anything else" 185; "Every target-deciding resolver call runs before the first file edit" 324; "A failure after the first edit ends the task with an error code" 291; "Exit 0 means the working tree changed and exit 3 means it did not" 168; "The cascade task does not turn a failure into a fallback version" 129.
+
+### Ledger: deps-cascade, Template and fixture versions advance once per pull request
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "Templates and the podinfo fixture get a new version when their tree differs from the merge base", "The new version is one patch above the merge base's, or the merge base's when unpublished", "A second run in the same pull request advances no version again", "A version is written only when it is greater than the file version", "The podinfo pin in the two consumers follows the fixture version without cue mod get or tidy", "A consumer pinning an unpublished podinfo version is pointed at the merge base version for cue mod get and tidy".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| First run advances each changed module once | "Templates and the podinfo fixture get a new version when their tree differs from the merge base", "First run advances each changed module once" | No (byte equal, checked) |
+| Second run does not advance again | "A second run in the same pull request advances no version again", "Second run does not advance again" | No (byte equal, checked) |
+| A consumer pinning the unpublished fixture still moves | "A consumer pinning an unpublished podinfo version is pointed at the merge base version for cue mod get and tidy", "A consumer pinning the unpublished fixture still moves" | No (byte equal, checked) |
+| (new) | "The new version is one patch above the merge base's, or the merge base's when unpublished", "The target version" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "A version is written only when it is greater than the file version", "A higher file version stays" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The podinfo pin in the two consumers follows the fixture version without cue mod get or tidy", "The consumers follow the fixture" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| The three templates (`opmodel.dev/templates/<name>@v1`) and the podinf... | body of "Templates and the podinfo fixture get a new version when their tree differs from the merge base", verbatim |
+| The new version SHALL be one patch above the merge base's declared ver... | body of "The new version is one patch above the merge base's, or the merge base's when unpublished", verbatim |
+| It SHALL be the merge base's version when that version is not yet publ... | body of "The new version is one patch above the merge base's, or the merge base's when unpublished", verbatim |
+| A second run in the same pull request SHALL NOT advance any version ag... | body of "A second run in the same pull request advances no version again", verbatim |
+| The task SHALL write a version only when it is greater than the file's... | body of "A version is written only when it is greater than the file version", verbatim |
+| A file version above the target SHALL stay, with a warning. | body of "A version is written only when it is greater than the file version", verbatim |
+| The podinfo pin in `examples/cue.mod/module.cue` and `tests/e2e/testda... | body of "The podinfo pin in the two consumers follows the fixture version without cue mod get or tidy", verbatim |
+| No `cue mod get` or `cue mod tidy` SHALL follow that rewrite. | body of "The podinfo pin in the two consumers follows the fixture version without cue mod get or tidy", verbatim |
+| When a consumer's catalog or core moves while it pins a podinfo versio... | body of "A consumer pinning an unpublished podinfo version is pointed at the merge base version for cue mod get and tidy", verbatim |
+| Source: workspace RELEASING.md, section "The cascade", "The receiver" ... | body of "Templates and the podinfo fixture get a new version when their tree differs from the merge base", verbatim; body of "The new version is one patch above the merge base's, or the merge base's when unpublished", verbatim; body of "A second run in the same pull request advances no version again", verbatim; body of "A version is written only when it is greater than the file version", verbatim; body of "The podinfo pin in the two consumers follows the fixture version without cue mod get or tidy", verbatim; body of "A consumer pinning an unpublished podinfo version is pointed at the merge base version for cue mod get and tidy", verbatim |
+
+Lengths (old, new): old 1341; new "Templates and the podinfo fixture get a new version when their tree differs from the merge base" 424; "The new version is one patch above the merge base's, or the merge base's when unpublished" 294; "A second run in the same pull request advances no version again" 185; "A version is written only when it is greater than the file version" 242; "The podinfo pin in the two consumers follows the fixture version without cue mod get or tidy" 395; "A consumer pinning an unpublished podinfo version is pointed at the merge base version for cue mod get and tidy" 343.
+
+### Ledger: deps-cascade, Title and body tasks describe the cascade diff
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The title task prints the resolver title using the path-class map", "The body task prints the resolver body for the same diff", "The pins script reports the library and operator pins", "The pins script reports the catalog and core pins", "Each pin of the pins script is of class shipped with no label".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| A shipped move titles as fix(deps) | "The title task prints the resolver title using the path-class map", "A shipped move titles as fix(deps)" | No (byte equal, checked) |
+| Test-only paths title as test(fixtures) | "The title task prints the resolver title using the path-class map", "Test-only paths title as test(fixtures)" | No (byte equal, checked) |
+| The body lists each moved pin | "The body task prints the resolver body for the same diff", "The body lists each moved pin" | No (byte equal, checked) |
+| A module-only pin move is reported | "The pins script reports the library and operator pins", "A module-only pin move is reported" | No (byte equal, checked) |
+| (new) | "The pins script reports the catalog and core pins", "Catalog and core are reported" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "Each pin of the pins script is of class shipped with no label", "Class of a reported pin" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| `task -x deps:cascade:title` SHALL print the shared resolver's one-lin... | body of "The title task prints the resolver title using the path-class map", verbatim; body of "The body task prints the resolver body for the same diff", verbatim |
+| It SHALL use the path-class map `.tasks/cascade/classes`, which classe... | body of "The title task prints the resolver title using the path-class map", verbatim |
+| `task -x deps:cascade:body` SHALL print the resolver's body for the sa... | body of "The body task prints the resolver body for the same diff", verbatim |
+| `.tasks/cascade/pins.sh <ref>` SHALL report five pins, each `v`-prefix... | body of "The pins script reports the library and operator pins", the part of this sentence it holds, verbatim or as the words changed below say; body of "The pins script reports the catalog and core pins", the part of this sentence it holds, verbatim or as the words changed below say; body of "Each pin of the pins script is of class shipped with no label", the part of this sentence it holds, verbatim or as the words changed below say |
+| Each pin SHALL be of class `shipped`, with no label. | body of "Each pin of the pins script is of class shipped with no label", verbatim |
+| Source: workspace RELEASING.md, section "The cascade", "Title from dif... | body of "The title task prints the resolver title using the path-class map", verbatim; body of "The body task prints the resolver body for the same diff", verbatim; body of "The pins script reports the library and operator pins", verbatim; body of "The pins script reports the catalog and core pins", verbatim; body of "Each pin of the pins script is of class shipped with no label", verbatim |
+
+Words changed or added:
+- "The pins script reports the library and operator pins": "`.tasks/cascade/pins.sh <ref>` SHALL report five pins, each `v`-prefixed: `github.com/open..." reads "`.tasks/cascade/pins.sh <ref>` SHALL report five pins, each `v`-prefixed: `github.com/open..." (the sentence cut at the list boundary after the third item; the final semicolon reads a period)
+- "The pins script reports the catalog and core pins": "`.tasks/cascade/pins.sh <ref>` SHALL report five pins, each `v`-prefixed: `github.com/open..." reads "`.tasks/cascade/pins.sh <ref>` SHALL report five pins, each `v`-prefixed: `opmodel.dev/cat..." (the sentence cut at the list boundary: the lead, then the last two items)
+- "Each pin of the pins script is of class shipped with no label": "`.tasks/cascade/pins.sh <ref>` SHALL report five pins, each `v`-prefixed: `github.com/open..." reads "`.tasks/cascade/pins.sh <ref>` SHALL report five pins, each `v`-prefixed." (the lead of the sentence with a period)
+
+Lengths (old, new): old 1161; new "The title task prints the resolver title using the path-class map" 454; "The body task prints the resolver body for the same diff" 297; "The pins script reports the library and operator pins" 490; "The pins script reports the catalog and core pins" 295; "Each pin of the pins script is of class shipped with no label" 206.
+
+### Ledger: deps-cascade, The cascade task is tested offline in required CI and fully in a network job
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The cascade test runs the task against the stub resolver in sandbox copies", "The offline set runs without registry or proxy access and checks fixed items", "The full set adds the older-pins, frozen-file and title and body scenarios", "The offline set also checks a core ahead of its catalog and a hold on core", "The full set also checks a second catalog move on a branch pinning the unpublished fixture", "The setup lowers the library to a version made from the tree and a failed setup fails its scenario", "The offline set runs as a step of the Lint job in pr.yml", "The full set runs in cascade-task.yml and is not a required check".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Offline set runs on every pull request | "The offline set runs as a step of the Lint job in pr.yml", "Offline set runs on every pull request" | No (byte equal, checked) |
+| The checkout is never modified by the test | "The cascade test runs the task against the stub resolver in sandbox copies", "The checkout is never modified by the test" | No (byte equal, checked) |
+| The full set passes when the cli uses the newest library's API | "The setup lowers the library to a version made from the tree and a failed setup fails its scenario", "The full set passes when the cli uses the newest library's API" | No (byte equal, checked) |
+| A stale older row fails the offline set | "The offline set runs without registry or proxy access and checks fixed items", "A stale older row fails the offline set" | No (byte equal, checked) |
+| (new) | "The full set adds the older-pins, frozen-file and title and body scenarios", "The full set adds scenarios" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The offline set also checks a core ahead of its catalog and a hold on core", "Offline checks on core" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The full set also checks a second catalog move on a branch pinning the unpublished fixture", "Full check on a second move" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The full set runs in cascade-task.yml and is not a required check", "The network job runs the full set" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| `task -x deps:cascade:test` SHALL run the cascade task against the stu... | body of "The cascade test runs the task against the stub resolver in sandbox copies", verbatim |
+| Its offline set, selected by `CASCADE_TEST_SET=offline`, SHALL run wit... | body of "The offline set runs without registry or proxy access and checks fixed items", the part of this sentence it holds, verbatim or as the words changed below say |
+| It SHALL check: the stub checksum; that `pins.sh` reads the worktree a... | body of "The offline set runs without registry or proxy access and checks fixed items", verbatim |
+| The full set SHALL add: the older-pins scenario, including its second,... | body of "The full set adds the older-pins, frozen-file and title and body scenarios", the part of this sentence it holds, verbatim or as the words changed below say |
+| The offline set SHALL also check that a core ahead of its catalog's pi... | body of "The offline set also checks a core ahead of its catalog and a hold on core", verbatim |
+| The full set SHALL also check a second catalog move on a branch whose ... | body of "The full set also checks a second catalog move on a branch pinning the unpublished fixture", verbatim |
+| The setup of the older-pins, frozen-file and second-move scenarios SHA... | body of "The setup lowers the library to a version made from the tree and a failed setup fails its scenario", verbatim |
+| A setup that fails SHALL fail its scenario with the failed step and th... | body of "The setup lowers the library to a version made from the tree and a failed setup fails its scenario", verbatim |
+| The offline set SHALL run as a step of the `Lint` job in `.github/work... | body of "The offline set runs as a step of the Lint job in pr.yml", verbatim |
+| The full set SHALL run in `.github/workflows/cascade-task.yml`, job `C... | body of "The full set runs in cascade-task.yml and is not a required check", verbatim |
+
+Words changed or added:
+- "The offline set runs without registry or proxy access and checks fixed items": "Its offline set, selected by `CASCADE_TEST_SET=offline`, SHALL run without registry or pro..." reads "The offline set of `task -x deps:cascade:test`, selected by `CASCADE_TEST_SET=offline`, SH..." ("Its offline set" reads "The offline set of `task -x deps:cascade:test`")
+- "The full set adds the older-pins, frozen-file and title and body scenarios": "The full set SHALL add: the older-pins scenario, including its second, idempotent run; the..." reads "The full set of `task -x deps:cascade:test` SHALL add: the older-pins scenario, including ..." ("The full set" reads "The full set of `task -x deps:cascade:test`")
+
+Lengths (old, new): old 1740; new "The cascade test runs the task against the stub resolver in sandbox copies" 142; "The offline set runs without registry or proxy access and checks fixed items" 492; "The full set adds the older-pins, frozen-file and title and body scenarios" 226; "The offline set also checks a core ahead of its catalog and a hold on core" 136; "The full set also checks a second catalog move on a branch pinning the unpublished fixture" 116; "The setup lowers the library to a version made from the tree and a failed setup fails its scenario" 368; "The offline set runs as a step of the Lint job in pr.yml" 169; "The full set runs in cascade-task.yml and is not a required check" 124.
+
+### Ledger: deps-cascade, The cascade task leaves non-cascade files alone and runs no dependency code
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The cascade task edits none of the frozen, release, workflow, docs-version or fixture files", "The cascade task does not publish, seed a registry or push", "The cascade task runs no program that links a moved Go dependency", "The cascade task appends a warning without failing in two cases".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Release and settings files stay untouched by a full run | "The cascade task edits none of the frozen, release, workflow, docs-version or fixture files", "Release and settings files stay untouched by a full run" | No (byte equal, checked) |
+| A library move runs no library code | "The cascade task runs no program that links a moved Go dependency", "A library move runs no library code" | No (byte equal, checked) |
+| Merge mode builds opm from the merge base | "The cascade task runs no program that links a moved Go dependency", "Merge mode builds opm from the merge base" | No (byte equal, checked) |
+| A newer language version is a warning | "The cascade task appends a warning without failing in two cases", "A newer language version is a warning" | No (byte equal, checked) |
+| (new) | "The cascade task does not publish, seed a registry or push", "No publish or push" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| `task deps:cascade` SHALL NOT edit any of these: `.cascade-frozen` or ... | body of "The cascade task edits none of the frozen, release, workflow, docs-version or fixture files", verbatim |
+| It SHALL NOT publish, seed a real registry or push. | body of "The cascade task does not publish, seed a registry or push", the part of this sentence it holds, verbatim or as the words changed below say |
+| It SHALL NOT build or run a program that links a moved Go dependency: ... | body of "The cascade task runs no program that links a moved Go dependency", the part of this sentence it holds, verbatim or as the words changed below say |
+| It SHALL append a warning to the cascade warnings file, without failin... | body of "The cascade task appends a warning without failing in two cases", the part of this sentence it holds, verbatim or as the words changed below say |
+
+Words changed or added:
+- "The cascade task does not publish, seed a registry or push": "It SHALL NOT publish, seed a real registry or push." reads "`task deps:cascade` SHALL NOT publish, seed a real registry or push." ("It" reads "`task deps:cascade`")
+- "The cascade task runs no program that links a moved Go dependency": "It SHALL NOT build or run a program that links a moved Go dependency: the only Go programs..." reads "`task deps:cascade` SHALL NOT build or run a program that links a moved Go dependency: the..." ("It" reads "`task deps:cascade`")
+- "The cascade task appends a warning without failing in two cases": "It SHALL append a warning to the cascade warnings file, without failing, in each of these ..." reads "`task deps:cascade` SHALL append a warning to the cascade warnings file, without failing, ..." ("It" reads "`task deps:cascade`")
+
+Lengths (old, new): old 999; new "The cascade task edits none of the frozen, release, workflow, docs-version or fixture files" 309; "The cascade task does not publish, seed a registry or push" 68; "The cascade task runs no program that links a moved Go dependency" 350; "The cascade task appends a warning without failing in two cases" 304.
+
+### Ledger: instance-init, Init writes a complete standalone instance package
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "Init writes exactly three files forming a standalone CUE module", "The cue.mod/module.cue file declares the package's module path, language version and dependencies", "The module file is exactly what opm module tidy leaves", "The instance.cue file declares the package, the imports and the module instance", "The values.cue file declares one values field", "The package's own module path defaults to a local placeholder and is never looked up".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Package for a published module | "Init writes exactly three files forming a standalone CUE module", "Package for a published module" | No (byte equal, checked) |
+| Builds with no step in between | "Init writes exactly three files forming a standalone CUE module", "Builds with no step in between" | No (byte equal, checked) |
+| Module path override | "The package's own module path defaults to a local placeholder and is never looked up", "Module path override" | No (byte equal, checked) |
+| (new) | "The cue.mod/module.cue file declares the package's module path, language version and dependencies", "The module file declares the closure" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The module file is exactly what opm module tidy leaves", "A tidy check of the module file passes" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The instance.cue file declares the package, the imports and the module instance", "The instance file" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The values.cue file declares one values field", "The values file" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| `opm instance init` SHALL write exactly three files into the target di... | body of "Init writes exactly three files forming a standalone CUE module", verbatim |
+| Every line derives from the acquired module; nothing is copied from a ... | body of "Init writes exactly three files forming a standalone CUE module", verbatim |
+| Source: enhancement 0016 ("A new CLI command scaffolds an on-disk inst... | body of "Init writes exactly three files forming a standalone CUE module", verbatim |
+| `cue.mod/module.cue` declares the package's own module path, a languag... | body of "The cue.mod/module.cue file declares the package's module path, language version and dependencies", the part of this sentence it holds, verbatim or as the words changed below say |
+| The file SHALL be exactly what `opm module tidy` leaves, so a tidy che... | body of "The module file is exactly what opm module tidy leaves", the part of this sentence it holds, verbatim or as the words changed below say |
+| Source: enhancement 0016 ("The generated module file pins the module e... | body of "The cue.mod/module.cue file declares the package's module path, language version and dependencies", verbatim; body of "The module file is exactly what opm module tidy leaves", verbatim; body of "The package's own module path defaults to a local placeholder and is never looked up", verbatim |
+| `instance.cue` declares `package instance`, imports core at the module... | body of "The instance.cue file declares the package, the imports and the module instance", the part of this sentence it holds, verbatim or as the words changed below say |
+| `values.cue` declares `package instance` and one `values` field, fille... | NOT FOUND |
+| The package's own module path SHALL default to `instance.local/<instan... | body of "The package's own module path defaults to a local placeholder and is never looked up", verbatim |
+| `--module-path` (string, default empty) overrides it with any valid ma... | body of "The package's own module path defaults to a local placeholder and is never looked up", verbatim |
+| The path is never looked up in a registry. | body of "The package's own module path defaults to a local placeholder and is never looked up", verbatim |
+| Source: enhancement 0016 ("The generated module file pins the module e... | body of "The cue.mod/module.cue file declares the package's module path, language version and dependencies", verbatim; body of "The module file is exactly what opm module tidy leaves", verbatim; body of "The package's own module path defaults to a local placeholder and is never looked up", verbatim |
+
+Words changed or added:
+- "The cue.mod/module.cue file declares the package's module path, language version and dependencies": "`cue.mod/module.cue` declares the package's own module path, a language version, and depen..." reads "`cue.mod/module.cue` SHALL declare the package's own module path, a language version, and ..." ("declares" reads "SHALL declare")
+- "The module file is exactly what opm module tidy leaves": "The file SHALL be exactly what `opm module tidy` leaves, so a tidy check of it passes." reads "The `cue.mod/module.cue` file SHALL be exactly what `opm module tidy` leaves, so a tidy ch..." ("The file" reads "The `cue.mod/module.cue` file")
+- "The instance.cue file declares the package, the imports and the module instance": "`instance.cue` declares `package instance`, imports core at the module's core major and th..." reads "`instance.cue` SHALL declare `package instance`, imports core at the module's core major a..." ("declares" reads "SHALL declare")
+- "The values.cue file declares one values field": "`values.cue` declares `package instance` and one `values` field, filled as "Values start f..." reads "`values.cue` SHALL declare `package instance` and one `values` field, filled as "values.cu..." ("declares" reads "SHALL declare"; the cite of the renamed requirement reads its new header "values.cue is filled from the first applicable source and the report names it")
+
+Lengths (old, new): old 1642; new "Init writes exactly three files forming a standalone CUE module" 380; "The cue.mod/module.cue file declares the package's module path, language version and dependencies" 422; "The module file is exactly what opm module tidy leaves" 266; "The instance.cue file declares the package, the imports and the module instance" 238; "The values.cue file declares one values field" 169; "The package's own module path defaults to a local placeholder and is never looked up" 382.
+
+### Ledger: instance-init, Init arguments mirror module init
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "Init takes the positionals and flags of module init", "With one positional a value with a slash or a dot is the module path", "Naming the module path twice is refused", "The module path is major-free", "The instance name and the namespace match the core name type and --dir defaults to the instance name", "A missing input is prompted on a terminal and refused without one", "A prompted value passes the same checks as the flag it replaces".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Positional module path | "With one positional a value with a slash or a dot is the module path", "Positional module path" | No (byte equal, checked) |
+| Module path named twice | "Naming the module path twice is refused", "Module path named twice" | No (byte equal, checked) |
+| Major suffix refused | "The module path is major-free", "Major suffix refused" | No (byte equal, checked) |
+| Missing namespace without a terminal | "A missing input is prompted on a terminal and refused without one", "Missing namespace without a terminal" | No (byte equal, checked) |
+| Missing module path without a terminal | "A missing input is prompted on a terminal and refused without one", "Missing module path without a terminal" | No (byte equal, checked) |
+| Missing module path on a terminal | "A missing input is prompted on a terminal and refused without one", "Missing module path on a terminal" | No (byte equal, checked) |
+| Invalid instance name | "The instance name and the namespace match the core name type and --dir defaults to the instance name", "Invalid instance name" | No (byte equal, checked) |
+| (new) | "Init takes the positionals and flags of module init", "Positionals and flags" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "A prompted value passes the same checks as the flag it replaces", "A prompted value is checked" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| The command SHALL take `[instance-name] [module-path]` positionals and... | body of "Init takes the positionals and flags of module init", verbatim |
+| With one positional, a value containing `/` or `.` is the module path,... | body of "With one positional a value with a slash or a dot is the module path", the part of this sentence it holds, verbatim or as the words changed below say |
+| `--from` is another spelling of the module path; naming the module pat... | body of "Naming the module path twice is refused", verbatim |
+| The module path SHALL be major-free: a path carrying a major suffix is... | body of "The module path is major-free", verbatim |
+| The instance name and the namespace SHALL each match the core name typ... | body of "The instance name and the namespace match the core name type and --dir defaults to the instance name", verbatim |
+| `--dir` SHALL default to the instance name. | body of "The instance name and the namespace match the core name type and --dir defaults to the instance name", verbatim |
+| When the instance name, the module path or the namespace is missing an... | body of "A missing input is prompted on a terminal and refused without one", verbatim |
+| A prompted value passes the same checks as the flag or positional it r... | body of "A prompted value passes the same checks as the flag it replaces", the part of this sentence it holds, verbatim or as the words changed below say |
+| Source: enhancement 0016 (a published module floats to the highest cor... | body of "Init takes the positionals and flags of module init", verbatim; body of "With one positional a value with a slash or a dot is the module path", verbatim; body of "Naming the module path twice is refused", verbatim; body of "The module path is major-free", verbatim; body of "The instance name and the namespace match the core name type and --dir defaults to the instance name", verbatim; body of "A missing input is prompted on a terminal and refused without one", verbatim; body of "A prompted value passes the same checks as the flag it replaces", verbatim |
+
+Words changed or added:
+- "With one positional a value with a slash or a dot is the module path": "With one positional, a value containing `/` or `.` is the module path, and anything else i..." reads "With one positional, a value containing `/` or `.` SHALL be the module path, and anything ..." ("is" reads "SHALL be" twice)
+- "A prompted value passes the same checks as the flag it replaces": "A prompted value passes the same checks as the flag or positional it replaces, before any ..." reads "A prompted value SHALL pass the same checks as the flag or positional it replaces, before ..." ("passes" reads "SHALL pass")
+
+Lengths (old, new): old 1342; new "Init takes the positionals and flags of module init" 288; "With one positional a value with a slash or a dot is the module path" 213; "Naming the module path twice is refused" 217; "The module path is major-free" 230; "The instance name and the namespace match the core name type and --dir defaults to the instance name" 346; "A missing input is prompted on a terminal and refused without one" 403; "A prompted value passes the same checks as the flag it replaces" 201.
+
+### Ledger: instance-init, Values start from the author's intended source
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "values.cue is filled from the first applicable source and the report names it", "The initValues source", "No debugValues content reaches the package", "The debugValues source", "A debugValues source makes the report warn the user to review the file", "With no usable source values.cue holds an empty struct and the report warns", "A concrete non-struct source is rendered verbatim", "An empty struct source is still named and carries the empty-file warning", "values.cue opens with a comment naming its source".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| debugValues used and flagged | "A debugValues source makes the report warn the user to review the file", "debugValues used and flagged" | No (byte equal, checked) |
+| initValues takes precedence | "No debugValues content reaches the package", "initValues takes precedence" | No (byte equal, checked) |
+| Non-concrete initValues | "The initValues source", "Non-concrete initValues" | No (byte equal, checked) |
+| No usable source | "With no usable source values.cue holds an empty struct and the report warns", "No usable source" | No (byte equal, checked) |
+| Partly concrete debugValues | "The debugValues source", "Partly concrete debugValues" | No (byte equal, checked) |
+| Empty debugValues | "An empty struct source is still named and carries the empty-file warning", "Empty debugValues" | No (byte equal, checked) |
+| (new) | "values.cue is filled from the first applicable source and the report names it", "The report names the source" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "A concrete non-struct source is rendered verbatim", "Non-struct source verbatim" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "values.cue opens with a comment naming its source", "The comment names the source" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| `values.cue` SHALL be filled from the first applicable source in this ... | body of "values.cue is filled from the first applicable source and the report names it", the part of this sentence it holds, verbatim or as the words changed below say; body of "The initValues source", the part of this sentence it holds, verbatim or as the words changed below say; body of "No debugValues content reaches the package", the part of this sentence it holds, verbatim or as the words changed below say; body of "The debugValues source", the part of this sentence it holds, verbatim or as the words changed below say; body of "A debugValues source makes the report warn the user to review the file", the part of this sentence it holds, verbatim or as the words changed below say; body of "With no usable source values.cue holds an empty struct and the report warns", the part of this sentence it holds, verbatim or as the words changed below say |
+| The module's `initValues`, when the module declares it. | body of "The initValues source", verbatim; body of "No debugValues content reaches the package", verbatim |
+| Its content is rendered even when non-concrete: a defaulted field appe... | body of "The initValues source", verbatim |
+| No `debugValues` content SHALL reach the package. | body of "No debugValues content reaches the package", verbatim |
+| Source: enhancement 0016 ("`#Module` gains an optional field carrying ... | body of "No debugValues content reaches the package", the part of this sentence it holds, verbatim or as the words changed below say |
+| Otherwise the module's `debugValues`, when the whole value is concrete... | body of "The debugValues source", the part of this sentence it holds, verbatim or as the words changed below say; body of "A debugValues source makes the report warn the user to review the file", the part of this sentence it holds, verbatim or as the words changed below say |
+| A `debugValues` with any field left without a value (a bare type, an u... | body of "The debugValues source", verbatim |
+| The report SHALL warn the user to review the file before deploying. | body of "A debugValues source makes the report warn the user to review the file", verbatim |
+| Source: enhancement 0016 ("`debugValues` is the default template sourc... | body of "The debugValues source", the part of this sentence it holds, verbatim or as the words changed below say; body of "A debugValues source makes the report warn the user to review the file", the part of this sentence it holds, verbatim or as the words changed below say |
+| Otherwise `values: {}`. | NOT FOUND |
+| The report SHALL warn that the values file is empty and point at `opm ... | body of "With no usable source values.cue holds an empty struct and the report warns", verbatim |
+| Source: enhancement 0016 ("With no usable template source, init writes... | body of "With no usable source values.cue holds an empty struct and the report warns", verbatim; body of "A concrete non-struct source is rendered verbatim", verbatim; body of "An empty struct source is still named and carries the empty-file warning", verbatim; body of "values.cue opens with a comment naming its source", verbatim |
+| A concrete non-struct source SHALL be rendered verbatim. | body of "A concrete non-struct source is rendered verbatim", verbatim |
+| When the chosen source renders as an empty struct, the report SHALL st... | body of "An empty struct source is still named and carries the empty-file warning", verbatim |
+| `values.cue` SHALL open with a comment naming the source it was filled... | body of "values.cue opens with a comment naming its source", verbatim |
+| Source: enhancement 0016 ("With no usable template source, init writes... | body of "With no usable source values.cue holds an empty struct and the report warns", verbatim; body of "A concrete non-struct source is rendered verbatim", verbatim; body of "An empty struct source is still named and carries the empty-file warning", verbatim; body of "values.cue opens with a comment naming its source", verbatim |
+
+Words changed or added:
+- "values.cue is filled from the first applicable source and the report names it": "`values.cue` SHALL be filled from the first applicable source in this order, and the repor..." reads "`values.cue` SHALL be filled from the first applicable source in this order, and the repor..." (the sentence without its final colon and list number, with a period)
+- "The initValues source": "`values.cue` SHALL be filled from the first applicable source in this order, and the repor..." reads "`values.cue` SHALL be filled from the first applicable source in this order:" (the sentence cut before ", and the report" and closed with its colon)
+- "The initValues source": "Source: enhancement 0016 ("`#Module` gains an optional field carrying the author-intended ..." reads "Source: enhancement 0016 ("The field is `initValues?: _`, open and optional, with no schem..." (whole title dropped: only the title that supports this rule stays)
+- "No debugValues content reaches the package": "`values.cue` SHALL be filled from the first applicable source in this order, and the repor..." reads "`values.cue` SHALL be filled from the first applicable source in this order:" (the sentence cut before ", and the report" and closed with its colon)
+- "No debugValues content reaches the package": "Source: enhancement 0016 ("`#Module` gains an optional field carrying the author-intended ..." reads "Source: enhancement 0016 ("`#Module` gains an optional field carrying the author-intended ..." (whole title dropped: only the title that supports this rule stays)
+- "The debugValues source": "Otherwise the module's `debugValues`, when the whole value is concrete once defaults are a..." reads "`values.cue` SHALL be filled from the first applicable source in this order: in every othe..." ("Otherwise" reads the quoted case (16:55), after the cut lead; the first letter of the rung is lowered)
+- "The debugValues source": "Source: enhancement 0016 ("`debugValues` is the default template source for the generated ..." reads "Source: enhancement 0016 ("`debugValues` is the default template source for the generated ..." (the trailing list number dropped)
+- "A debugValues source makes the report warn the user to review the file": "Otherwise the module's `debugValues`, when the whole value is concrete once defaults are a..." reads "`values.cue` SHALL be filled from the first applicable source in this order: in every othe..." ("Otherwise" reads the quoted case (16:55), after the cut lead; the first letter of the rung is lowered)
+- "A debugValues source makes the report warn the user to review the file": "Source: enhancement 0016 ("`debugValues` is the default template source for the generated ..." reads "Source: enhancement 0016 ("`debugValues` is the default template source for the generated ..." (the trailing list number dropped)
+- "With no usable source values.cue holds an empty struct and the report warns": "Otherwise `values: {}`." reads "`values.cue` SHALL be filled from the first applicable source in this order: in every othe..." ("Otherwise" reads the quoted cases (16:55), after the cut lead)
+
+Lengths (old, new): old 1757; new "values.cue is filled from the first applicable source and the report names it" 119; "The initValues source" 431; "No debugValues content reaches the package" 327; "The debugValues source" 489; "A debugValues source makes the report warn the user to review the file" 411; "With no usable source values.cue holds an empty struct and the report warns" 459; "A concrete non-struct source is rendered verbatim" 153; "An empty struct source is still named and carries the empty-file warning" 282; "values.cue opens with a comment naming its source" 173.
+
+### Ledger: instance-init, Init writes all or nothing, and only where a standalone package belongs
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "An existing target directory is refused with exit 2 before any registry access", "A target inside an existing CUE module is refused with exit 2 before any registry access", "The package is written completely or not at all".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Existing directory refused | "An existing target directory is refused with exit 2 before any registry access", "Existing directory refused" | No (byte equal, checked) |
+| Inside a CUE module refused | "A target inside an existing CUE module is refused with exit 2 before any registry access", "Inside a CUE module refused" | No (byte equal, checked) |
+| Failure leaves nothing behind | "The package is written completely or not at all", "Failure leaves nothing behind" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The command SHALL refuse with exit 2, before any registry access, when... | body of "An existing target directory is refused with exit 2 before any registry access", the part of this sentence it holds, verbatim or as the words changed below say; body of "A target inside an existing CUE module is refused with exit 2 before any registry access", the part of this sentence it holds, verbatim or as the words changed below say |
+| The package SHALL be written completely or not at all: on any failure ... | body of "The package is written completely or not at all", verbatim |
+| Source: enhancement 0016 ("`opm instance init` mirrors `opm module ini... | body of "An existing target directory is refused with exit 2 before any registry access", verbatim; body of "A target inside an existing CUE module is refused with exit 2 before any registry access", verbatim; body of "The package is written completely or not at all", verbatim |
+
+Words changed or added:
+- "An existing target directory is refused with exit 2 before any registry access": "The command SHALL refuse with exit 2, before any registry access, when the target director..." reads "The command SHALL refuse with exit 2, before any registry access, when the target director..." (the first condition, up to its parenthesis, with a period)
+- "A target inside an existing CUE module is refused with exit 2 before any registry access": "The command SHALL refuse with exit 2, before any registry access, when the target director..." reads "The command SHALL refuse with exit 2, before any registry access, when the target director..." (the lead repeated, then the second condition; "or" dropped)
+
+Lengths (old, new): old 757; new "An existing target directory is refused with exit 2 before any registry access" 413; "A target inside an existing CUE module is refused with exit 2 before any registry access" 430; "The package is written completely or not at all" 475.
+
+### Ledger: instance-init, Init reports what it wrote and does not validate it
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "Init does not evaluate the generated package against the module config", "On success init reports the resolution, the values source, the files and a closing vet line", "The pinned version appears in the report", "Init exit codes are those of module init".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Success report | "On success init reports the resolution, the values source, the files and a closing vet line", "Success report" | No (byte equal, checked) |
+| Registry unreachable | "Init exit codes are those of module init", "Registry unreachable" | No (byte equal, checked) |
+| Registry unreachable while resolving dependencies | "Init exit codes are those of module init", "Registry unreachable while resolving dependencies" | No (byte equal, checked) |
+| Values that violate the contract still initialize | "Init does not evaluate the generated package against the module config", "Values that violate the contract still initialize" | No (byte equal, checked) |
+| (new) | "The pinned version appears in the report", "The pinned version is reported" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| Init SHALL NOT evaluate the generated package against the module's `#c... | body of "Init does not evaluate the generated package against the module config", verbatim |
+| On success it SHALL report: the resolution (module path, selected majo... | body of "On success init reports the resolution, the values source, the files and a closing vet line", verbatim |
+| The pinned version SHALL appear in the report; pins never float. | body of "The pinned version appears in the report", verbatim |
+| Exit codes SHALL be those of `opm module init`: 0 written, 2 refused, ... | body of "Init exit codes are those of module init", verbatim |
+| Source: enhancement 0016 ("`opm instance init` mirrors `opm module ini... | body of "Init does not evaluate the generated package against the module config", the part of this sentence it holds, verbatim or as the words changed below say; body of "On success init reports the resolution, the values source, the files and a closing vet line", the part of this sentence it holds, verbatim or as the words changed below say; body of "Init exit codes are those of module init", the part of this sentence it holds, verbatim or as the words changed below say |
+
+Words changed or added:
+- "Init does not evaluate the generated package against the module config": "Source: enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-fr..." reads "Source: enhancement 0016 ("Init does not validate the generated package; it tells the user..." (whole titles dropped: only the titles that support this rule stay)
+- "On success init reports the resolution, the values source, the files and a closing vet line": "Source: enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-fr..." reads "Source: enhancement 0016 ("Init does not validate the generated package; it tells the user..." (whole titles dropped: only the titles that support this rule stay)
+- "The pinned version appears in the report": "Source: enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-fr..." reads "Source: enhancement 0016 ("The generated module file pins the module exactly, carries core..." (whole titles dropped: only the titles that support this rule stay)
+- "Init exit codes are those of module init": "Source: enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-fr..." reads "Source: enhancement 0016 ("`opm instance init` mirrors `opm module init`, takes a major-fr..." (whole titles dropped: only the titles that support this rule stay)
+
+Lengths (old, new): old 1008; new "Init does not evaluate the generated package against the module config" 178; "On success init reports the resolution, the values source, the files and a closing vet line" 376; "The pinned version appears in the report" 223; "Init exit codes are those of module init" 380.
+
+### Ledger: instance-init, Only a registry that gave no response counts as unreachable
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A registry failure with no HTTP response counts as unreachable", "A registry answer that a dependency is not held is not unreachable", "Reading the module's own module file stays exit 3 for every failure", "The CLI takes the unreachable decision from the library's typed fetch classification".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| A dependency the registry does not hold | "A registry answer that a dependency is not held is not unreachable", "A dependency the registry does not hold" | No (byte equal, checked) |
+| (new) | "A registry failure with no HTTP response counts as unreachable", "No response is unreachable" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "Reading the module's own module file stays exit 3 for every failure", "Reading the module file" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The CLI takes the unreachable decision from the library's typed fetch classification", "No message matching" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| While `opm instance init` acquires the module archive and while it res... | body of "A registry failure with no HTTP response counts as unreachable", verbatim |
+| A registry answer that a dependency of the staged package is not held ... | body of "A registry answer that a dependency is not held is not unreachable", verbatim |
+| Reading the module's own module file, between resolution and acquire, ... | body of "Reading the module's own module file stays exit 3 for every failure", the part of this sentence it holds, verbatim or as the words changed below say |
+| Source: enhancement 0016 (a published module floats to the highest cor... | body of "A registry failure with no HTTP response counts as unreachable", verbatim; body of "A registry answer that a dependency is not held is not unreachable", verbatim; body of "Reading the module's own module file stays exit 3 for every failure", verbatim |
+| The CLI SHALL take the unreachable decision from the library's typed f... | body of "The CLI takes the unreachable decision from the library's typed fetch classification", verbatim |
+| Source: enhancement 0021 ("A beta line reaches GA only when its exit c... | body of "The CLI takes the unreachable decision from the library's typed fetch classification", verbatim |
+
+Words changed or added:
+- "Reading the module's own module file stays exit 3 for every failure": "Reading the module's own module file, between resolution and acquire, stays exit 3 for eve..." reads "Reading the module's own module file, between resolution and acquire, SHALL stay exit 3 fo..." ("stays" reads "SHALL stay")
+
+Lengths (old, new): old 831; new "A registry failure with no HTTP response counts as unreachable" 356; "A registry answer that a dependency is not held is not unreachable" 225; "Reading the module's own module file stays exit 3 for every failure" 197; "The CLI takes the unreachable decision from the library's typed fetch classification" 237.
+
+### Ledger: authoring-commands, version set writes in place, idempotently, offline
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "version set rewrites the identity Version in place", "Setting the already-declared version writes nothing", "version set performs no registry I/O", "An identity file of the wrong shape is refused with the path and a pointer to the conformance check", "The writer tolerates every authored form of the Version field and preserves the form it finds", "Every identity file the CLI emits uses the plain-literal form".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Idempotent no-op | "Setting the already-declared version writes nothing", "Idempotent no-op" | No (byte equal, checked) |
+| Plain literal rewritten in place | "version set rewrites the identity Version in place", "Plain literal rewritten in place" | No (byte equal, checked) |
+| Assertion survives the write | "version set rewrites the identity Version in place", "Assertion survives the write" | No (byte equal, checked) |
+| Defaulted declaration stays defaulted | "The writer tolerates every authored form of the Version field and preserves the form it finds", "Defaulted declaration stays defaulted" | No (byte equal, checked) |
+| Structural refusal | "An identity file of the wrong shape is refused with the path and a pointer to the conformance check", "Structural refusal" | No (byte equal, checked) |
+| Catalog refusal points at a command that exists | "An identity file of the wrong shape is refused with the path and a pointer to the conformance check", "Catalog refusal points at a command that exists" | No (byte equal, checked) |
+| (new) | "version set performs no registry I/O", "No registry access" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "Every identity file the CLI emits uses the plain-literal form", "Emitted identity files" | New restatement scenario: only words of the old clause, no new case |
+
+| Old clause | New place |
+| --- | --- |
+| `opm module version set <semver> [path]` and `opm catalog version set ... | body of "version set rewrites the identity Version in place", verbatim |
+| Setting the already-declared version SHALL write nothing — no file mod... | body of "Setting the already-declared version writes nothing", verbatim |
+| The command SHALL perform no registry I/O; an identity file that does ... | body of "version set performs no registry I/O", the part of this sentence it holds, verbatim or as the words changed below say; body of "An identity file of the wrong shape is refused with the path and a pointer to the conformance check", the part of this sentence it holds, verbatim or as the words changed below say |
+| The writer SHALL tolerate every authored form (plain literal, `#Versio... | body of "The writer tolerates every authored form of the Version field and preserves the form it finds", verbatim |
+| Every identity file the CLI itself emits (scaffold, repair, official t... | body of "Every identity file the CLI emits uses the plain-literal form", verbatim |
+
+Words changed or added:
+- "version set performs no registry I/O": "The command SHALL perform no registry I/O; an identity file that does not structurally mat..." reads "The command SHALL perform no registry I/O." (the first clause up to the semicolon, with a period)
+- "An identity file of the wrong shape is refused with the path and a pointer to the conformance check": "The command SHALL perform no registry I/O; an identity file that does not structurally mat..." reads "An identity file that does not structurally match the schema-fixed shape SHALL be refused ..." (the second clause after the semicolon, with a capital letter)
+
+Lengths (old, new): old 1161; new "version set rewrites the identity Version in place" 313; "Setting the already-declared version writes nothing" 131; "version set performs no registry I/O" 42; "An identity file of the wrong shape is refused with the path and a pointer to the conformance check" 324; "The writer tolerates every authored form of the Version field and preserves the form it finds" 158; "Every identity file the CLI emits uses the plain-literal form" 188.
+
+### Strength table of cli-B3
+
+Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text:
+
+| Old sentence | New body | Word added |
+| --- | --- | --- |
+| A release with no template changed publishes nothing and succeeds, and a re-run after a partial publish skips ... | "A release with no template changed publishes nothing" | "publishes" reads "SHALL publish", "succeeds" reads "succeed", "skips" reads "SHALL skip" |
+| A `BREAKING CHANGE:` footer in a pull request body or a branch commit message SHALL NOT be relied on, because ... | "The migration note goes in the pull request body" | "the migration note goes" reads "The migration note of a breaking change SHALL go"; the trailing comma reads a period |
+| The action mints the dispatch token and chooses the targets: catalog_opm and opm-operator, as release-tool edg... | "The cascade-notify action mints the dispatch token and chooses the targets" | "mints" reads "SHALL mint", "chooses" reads "choose" |
+| The kernel reports advisory facts as structured rows and attaches no message strings to a render result. | "The CLI words the advisory facts of the kernel as warnings" | "reports" reads "SHALL report" |
+| The digest leaves the value of the `app.kubernetes.io/managed-by` label out, so the CLI (`opm-cli`) and the op... | "The digest leaves out the value of the managed-by label" | "The digest leaves" reads "`status.lastAppliedRenderDigest` SHALL leave" |
+| Evaluator-version skew reporting applies to a future cross-binary comparison, where the CLI and operator binar... | "Evaluator-version skew applies to a future cross-binary comparison" | "applies" reads "SHALL apply" |
+| When the platform is generated from the render's own deps (`opm module build` and `opm module vet` without `--... | "A platform generated from the render's own deps carries the module's replacements" | "are carried" reads "SHALL be carried" |
+| The provenance signal (`SourceLocal`, the `module-instance.opmodel.dev/source: local` annotation) keeps its fi... | "The provenance signal keeps its file-presence rule" | "keeps" reads "SHALL keep" |
+| The switch is the only thing the flag does: which demands are skippable, and what a skip does to the rendered ... | "Render-bearing commands accept --skip-unprovided and pass it to the kernel" | "is" reads "SHALL be" |
+| A platform the CLI generates (from the cluster Platform or from the render's own dependency pins) pins the ker... | "A platform the CLI generates is never refused for its core" | "pins" reads "SHALL pin" |
+| **Catalog and core as a consistent set.** This covers the `cue.mod/module.cue` files of the three templates, `... | "The catalog and core pins cover a fixed set of cue.mod/module.cue files" | "covers" reads "SHALL cover" |
+| The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves". | "The pin rules take their source from workspace RELEASING.md" | "is" reads "SHALL be" |
+| Exit codes: 0 when the working tree changed; 3 when it did not; any other code on error. | "Exit 0 means the working tree changed and exit 3 means it did not" | "Exit codes:" reads "Exit codes SHALL be:" |
+| `cue.mod/module.cue` declares the package's own module path, a language version, and dependencies: the deploye... | "The cue.mod/module.cue file declares the package's module path, language version and dependencies" | "declares" reads "SHALL declare" |
+| `instance.cue` declares `package instance`, imports core at the module's core major and the module at its majo... | "The instance.cue file declares the package, the imports and the module instance" | "declares" reads "SHALL declare" |
+| `values.cue` declares `package instance` and one `values` field, filled as "Values start from the author's int... | "The values.cue file declares one values field" | "declares" reads "SHALL declare" |
+| With one positional, a value containing `/` or `.` is the module path, and anything else is the instance name. | "With one positional a value with a slash or a dot is the module path" | "is" reads "SHALL be" twice |
+| A prompted value passes the same checks as the flag or positional it replaces, before any registry access. | "A prompted value passes the same checks as the flag it replaces" | "passes" reads "SHALL pass" |
+| Reading the module's own module file, between resolution and acquire, stays exit 3 for every failure. | "Reading the module's own module file stays exit 3 for every failure" | "stays" reads "SHALL stay" |
