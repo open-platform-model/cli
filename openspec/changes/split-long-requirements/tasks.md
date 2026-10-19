@@ -10,7 +10,7 @@
 - [x] 2.1 List the 28 long requirements of the three specs and confirm the count
 - [x] 2.2 Write the delta files for the three specs and append their ledger subsections
 - [x] 2.3 Grep for old headers; run the byte check per rewritten requirement
-- [x] 2.4 Run the gate with N=56 and the per-spec validation; `task lint` and `task test` green, then commit `docs(openspec): split the long requirements of deploy, platform-resolution and artifact-publishing`
+- [x] 2.4 Run the gate with N=56 and the per-spec validation; `task lint` and `task test:unit` ran (the cluster-backed `task test` did not run, DECISIONS.md 2026-10-19 15:05), then commit `docs(openspec): split the long requirements of deploy, platform-resolution and artifact-publishing`
 
 ## 3. cli-B3: release-workflow (8), kernel-render (7), deps-cascade (6), instance-init (6), authoring-commands (1), 28 requirements
 

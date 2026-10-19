@@ -824,830 +824,6 @@ Plain sentences that carry an RFC 2119 keyword in the new text and had none in t
 | --- | --- | --- |
 | `opm operator install` is the exception: it refuses on such a resource | "Operator install refuses a resource adopted by another instance" | "it refuses" reads "it SHALL refuse" |
 
-
-## Ledger entries of cli-B2 (deploy, platform-resolution, artifact-publishing)
-
-One subsection per rewritten requirement, 28 in all. Every new body is built from whole sentences of the old body, copied unchanged (swarm DECISIONS.md 2026-10-19 15:50). A clause row says "verbatim" for a sentence that appears unchanged. A row that names a substitution lists each changed word pair; a lowered first letter after a copied condition is named as such. A list marker `- ` of an old bullet is dropped where its sentence opens a body or follows a sentence that does not end in a colon. Old scenario names are all kept; the byte check ran once per rewritten requirement and printed no `DIFF` and no `LOST`.
-
-Form per requirement: the names below are cited by other requirements, so they keep their header as form b parents (MODIFIED, all old scenarios in place, split-offs ADDED with restatement scenarios): in `platform-resolution` "Acquisition mirrors the operator", "The cluster arm reads the effective registry", "Module commands render against the module's deps", "Platform source precedence by command", "Renders fall back to their own deps"; in `deploy` "Instance delete re-checks live ownership before each delete" and "Instance delete follows the shared deletion plan" (both cited by `operator-lifecycle`). The other 21 are form c2.
-
-Exceptions to the one-sentence rule, all with every word copied from the old requirement:
-
-- Four old sentences are longer than 500 characters and are cut inside the sentence, each part verbatim, the subject repeated: `artifact-publishing` "One pipeline, two entry points" (562), "Gates and refusal catalog" (769, the gate list is cut at its semicolons), "The compatibility gate" (531); `deploy` "Instance delete keeps PersistentVolumeClaims unless delete-data is set" (610). The supervisor is asked to rule on this in the report.
-- A condition or subject copied from the same old requirement leads a body where the old sentence relied on a sibling (rows "the part from ... on"). Where the old content cannot fit, a body names a sibling by its exact header (the 16:55 extension): "These, as listed in requirement ...", "one of the checks listed in requirement ...", "no such field (the field of requirement ...)", "In every other case than the one of requirement ...".
-- Cites of renamed requirements are updated to the new header: "Instance delete keeps PersistentVolumeClaims unless delete-data is set" and "Instance delete waits for the deleted resources when wait is set" in `deploy`, "Ownership guard judges every apply and dry run" (see the section above).
-- A `Source:` line is repeated whole on each split where the old text does not tie it to a clause. Where it does not fit, the quote that supports the block stays and the other quote stays in the block that carries its rule ("Instance delete re-checks live ownership before each delete" and its split).
-
-### Ledger: deploy, Instance delete never deletes CRDs or Namespaces
-
-Form: c2 (REMOVED, ADDED under new names). New requirements: "Instance delete never deletes a Namespace or a CustomResourceDefinition", "Instance delete lists a protected resource as left behind", "A left-behind resource does not fail the delete".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| Namespace tracked by the instance is left behind | "A left-behind resource does not fail the delete", "Namespace tracked by the instance is left behind" | No (byte equal, checked) |
-| CRD tracked by the instance is left behind | "Instance delete lists a protected resource as left behind", "CRD tracked by the instance is left behind" | No (byte equal, checked) |
-| Dry run reports left-behind resources | "Instance delete lists a protected resource as left behind", "Dry run reports left-behind resources" | No (byte equal, checked) |
-| (new) | "Instance delete never deletes a Namespace or a CustomResourceDefinition", "No flag overrides the protection" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| `opm instance delete` of a CLI-owned instance SHALL NOT delete a `Name... | body of "Instance delete never deletes a Namespace or a CustomResourceDefinition", verbatim; body of "Instance delete lists a protected resource as left behind", verbatim; body of "A left-behind resource does not fail the delete", verbatim |
-| There SHALL be no flag that overrides this. | body of "Instance delete never deletes a Namespace or a CustomResourceDefinition", verbatim |
-| Each such resource SHALL be listed as left behind, naming its kind, na... | body of "Instance delete lists a protected resource as left behind", verbatim |
-| A left-behind resource SHALL NOT count as a failure: the remaining tra... | body of "A left-behind resource does not fail the delete", verbatim |
-| The closing line SHALL state how many resources were left behind and h... | body of "A left-behind resource does not fail the delete", verbatim |
-
-Lengths (old, new): old 699; new "Instance delete never deletes a Namespace or a CustomResourceDefinition" 257; "Instance delete lists a protected resource as left behind" 382; "A left-behind resource does not fail the delete" 486.
-
-### Ledger: deploy, Instance delete re-checks live ownership before each delete
-
-Form: b (MODIFIED parent with its header and all scenarios, ADDED splits). New requirements: "keep", "A tracked resource is deleted only when its live labels and annotation show the instance owns it", "An object with no UUID label is judged without the UUID comparison", "A resource that fails the ownership check is left behind and does not fail the delete", "Each delete carries a precondition on the UID of the object that was read", "A resource that is already gone is no failure and any other read error is".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| Resource no longer managed by OPM is left behind | "Instance delete re-checks live ownership before each delete", "Resource no longer managed by OPM is left behind" | No (byte equal, checked) |
-| Resource owned by another instance is left behind | "Instance delete re-checks live ownership before each delete", "Resource owned by another instance is left behind" | No (byte equal, checked) |
-| Resource without a UUID label is deleted on managed-by alone | "Instance delete re-checks live ownership before each delete", "Resource without a UUID label is deleted on managed-by alone" | No (byte equal, checked) |
-| Resource gone before its delete | "Instance delete re-checks live ownership before each delete", "Resource gone before its delete" | No (byte equal, checked) |
-| Resource gone between its re-read and its delete | "Instance delete re-checks live ownership before each delete", "Resource gone between its re-read and its delete" | No (byte equal, checked) |
-| Instance without a recorded UUID deletes on managed-by alone | "Instance delete re-checks live ownership before each delete", "Instance without a recorded UUID deletes on managed-by alone" | No (byte equal, checked) |
-| Read error keeps the ModuleInstance | "Instance delete re-checks live ownership before each delete", "Read error keeps the ModuleInstance" | No (byte equal, checked) |
-| Resource adopted by another instance is left behind | "Instance delete re-checks live ownership before each delete", "Resource adopted by another instance is left behind" | No (byte equal, checked) |
-| Delete carries a UID precondition | "Instance delete re-checks live ownership before each delete", "Delete carries a UID precondition" | No (byte equal, checked) |
-| Object replaced between its re-read and its delete | "Instance delete re-checks live ownership before each delete", "Object replaced between its re-read and its delete" | No (byte equal, checked) |
-| (new) | "A tracked resource is deleted only when its live labels and annotation show the instance owns it", "Ownership conditions for the delete" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "An object with no UUID label is judged without the UUID comparison", "No UUID comparison without a UUID" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "A resource that fails the ownership check is left behind and does not fail the delete", "A resource that fails the check is listed with the reason" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "Each delete carries a precondition on the UID of the object that was read", "A refused precondition is a failure" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "A resource that is already gone is no failure and any other read error is", "Already gone counts neither as deleted nor as a failure" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| Before deleting each tracked resource, `opm instance delete` SHALL rea... | body of "Instance delete re-checks live ownership before each delete", verbatim; body of "An object with no UUID label is judged without the UUID comparison", the part from "Before deleting each tracked r..." on, verbatim; body of "A resource that fails the ownership check is left behind and does not fail the delete", the part from "Before deleting each tracked r..." on, verbatim; body of "Each delete carries a precondition on the UID of the object that was read", the part from "Before deleting each tracked r..." on, verbatim; body of "A resource that is already gone is no failure and any other read error is", the part from "Before deleting each tracked r..." on, verbatim |
-| It SHALL delete the resource only when the live `app.kubernetes.io/man... | body of "A tracked resource is deleted only when its live labels and annotation show the instance owns it", with "It SHALL delete the resource" reads "`opm instance delete` SHALL delete each tracked resource"; body of "An object with no UUID label is judged without the UUID comparison", with "It SHALL" reads "SHALL"; body of "A resource that fails the ownership check is left behind and does not fail the delete", with "It SHALL" reads "SHALL" |
-| An object with no UUID label SHALL be judged without the UUID comparis... | body of "An object with no UUID label is judged without the UUID comparison", verbatim |
-| A resource that fails the check SHALL be left behind and listed with t... | body of "A resource that fails the ownership check is left behind and does not fail the delete", verbatim |
-| Each delete SHALL carry a precondition on the UID of the object that w... | body of "Each delete carries a precondition on the UID of the object that was read", verbatim |
-| A resource that is already gone, whether its re-read or its delete cal... | body of "A resource that is already gone is no failure and any other read error is", verbatim |
-| Any other read error SHALL count as a failure for that resource, so th... | body of "A resource that is already gone is no failure and any other read error is", verbatim |
-| Source: enhancement 0012 ("The library owns the whole deletion sequenc... | body of "Instance delete re-checks live ownership before each delete", the part from "Source: enhancement 0012 (" on, verbatim; body of "A tracked resource is deleted only when its live labels and annotation show the instance owns it", the part from "Source: enhancement 0012 (" on, verbatim; body of "A tracked resource is deleted only when its live labels and annotation show the instance owns it", the part from ""The apply guard runs" on, verbatim |
-
-Lengths (old, new): old 1645; new "Instance delete re-checks live ownership before each delete" 401; "A tracked resource is deleted only when its live labels and annotation show the instance owns it" 497; "An object with no UUID label is judged without the UUID comparison" 458; "A resource that fails the ownership check is left behind and does not fail the delete" 498; "Each delete carries a precondition on the UID of the object that was read" 307; "A resource that is already gone is no failure and any other read error is" 359.
-
-### Ledger: deploy, Apply stages CustomResourceDefinitions and Namespaces before the rest
-
-Form: c2 (REMOVED, ADDED under new names). New requirements: "The apply goes in two stages in ascending kind-class weight", "The first stage holds every CustomResourceDefinition and every Namespace", "After the first stage the apply waits until the CustomResourceDefinitions are established", "A wait that does not complete fails the apply", "A resource that fails to apply does not stop the rest".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| A CRD and its custom resource apply in one run | "After the first stage the apply waits until the CustomResourceDefinitions are established", "A CRD and its custom resource apply in one run" | No (byte equal, checked) |
-| A Namespace is applied before the objects in it | "The first stage holds every CustomResourceDefinition and every Namespace", "A Namespace is applied before the objects in it" | No (byte equal, checked) |
-| The second stage follows weight order | "The apply goes in two stages in ascending kind-class weight", "The second stage follows weight order" | No (byte equal, checked) |
-| A CRD that never becomes established fails the apply | "A wait that does not complete fails the apply", "A CRD that never becomes established fails the apply" | No (byte equal, checked) |
-| (new) | "A resource that fails to apply does not stop the rest", "A failed resource is reported and the stages go on" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| `opm instance apply` and `opm module apply` SHALL apply the rendered r... | body of "The apply goes in two stages in ascending kind-class weight", verbatim; body of "The first stage holds every CustomResourceDefinition and every Namespace", the part from "`opm instance apply` and `opm ..." on, verbatim; body of "A resource that fails to apply does not stop the rest", the part from "`opm instance apply` and `opm ..." on, verbatim |
-| The first stage SHALL hold every `CustomResourceDefinition` (group `ap... | body of "The first stage holds every CustomResourceDefinition and every Namespace", verbatim |
-| Outside a dry run, after the first stage the command SHALL wait until ... | body of "After the first stage the apply waits until the CustomResourceDefinitions are established", verbatim; body of "A wait that does not complete fails the apply", the part from "Outside a dry run, after the f..." on, verbatim |
-| When the wait does not complete, the command SHALL fail naming the Cus... | body of "A wait that does not complete fails the apply", verbatim |
-| A resource that fails to apply SHALL be reported and SHALL NOT stop th... | body of "A resource that fails to apply does not stop the rest", verbatim |
-
-Lengths (old, new): old 1203; new "The apply goes in two stages in ascending kind-class weight" 375; "The first stage holds every CustomResourceDefinition and every Namespace" 265; "After the first stage the apply waits until the CustomResourceDefinitions are established" 345; "A wait that does not complete fails the apply" 366; "A resource that fails to apply does not stop the rest" 217.
-
-### Ledger: deploy, A dry run skips a custom resource whose CRD the same apply creates
-
-Form: c2 (REMOVED, ADDED under new names). New requirements: "A dry run skips a custom resource whose CRD the same apply creates and warns", "A dry run sends a custom resource whose CRD already exists", "A dry run does not wait for any CustomResourceDefinition", "A custom resource in a namespace the same apply creates is warned about once".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| A dry run with a new CRD skips its custom resource | "A dry run skips a custom resource whose CRD the same apply creates and warns", "A dry run with a new CRD skips its custom resource" | No (byte equal, checked) |
-| A dry run with an existing CRD sends its custom resource | "A dry run sends a custom resource whose CRD already exists", "A dry run with an existing CRD sends its custom resource" | No (byte equal, checked) |
-| (new) | "A dry run does not wait for any CustomResourceDefinition", "A dry run does not wait" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "A custom resource in a namespace the same apply creates is warned about once", "One warning for a custom resource in a new namespace" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| On `--dry-run`, `opm instance apply` and `opm module apply` SHALL NOT ... | body of "A dry run skips a custom resource whose CRD the same apply creates and warns", verbatim; body of "A dry run sends a custom resource whose CRD already exists", the part from "On `--dry-run`, `opm instance ..." on, verbatim; body of "A dry run does not wait for any CustomResourceDefinition", the part from "On `--dry-run`, `opm instance ..." on, verbatim; body of "A custom resource in a namespace the same apply creates is warned about once", the part from "On `--dry-run`, `opm instance ..." on, verbatim |
-| The command SHALL log a warning naming the skipped resource and its Cu... | body of "A dry run skips a custom resource whose CRD the same apply creates and warns", verbatim |
-| A dry run SHALL NOT wait for any CustomResourceDefinition. | body of "A dry run does not wait for any CustomResourceDefinition", first letter lowered after the condition, otherwise verbatim |
-| A custom resource whose CustomResourceDefinition already exists on the... | body of "A dry run sends a custom resource whose CRD already exists", first letter lowered after the condition, otherwise verbatim |
-| A custom resource that is also in a namespace the same apply creates S... | body of "A custom resource in a namespace the same apply creates is warned about once", first letter lowered after the condition, otherwise verbatim |
-
-Lengths (old, new): old 686; new "A dry run skips a custom resource whose CRD the same apply creates and warns" 393; "A dry run sends a custom resource whose CRD already exists" 163; "A dry run does not wait for any CustomResourceDefinition" 119; "A custom resource in a namespace the same apply creates is warned about once" 191.
-
-### Ledger: deploy, Instance delete of an instance that deploys the operator is guarded
-
-Form: c2 (REMOVED, ADDED under new names). New requirements: "An instance deploys the operator when one of three signals holds", "Instance delete does not delete an instance that deploys the operator", "The guard runs before any object is deleted, on both branches and on a dry run", "An operator-owned target is refused with exit code 2", "The guard lists ModuleInstance resources cluster-wide when the target is not operator-owned", "An armed instance blocks the delete with exit code 2", "A failed cluster-wide list fails closed", "Instance delete offers no flag that removes finalizers", "The yes flag and its deprecated alias do not bypass either refusal", "Every other instance's delete is unchanged by the guard".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| Refused while an instance waits on the operator's cleanup | "An armed instance blocks the delete with exit code 2", "Refused while an instance waits on the operator's cleanup" | No (byte equal, checked) |
-| Operator-owned instance of the operator is refused | "An operator-owned target is refused with exit code 2", "Operator-owned instance of the operator is refused" | No (byte equal, checked) |
-| Dry run reports the same refusal | "The guard runs before any object is deleted, on both branches and on a dry run", "Dry run reports the same refusal" | No (byte equal, checked) |
-| The target itself carries the finalizer | "An armed instance blocks the delete with exit code 2", "The target itself carries the finalizer" | No (byte equal, checked) |
-| The operator module under another name is guarded | "An instance deploys the operator when one of three signals holds", "The operator module under another name is guarded" | No (byte equal, checked) |
-| A record holding the operator's CRDs is guarded | "An instance deploys the operator when one of three signals holds", "A record holding the operator's CRDs is guarded" | No (byte equal, checked) |
-| Look-alike names are not the operator | "An instance deploys the operator when one of three signals holds", "Look-alike names are not the operator" | No (byte equal, checked) |
-| No armed instance, no refusal | "An armed instance blocks the delete with exit code 2", "No armed instance, no refusal" | No (byte equal, checked) |
-| List failure fails closed | "A failed cluster-wide list fails closed", "List failure fails closed" | No (byte equal, checked) |
-| Other instances are not guarded | "Every other instance's delete is unchanged by the guard", "Other instances are not guarded" | No (byte equal, checked) |
-| The deprecated alias does not bypass the guard | "The yes flag and its deprecated alias do not bypass either refusal", "The deprecated alias does not bypass the guard" | No (byte equal, checked) |
-| (new) | "Instance delete does not delete an instance that deploys the operator", "The guard names the operator's instance" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "The guard lists ModuleInstance resources cluster-wide when the target is not operator-owned", "The guard lists every ModuleInstance" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "Instance delete offers no flag that removes finalizers", "No finalizer flag and no owner write" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| `opm instance delete` SHALL NOT delete an instance that deploys the op... | body of "Instance delete does not delete an instance that deploys the operator", verbatim; body of "The yes flag and its deprecated alias do not bypass either refusal", verbatim |
-| An instance deploys the operator when any one of these holds, read fro... | body of "An instance deploys the operator when one of three signals holds", with "any one of these holds" reads "any one of these SHALL hold" |
-| These are the same signals by which the operator recognises the instan... | body of "Instance delete does not delete an instance that deploys the operator", with "These are the same signals" reads "These, as listed in requirement "An instance deploys the operator when one of three signals holds", are the same signals" |
-| The guard SHALL run after the target instance is resolved and before a... | body of "The guard runs before any object is deleted, on both branches and on a dry run", verbatim |
-| - When the target is operator-owned, the command SHALL refuse with exi... | body of "An operator-owned target is refused with exit code 2", verbatim |
-| The operator never reconciles, finalizes or prunes the instance that d... | body of "An operator-owned target is refused with exit code 2", verbatim |
-| - Otherwise the command SHALL list `ModuleInstance` resources cluster-... | body of "The guard lists ModuleInstance resources cluster-wide when the target is not operator-owned", with "Otherwise the command" reads "When the target is not operator-owned, the command"; body of "An armed instance blocks the delete with exit code 2", with "Otherwise the command" reads "When the target is not operator-owned, the command"; body of "A failed cluster-wide list fails closed", with "Otherwise the command" reads "When the target is not operator-owned, the command" |
-| When any carries `opmodel.dev/cleanup`, the command SHALL refuse with ... | body of "An armed instance blocks the delete with exit code 2", verbatim |
-| Deleting the operator while it still owes cleanup leaves every armed i... | body of "The guard lists ModuleInstance resources cluster-wide when the target is not operator-owned", verbatim |
-| When the cluster-wide list fails, the command SHALL fail closed with t... | body of "A failed cluster-wide list fails closed", verbatim |
-| `opm instance delete` SHALL offer no flag that removes finalizers and ... | body of "Instance delete offers no flag that removes finalizers", verbatim |
-| `--yes` SHALL keep its one meaning, skipping the confirmation prompt, ... | body of "The yes flag and its deprecated alias do not bypass either refusal", verbatim |
-| Every other instance's delete SHALL be unchanged by this requirement. | body of "Every other instance's delete is unchanged by the guard", verbatim |
-
-Lengths (old, new): old 2453; new "An instance deploys the operator when one of three signals holds" 416; "Instance delete does not delete an instance that deploys the operator" 451; "The guard runs before any object is deleted, on both branches and on a dry run" 201; "An operator-owned target is refused with exit code 2" 355; "The guard lists ModuleInstance resources cluster-wide when the target is not operator-owned" 236; "An armed instance blocks the delete with exit code 2" 459; "A failed cluster-wide list fails closed" 287; "Instance delete offers no flag that removes finalizers" 99; "The yes flag and its deprecated alias do not bypass either refusal" 408; "Every other instance's delete is unchanged by the guard" 69.
-
-### Ledger: deploy, Instance delete keeps the ModuleInstance when a tracked resource could not be read
-
-Form: c2 (REMOVED, ADDED under new names). New requirements: "An unreadable tracked resource counts as a failure and keeps the ModuleInstance", "The output says the ModuleInstance was kept and a dry run counts the resource as not checked", "An unreadable Namespace or CustomResourceDefinition is left behind and is no failure", "The operator-owned delete path is not affected by discovery read errors".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| Discovery read error keeps the ModuleInstance | "An unreadable tracked resource counts as a failure and keeps the ModuleInstance", "Discovery read error keeps the ModuleInstance" | No (byte equal, checked) |
-| Dry run counts an unreadable resource as not checked | "The output says the ModuleInstance was kept and a dry run counts the resource as not checked", "Dry run counts an unreadable resource as not checked" | No (byte equal, checked) |
-| Unreadable Namespace is left behind, not a failure | "An unreadable Namespace or CustomResourceDefinition is left behind and is no failure", "Unreadable Namespace is left behind, not a failure" | No (byte equal, checked) |
-| Operator-owned delete ignores discovery read errors | "The operator-owned delete path is not affected by discovery read errors", "Operator-owned delete ignores discovery read errors" | No (byte equal, checked) |
-
-| Old clause | New place |
-| --- | --- |
-| When `opm instance delete` deletes a CLI-owned instance and a tracked ... | body of "An unreadable tracked resource counts as a failure and keeps the ModuleInstance", verbatim; body of "The output says the ModuleInstance was kept and a dry run counts the resource as not checked", the part from "When `opm instance delete` del..." on, verbatim; body of "An unreadable Namespace or CustomResourceDefinition is left behind and is no failure", the part from "When `opm instance delete` del..." on, verbatim; body of "The operator-owned delete path is not affected by discovery read errors", verbatim |
-| On a real run the output SHALL say that the `ModuleInstance` was kept ... | body of "The output says the ModuleInstance was kept and a dry run counts the resource as not checked", first letter lowered after the condition, otherwise verbatim |
-| A dry run SHALL count the resource among those it could not check. | body of "The output says the ModuleInstance was kept and a dry run counts the resource as not checked", verbatim |
-| A tracked `Namespace` in the core group or `CustomResourceDefinition` ... | body of "An unreadable Namespace or CustomResourceDefinition is left behind and is no failure", first letter lowered after the condition, otherwise verbatim |
-| The operator-owned delete path SHALL NOT be affected. | body of "The operator-owned delete path is not affected by discovery read errors", verbatim |
-
-Lengths (old, new): old 880; new "An unreadable tracked resource counts as a failure and keeps the ModuleInstance" 441; "The output says the ModuleInstance was kept and a dry run counts the resource as not checked" 332; "An unreadable Namespace or CustomResourceDefinition is left behind and is no failure" 385; "The operator-owned delete path is not affected by discovery read errors" 495.
-
-### Ledger: deploy, A dry run skips a namespaced object whose namespace the same apply creates
-
-Form: c2 (REMOVED, ADDED under new names). New requirements: "A dry run skips a namespaced object whose namespace the apply would create", "A skipped object is warned about, counted and no error", "A dry run sends every other object as usual".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| A dry run with a new Namespace skips the objects in it | "A dry run skips a namespaced object whose namespace the apply would create", "A dry run with a new Namespace skips the objects in it" | No (byte equal, checked) |
-| A dry run with --create-namespace skips the objects in the new instance namespace | "A dry run skips a namespaced object whose namespace the apply would create", "A dry run with --create-namespace skips the objects in the new instance namespace" | No (byte equal, checked) |
-| A dry run in an existing namespace sends everything | "A dry run sends every other object as usual", "A dry run in an existing namespace sends everything" | No (byte equal, checked) |
-| A real apply skips nothing | "A dry run sends every other object as usual", "A real apply skips nothing" | No (byte equal, checked) |
-| (new) | "A skipped object is warned about, counted and no error", "A skipped object gets a warning and a count" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| On `--dry-run`, `opm instance apply` and `opm module apply` SHALL NOT ... | body of "A dry run skips a namespaced object whose namespace the apply would create", verbatim; body of "A skipped object is warned about, counted and no error", the part from "On `--dry-run`, `opm instance ..." on, verbatim; body of "A dry run sends every other object as usual", the part from "On `--dry-run`, `opm instance ..." on, verbatim |
-| A dry run persists neither, so the server's namespace admission would ... | body of "A dry run skips a namespaced object whose namespace the apply would create", verbatim |
-| The command SHALL log a warning naming the skipped object and its name... | body of "A skipped object is warned about, counted and no error", verbatim |
-| A namespaced object in a namespace that already exists, and every clus... | body of "A dry run sends every other object as usual", verbatim |
-| Without `--create-namespace`, a missing instance namespace that no ren... | body of "A dry run sends every other object as usual", verbatim |
-| Outside a dry run nothing is skipped. | body of "A dry run sends every other object as usual", verbatim |
-
-Lengths (old, new): old 996; new "A dry run skips a namespaced object whose namespace the apply would create" 423; "A skipped object is warned about, counted and no error" 380; "A dry run sends every other object as usual" 461.
-
-### Ledger: deploy, Create-namespace creates the namespace only after every check passed
-
-Form: c2 (REMOVED, ADDED under new names). New requirements: "Create-namespace creates a missing namespace only after every check that can refuse the apply passed", "A check that refuses the apply leaves the cluster unchanged and creates no namespace", "While the namespace is missing the apply sends no read into it", "The status-permission check runs unchanged with a missing namespace", "A failed read or create of the namespace stops the apply with the exit code of its cause", "A namespace that exists at the create stops the apply with exit code 1", "A dry run creates no namespace and reports that it would".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| A refused first install creates no namespace | "A check that refuses the apply leaves the cluster unchanged and creates no namespace", "A refused first install creates no namespace" | No (byte equal, checked) |
-| An untracked cluster-scoped resource refuses before the namespace is created | "A check that refuses the apply leaves the cluster unchanged and creates no namespace", "An untracked cluster-scoped resource refuses before the namespace is created" | No (byte equal, checked) |
-| A failed cluster gate creates no namespace | "A check that refuses the apply leaves the cluster unchanged and creates no namespace", "A failed cluster gate creates no namespace" | No (byte equal, checked) |
-| A denied status permission creates no namespace | "A check that refuses the apply leaves the cluster unchanged and creates no namespace", "A denied status permission creates no namespace" | No (byte equal, checked) |
-| A missing namespace is a first install and is not read | "While the namespace is missing the apply sends no read into it", "A missing namespace is a first install and is not read" | No (byte equal, checked) |
-| A caller without cluster-wide read is not refused by the missing namespace | "While the namespace is missing the apply sends no read into it", "A caller without cluster-wide read is not refused by the missing namespace" | No (byte equal, checked) |
-| An existing namespace is left alone | "Create-namespace creates a missing namespace only after every check that can refuse the apply passed", "An existing namespace is left alone" | No (byte equal, checked) |
-| The namespace read fails | "A failed read or create of the namespace stops the apply with the exit code of its cause", "The namespace read fails" | No (byte equal, checked) |
-| The namespace create fails | "A failed read or create of the namespace stops the apply with the exit code of its cause", "The namespace create fails" | No (byte equal, checked) |
-| The namespace appears during the checks | "A namespace that exists at the create stops the apply with exit code 1", "The namespace appears during the checks" | No (byte equal, checked) |
-| (new) | "The status-permission check runs unchanged with a missing namespace", "The status-permission check asks about the namespace by name" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "A dry run creates no namespace and reports that it would", "A dry run reports first that the namespace would be created" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| With `--create-namespace`, `opm instance apply` and `opm module apply`... | body of "Create-namespace creates a missing namespace only after every check that can refuse the apply passed", with "(capability `apply-pruning`, "Ownership guard judges every apply and dry run")" reads "(capability `apply-pruning`, "The ownership guard judges every apply")"; body of "The status-permission check runs unchanged with a missing namespace", the part from "With `--create-namespace`, `op..." on, verbatim; body of "A failed read or create of the namespace stops the apply with the exit code of its cause", the part from "With `--create-namespace`, `op..." on, verbatim; body of "A namespace that exists at the create stops the apply with exit code 1", the part from "With `--create-namespace`, `op..." on, verbatim; body of "A dry run creates no namespace and reports that it would", the part from "With `--create-namespace`, `op..." on, verbatim |
-| The namespace SHALL be created before the first rendered resource is a... | body of "Create-namespace creates a missing namespace only after every check that can refuse the apply passed", verbatim |
-| An apply that one of these checks refuses SHALL NOT create the namespa... | body of "A check that refuses the apply leaves the cluster unchanged and creates no namespace", with "one of these checks" reads "one of the checks listed in requirement "Create-namespace creates a missing namespace only after every check that can refuse the apply passed"" |
-| While the namespace is missing, the apply SHALL treat it as holding no... | body of "While the namespace is missing the apply sends no read into it", verbatim |
-| Rendered cluster-scoped objects and objects in other namespaces SHALL ... | body of "While the namespace is missing the apply sends no read into it", verbatim |
-| The status-permission check SHALL run unchanged; it asks about the nam... | body of "The status-permission check runs unchanged with a missing namespace", verbatim |
-| A failure of the first read (whether the namespace exists) SHALL stop ... | body of "A failed read or create of the namespace stops the apply with the exit code of its cause", verbatim |
-| A failure of the create SHALL stop the apply with the exit code of its... | body of "A failed read or create of the namespace stops the apply with the exit code of its cause", verbatim |
-| When the namespace turns out to exist at the create although the first... | body of "A namespace that exists at the create stops the apply with exit code 1", verbatim |
-| A dry run SHALL create nothing and SHALL report first that the namespa... | body of "A dry run creates no namespace and reports that it would", verbatim |
-| (note) | "Create-namespace creates a missing namespace only after every check that can refuse the apply passed": The cite of the removed name of apply-pruning is updated as DECISIONS.md 2026-10-19 15:05 rules. |
-
-Lengths (old, new): old 1663; new "Create-namespace creates a missing namespace only after every check that can refuse the apply passed" 472; "A check that refuses the apply leaves the cluster unchanged and creates no namespace" 234; "While the namespace is missing the apply sends no read into it" 357; "The status-permission check runs unchanged with a missing namespace" 242; "A failed read or create of the namespace stops the apply with the exit code of its cause" 381; "A namespace that exists at the create stops the apply with exit code 1" 377; "A dry run creates no namespace and reports that it would" 217.
-
-### Ledger: deploy, Instance delete fails when the ModuleInstance record cannot be deleted
-
-Form: c2 (REMOVED, ADDED under new names). New requirements: "A failed record delete prints no success line and exits non-zero", "A failed record delete exits by the answer of the API server", "A re-run after the cause is fixed deletes the record", "A dry run is not affected by a failed record delete".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| Forbidden record delete | "A failed record delete prints no success line and exits non-zero", "Forbidden record delete" | No (byte equal, checked) |
-| Record delete fails with a server error | "A failed record delete exits by the answer of the API server", "Record delete fails with a server error" | No (byte equal, checked) |
-| Re-run after the cause is fixed | "A re-run after the cause is fixed deletes the record", "Re-run after the cause is fixed" | No (byte equal, checked) |
-| (new) | "A dry run is not affected by a failed record delete", "A dry run deletes no record" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| When `opm instance delete` deletes a CLI-owned instance, every tracked... | body of "A failed record delete prints no success line and exits non-zero", verbatim; body of "A failed record delete exits by the answer of the API server", the part from "When `opm instance delete` del..." on, verbatim; body of "A re-run after the cause is fixed deletes the record", the part from "When `opm instance delete` del..." on, verbatim; body of "A dry run is not affected by a failed record delete", verbatim |
-| The output SHALL name the record and the error, SHALL say that the tra... | body of "A failed record delete prints no success line and exits non-zero", verbatim |
-| The exit code SHALL be 4 when the API server denied the delete (Forbid... | body of "A failed record delete exits by the answer of the API server", first letter lowered after the condition, otherwise verbatim |
-| A NotFound answer SHALL count as deleted. | body of "A failed record delete exits by the answer of the API server", verbatim |
-| Re-running the command after the cause is fixed SHALL delete the recor... | body of "A re-run after the cause is fixed deletes the record", first letter lowered after the condition, otherwise verbatim |
-| A dry run deletes no record and SHALL NOT be affected. | body of "A dry run is not affected by a failed record delete", verbatim |
-
-Lengths (old, new): old 785; new "A failed record delete prints no success line and exits non-zero" 418; "A failed record delete exits by the answer of the API server" 412; "A re-run after the cause is fixed deletes the record" 268; "A dry run is not affected by a failed record delete" 307.
-
-### Ledger: deploy, Instance delete keeps PersistentVolumeClaims unless delete-data is set
-
-Form: c2 (REMOVED, ADDED under new names). New requirements: "Instance delete keeps a tracked PersistentVolumeClaim unless `--delete-data` is set", "Each kept claim is listed on its own line at the informational level", "A kept claim does not count as a failure", "The closing output counts the kept claims and names the command that deletes them", "With --delete-data a tracked claim is deleted under the live-ownership check", "The kept-claim rule covers the core group only and no StatefulSet template claim", "--delete-data on an operator-managed instance warns and changes nothing", "The kept-claim rule of the CLI is not claimed for an operator-managed instance", "An operator-managed delete that may have kept claims does not claim a full prune", "The closing output of an operator-managed delete that may have kept claims names them", "Every other operator-managed delete closes as a prune of the tracked resources".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| Claim is kept by default | "Instance delete keeps a tracked PersistentVolumeClaim unless `--delete-data` is set", "Claim is kept by default" | No (byte equal, checked) |
-| Delete-data deletes the claim | "With --delete-data a tracked claim is deleted under the live-ownership check", "Delete-data deletes the claim" | No (byte equal, checked) |
-| Dry run lists the claim as kept | "Each kept claim is listed on its own line at the informational level", "Dry run lists the claim as kept" | No (byte equal, checked) |
-| Unreadable claim is kept | "A kept claim does not count as a failure", "Unreadable claim is kept" | No (byte equal, checked) |
-| Operator-managed instance | "--delete-data on an operator-managed instance warns and changes nothing", "Operator-managed instance" | No (byte equal, checked) |
-| Operator-managed delete that may have kept claims closes without claiming either outcome | "The closing output of an operator-managed delete that may have kept claims names them", "Operator-managed delete that may have kept claims closes without claiming either outcome" | No (byte equal, checked) |
-| Operator-managed delete with the Delete policy closes as a full prune | "Every other operator-managed delete closes as a prune of the tracked resources", "Operator-managed delete with the Delete policy closes as a full prune" | No (byte equal, checked) |
-| Operator-managed delete on an operator without the field closes as a full prune | "Every other operator-managed delete closes as a prune of the tracked resources", "Operator-managed delete on an operator without the field closes as a full prune" | No (byte equal, checked) |
-| (new) | "The closing output counts the kept claims and names the command that deletes them", "The closing output names the claims kept" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "The kept-claim rule covers the core group only and no StatefulSet template claim", "A claim of another group is deleted like any other resource" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "The kept-claim rule of the CLI is not claimed for an operator-managed instance", "The operator decides what it removes" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "An operator-managed delete that may have kept claims does not claim a full prune", "No claim of a full prune and no claim of claims in the cluster" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| `opm instance delete` of a CLI-owned instance SHALL NOT delete a track... | body of "Instance delete keeps a tracked PersistentVolumeClaim unless `--delete-data` is set", verbatim; body of "Each kept claim is listed on its own line at the informational level", verbatim; body of "A kept claim does not count as a failure", verbatim; body of "The closing output counts the kept claims and names the command that deletes them", verbatim; body of "With --delete-data a tracked claim is deleted under the live-ownership check", verbatim; body of "The kept-claim rule covers the core group only and no StatefulSet template claim", verbatim; body of "The kept-claim rule of the CLI is not claimed for an operator-managed instance", verbatim |
-| Each kept claim SHALL be listed on its own line, naming its kind, name... | body of "Each kept claim is listed on its own line at the informational level", verbatim |
-| A kept claim SHALL NOT count as a failure: the other tracked resources... | body of "A kept claim does not count as a failure", verbatim |
-| After the delete the claim is in no inventory, so no later `opm` comma... | body of "Instance delete keeps a tracked PersistentVolumeClaim unless `--delete-data` is set", verbatim |
-| The closing output SHALL state how many claims were kept, SHALL print ... | body of "The closing output counts the kept claims and names the command that deletes them", verbatim |
-| With `--delete-data`, a tracked claim SHALL be deleted under the same ... | body of "With --delete-data a tracked claim is deleted under the live-ownership check", verbatim |
-| The kept-claim rule SHALL apply to the core group only: a kind of the ... | body of "The kept-claim rule covers the core group only and no StatefulSet template claim", verbatim |
-| The command SHALL NOT handle claims that a StatefulSet created from `v... | body of "The kept-claim rule covers the core group only and no StatefulSet template claim", verbatim |
-| On an operator-managed instance `--delete-data` SHALL NOT change what ... | body of "--delete-data on an operator-managed instance warns and changes nothing", verbatim |
-| The kept-claim rule of the CLI SHALL NOT be claimed for an operator-ma... | body of "The kept-claim rule of the CLI is not claimed for an operator-managed instance", verbatim |
-| When the delete of an operator-managed instance with `spec.prune` set ... | body of "An operator-managed delete that may have kept claims does not claim a full prune", the part from "When the delete of an operator..." on, verbatim; body of "An operator-managed delete that may have kept claims does not claim a full prune", the part from "the closing output SHALL NOT s..." on, verbatim; body of "The closing output of an operator-managed delete that may have kept claims names them", the part from "When the delete of an operator..." on, verbatim; body of "The closing output of an operator-managed delete that may have kept claims names them", the part from "it SHALL name each such claim" on, verbatim; "it SHALL name" reads "the closing output SHALL name" |
-| In every other case the closing output SHALL report the prune of the t... | body of "Every other operator-managed delete closes as a prune of the tracked resources", with "In every other case" reads "In every other case than the one of requirement "An operator-managed delete that may have kept claims does not claim a full prune"" |
-
-Lengths (old, new): old 2409; new "Instance delete keeps a tracked PersistentVolumeClaim unless `--delete-data` is set" 234; "Each kept claim is listed on its own line at the informational level" 361; "A kept claim does not count as a failure" 319; "The closing output counts the kept claims and names the command that deletes them" 321; "With --delete-data a tracked claim is deleted under the live-ownership check" 273; "The kept-claim rule covers the core group only and no StatefulSet template claim" 435; "--delete-data on an operator-managed instance warns and changes nothing" 377; "The kept-claim rule of the CLI is not claimed for an operator-managed instance" 273; "An operator-managed delete that may have kept claims does not claim a full prune" 404; "The closing output of an operator-managed delete that may have kept claims names them" 494; "Every other operator-managed delete closes as a prune of the tracked resources" 208.
-
-### Ledger: deploy, Instance delete confirmation names the claims that delete-data deletes
-
-Form: c2 (REMOVED, ADDED under new names). New requirements: "Instance delete reads the instance record before it asks for confirmation", "The prompt names the claims that delete-data deletes", "Without delete-data the prompt says PersistentVolumeClaims are kept", "The prompt for an operator-managed instance says so and says what the operator does", "The prompt for an operator-managed instance without prune says the operator leaves the tracked resources running", "The prompt for an operator-managed instance with prune set and no claim says nothing about claims", "With prune set and a tracked claim the prompt says one of four things decided by the CRD", "The prompt says the operator deletes the claims and their data when the CRD has no policy field or the policy is Delete", "The prompt says the operator keeps the claims when the CRD has the field and the policy is Keep, absent or another value", "The prompt does not say whether claims are kept when the CRD has no readable schema", "The prompt shows the value of spec.dataPolicy as it is", "Every check that can refuse the delete runs before the prompt".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| Prompt lists the claims | "The prompt names the claims that delete-data deletes", "Prompt lists the claims" | No (byte equal, checked) |
-| Prompt without delete-data | "Without delete-data the prompt says PersistentVolumeClaims are kept", "Prompt without delete-data" | No (byte equal, checked) |
-| Prompt for an operator-managed instance with prune set | "The prompt says the operator deletes the claims and their data when the CRD has no policy field or the policy is Delete", "Prompt for an operator-managed instance with prune set" | No (byte equal, checked) |
-| Prompt on an operator without the field | "The prompt says the operator deletes the claims and their data when the CRD has no policy field or the policy is Delete", "Prompt on an operator without the field" | No (byte equal, checked) |
-| Prompt for an operator-managed instance with prune set and no data policy | "The prompt says the operator keeps the claims when the CRD has the field and the policy is Keep, absent or another value", "Prompt for an operator-managed instance with prune set and no data policy" | No (byte equal, checked) |
-| Prompt when the CRD cannot be read | "The prompt does not say whether claims are kept when the CRD has no readable schema", "Prompt when the CRD cannot be read" | No (byte equal, checked) |
-| Refusal comes before the question | "Every check that can refuse the delete runs before the prompt", "Refusal comes before the question" | No (byte equal, checked) |
-| Prompt for an unknown data policy | "The prompt shows the value of spec.dataPolicy as it is", "Prompt for an unknown data policy" | No (byte equal, checked) |
-| Prompt for an operator-managed instance without prune | "The prompt for an operator-managed instance without prune says the operator leaves the tracked resources running", "Prompt for an operator-managed instance without prune" | No (byte equal, checked) |
-| Prompt for an instance that tracks no claim | "The prompt for an operator-managed instance with prune set and no claim says nothing about claims", "Prompt for an instance that tracks no claim" | No (byte equal, checked) |
-| Delete-data note comes before the question | "The prompt for an operator-managed instance says so and says what the operator does", "Delete-data note comes before the question" | No (byte equal, checked) |
-| Missing instance is reported before the prompt | "Instance delete reads the instance record before it asks for confirmation", "Missing instance is reported before the prompt" | No (byte equal, checked) |
-| (new) | "With prune set and a tracked claim the prompt says one of four things decided by the CRD", "Same outcome in a dry run and with --yes" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "With prune set and a tracked claim the prompt says one of four things decided by the CRD", "The prompt depends on the CRD" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| `opm instance delete` SHALL read the instance record before it asks fo... | body of "Instance delete reads the instance record before it asks for confirmation", verbatim |
-| When `--delete-data` is set, the instance is CLI-owned and its invento... | body of "The prompt names the claims that delete-data deletes", verbatim |
-| Without `--delete-data` the prompt for a CLI-owned instance SHALL say ... | body of "Without delete-data the prompt says PersistentVolumeClaims are kept", verbatim |
-| For an operator-managed instance the prompt SHALL be the same with or ... | body of "The prompt for an operator-managed instance says so and says what the operator does", verbatim; body of "The prompt for an operator-managed instance without prune says the operator leaves the tracked resources running", verbatim; body of "The prompt for an operator-managed instance with prune set and no claim says nothing about claims", verbatim |
-| When `spec.prune` is not set, it SHALL say that the operator leaves th... | body of "The prompt for an operator-managed instance without prune says the operator leaves the tracked resources running", verbatim |
-| When `spec.prune` is set and the inventory tracks no PersistentVolumeC... | body of "The prompt for an operator-managed instance with prune set and no claim says nothing about claims", verbatim |
-| When `spec.prune` is set and the inventory tracks at least one Persist... | body of "With prune set and a tracked claim the prompt says one of four things decided by the CRD", verbatim; body of "The prompt says the operator keeps the claims when the CRD has the field and the policy is Keep, absent or another value", the part from "When `spec.prune` is set and t..." on, verbatim; body of "The prompt does not say whether claims are kept when the CRD has no readable schema", the part from "When `spec.prune` is set and t..." on, verbatim |
-| The command SHALL take that from the CRD its operator-readiness check ... | body of "With prune set and a tracked claim the prompt says one of four things decided by the CRD", verbatim |
-| When the CRD has no such field, the operator does not know it: the pro... | body of "The prompt says the operator deletes the claims and their data when the CRD has no policy field or the policy is Delete", with "no such field" reads "no such field (the field of requirement "With prune set and a tracked claim the prompt says one of four things decided by the CRD")" |
-| When `spec.dataPolicy` is `Delete`, it SHALL say the same and name the... | body of "The prompt says the operator deletes the claims and their data when the CRD has no policy field or the policy is Delete", verbatim |
-| When the CRD has the field and `spec.dataPolicy` is `Keep`, absent, or... | body of "The prompt says the operator keeps the claims when the CRD has the field and the policy is Keep, absent or another value", with "it SHALL say that the operator deletes" reads "the prompt SHALL say that the operator deletes" |
-| When the CRD has no schema that can be read and `spec.dataPolicy` is n... | body of "The prompt does not say whether claims are kept when the CRD has no readable schema", with "it SHALL NOT say that claims" reads "the prompt SHALL NOT say that claims" |
-| The prompt SHALL show the value of `spec.dataPolicy` as it is, or say ... | body of "The prompt shows the value of spec.dataPolicy as it is", verbatim |
-| The dry run, and the run with `--yes`, SHALL state the same outcome fo... | body of "With prune set and a tracked claim the prompt says one of four things decided by the CRD", verbatim |
-| An instance that has no record SHALL be reported as not found before a... | body of "Instance delete reads the instance record before it asks for confirmation", verbatim |
-| Every check that can refuse the delete SHALL run before the prompt: th... | body of "Every check that can refuse the delete runs before the prompt", verbatim |
-| A refused delete SHALL NOT ask for confirmation. | body of "Every check that can refuse the delete runs before the prompt", verbatim |
-
-Lengths (old, new): old 2802; new "Instance delete reads the instance record before it asks for confirmation" 166; "The prompt names the claims that delete-data deletes" 242; "Without delete-data the prompt says PersistentVolumeClaims are kept" 107; "The prompt for an operator-managed instance says so and says what the operator does" 174; "The prompt for an operator-managed instance without prune says the operator leaves the tracked resources running" 273; "The prompt for an operator-managed instance with prune set and no claim says nothing about claims" 363; "With prune set and a tracked claim the prompt says one of four things decided by the CRD" 440; "The prompt says the operator deletes the claims and their data when the CRD has no policy field or the policy is Delete" 424; "The prompt says the operator keeps the claims when the CRD has the field and the policy is Keep, absent or another value" 451; "The prompt does not say whether claims are kept when the CRD has no readable schema" 422; "The prompt shows the value of spec.dataPolicy as it is" 179; "Every check that can refuse the delete runs before the prompt" 288.
-
-### Ledger: deploy, Instance delete follows the shared deletion plan
-
-Form: b (MODIFIED parent with its header and all scenarios, ADDED splits). New requirements: "keep", "A recorded resource that the command did not find is not in the deletion plan", "The command acts on a tracked resource only as the deletion plan names", "The deletion plan does not hold a PersistentVolumeClaim that the command keeps", "The ModuleInstance record is deleted only when the plan's release verdict allows it", "A dry run follows the same plan and deletes nothing", "The output lines and exit codes stay as the other requirements state them".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| Resources are deleted in the plan's order | "Instance delete follows the shared deletion plan", "Resources are deleted in the plan's order" | No (byte equal, checked) |
-| Delete carries what the plan names | "Instance delete follows the shared deletion plan", "Delete carries what the plan names" | No (byte equal, checked) |
-| Failed resource holds the record | "Instance delete follows the shared deletion plan", "Failed resource holds the record" | No (byte equal, checked) |
-| Left-behind resources do not hold the record | "Instance delete follows the shared deletion plan", "Left-behind resources do not hold the record" | No (byte equal, checked) |
-| Kept claim is outside the plan | "Instance delete follows the shared deletion plan", "Kept claim is outside the plan" | No (byte equal, checked) |
-| Resource that appears after the instance was read | "Instance delete follows the shared deletion plan", "Resource that appears after the instance was read" | No (byte equal, checked) |
-| Dry run follows the plan without deleting | "Instance delete follows the shared deletion plan", "Dry run follows the plan without deleting" | No (byte equal, checked) |
-| (new) | "A recorded resource that the command did not find is not in the deletion plan", "A resource not found is not in the plan" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "The command acts on a tracked resource only as the deletion plan names", "Actions and delete options come from the plan" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "The deletion plan does not hold a PersistentVolumeClaim that the command keeps", "A kept claim is outside the plan" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "The ModuleInstance record is deleted only when the plan's release verdict allows it", "The release verdict holds the record" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "A dry run follows the same plan and deletes nothing", "A dry run sends no delete" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "The output lines and exit codes stay as the other requirements state them", "Output and exit codes are unchanged" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| `opm instance delete` of a CLI-owned instance SHALL take every action ... | body of "Instance delete follows the shared deletion plan", verbatim; body of "A recorded resource that the command did not find is not in the deletion plan", verbatim; body of "The command acts on a tracked resource only as the deletion plan names", the part from "`opm instance delete` of a CLI..." on, verbatim; body of "The deletion plan does not hold a PersistentVolumeClaim that the command keeps", the part from "`opm instance delete` of a CLI..." on, verbatim; body of "The ModuleInstance record is deleted only when the plan's release verdict allows it", the part from "`opm instance delete` of a CLI..." on, verbatim; body of "A dry run follows the same plan and deletes nothing", the part from "`opm instance delete` of a CLI..." on, verbatim; body of "The output lines and exit codes stay as the other requirements state them", the part from "`opm instance delete` of a CLI..." on, verbatim |
-| A recorded resource that the command did not find when it read the ins... | body of "A recorded resource that the command did not find is not in the deletion plan", verbatim |
-| It SHALL read a tracked resource, delete it or leave it in place only ... | body of "The command acts on a tracked resource only as the deletion plan names", verbatim |
-| The plan SHALL NOT hold a `PersistentVolumeClaim` that the command kee... | body of "The deletion plan does not hold a PersistentVolumeClaim that the command keeps", with "("Instance delete keeps PersistentVolumeClaims unless delete-data is set")" reads "("Instance delete keeps a tracked PersistentVolumeClaim unless `--delete-data` is set")" |
-| The command SHALL delete the `ModuleInstance` record only when the pla... | body of "The ModuleInstance record is deleted only when the plan's release verdict allows it", verbatim |
-| A dry run SHALL follow the same plan, SHALL send no delete, and SHALL ... | body of "A dry run follows the same plan and deletes nothing", verbatim |
-| The output lines, their wording and the exit codes of the command SHAL... | body of "The output lines and exit codes stay as the other requirements state them", verbatim |
-| The operator-owned delete path SHALL NOT be affected. | body of "The output lines and exit codes stay as the other requirements state them", verbatim |
-| Source: enhancement 0012 ("The library owns the whole deletion sequenc... | body of "Instance delete follows the shared deletion plan", verbatim |
-
-Lengths (old, new): old 1424; new "Instance delete follows the shared deletion plan" 456; "A recorded resource that the command did not find is not in the deletion plan" 465; "The command acts on a tracked resource only as the deletion plan names" 362; "The deletion plan does not hold a PersistentVolumeClaim that the command keeps" 310; "The ModuleInstance record is deleted only when the plan's release verdict allows it" 332; "A dry run follows the same plan and deletes nothing" 241; "The output lines and exit codes stay as the other requirements state them" 336.
-
-### Ledger: deploy, Instance delete reports a resource as deleted when its delete is accepted
-
-Form: c2 (REMOVED, ADDED under new names). New requirements: "Instance delete reports a resource as deleted when the API server accepts its delete", "Without --wait an accepted delete is no failure although the resource still exists", "With --wait the command also waits for the deleted resources to disappear".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| Resource held by a finalizer | "Without --wait an accepted delete is no failure although the resource still exists", "Resource held by a finalizer" | No (byte equal, checked) |
-| Accepted delete of a resource with dependents | "Instance delete reports a resource as deleted when the API server accepts its delete", "Accepted delete of a resource with dependents" | No (byte equal, checked) |
-| (new) | "With --wait the command also waits for the deleted resources to disappear", "The wait is bounded" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| `opm instance delete` of a CLI-owned instance SHALL report a tracked r... | body of "Instance delete reports a resource as deleted when the API server accepts its delete", verbatim |
-| Each delete uses Foreground propagation, so a deleted resource can sti... | body of "Instance delete reports a resource as deleted when the API server accepts its delete", verbatim |
-| Without `--wait`, a resource whose delete was accepted SHALL NOT count... | body of "Without --wait an accepted delete is no failure although the resource still exists", verbatim |
-| This requirement describes when a resource counts as deleted. | body of "Instance delete reports a resource as deleted when the API server accepts its delete", verbatim |
-| With `--wait` the command also waits, bounded, for the deleted resourc... | body of "With --wait the command also waits for the deleted resources to disappear", with "the command also waits" reads "the command SHALL also wait"; "("Instance delete waits for the deleted resources when wait is set")" reads "("Instance delete with `--wait` waits for the deleted resources to disappear")" |
-
-Lengths (old, new): old 784; new "Instance delete reports a resource as deleted when the API server accepts its delete" 402; "Without --wait an accepted delete is no failure although the resource still exists" 225; "With --wait the command also waits for the deleted resources to disappear" 170.
-
-### Ledger: deploy, Instance delete waits for the deleted resources when wait is set
-
-Form: c2 (REMOVED, ADDED under new names). New requirements: "Instance delete accepts --wait and without it nothing changes", "Instance delete with `--wait` waits for the deleted resources to disappear", "A resource is gone when its read returns NotFound or its UID differs", "While it waits the command prints how many deleted resources are still terminating", "The wait skips a resource the command did not delete", "A timeout lists the resources still terminating and keeps the ModuleInstance record", "--wait has no effect on a dry run, after a failed delete or on an operator-managed instance".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| Deleted resources go away within the timeout | "Instance delete with `--wait` waits for the deleted resources to disappear", "Deleted resources go away within the timeout" | No (byte equal, checked) |
-| Resource held by a finalizer times out | "A timeout lists the resources still terminating and keeps the ModuleInstance record", "Resource held by a finalizer times out" | No (byte equal, checked) |
-| Name taken by a new object | "A resource is gone when its read returns NotFound or its UID differs", "Name taken by a new object" | No (byte equal, checked) |
-| Kept claim is not waited for | "The wait skips a resource the command did not delete", "Kept claim is not waited for" | No (byte equal, checked) |
-| Resource left behind is not waited for | "The wait skips a resource the command did not delete", "Resource left behind is not waited for" | No (byte equal, checked) |
-| Re-run after a timeout | "A timeout lists the resources still terminating and keeps the ModuleInstance record", "Re-run after a timeout" | No (byte equal, checked) |
-| Dry run does not wait | "--wait has no effect on a dry run, after a failed delete or on an operator-managed instance", "Dry run does not wait" | No (byte equal, checked) |
-| Operator-managed instance | "--wait has no effect on a dry run, after a failed delete or on an operator-managed instance", "Operator-managed instance" | No (byte equal, checked) |
-| Without the flag nothing changes | "Instance delete accepts --wait and without it nothing changes", "Without the flag nothing changes" | No (byte equal, checked) |
-| (new) | "While it waits the command prints how many deleted resources are still terminating", "Progress while waiting" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| `opm instance delete` SHALL accept `--wait`. | body of "Instance delete accepts --wait and without it nothing changes", verbatim |
-| With `--wait`, on a real run of a CLI-owned instance in which no track... | body of "Instance delete with `--wait` waits for the deleted resources to disappear", verbatim; body of "While it waits the command prints how many deleted resources are still terminating", the part from "With `--wait`, on a real run o..." on, verbatim; body of "The wait skips a resource the command did not delete", the part from "With `--wait`, on a real run o..." on, verbatim; body of "A timeout lists the resources still terminating and keeps the ModuleInstance record", the part from "With `--wait`, on a real run o..." on, verbatim |
-| A resource is gone when its read returns NotFound, or when the live ob... | body of "A resource is gone when its read returns NotFound or its UID differs", verbatim |
-| A read that fails with another error SHALL NOT count as gone. | body of "A resource is gone when its read returns NotFound or its UID differs", verbatim |
-| While it waits, the command SHALL print a line that says how many of t... | body of "While it waits the command prints how many deleted resources are still terminating", first letter lowered after the condition, otherwise verbatim |
-| The command SHALL NOT wait for a resource it did not delete: a kept `P... | body of "The wait skips a resource the command did not delete", first letter lowered after the condition, otherwise verbatim |
-| When every such resource is gone, the command SHALL delete the `Module... | body of "Instance delete with `--wait` waits for the deleted resources to disappear", verbatim |
-| When the timeout passes first, the command SHALL list each resource th... | body of "A timeout lists the resources still terminating and keeps the ModuleInstance record", first letter lowered after the condition, otherwise verbatim |
-| With `--dry-run`, and in a run in which a tracked resource failed, `--... | body of "--wait has no effect on a dry run, after a failed delete or on an operator-managed instance", verbatim |
-| For an operator-managed instance `--wait` SHALL have no effect: the co... | body of "--wait has no effect on a dry run, after a failed delete or on an operator-managed instance", verbatim |
-| Without `--wait`, the output and the exit code of the command SHALL be... | body of "Instance delete accepts --wait and without it nothing changes", verbatim |
-
-Lengths (old, new): old 1665; new "Instance delete accepts --wait and without it nothing changes" 152; "Instance delete with `--wait` waits for the deleted resources to disappear" 471; "A resource is gone when its read returns NotFound or its UID differs" 212; "While it waits the command prints how many deleted resources are still terminating" 272; "The wait skips a resource the command did not delete" 245; "A timeout lists the resources still terminating and keeps the ModuleInstance record" 317; "--wait has no effect on a dry run, after a failed delete or on an operator-managed instance" 260.
-
-### Ledger: platform-resolution, Registry-resolved catalog subscription
-
-Form: c2 (REMOVED, ADDED under new names). New requirements: "The CLI resolves a catalog subscription version from the registry within one major", "Release and prerelease are the two selection modes", "Development builds are never selected", "Versions that are not valid SemVer are ignored", "Resolution refuses rather than substitute a version from the other mode", "Resolution infers nothing".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| Stable release selected by default | "Release and prerelease are the two selection modes", "Stable release selected by default" | No (byte equal, checked) |
-| Prerelease-only history refuses under the default | "Resolution refuses rather than substitute a version from the other mode", "Prerelease-only history refuses under the default" | No (byte equal, checked) |
-| Prerelease mode ignores development builds | "Development builds are never selected", "Prerelease mode ignores development builds" | No (byte equal, checked) |
-| Development builds are never the answer | "Development builds are never selected", "Development builds are never the answer" | No (byte equal, checked) |
-| Empty history refuses | "Resolution refuses rather than substitute a version from the other mode", "Empty history refuses" | No (byte equal, checked) |
-| Registry failure is not a refusal | "Resolution refuses rather than substitute a version from the other mode", "Registry failure is not a refusal" | No (byte equal, checked) |
-| (new) | "The CLI resolves a catalog subscription version from the registry within one major", "Resolution is scoped to the major of the path" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "Versions that are not valid SemVer are ignored", "An invalid version is not a candidate" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "Resolution infers nothing", "No inference of maturity, major or literal" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| The CLI SHALL be able to resolve the version a Platform subscription p... | body of "The CLI resolves a catalog subscription version from the registry within one major", verbatim |
-| Resolution SHALL be scoped to the major carried by that path, so a bui... | body of "The CLI resolves a catalog subscription version from the registry within one major", verbatim |
-| Two selection modes exist, and the caller chooses between them explici... | body of "Release and prerelease are the two selection modes", with "exist," reads "SHALL exist," |
-| - **Release (default)**: the highest published version whose SemVer pr... | body of "Release and prerelease are the two selection modes", verbatim |
-| - **Prerelease (opt-in)**: the highest published version whose prerele... | body of "Release and prerelease are the two selection modes", verbatim |
-| Development builds SHALL NEVER be selected in either mode. | body of "Development builds are never selected", verbatim |
-| A development build is identified by a prerelease part whose first ide... | body of "Development builds are never selected", verbatim |
-| Versions the registry returns that are not valid SemVer SHALL be ignor... | body of "Versions that are not valid SemVer are ignored", verbatim |
-| When no published version satisfies the active mode, resolution SHALL ... | body of "Resolution refuses rather than substitute a version from the other mode", verbatim |
-| The refusal SHALL name the module path queried, the registry consulted... | body of "Resolution refuses rather than substitute a version from the other mode", verbatim |
-| Resolution SHALL NOT infer maturity, widen the major, or fall back to ... | body of "Resolution infers nothing", verbatim |
-
-Lengths (old, new): old 1358; new "The CLI resolves a catalog subscription version from the registry within one major" 332; "Release and prerelease are the two selection modes" 291; "Development builds are never selected" 266; "Versions that are not valid SemVer are ignored" 107; "Resolution refuses rather than substitute a version from the other mode" 271; "Resolution infers nothing" 92.
-
-### Ledger: platform-resolution, Acquisition mirrors the operator
-
-Form: b (MODIFIED parent with its header and all scenarios, ADDED splits). New requirements: "keep", "The registry entries of a generated platform are the effective registry", "Every platform source is acquired through the kernel's directory acquisition", "The CLI neither synthesizes nor persists a platform value", "A generated platform module lives in the OPM home cache under its content hash", "The CLI does not publish or write the generated module".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| CR generates the operator's module | "Acquisition mirrors the operator", "CR generates the operator's module" | No (byte equal, checked) |
-| An active claim's catalog is generated | "Acquisition mirrors the operator", "An active claim's catalog is generated" | No (byte equal, checked) |
-| Unchanged CR reuses the cache | "Acquisition mirrors the operator", "Unchanged CR reuses the cache" | No (byte equal, checked) |
-| Unpublished pin fails at acquisition | "Acquisition mirrors the operator", "Unpublished pin fails at acquisition" | No (byte equal, checked) |
-| Same failure surface for every source | "Acquisition mirrors the operator", "Same failure surface for every source" | No (byte equal, checked) |
-| (new) | "The registry entries of a generated platform are the effective registry", "The effective registry feeds the entries" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "Every platform source is acquired through the kernel's directory acquisition", "A bad pin fails at acquisition for every source" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "The CLI neither synthesizes nor persists a platform value", "No synthesized or persisted platform value" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "A generated platform module lives in the OPM home cache under its content hash", "The cache directory is named by the content hash" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "The CLI does not publish or write the generated module", "The generated module is derived state" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| A cluster `Platform` CR SHALL be turned into a platform module exactly... | body of "Acquisition mirrors the operator", verbatim; body of "The registry entries of a generated platform are the effective registry", the part from "A cluster `Platform` CR SHALL ..." on, verbatim; body of "A generated platform module lives in the OPM home cache under its content hash", the part from "A cluster `Platform` CR SHALL ..." on, verbatim |
-| The registry entries SHALL be the effective registry the operator reco... | body of "The registry entries of a generated platform are the effective registry", verbatim |
-| Every platform source SHALL then be acquired through the kernel's dire... | body of "Every platform source is acquired through the kernel's directory acquisition", verbatim |
-| The CLI MUST NOT synthesize a platform value from typed inputs and MUS... | body of "The CLI neither synthesizes nor persists a platform value", verbatim |
-| The generated module SHALL live under the OPM home cache at `cache/pla... | body of "A generated platform module lives in the OPM home cache under its content hash", verbatim |
-| The CLI MUST NOT publish the generated module, write it to the cluster... | body of "The CLI does not publish or write the generated module", verbatim |
-
-Lengths (old, new): old 1579; new "Acquisition mirrors the operator" 445; "The registry entries of a generated platform are the effective registry" 413; "Every platform source is acquired through the kernel's directory acquisition" 252; "The CLI neither synthesizes nor persists a platform value" 109; "A generated platform module lives in the OPM home cache under its content hash" 394; "The CLI does not publish or write the generated module" 153.
-
-### Ledger: platform-resolution, The cluster arm reads the effective registry
-
-Form: b (MODIFIED parent with its header and all scenarios, ADDED splits). New requirements: "keep", "Resolution warns and never silently substitutes when the status is stale or the Platform is not Ready", "The write-if-absent seeding of a missing Platform is unchanged".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| Effective registry wins over the spec | "The cluster arm reads the effective registry", "Effective registry wins over the spec" | No (byte equal, checked) |
-| No recorded registry falls back to the spec | "The cluster arm reads the effective registry", "No recorded registry falls back to the spec" | No (byte equal, checked) |
-| A stale status warns | "The cluster arm reads the effective registry", "A stale status warns" | No (byte equal, checked) |
-| A refused Platform renders against the last good package | "The cluster arm reads the effective registry", "A refused Platform renders against the last good package" | No (byte equal, checked) |
-| (new) | "Resolution warns and never silently substitutes when the status is stale or the Platform is not Ready", "A warning does not change the generated package" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "The write-if-absent seeding of a missing Platform is unchanged", "Seeding happens only when no CR exists" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| When the cluster Platform's status carries a resolved registry, resolu... | body of "The cluster arm reads the effective registry", verbatim |
-| When it carries none, resolution SHALL generate from the spec and SHAL... | body of "The cluster arm reads the effective registry", verbatim |
-| Resolution SHALL warn, never silently substitute, in two cases: when `... | body of "Resolution warns and never silently substitutes when the status is stale or the Platform is not Ready", verbatim |
-| Neither warning changes which package is generated. | body of "Resolution warns and never silently substitutes when the status is stale or the Platform is not Ready", verbatim |
-| The write-if-absent seeding of a missing Platform is unchanged: it hap... | body of "The write-if-absent seeding of a missing Platform is unchanged", with "is unchanged:" reads "SHALL be unchanged:" |
-
-Lengths (old, new): old 796; new "The cluster arm reads the effective registry" 243; "Resolution warns and never silently substitutes when the status is stale or the Platform is not Ready" 410; "The write-if-absent seeding of a missing Platform is unchanged" 147.
-
-### Ledger: platform-resolution, Module commands render against the module's deps
-
-Form: b (MODIFIED parent with its header and all scenarios, ADDED splits). New requirements: "keep", "The generated platform carries one enabled registry entry per catalog dependency", "The dependency list of the generated platform is the closure of the pins", "The generated platform carries the module's replacements", "The deps are read from the module's acquired source", "The generated platform is cached under its content hash", "The provenance line names the module's deps", "The skew policy is neither named nor applied to the module's deps", "A module with no catalog dependency renders against an empty registry", "A pin that is not published fails at generation", "A refusal for unresolved demands adds a hint that names the platform flag", "The same generator serves every other render".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| Catalog pins come from the module | "Module commands render against the module's deps", "Catalog pins come from the module" | No (byte equal, checked) |
-| A catalog's own dependencies are closed over | "Module commands render against the module's deps", "A catalog's own dependencies are closed over" | No (byte equal, checked) |
-| No local default platform is needed | "Module commands render against the module's deps", "No local default platform is needed" | No (byte equal, checked) |
-| The flag overrides the deps | "Module commands render against the module's deps", "The flag overrides the deps" | No (byte equal, checked) |
-| Deploying commands keep the platform | "Module commands render against the module's deps", "Deploying commands keep the platform" | No (byte equal, checked) |
-| A local catalog checkout is rendered | "Module commands render against the module's deps", "A local catalog checkout is rendered" | No (byte equal, checked) |
-| A published module renders against its own deps | "Module commands render against the module's deps", "A published module renders against its own deps" | No (byte equal, checked) |
-| A module without a catalog dependency renders against an empty registry | "Module commands render against the module's deps", "A module without a catalog dependency renders against an empty registry" | No (byte equal, checked) |
-| Core never falls below the kernel's verified release | "Module commands render against the module's deps", "Core never falls below the kernel's verified release" | No (byte equal, checked) |
-| A provider-fulfilled demand names the platform flag | "Module commands render against the module's deps", "A provider-fulfilled demand names the platform flag" | No (byte equal, checked) |
-| Unchanged deps reuse the cache | "Module commands render against the module's deps", "Unchanged deps reuse the cache" | No (byte equal, checked) |
-| (new) | "The generated platform carries one enabled registry entry per catalog dependency", "Registry entries and the core pin" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "The dependency list of the generated platform is the closure of the pins", "Dependency list is a closure" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "The generated platform carries the module's replacements", "Replacements are carried" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "The deps are read from the module's acquired source", "Deps come from the acquired source" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "The generated platform is cached under its content hash", "Cache named by the content hash" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "The provenance line names the module's deps", "Provenance names the deps" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "The skew policy is neither named nor applied to the module's deps", "No skew policy for the deps" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "A module with no catalog dependency renders against an empty registry", "Empty registry for a module without catalog dependency" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "A pin that is not published fails at generation", "Unpublished pin fails at generation" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "A refusal for unresolved demands adds a hint that names the platform flag", "Hint on an unresolved demand" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "The same generator serves every other render", "One generator for every render" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| When `opm module build` or `opm module vet` runs without `--platform`,... | body of "Module commands render against the module's deps", verbatim; body of "The generated platform carries one enabled registry entry per catalog dependency", the part from "When `opm module build` or `op..." on, verbatim; body of "The dependency list of the generated platform is the closure of the pins", the part from "When `opm module build` or `op..." on, verbatim; body of "The generated platform carries the module's replacements", the part from "When `opm module build` or `op..." on, verbatim; body of "The deps are read from the module's acquired source", the part from "When `opm module build` or `op..." on, verbatim; body of "The generated platform is cached under its content hash", the part from "When `opm module build` or `op..." on, verbatim; body of "The provenance line names the module's deps", the part from "When `opm module build` or `op..." on, verbatim; body of "The skew policy is neither named nor applied to the module's deps", the part from "When `opm module build` or `op..." on, verbatim; body of "A module with no catalog dependency renders against an empty registry", the part from "When `opm module build` or `op..." on, verbatim; body of "A pin that is not published fails at generation", the part from "When `opm module build` or `op..." on, verbatim; body of "A refusal for unresolved demands adds a hint that names the platform flag", verbatim; body of "The same generator serves every other render", verbatim |
-| Source: cli issue 229. | body of "Module commands render against the module's deps", verbatim; body of "The generated platform carries one enabled registry entry per catalog dependency", verbatim; body of "The dependency list of the generated platform is the closure of the pins", verbatim; body of "The generated platform carries the module's replacements", verbatim; body of "The deps are read from the module's acquired source", verbatim; body of "The generated platform is cached under its content hash", verbatim; body of "The provenance line names the module's deps", verbatim; body of "The skew policy is neither named nor applied to the module's deps", verbatim; body of "A module with no catalog dependency renders against an empty registry", verbatim; body of "A pin that is not published fails at generation", verbatim; body of "A refusal for unresolved demands adds a hint that names the platform flag", verbatim |
-| - The generated platform SHALL carry one enabled `#registry` entry per... | body of "The generated platform carries one enabled registry entry per catalog dependency", first letter lowered after the condition, otherwise verbatim |
-| - Its dependency list SHALL be the minimum-version-selection closure o... | body of "The dependency list of the generated platform is the closure of the pins", first letter lowered after the condition, otherwise verbatim |
-| - Each `replaceWith` in the module's `cue.mod/local-module.cue` whose ... | body of "The generated platform carries the module's replacements", first letter lowered after the condition, otherwise verbatim |
-| The closure SHALL read a directory-replaced module's requirements from... | body of "The dependency list of the generated platform is the closure of the pins", verbatim |
-| - The deps SHALL be read from the module's acquired source, so a modul... | body of "The deps are read from the module's acquired source", first letter lowered after the condition, otherwise verbatim |
-| A published module has no local module context, so nothing is carried ... | body of "The deps are read from the module's acquired source", verbatim |
-| - The generated module SHALL be cached under `cache/platforms/` beside... | body of "The generated platform is cached under its content hash", first letter lowered after the condition, otherwise verbatim |
-| - The provenance line SHALL name the source as the module's deps and l... | body of "The provenance line names the module's deps", first letter lowered after the condition, otherwise verbatim |
-| The skew policy SHALL NOT be named or applied: every pinned path is at... | body of "The skew policy is neither named nor applied to the module's deps", first letter lowered after the condition, otherwise verbatim |
-| - A module with no `opmodel.dev/catalogs/*` dependency SHALL render ag... | body of "A module with no catalog dependency renders against an empty registry", first letter lowered after the condition, otherwise verbatim |
-| - A pin that is not published SHALL fail at generation naming the modu... | body of "A pin that is not published fails at generation", first letter lowered after the condition, otherwise verbatim |
-| - When a render against this source is refused for unresolved demands,... | body of "A refusal for unresolved demands adds a hint that names the platform flag", verbatim |
-| - The same generator serves the deps fallback of every other render (s... | body of "The same generator serves every other render", with "serves" reads "SHALL serve" |
-
-Lengths (old, new): old 2420; new "Module commands render against the module's deps" 206; "The generated platform carries one enabled registry entry per catalog dependency" 441; "The dependency list of the generated platform is the closure of the pins" 422; "The generated platform carries the module's replacements" 324; "The deps are read from the module's acquired source" 334; "The generated platform is cached under its content hash" 269; "The provenance line names the module's deps" 196; "The skew policy is neither named nor applied to the module's deps" 203; "A module with no catalog dependency renders against an empty registry" 367; "A pin that is not published fails at generation" 182; "A refusal for unresolved demands adds a hint that names the platform flag" 388; "The same generator serves every other render" 299.
-
-### Ledger: platform-resolution, Platform source precedence by command
-
-Form: b (MODIFIED parent with its header and all scenarios, ADDED splits). New requirements: "keep", "Instance commands and module apply resolve the flag, then the cluster Platform, then their own deps", "Platform check resolves its argument, then the flag, then the cluster Platform", "Every platform source resolves to a platform module directory", "Every command that renders reports the platform source it resolved", "A platform argument that is a file or an empty directory fails with the expected shape", "The --provider flag does not exist".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| Flag wins | "Platform source precedence by command", "Flag wins" | No (byte equal, checked) |
-| Cluster CR used when no flag | "Platform source precedence by command", "Cluster CR used when no flag" | No (byte equal, checked) |
-| Absent Platform falls back to the deps | "Platform source precedence by command", "Absent Platform falls back to the deps" | No (byte equal, checked) |
-| Module commands never read the cluster | "Platform source precedence by command", "Module commands never read the cluster" | No (byte equal, checked) |
-| A platform file is refused | "Platform source precedence by command", "A platform file is refused" | No (byte equal, checked) |
-| platform check with no source refuses | "Platform source precedence by command", "platform check with no source refuses" | No (byte equal, checked) |
-| (new) | "Instance commands and module apply resolve the flag, then the cluster Platform, then their own deps", "Precedence of the instance commands" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "Platform check resolves its argument, then the flag, then the cluster Platform", "Precedence of platform check" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "Every platform source resolves to a platform module directory", "Every source is a module directory" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "Every command that renders reports the platform source it resolved", "The resolved source is reported" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "A platform argument that is a file or an empty directory fails with the expected shape", "A directory without a platform module is refused" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "The --provider flag does not exist", "No --provider flag" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| The CLI SHALL resolve the platform for every render by precedence, and... | body of "Platform source precedence by command", verbatim; body of "Instance commands and module apply resolve the flag, then the cluster Platform, then their own deps", verbatim; body of "Platform check resolves its argument, then the flag, then the cluster Platform", verbatim |
-| - `opm module build` and `opm module vet` resolve `--platform <dir>` (... | body of "Platform source precedence by command", verbatim |
-| - `opm instance build`, `opm instance vet`, `opm instance diff`, `opm ... | body of "Instance commands and module apply resolve the flag, then the cluster Platform, then their own deps", verbatim |
-| - `opm platform check` resolves its `[dir]` argument (highest) > `--pl... | body of "Platform check resolves its argument, then the flag, then the cluster Platform", verbatim |
-| Every source resolves to a platform module directory the kernel acquir... | body of "Every platform source resolves to a platform module directory", with "Every source resolves to" reads "Every source SHALL resolve to" |
-| Every command that renders SHALL report which platform source it resol... | body of "Every command that renders reports the platform source it resolved", verbatim |
-| A `--platform` argument that is a file, or a directory holding no plat... | body of "A platform argument that is a file or an empty directory fails with the expected shape", verbatim |
-| The `--provider` flag SHALL NOT exist (superseded by `--platform`, enh... | body of "The --provider flag does not exist", verbatim |
-
-Lengths (old, new): old 1859; new "Platform source precedence by command" 337; "Instance commands and module apply resolve the flag, then the cluster Platform, then their own deps" 437; "Platform check resolves its argument, then the flag, then the cluster Platform" 313; "Every platform source resolves to a platform module directory" 415; "Every command that renders reports the platform source it resolved" 224; "A platform argument that is a file or an empty directory fails with the expected shape" 186; "The --provider flag does not exist" 228.
-
-### Ledger: platform-resolution, Only operator install seeds the cluster Platform
-
-Form: c2 (REMOVED, ADDED under new names). New requirements: "Operator install seeds the cluster Platform with a plain create", "A forbidden create of the seeded Platform degrades to a warning", "Operator install reports the provenance it resolved and no other source", "No render-bearing command seeds a Platform".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| Install seeds an absent Platform | "Operator install seeds the cluster Platform with a plain create", "Install seeds an absent Platform" | No (byte equal, checked) |
-| Concurrent create tolerated | "Operator install seeds the cluster Platform with a plain create", "Concurrent create tolerated" | No (byte equal, checked) |
-| RBAC-denied create degrades | "A forbidden create of the seeded Platform degrades to a warning", "RBAC-denied create degrades" | No (byte equal, checked) |
-| Install reports its own provenance | "Operator install reports the provenance it resolved and no other source", "Install reports its own provenance" | No (byte equal, checked) |
-| Apply never seeds a Platform | "No render-bearing command seeds a Platform", "Apply never seeds a Platform" | No (byte equal, checked) |
-
-| Old clause | New place |
-| --- | --- |
-| `opm operator install` SHALL seed the singleton `cluster` Platform wit... | body of "Operator install seeds the cluster Platform with a plain create", verbatim; body of "A forbidden create of the seeded Platform degrades to a warning", the part from "`opm operator install` SHALL s..." on, verbatim |
-| The CLI MUST NOT use server-side apply or update for this write and MU... | body of "Operator install seeds the cluster Platform with a plain create", verbatim |
-| A forbidden create SHALL degrade to a warning. | body of "A forbidden create of the seeded Platform degrades to a warning", verbatim |
-| The reported provenance SHALL name the catalog coordinate and version ... | body of "Operator install reports the provenance it resolved and no other source", verbatim |
-| No render-bearing command SHALL create, update or seed a `Platform`: `... | body of "No render-bearing command seeds a Platform", verbatim |
-
-Lengths (old, new): old 843; new "Operator install seeds the cluster Platform with a plain create" 498; "A forbidden create of the seeded Platform degrades to a warning" 160; "Operator install reports the provenance it resolved and no other source" 128; "No render-bearing command seeds a Platform" 168.
-
-### Ledger: platform-resolution, Renders fall back to their own deps
-
-Form: b (MODIFIED parent with its header and all scenarios, ADDED splits). New requirements: "keep", "An instance command reads its pins and replacements from the instance package", "Module apply reads its pins from the module's acquired source", "The skew policy is not applied to the deps fallback", "An instance package with no catalog dependency renders against an empty registry".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| Instance build with no cluster renders against its pins | "Renders fall back to their own deps", "Instance build with no cluster renders against its pins" | No (byte equal, checked) |
-| module apply on a cluster without a Platform | "Renders fall back to their own deps", "module apply on a cluster without a Platform" | No (byte equal, checked) |
-| (new) | "An instance command reads its pins and replacements from the instance package", "Pins of an instance command" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "Module apply reads its pins from the module's acquired source", "Pins of module apply" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "The skew policy is not applied to the deps fallback", "No skew policy for the fallback" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "An instance package with no catalog dependency renders against an empty registry", "Empty registry for an instance package" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| When `opm instance build`, `opm instance vet`, `opm instance diff`, `o... | body of "Renders fall back to their own deps", verbatim; body of "An instance command reads its pins and replacements from the instance package", the part from "When `opm instance build`, `op..." on, verbatim; body of "Module apply reads its pins from the module's acquired source", the part from "When `opm instance build`, `op..." on, verbatim; body of "The skew policy is not applied to the deps fallback", the part from "When `opm instance build`, `op..." on, verbatim; body of "An instance package with no catalog dependency renders against an empty registry", the part from "When `opm instance build`, `op..." on, verbatim |
-| - For an instance command, the pins SHALL be read from the instance pa... | body of "An instance command reads its pins and replacements from the instance package", first letter lowered after the condition, otherwise verbatim |
-| - For `opm module apply`, the pins SHALL be read from the module's acq... | body of "Module apply reads its pins from the module's acquired source", first letter lowered after the condition, otherwise verbatim |
-| - The skew policy SHALL NOT be applied to this source. | body of "The skew policy is not applied to the deps fallback", first letter lowered after the condition, otherwise verbatim |
-| - An instance package whose `cue.mod/module.cue` lists no `opmodel.dev... | body of "An instance package with no catalog dependency renders against an empty registry", first letter lowered after the condition, otherwise verbatim |
-
-Lengths (old, new): old 1094; new "Renders fall back to their own deps" 470; "An instance command reads its pins and replacements from the instance package" 365; "Module apply reads its pins from the module's acquired source" 310; "The skew policy is not applied to the deps fallback" 239; "An instance package with no catalog dependency renders against an empty registry" 446.
-
-### Ledger: platform-resolution, Instance build and vet probe the cluster without depending on it
-
-Form: c2 (REMOVED, ADDED under new names). New requirements: "Instance build and vet try the cluster Platform before the deps", "Offline instance build and vet never contact a cluster", "Instance build and vet resolve the deps silently when no kubeconfig context resolves", "Instance build and vet warn and resolve the deps when the Platform is absent or forbidden", "Instance build and vet warn and resolve the deps when the cluster does not answer in time", "Instance diff, instance apply and module apply keep failing on an unreachable cluster".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| offline never contacts the cluster | "Offline instance build and vet never contact a cluster", "offline never contacts the cluster" | No (byte equal, checked) |
-| Unreachable cluster degrades to the deps | "Instance build and vet warn and resolve the deps when the cluster does not answer in time", "Unreachable cluster degrades to the deps" | No (byte equal, checked) |
-| Kubeconfig flags select the cluster | "Instance build and vet try the cluster Platform before the deps", "Kubeconfig flags select the cluster" | No (byte equal, checked) |
-| (new) | "Instance build and vet resolve the deps silently when no kubeconfig context resolves", "No kubeconfig context resolves the deps without a warning" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "Instance build and vet warn and resolve the deps when the Platform is absent or forbidden", "Absent or forbidden Platform warns and resolves the deps" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "Instance diff, instance apply and module apply keep failing on an unreachable cluster", "Deploying commands need the cluster" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| `opm instance build` and `opm instance vet` SHALL try the cluster `Pla... | body of "Instance build and vet try the cluster Platform before the deps", verbatim; body of "Offline instance build and vet never contact a cluster", verbatim; body of "Instance build and vet resolve the deps silently when no kubeconfig context resolves", verbatim; body of "Instance build and vet warn and resolve the deps when the Platform is absent or forbidden", verbatim; body of "Instance build and vet warn and resolve the deps when the cluster does not answer in time", verbatim |
-| - With `--offline`, the CLI SHALL NOT resolve a kubeconfig or contact ... | body of "Offline instance build and vet never contact a cluster", verbatim |
-| - With no resolvable kubeconfig context, the CLI SHALL resolve the dep... | body of "Instance build and vet resolve the deps silently when no kubeconfig context resolves", verbatim |
-| - When the `Platform` CR is absent (including a cluster without the `P... | body of "Instance build and vet warn and resolve the deps when the Platform is absent or forbidden", verbatim |
-| - When the API server does not answer within a bounded wait (at most 1... | body of "Instance build and vet warn and resolve the deps when the cluster does not answer in time", verbatim |
-| - `opm instance diff`, `opm instance apply` and `opm module apply` kee... | body of "Instance diff, instance apply and module apply keep failing on an unreachable cluster", with "keep failing" reads "SHALL keep failing" |
-
-Lengths (old, new): old 918; new "Instance build and vet try the cluster Platform before the deps" 136; "Offline instance build and vet never contact a cluster" 267; "Instance build and vet resolve the deps silently when no kubeconfig context resolves" 226; "Instance build and vet warn and resolve the deps when the Platform is absent or forbidden" 343; "Instance build and vet warn and resolve the deps when the cluster does not answer in time" 335; "Instance diff, instance apply and module apply keep failing on an unreachable cluster" 150.
-
-### Ledger: platform-resolution, Operator install renders against the operator module's own pins
-
-Form: c2 (REMOVED, ADDED under new names). New requirements: "Operator install renders the operator module against a platform of its own pins", "Operator install renders the same objects whatever the cluster Platform holds", "Operator install names the module's deps as the provenance source", "The operator render narrows the platform-source precedence for the operator's own instance only".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| Seeded Platform on another catalog release | "Operator install renders the same objects whatever the cluster Platform holds", "Seeded Platform on another catalog release" | No (byte equal, checked) |
-| Stalled Platform does not block repair | "Operator install renders the operator module against a platform of its own pins", "Stalled Platform does not block repair" | No (byte equal, checked) |
-| (new) | "Operator install names the module's deps as the provenance source", "Provenance of the operator render" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "The operator render narrows the platform-source precedence for the operator's own instance only", "The narrowing is for the operator's own instance only" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| `opm operator install`, the CRDs-only form included, SHALL render the ... | body of "Operator install renders the operator module against a platform of its own pins", verbatim; body of "Operator install renders the same objects whatever the cluster Platform holds", the part from "`opm operator install`, the CR..." on, verbatim; body of "Operator install names the module's deps as the provenance source", the part from "`opm operator install`, the CR..." on, verbatim; body of "The operator render narrows the platform-source precedence for the operator's own instance only", verbatim |
-| Every other command keeps its precedence under "Platform source preced... | body of "Operator install renders the operator module against a platform of its own pins", verbatim |
-| The same module version and values SHALL render the same objects wheth... | body of "Operator install renders the same objects whatever the cluster Platform holds", verbatim |
-| The provenance line SHALL name the module's deps as the source. | body of "Operator install names the module's deps as the provenance source", verbatim |
-| This narrows the platform-source precedence of enhancement 0006 for th... | body of "The operator render narrows the platform-source precedence for the operator's own instance only", verbatim |
-| Source: enhancement 0021 ("The operator's install artifact is a regist... | body of "Operator install renders the operator module against a platform of its own pins", verbatim; body of "Operator install renders the same objects whatever the cluster Platform holds", verbatim; body of "Operator install names the module's deps as the provenance source", verbatim |
-
-Lengths (old, new): old 911; new "Operator install renders the operator module against a platform of its own pins" 453; "Operator install renders the same objects whatever the cluster Platform holds" 419; "Operator install names the module's deps as the provenance source" 258; "The operator render narrows the platform-source precedence for the operator's own instance only" 426.
-
-### Ledger: artifact-publishing, One pipeline, two entry points
-
-Form: c2 (REMOVED, ADDED under new names). New requirements: "Publish loads the artifact tree and validates its identity package by unification", "Publish derives the registry coordinates, runs the gates and pushes", "What is published is exactly the committed tree", "Module publish loads the tree through the kernel's module loader".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| Clean artifact publishes at its declared version | "Publish derives the registry coordinates, runs the gates and pushes", "Clean artifact publishes at its declared version" | No (byte equal, checked) |
-| Identity is validated by unification | "Publish loads the artifact tree and validates its identity package by unification", "Identity is validated by unification" | No (byte equal, checked) |
-| A tree that does not load surfaces the load error | "Publish loads the artifact tree and validates its identity package by unification", "A tree that does not load surfaces the load error" | No (byte equal, checked) |
-| A module the kernel refuses is refused by publish | "Module publish loads the tree through the kernel's module loader", "A module the kernel refuses is refused by publish" | No (byte equal, checked) |
-| (new) | "What is published is exactly the committed tree", "Published bytes are the committed tree" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| `opm module publish [dir]` and `opm catalog publish [dir]` SHALL share... | body of "Publish loads the artifact tree and validates its identity package by unification", the part from "`opm module publish [dir]`" on, verbatim; body of "Publish derives the registry coordinates, runs the gates and pushes", the part from "`opm module publish [dir]`" on, verbatim; body of "Publish derives the registry coordinates, runs the gates and pushes", the part from "derive the registry coordinate..." on, verbatim |
-| What is published SHALL be exactly the committed tree - no copied buil... | body of "What is published is exactly the committed tree", verbatim |
-| For a module, publish SHALL additionally load the tree through the ker... | body of "Module publish loads the tree through the kernel's module loader", verbatim |
-| Publish SHALL NOT judge a module loadable by any test the kernel does ... | body of "Module publish loads the tree through the kernel's module loader", verbatim |
-| (note) | "Publish loads the artifact tree and validates its identity package by unification": The first sentence is longer than 500 characters, so it is cut at its list of steps: this block holds the subject and the first two steps, the next block the subject and the last three steps. |
-
-Lengths (old, new): old 984; new "Publish loads the artifact tree and validates its identity package by unification" 291; "Publish derives the registry coordinates, runs the gates and pushes" 361; "What is published is exactly the committed tree" 122; "Module publish loads the tree through the kernel's module loader" 298.
-
-### Ledger: artifact-publishing, Gates and refusal catalog
-
-Form: c2 (REMOVED, ADDED under new names). New requirements: "Publish accumulates every refusal and refuses with exit code 2", "Each refusal follows one fixed shape", "One cause yields one refusal", "The loadability, identity and derivation gates", "The cue.mod, source, tag and package-name gates", "The domain, local-override and already-published gates".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| Multiple defects reported in one pass | "Publish accumulates every refusal and refuses with exit code 2", "Multiple defects reported in one pass" | No (byte equal, checked) |
-| Kernel refusal is one refusal | "One cause yields one refusal", "Kernel refusal is one refusal" | No (byte equal, checked) |
-| Already published is always a refusal | "The domain, local-override and already-published gates", "Already published is always a refusal" | No (byte equal, checked) |
-| Unowned domains are not policed | "The domain, local-override and already-published gates", "Unowned domains are not policed" | No (byte equal, checked) |
-| (new) | "Each refusal follows one fixed shape", "A refusal follows the fixed shape" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "The loadability, identity and derivation gates", "The loadability and identity gates run" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "The cue.mod, source, tag and package-name gates", "The cue.mod and tag gates run" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| Publish SHALL evaluate every evaluable gate, accumulate all refusals i... | body of "Publish accumulates every refusal and refuses with exit code 2", verbatim |
-| Each refusal SHALL follow the fixed shape condition → evidence → conse... | body of "Each refusal follows one fixed shape", verbatim |
-| One cause SHALL yield one refusal. | body of "One cause yields one refusal", verbatim |
-| The gates: kernel loadability (modules only: the kernel's module loade... | body of "The loadability, identity and derivation gates", the part from "The gates:" on, verbatim; "The gates:" reads "The gates SHALL be:"; body of "The cue.mod, source, tag and package-name gates", the part from "The gates:" on, verbatim; "The gates:" reads "The gates SHALL be:"; body of "The cue.mod, source, tag and package-name gates", the part from "`cue.mod` `module:`" on, verbatim; body of "The domain, local-override and already-published gates", the part from "The gates:" on, verbatim; "The gates:" reads "The gates SHALL be:"; body of "The domain, local-override and already-published gates", the part from "namespace and kind-segment che..." on, verbatim |
-| (note) | "The loadability, identity and derivation gates": The gate list is one sentence of 769 characters, so it is cut at the semicolons between gates; each block holds "The gates:" and a contiguous run of its items. |
-
-Lengths (old, new): old 1175; new "Publish accumulates every refusal and refuses with exit code 2" 132; "Each refusal follows one fixed shape" 237; "One cause yields one refusal" 34; "The loadability, identity and derivation gates" 359; "The cue.mod, source, tag and package-name gates" 333; "The domain, local-override and already-published gates" 124.
-
-### Ledger: artifact-publishing, Exit codes
-
-Form: c2 (REMOVED, ADDED under new names). New requirements: "Publish exits 0, 2, 4, 3 or 1 by outcome", "A failed already-published lookup does not hide locally derived refusals", "A failed registry operation with no HTTP response reads registry unreachable", "A 401 or 403 answer reads as refused credentials and exits 4", "Any other failure answer reads registry operation failed", "A 403 answer to the already-published lookup is not a failure", "A refusing token endpoint is a refused credential", "Publish with no registry configured exits 2".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| Connectivity is not a refusal | "A failed registry operation with no HTTP response reads registry unreachable", "Connectivity is not a refusal" | No (byte equal, checked) |
-| A refused credential is not called unreachable | "A 401 or 403 answer reads as refused credentials and exits 4", "A refused credential is not called unreachable" | No (byte equal, checked) |
-| A refusing token endpoint is not called unreachable | "A refusing token endpoint is a refused credential", "A refusing token endpoint is not called unreachable" | No (byte equal, checked) |
-| A forbidden lookup reads as not published | "A 403 answer to the already-published lookup is not a failure", "A forbidden lookup reads as not published" | No (byte equal, checked) |
-| Another registry answer is not called unreachable | "Any other failure answer reads registry operation failed", "Another registry answer is not called unreachable" | No (byte equal, checked) |
-| No registry is configured | "Publish with no registry configured exits 2", "No registry is configured" | No (byte equal, checked) |
-| (new) | "Publish exits 0, 2, 4, 3 or 1 by outcome", "Exit code by outcome" | New restatement scenario: only words of the old clause, no new case |
-| (new) | "A failed already-published lookup does not hide locally derived refusals", "Locally derived refusals print before the registry error" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| Publish SHALL exit 0 on success, 2 on any refusal, 4 when a registry r... | body of "Publish exits 0, 2, 4, 3 or 1 by outcome", verbatim; body of "A 403 answer to the already-published lookup is not a failure", verbatim |
-| No consumer contract is made on distinguishing refusal causes by code. | body of "Publish exits 0, 2, 4, 3 or 1 by outcome", verbatim |
-| When the already-published lookup is what failed, the plan and every l... | body of "A failed already-published lookup does not hide locally derived refusals", verbatim |
-| A failed registry operation SHALL be named by its cause, and the messa... | body of "A failed registry operation with no HTTP response reads registry unreachable", verbatim; body of "A 401 or 403 answer reads as refused credentials and exits 4", verbatim; body of "Any other failure answer reads registry operation failed", verbatim |
-| - no HTTP response at all (a refused connection, a DNS or TLS failure,... | body of "A failed registry operation with no HTTP response reads registry unreachable", verbatim |
-| - a 401 or 403 answer that reaches the cli as such SHALL exit 4, SHALL... | body of "A 401 or 403 answer reads as refused credentials and exits 4", verbatim |
-| - any other failure answer SHALL read "registry operation failed" and ... | body of "Any other failure answer reads registry operation failed", verbatim |
-| A 403 answer to the already-published lookup is not such a failure: th... | body of "A 403 answer to the already-published lookup is not a failure", verbatim |
-| A registry that hands out bearer tokens and whose token endpoint refus... | body of "A refusing token endpoint is a refused credential", with "is a refused credential" reads "SHALL be a refused credential" |
-| A 403 from the token endpoint on the lookup or the core-schema fetch r... | body of "A refusing token endpoint is a refused credential", verbatim |
-| When the core-schema fetch fails and no registry is configured (no `--... | body of "Publish with no registry configured exits 2", verbatim |
-
-Lengths (old, new): old 2236; new "Publish exits 0, 2, 4, 3 or 1 by outcome" 334; "A failed already-published lookup does not hide locally derived refusals" 292; "A failed registry operation with no HTTP response reads registry unreachable" 277; "A 401 or 403 answer reads as refused credentials and exits 4" 433; "Any other failure answer reads registry operation failed" 260; "A 403 answer to the already-published lookup is not a failure" 455; "A refusing token endpoint is a refused credential" 466; "Publish with no registry configured exits 2" 304.
-
-### Ledger: artifact-publishing, The compatibility gate
-
-Form: c2 (REMOVED, ADDED under new names). New requirements: "Catalog publish compares each beta and GA member under the additive-only rule", "The compatibility baseline is the last published build that shipped the member", "A violation refuses as refusal 9", "A beta or GA name and apiVersion key is a permanent claim", "A dev build is not judged and is never a predecessor", "A release prerelease tag exempts beta and GA members until the first stable tag".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| Field removal refused against the true predecessor | "A violation refuses as refusal 9", "Field removal refused against the true predecessor" | No (byte equal, checked) |
-| Prerelease predecessors count | "The compatibility baseline is the last published build that shipped the member", "Prerelease predecessors count" | No (byte equal, checked) |
-| Remove-then-readd refused | "A beta or GA name and apiVersion key is a permanent claim", "Remove-then-readd refused" | No (byte equal, checked) |
-| apiVersion bump escapes | "The compatibility baseline is the last published build that shipped the member", "apiVersion bump escapes" | No (byte equal, checked) |
-| Dev build is not judged | "A dev build is not judged and is never a predecessor", "Dev build is not judged" | No (byte equal, checked) |
-| Dev build is never the baseline | "A dev build is not judged and is never a predecessor", "Dev build is never the baseline" | No (byte equal, checked) |
-| Release prereleases stay in the window | "The compatibility baseline is the last published build that shipped the member", "Release prereleases stay in the window" | No (byte equal, checked) |
-| Prerelease module line is exempt, visibly | "A release prerelease tag exempts beta and GA members until the first stable tag", "Prerelease module line is exempt, visibly" | No (byte equal, checked) |
-| First stable tag arms the gate | "A release prerelease tag exempts beta and GA members until the first stable tag", "First stable tag arms the gate" | No (byte equal, checked) |
-| (new) | "Catalog publish compares each beta and GA member under the additive-only rule", "Each beta and GA member is compared" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| `opm catalog publish` SHALL, for every member of the tree at beta or G... | body of "Catalog publish compares each beta and GA member under the additive-only rule", the part from "`opm catalog publish` SHALL" on, verbatim; body of "Catalog publish compares each beta and GA member under the additive-only rule", the part from "under the additive-only rule v..." on, verbatim; body of "The compatibility baseline is the last published build that shipped the member", the part from "`opm catalog publish` SHALL" on, verbatim; body of "The compatibility baseline is the last published build that shipped the member", the part from "for every member of the tree a..." on, verbatim; body of "The compatibility baseline is the last published build that shipped the member", the part from "compare the member against the..." on, verbatim |
-| A member no published build has carried SHALL pass. | body of "The compatibility baseline is the last published build that shipped the member", verbatim |
-| Violations SHALL refuse as refusal 9: a header naming the member, its ... | body of "A violation refuses as refusal 9", verbatim |
-| The gate makes a beta-or-GA name-and-apiVersion key a permanent claim ... | body of "A beta or GA name and apiVersion key is a permanent claim", verbatim |
-| A dev build, an effective tag whose prerelease segment carries a `dev`... | body of "A dev build is not judged and is never a predecessor", verbatim |
-| The plan SHALL report the skip visibly on the `compat gate` row as `de... | body of "A dev build is not judged and is never a predecessor", verbatim |
-| While the effective tag is a release prerelease (`-alpha.N`, `-beta.N`... | body of "A release prerelease tag exempts beta and GA members until the first stable tag", verbatim |
-| The exemption SHALL end at the first stable tag of the major: a stable... | body of "A release prerelease tag exempts beta and GA members until the first stable tag", verbatim |
-| (note) | "Catalog publish compares each beta and GA member under the additive-only rule": The first sentence is 531 characters, so it is cut: this block holds the sentence without the clause that starts at the dash, the next block holds the subject, the scope and that clause. |
-
-Lengths (old, new): old 1702; new "Catalog publish compares each beta and GA member under the additive-only rule" 344; "The compatibility baseline is the last published build that shipped the member" 481; "A violation refuses as refusal 9" 160; "A beta or GA name and apiVersion key is a permanent claim" 167; "A dev build is not judged and is never a predecessor" 348; "A release prerelease tag exempts beta and GA members until the first stable tag" 440.
-
-### Ledger: artifact-publishing, Connectivity across the member walk
-
-Form: c2 (REMOVED, ADDED under new names). New requirements: "A transport failure or a missing dependency aborts the walk as a connectivity error", "A package absent at a published version is the scan's negative signal", "The CLI takes fetch decisions from the library's typed classification".
-
-| Old scenario name | New place (requirement, scenario name) | Changed text? |
-| --- | --- | --- |
-| Mid-walk failure renders no verdict | "A transport failure or a missing dependency aborts the walk as a connectivity error", "Mid-walk failure renders no verdict" | No (byte equal, checked) |
-| Package absent at a published version | "A package absent at a published version is the scan's negative signal", "Package absent at a published version" | No (byte equal, checked) |
-| A predecessor's dependency is not held | "A transport failure or a missing dependency aborts the walk as a connectivity error", "A predecessor's dependency is not held" | No (byte equal, checked) |
-| (new) | "The CLI takes fetch decisions from the library's typed classification", "Decisions come from the typed fetch classification" | New restatement scenario: only words of the old clause, no new case |
-
-| Old clause | New place |
-| --- | --- |
-| A transport failure during predecessor enumeration or package loading ... | body of "A transport failure or a missing dependency aborts the walk as a connectivity error", verbatim; body of "The CLI takes fetch decisions from the library's typed classification", verbatim |
-| A package absent at a given published version is the scan's negative s... | body of "A package absent at a published version is the scan's negative signal", verbatim |
-| Absent SHALL include a probed version the registry does not hold and a... | body of "A package absent at a published version is the scan's negative signal", verbatim |
-| A dependency of the predecessor build that the registry does not hold ... | body of "A transport failure or a missing dependency aborts the walk as a connectivity error", verbatim |
-| Source: enhancement 0011 ("`opm catalog publish` refuses a build that ... | body of "A transport failure or a missing dependency aborts the walk as a connectivity error", verbatim; body of "A package absent at a published version is the scan's negative signal", verbatim |
-| The CLI SHALL take these decisions from the library's typed fetch clas... | body of "The CLI takes fetch decisions from the library's typed classification", verbatim |
-| Source: enhancement 0021 ("A beta line reaches GA only when its exit c... | body of "The CLI takes fetch decisions from the library's typed classification", verbatim |
-
-Lengths (old, new): old 876; new "A transport failure or a missing dependency aborts the walk as a connectivity error" 390; "A package absent at a published version is the scan's negative signal" 331; "The CLI takes fetch decisions from the library's typed classification" 428.
-
-### Strength table of cli-B2
-
-Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text:
-
-| Old sentence | New body | Word added |
-| --- | --- | --- |
-| An instance deploys the operator when any one of these holds, read from its record without rendering: it is na... | "An instance deploys the operator when one of three signals holds" | "any one of these holds" reads "any one of these SHALL hold" |
-| With `--wait` the command also waits, bounded, for the deleted resources to disappear ("Instance delete waits ... | "With --wait the command also waits for the deleted resources to disappear" | "the command also waits" reads "the command SHALL also wait" |
-| Two selection modes exist, and the caller chooses between them explicitly: | "Release and prerelease are the two selection modes" | "exist," reads "SHALL exist," |
-| The write-if-absent seeding of a missing Platform is unchanged: it happens only when no CR exists, and it seed... | "The write-if-absent seeding of a missing Platform is unchanged" | "is unchanged:" reads "SHALL be unchanged:" |
-| - The same generator serves the deps fallback of every other render (see "Renders fall back to their own deps"... | "The same generator serves every other render" | "serves" reads "SHALL serve" |
-| Every source resolves to a platform module directory the kernel acquires; the CR source is generated into one ... | "Every platform source resolves to a platform module directory" | "Every source resolves to" reads "Every source SHALL resolve to" |
-| - `opm instance diff`, `opm instance apply` and `opm module apply` keep failing on an unreachable cluster: the... | "Instance diff, instance apply and module apply keep failing on an unreachable cluster" | "keep failing" reads "SHALL keep failing" |
-| The gates: kernel loadability (modules only: the kernel's module loader accepts the tree; its refusal is surfa... | "The loadability, identity and derivation gates" | "The gates:" reads "The gates SHALL be:" |
-| The gates: kernel loadability (modules only: the kernel's module loader accepts the tree; its refusal is surfa... | "The cue.mod, source, tag and package-name gates" | "The gates:" reads "The gates SHALL be:" |
-| The gates: kernel loadability (modules only: the kernel's module loader accepts the tree; its refusal is surfa... | "The domain, local-override and already-published gates" | "The gates:" reads "The gates SHALL be:" |
-| A registry that hands out bearer tokens and whose token endpoint refuses the caller is a refused credential li... | "A refusing token endpoint is a refused credential" | "is a refused credential" reads "SHALL be a refused credential" |
-
-
 ## Ledger entries of cli-B2 (deploy, platform-resolution, artifact-publishing)
 
 One subsection per rewritten requirement, 28 in all. Every new body is built from whole sentences of the old body, copied unchanged (swarm DECISIONS.md 2026-10-19 15:50). A clause row says "verbatim" for a sentence that appears unchanged. A row that names a substitution lists each changed word pair; a lowered first letter after a copied condition is named as such. A list marker `- ` of an old bullet is dropped where its sentence opens a body or follows a sentence that does not end in a colon. Old scenario names are all kept; the byte check ran once per rewritten requirement and printed no `DIFF` and no `LOST`.
@@ -1659,7 +835,11 @@ Exceptions to the one-sentence rule, all with every word copied from the old req
 - Three old sentences are longer than 500 characters and are cut inside the sentence, each part verbatim, the subject repeated: `artifact-publishing` "One pipeline, two entry points" (562) and "The compatibility gate" (531); `deploy` "Instance delete keeps PersistentVolumeClaims unless delete-data is set" (610). The gate list of "Gates and refusal catalog" (769) stays whole as the THEN line of the scenario "The ten gates of the gate list" (DECISIONS.md 2026-10-19 15:15), and the body names that scenario. The supervisor is asked to rule on the cuts in the report.
 - A condition or subject copied from the same old requirement leads a body where the old sentence relied on a sibling (rows "the part from ... on"). Where the old content cannot fit, a body names a sibling by its exact header (the 16:55 extension): "These, as listed in requirement ...", "one of the checks listed in requirement ...", "no such field (the field of requirement ...)", "In every other case than the one of requirement ...".
 - Cites of renamed requirements are updated to the new header: "Instance delete keeps PersistentVolumeClaims unless delete-data is set" and "Instance delete waits for the deleted resources when wait is set" in `deploy`, "Ownership guard judges every apply and dry run" (see the section above).
-- A `Source:` line is repeated whole on each split block where it fits within 500 characters. It is left out where it does not fit: "Instance delete re-checks live ownership before each delete" keeps one quote in the parent and the other in the ownership block; "Operator install renders against the operator module's own pins" carries its line in three of four blocks, and the fourth ("The operator render narrows the platform-source precedence ...") is 420 characters without it; a one-title line cannot be shortened.
+- A `Source:` line is repeated whole on each split block where it fits within 500 characters. Where it does not fit, the block carries the short line `Source: enhancement 0012.` or `Source: enhancement 0021.`, which drops whole titles and keeps the id (DECISIONS.md 2026-10-19 16:20 and 17:05): `deploy` "An object with no UUID label is judged without the UUID comparison", "A resource that fails the ownership check is left behind and does not fail the delete" and "A recorded resource that the command did not find is not in the deletion plan"; `platform-resolution` "The operator render narrows the platform-source precedence for the operator's own instance only". "Instance delete re-checks live ownership before each delete" keeps one quote in the parent and the other in the ownership block. No split block is left without a `Source:` line where its old requirement had one.
+- A subject copied from the same old requirement stands beside "the command" in twelve `deploy` bodies that name no command otherwise: "the command (`opm instance apply` and `opm module apply`)" in "After the first stage the apply waits until the CustomResourceDefinitions are established" and "A wait that does not complete fails the apply"; "the command (`opm instance delete`)" in the bodies of the guard and `--wait` blocks and in "--delete-data on an operator-managed instance warns and changes nothing". No word is dropped.
+- "A resource that fails the ownership check is left behind and does not fail the delete" names the conditions by their requirement ("only as listed in requirement ...", 16:55), because the three conditions and its own sentence do not fit 500 characters with the `Source:` line.
+- "The closure reads a directory-replaced module's requirements from that directory" (new, `platform-resolution`) holds the old sentence "The closure SHALL read a directory-replaced module's requirements ..." with the copied condition and names the closure requirement; "The dependency list of the generated platform is the closure of the pins" names the requirement that lists the generated platform and its pins, because its subject "Its" and "those pins" came from the bullets before.
+- "Any other failure answer reads registry operation failed" names the two requirements whose answers "any other" excludes (16:55).
 
 ### Ledger: deploy, Instance delete never deletes CRDs or Namespaces
 
@@ -1706,8 +886,8 @@ Form: b (MODIFIED parent with its header and all scenarios, ADDED splits). New r
 
 | Old clause | New place |
 | --- | --- |
-| Before deleting each tracked resource, `opm instance delete` SHALL rea... | body of "Instance delete re-checks live ownership before each delete", verbatim; body of "An object with no UUID label is judged without the UUID comparison", the part from "Before deleting each tracked r..." on, verbatim; body of "A resource that fails the ownership check is left behind and does not fail the delete", the part from "Before deleting each tracked r..." on, verbatim; body of "Each delete carries a precondition on the UID of the object that was read", the part from "Before deleting each tracked r..." on, verbatim; body of "A resource that is already gone is no failure and any other read error is", the part from "Before deleting each tracked r..." on, verbatim |
-| It SHALL delete the resource only when the live `app.kubernetes.io/man... | body of "A tracked resource is deleted only when its live labels and annotation show the instance owns it", with "It SHALL delete the resource" reads "`opm instance delete` SHALL delete each tracked resource"; body of "An object with no UUID label is judged without the UUID comparison", with "It SHALL" reads "SHALL"; body of "A resource that fails the ownership check is left behind and does not fail the delete", with "It SHALL" reads "SHALL" |
+| Before deleting each tracked resource, `opm instance delete` SHALL rea... | body of "Instance delete re-checks live ownership before each delete", verbatim; body of "An object with no UUID label is judged without the UUID comparison", the part from "Before deleting each tracked r..." on, verbatim; body of "A resource that fails the ownership check is left behind and does not fail the delete", the first sentence replaced by "Before deleting each tracked resource, `opm instance delete` SHALL delete the resource only as listed in requirement ..." (16:55); body of "Each delete carries a precondition on the UID of the object that was read", the part from "Before deleting each tracked r..." on, verbatim; body of "A resource that is already gone is no failure and any other read error is", the part from "Before deleting each tracked r..." on, verbatim |
+| It SHALL delete the resource only when the live `app.kubernetes.io/man... | body of "A tracked resource is deleted only when its live labels and annotation show the instance owns it", with "It SHALL delete the resource" reads "`opm instance delete` SHALL delete each tracked resource"; body of "An object with no UUID label is judged without the UUID comparison", with "It SHALL" reads "SHALL" |
 | An object with no UUID label SHALL be judged without the UUID comparis... | body of "An object with no UUID label is judged without the UUID comparison", verbatim |
 | A resource that fails the check SHALL be left behind and listed with t... | body of "A resource that fails the ownership check is left behind and does not fail the delete", verbatim |
 | Each delete SHALL carry a precondition on the UID of the object that w... | body of "Each delete carries a precondition on the UID of the object that was read", verbatim |
@@ -1715,7 +895,7 @@ Form: b (MODIFIED parent with its header and all scenarios, ADDED splits). New r
 | Any other read error SHALL count as a failure for that resource, so th... | body of "A resource that is already gone is no failure and any other read error is", verbatim |
 | Source: enhancement 0012 ("The library owns the whole deletion sequenc... | body of "Instance delete re-checks live ownership before each delete", the part from "Source: enhancement 0012 (" on, verbatim; body of "A tracked resource is deleted only when its live labels and annotation show the instance owns it", the part from "Source: enhancement 0012 (" on, verbatim; body of "A tracked resource is deleted only when its live labels and annotation show the instance owns it", the part from ""The apply guard runs" on, verbatim; body of "Each delete carries a precondition on the UID of the object that was read", the part from "Source: enhancement 0012 (" on, verbatim; body of "A resource that is already gone is no failure and any other read error is", the part from "Source: enhancement 0012 (" on, verbatim |
 
-Lengths (old, new): old 1645; new "Instance delete re-checks live ownership before each delete" 401; "A tracked resource is deleted only when its live labels and annotation show the instance owns it" 497; "An object with no UUID label is judged without the UUID comparison" 458; "A resource that fails the ownership check is left behind and does not fail the delete" 498; "Each delete carries a precondition on the UID of the object that was read" 438; "A resource that is already gone is no failure and any other read error is" 490.
+Lengths (old, new): old 1645; new "Instance delete re-checks live ownership before each delete" 401; "A tracked resource is deleted only when its live labels and annotation show the instance owns it" 497; "An object with no UUID label is judged without the UUID comparison" 484; "A resource that fails the ownership check is left behind and does not fail the delete" 422; "Each delete carries a precondition on the UID of the object that was read" 438; "A resource that is already gone is no failure and any other read error is" 490.
 
 ### Ledger: deploy, Apply stages CustomResourceDefinitions and Namespaces before the rest
 
@@ -1737,7 +917,7 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "The apply goes in 
 | When the wait does not complete, the command SHALL fail naming the Cus... | body of "A wait that does not complete fails the apply", verbatim |
 | A resource that fails to apply SHALL be reported and SHALL NOT stop th... | body of "A resource that fails to apply does not stop the rest", verbatim |
 
-Lengths (old, new): old 1203; new "The apply goes in two stages in ascending kind-class weight" 375; "The first stage holds every CustomResourceDefinition and every Namespace" 265; "After the first stage the apply waits until the CustomResourceDefinitions are established" 345; "A wait that does not complete fails the apply" 366; "A resource that fails to apply does not stop the rest" 217.
+Lengths (old, new): old 1203; new "The apply goes in two stages in ascending kind-class weight" 375; "The first stage holds every CustomResourceDefinition and every Namespace" 265; "After the first stage the apply waits until the CustomResourceDefinitions are established" 391; "A wait that does not complete fails the apply" 412; "A resource that fails to apply does not stop the rest" 217.
 
 ### Ledger: deploy, A dry run skips a custom resource whose CRD the same apply creates
 
@@ -1797,7 +977,7 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "An instance deploy
 | `--yes` SHALL keep its one meaning, skipping the confirmation prompt, ... | body of "The yes flag and its deprecated alias do not bypass either refusal", verbatim |
 | Every other instance's delete SHALL be unchanged by this requirement. | body of "Every other instance's delete is unchanged by the guard", verbatim |
 
-Lengths (old, new): old 2453; new "An instance deploys the operator when one of three signals holds" 416; "Instance delete does not delete an instance that deploys the operator" 451; "The guard runs before any object is deleted, on both branches and on a dry run" 279; "An operator-owned target is refused with exit code 2" 398; "The guard lists ModuleInstance resources cluster-wide when the target is not operator-owned" 267; "An armed instance blocks the delete with exit code 2" 458; "A failed cluster-wide list fails closed" 318; "Instance delete offers no flag that removes finalizers" 177; "The yes flag and its deprecated alias do not bypass either refusal" 408; "Every other instance's delete is unchanged by the guard" 147.
+Lengths (old, new): old 2453; new "An instance deploys the operator when one of three signals holds" 416; "Instance delete does not delete an instance that deploys the operator" 451; "The guard runs before any object is deleted, on both branches and on a dry run" 408; "An operator-owned target is refused with exit code 2" 422; "The guard lists ModuleInstance resources cluster-wide when the target is not operator-owned" 291; "An armed instance blocks the delete with exit code 2" 458; "A failed cluster-wide list fails closed" 342; "Instance delete offers no flag that removes finalizers" 306; "The yes flag and its deprecated alias do not bypass either refusal" 408; "Every other instance's delete is unchanged by the guard" 276.
 
 ### Ledger: deploy, Instance delete keeps the ModuleInstance when a tracked resource could not be read
 
@@ -1934,7 +1114,7 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "Instance delete ke
 | When the delete of an operator-managed instance with `spec.prune` set ... | body of "An operator-managed delete that may have kept claims does not claim a full prune", the part from "When the delete of an operator..." on, verbatim; body of "An operator-managed delete that may have kept claims does not claim a full prune", the part from "the closing output SHALL NOT s..." on, verbatim; body of "The closing output of an operator-managed delete that may have kept claims names them", the part from "When the delete of an operator..." on, verbatim; body of "The closing output of an operator-managed delete that may have kept claims names them", the part from "it SHALL name each such claim" on, verbatim; "it SHALL name" reads "the closing output SHALL name" |
 | In every other case the closing output SHALL report the prune of the t... | body of "Every other operator-managed delete closes as a prune of the tracked resources", with "In every other case" reads "In every other case than the one of requirement "An operator-managed delete that may have kept claims does not claim a full prune"" |
 
-Lengths (old, new): old 2409; new "Instance delete keeps a tracked PersistentVolumeClaim unless `--delete-data` is set" 234; "Each kept claim is listed on its own line at the informational level" 361; "A kept claim does not count as a failure" 319; "The closing output counts the kept claims and names the command that deletes them" 321; "With --delete-data a tracked claim is deleted under the live-ownership check" 273; "The kept-claim rule covers the core group only and no StatefulSet template claim" 435; "--delete-data on an operator-managed instance warns and changes nothing" 377; "The kept-claim rule of the CLI is not claimed for an operator-managed instance" 273; "An operator-managed delete that may have kept claims does not claim a full prune" 404; "The closing output of an operator-managed delete that may have kept claims names them" 494; "Every other operator-managed delete closes as a prune of the tracked resources" 208.
+Lengths (old, new): old 2409; new "Instance delete keeps a tracked PersistentVolumeClaim unless `--delete-data` is set" 234; "Each kept claim is listed on its own line at the informational level" 361; "A kept claim does not count as a failure" 319; "The closing output counts the kept claims and names the command that deletes them" 321; "With --delete-data a tracked claim is deleted under the live-ownership check" 273; "The kept-claim rule covers the core group only and no StatefulSet template claim" 435; "--delete-data on an operator-managed instance warns and changes nothing" 401; "The kept-claim rule of the CLI is not claimed for an operator-managed instance" 273; "An operator-managed delete that may have kept claims does not claim a full prune" 404; "The closing output of an operator-managed delete that may have kept claims names them" 494; "Every other operator-managed delete closes as a prune of the tracked resources" 208.
 
 ### Ledger: deploy, Instance delete confirmation names the claims that delete-data deletes
 
@@ -2011,7 +1191,7 @@ Form: b (MODIFIED parent with its header and all scenarios, ADDED splits). New r
 | The operator-owned delete path SHALL NOT be affected. | body of "The output lines and exit codes stay as the other requirements state them", verbatim |
 | Source: enhancement 0012 ("The library owns the whole deletion sequenc... | body of "Instance delete follows the shared deletion plan", verbatim; body of "The command acts on a tracked resource only as the deletion plan names", verbatim; body of "The deletion plan does not hold a PersistentVolumeClaim that the command keeps", verbatim; body of "The ModuleInstance record is deleted only when the plan's release verdict allows it", verbatim; body of "A dry run follows the same plan and deletes nothing", verbatim; body of "The output lines and exit codes stay as the other requirements state them", verbatim |
 
-Lengths (old, new): old 1424; new "Instance delete follows the shared deletion plan" 456; "A recorded resource that the command did not find is not in the deletion plan" 465; "The command acts on a tracked resource only as the deletion plan names" 493; "The deletion plan does not hold a PersistentVolumeClaim that the command keeps" 441; "The ModuleInstance record is deleted only when the plan's release verdict allows it" 463; "A dry run follows the same plan and deletes nothing" 372; "The output lines and exit codes stay as the other requirements state them" 467.
+Lengths (old, new): old 1424; new "Instance delete follows the shared deletion plan" 456; "A recorded resource that the command did not find is not in the deletion plan" 491; "The command acts on a tracked resource only as the deletion plan names" 493; "The deletion plan does not hold a PersistentVolumeClaim that the command keeps" 441; "The ModuleInstance record is deleted only when the plan's release verdict allows it" 463; "A dry run follows the same plan and deletes nothing" 372; "The output lines and exit codes stay as the other requirements state them" 467.
 
 ### Ledger: deploy, Instance delete reports a resource as deleted when its delete is accepted
 
@@ -2031,7 +1211,7 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "Instance delete re
 | This requirement describes when a resource counts as deleted. | body of "Instance delete reports a resource as deleted when the API server accepts its delete", verbatim |
 | With `--wait` the command also waits, bounded, for the deleted resourc... | body of "With --wait the command also waits for the deleted resources to disappear", with "the command also waits" reads "the command SHALL also wait"; "("Instance delete waits for the deleted resources when wait is set")" reads "("Instance delete with `--wait` waits for the deleted resources to disappear")" |
 
-Lengths (old, new): old 784; new "Instance delete reports a resource as deleted when the API server accepts its delete" 402; "Without --wait an accepted delete is no failure although the resource still exists" 225; "With --wait the command also waits for the deleted resources to disappear" 170.
+Lengths (old, new): old 784; new "Instance delete reports a resource as deleted when the API server accepts its delete" 402; "Without --wait an accepted delete is no failure although the resource still exists" 225; "With --wait the command also waits for the deleted resources to disappear" 194.
 
 ### Ledger: deploy, Instance delete waits for the deleted resources when wait is set
 
@@ -2064,7 +1244,7 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "Instance delete ac
 | For an operator-managed instance `--wait` SHALL have no effect: the co... | body of "--wait has no effect on a dry run, after a failed delete or on an operator-managed instance", verbatim |
 | Without `--wait`, the output and the exit code of the command SHALL be... | body of "Instance delete accepts --wait and without it nothing changes", verbatim |
 
-Lengths (old, new): old 1665; new "Instance delete accepts --wait and without it nothing changes" 152; "Instance delete with `--wait` waits for the deleted resources to disappear" 471; "A resource is gone when its read returns NotFound or its UID differs" 212; "While it waits the command prints how many deleted resources are still terminating" 272; "The wait skips a resource the command did not delete" 245; "A timeout lists the resources still terminating and keeps the ModuleInstance record" 317; "--wait has no effect on a dry run, after a failed delete or on an operator-managed instance" 260.
+Lengths (old, new): old 1665; new "Instance delete accepts --wait and without it nothing changes" 152; "Instance delete with `--wait` waits for the deleted resources to disappear" 495; "A resource is gone when its read returns NotFound or its UID differs" 212; "While it waits the command prints how many deleted resources are still terminating" 296; "The wait skips a resource the command did not delete" 269; "A timeout lists the resources still terminating and keeps the ModuleInstance record" 341; "--wait has no effect on a dry run, after a failed delete or on an operator-managed instance" 284.
 
 ### Ledger: platform-resolution, Registry-resolved catalog subscription
 
@@ -2151,7 +1331,7 @@ Lengths (old, new): old 796; new "The cluster arm reads the effective registry" 
 
 ### Ledger: platform-resolution, Module commands render against the module's deps
 
-Form: b (MODIFIED parent with its header and all scenarios, ADDED splits). New requirements: "keep", "The generated platform carries one enabled registry entry per catalog dependency", "The dependency list of the generated platform is the closure of the pins", "The generated platform carries the module's replacements", "The deps are read from the module's acquired source", "The generated platform is cached under its content hash", "The provenance line names the module's deps", "The skew policy is neither named nor applied to the module's deps", "A module with no catalog dependency renders against an empty registry", "A pin that is not published fails at generation", "A refusal for unresolved demands adds a hint that names the platform flag", "The same generator serves every other render".
+Form: b (MODIFIED parent with its header and all scenarios, ADDED splits). New requirements: "keep", "The generated platform carries one enabled registry entry per catalog dependency", "The dependency list of the generated platform is the closure of the pins", "The closure reads a directory-replaced module's requirements from that directory", "The generated platform carries the module's replacements", "The deps are read from the module's acquired source", "The generated platform is cached under its content hash", "The provenance line names the module's deps", "The skew policy is neither named nor applied to the module's deps", "A module with no catalog dependency renders against an empty registry", "A pin that is not published fails at generation", "A refusal for unresolved demands adds a hint that names the platform flag", "The same generator serves every other render".
 
 | Old scenario name | New place (requirement, scenario name) | Changed text? |
 | --- | --- | --- |
@@ -2168,6 +1348,7 @@ Form: b (MODIFIED parent with its header and all scenarios, ADDED splits). New r
 | Unchanged deps reuse the cache | "Module commands render against the module's deps", "Unchanged deps reuse the cache" | No (byte equal, checked) |
 | (new) | "The generated platform carries one enabled registry entry per catalog dependency", "Registry entries and the core pin" | New restatement scenario: only words of the old clause, no new case |
 | (new) | "The dependency list of the generated platform is the closure of the pins", "Dependency list is a closure" | New restatement scenario: only words of the old clause, no new case |
+| (new) | "The closure reads a directory-replaced module's requirements from that directory", "A directory-replaced module is read from its directory" | New restatement scenario: only words of the old clause, no new case |
 | (new) | "The generated platform carries the module's replacements", "Replacements are carried" | New restatement scenario: only words of the old clause, no new case |
 | (new) | "The deps are read from the module's acquired source", "Deps come from the acquired source" | New restatement scenario: only words of the old clause, no new case |
 | (new) | "The generated platform is cached under its content hash", "Cache named by the content hash" | New restatement scenario: only words of the old clause, no new case |
@@ -2185,7 +1366,7 @@ Form: b (MODIFIED parent with its header and all scenarios, ADDED splits). New r
 | - The generated platform SHALL carry one enabled `#registry` entry per... | body of "The generated platform carries one enabled registry entry per catalog dependency", first letter lowered after the condition, otherwise verbatim |
 | - Its dependency list SHALL be the minimum-version-selection closure o... | body of "The dependency list of the generated platform is the closure of the pins", first letter lowered after the condition, otherwise verbatim |
 | - Each `replaceWith` in the module's `cue.mod/local-module.cue` whose ... | body of "The generated platform carries the module's replacements", first letter lowered after the condition, otherwise verbatim |
-| The closure SHALL read a directory-replaced module's requirements from... | body of "The dependency list of the generated platform is the closure of the pins", verbatim |
+| The closure SHALL read a directory-replaced module's requirements from... | body of "The closure reads a directory-replaced module's requirements from that directory", with the condition "When `opm module build` or `opm module vet` runs without `--platform`," copied in and "The closure" lowered; the sentence "The closure is that of requirement ..." names the closure requirement (16:55) |
 | - The deps SHALL be read from the module's acquired source, so a modul... | body of "The deps are read from the module's acquired source", first letter lowered after the condition, otherwise verbatim |
 | A published module has no local module context, so nothing is carried ... | body of "The deps are read from the module's acquired source", verbatim |
 | - The generated module SHALL be cached under `cache/platforms/` beside... | body of "The generated platform is cached under its content hash", first letter lowered after the condition, otherwise verbatim |
@@ -2196,7 +1377,7 @@ Form: b (MODIFIED parent with its header and all scenarios, ADDED splits). New r
 | - When a render against this source is refused for unresolved demands,... | body of "A refusal for unresolved demands adds a hint that names the platform flag", verbatim |
 | - The same generator serves the deps fallback of every other render (s... | body of "The same generator serves every other render", with "serves" reads "SHALL serve" |
 
-Lengths (old, new): old 2420; new "Module commands render against the module's deps" 206; "The generated platform carries one enabled registry entry per catalog dependency" 441; "The dependency list of the generated platform is the closure of the pins" 422; "The generated platform carries the module's replacements" 324; "The deps are read from the module's acquired source" 334; "The generated platform is cached under its content hash" 269; "The provenance line names the module's deps" 196; "The skew policy is neither named nor applied to the module's deps" 203; "A module with no catalog dependency renders against an empty registry" 367; "A pin that is not published fails at generation" 182; "A refusal for unresolved demands adds a hint that names the platform flag" 388; "The same generator serves every other render" 322.
+Lengths (old, new): old 2420; new "Module commands render against the module's deps" 206; "The generated platform carries one enabled registry entry per catalog dependency" 441; "The dependency list of the generated platform is the closure of the pins" 437 (its sentence "The generated platform and its pins are as listed in requirement ..." names the pins, 16:55); "The closure reads a directory-replaced module's requirements from that directory" 338; "The generated platform carries the module's replacements" 324; "The deps are read from the module's acquired source" 334; "The generated platform is cached under its content hash" 269; "The provenance line names the module's deps" 196; "The skew policy is neither named nor applied to the module's deps" 203; "A module with no catalog dependency renders against an empty registry" 367; "A pin that is not published fails at generation" 182; "A refusal for unresolved demands adds a hint that names the platform flag" 388; "The same generator serves every other render" 322.
 
 ### Ledger: platform-resolution, Platform source precedence by command
 
@@ -2319,7 +1500,7 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "Operator install r
 | This narrows the platform-source precedence of enhancement 0006 for th... | body of "The operator render narrows the platform-source precedence for the operator's own instance only", verbatim |
 | Source: enhancement 0021 ("The operator's install artifact is a regist... | body of "Operator install renders the operator module against a platform of its own pins", verbatim; body of "Operator install renders the same objects whatever the cluster Platform holds", verbatim; body of "Operator install names the module's deps as the provenance source", verbatim |
 
-Lengths (old, new): old 911; new "Operator install renders the operator module against a platform of its own pins" 453; "Operator install renders the same objects whatever the cluster Platform holds" 419; "Operator install names the module's deps as the provenance source" 258; "The operator render narrows the platform-source precedence for the operator's own instance only" 426.
+Lengths (old, new): old 911; new "Operator install renders the operator module against a platform of its own pins" 453; "Operator install renders the same objects whatever the cluster Platform holds" 419; "Operator install names the module's deps as the provenance source" 258; "The operator render narrows the platform-source precedence for the operator's own instance only" 452.
 
 ### Ledger: artifact-publishing, One pipeline, two entry points
 
@@ -2395,7 +1576,7 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "Publish exits 0, 2
 | A 403 from the token endpoint on the lookup or the core-schema fetch r... | body of "A refusing token endpoint is a refused credential", verbatim |
 | When the core-schema fetch fails and no registry is configured (no `--... | body of "Publish with no registry configured exits 2", verbatim |
 
-Lengths (old, new): old 2236; new "Publish exits 0, 2, 4, 3 or 1 by outcome" 334; "A failed already-published lookup does not hide locally derived refusals" 292; "A failed registry operation with no HTTP response reads registry unreachable" 277; "A 401 or 403 answer reads as refused credentials and exits 4" 433; "Any other failure answer reads registry operation failed" 260; "A 403 answer to the already-published lookup is not a failure" 455; "A refusing token endpoint is a refused credential" 466; "Publish with no registry configured exits 2" 304.
+Lengths (old, new): old 2236; new "Publish exits 0, 2, 4, 3 or 1 by outcome" 334; "A failed already-published lookup does not hide locally derived refusals" 292; "A failed registry operation with no HTTP response reads registry unreachable" 277; "A 401 or 403 answer reads as refused credentials and exits 4" 433; "Any other failure answer reads registry operation failed" 488; "A 403 answer to the already-published lookup is not a failure" 455; "A refusing token endpoint is a refused credential" 466; "Publish with no registry configured exits 2" 304.
 
 ### Ledger: artifact-publishing, The compatibility gate
 

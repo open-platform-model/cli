@@ -213,7 +213,7 @@ Before deleting each tracked resource, `opm instance delete` SHALL read the live
 
 ### Requirement: An object with no UUID label is judged without the UUID comparison
 
-Before deleting each tracked resource, `opm instance delete` SHALL delete the resource only when the live `app.kubernetes.io/managed-by` label carries an OPM value, its `module-instance.opmodel.dev/uuid` label matches the instance's recorded UUID, and its `opmodel.dev/adopt` annotation does not name another instance. An object with no UUID label SHALL be judged without the UUID comparison, and so SHALL every object when the instance has no recorded UUID.
+Before deleting each tracked resource, `opm instance delete` SHALL delete the resource only when the live `app.kubernetes.io/managed-by` label carries an OPM value, its `module-instance.opmodel.dev/uuid` label matches the instance's recorded UUID, and its `opmodel.dev/adopt` annotation does not name another instance. An object with no UUID label SHALL be judged without the UUID comparison, and so SHALL every object when the instance has no recorded UUID. Source: enhancement 0012.
 
 #### Scenario: No UUID comparison without a UUID
 
@@ -222,7 +222,7 @@ Before deleting each tracked resource, `opm instance delete` SHALL delete the re
 
 ### Requirement: A resource that fails the ownership check is left behind and does not fail the delete
 
-Before deleting each tracked resource, `opm instance delete` SHALL delete the resource only when the live `app.kubernetes.io/managed-by` label carries an OPM value, its `module-instance.opmodel.dev/uuid` label matches the instance's recorded UUID, and its `opmodel.dev/adopt` annotation does not name another instance. A resource that fails the check SHALL be left behind and listed with the reason, and SHALL NOT count as a failure; the closing line SHALL give the number of resources left behind.
+Before deleting each tracked resource, `opm instance delete` SHALL delete the resource only as listed in requirement "A tracked resource is deleted only when its live labels and annotation show the instance owns it". A resource that fails the check SHALL be left behind and listed with the reason, and SHALL NOT count as a failure; the closing line SHALL give the number of resources left behind. Source: enhancement 0012.
 
 #### Scenario: A resource that fails the check is listed with the reason
 
@@ -267,7 +267,7 @@ Before deleting each tracked resource, `opm instance delete` SHALL read the live
 
 ### Requirement: After the first stage the apply waits until the CustomResourceDefinitions are established
 
-Outside a dry run, after the first stage the command SHALL wait until every CustomResourceDefinition the first stage applied without error reports the condition `Established=True`, bounded by `--timeout` (default 5m) counted from the start of the apply, with a timeout reporting the time elapsed since then, and only then apply the second stage.
+Outside a dry run, after the first stage the command (`opm instance apply` and `opm module apply`) SHALL wait until every CustomResourceDefinition the first stage applied without error reports the condition `Established=True`, bounded by `--timeout` (default 5m) counted from the start of the apply, with a timeout reporting the time elapsed since then, and only then apply the second stage.
 
 #### Scenario: A CRD and its custom resource apply in one run
 
@@ -276,7 +276,7 @@ Outside a dry run, after the first stage the command SHALL wait until every Cust
 
 ### Requirement: A wait that does not complete fails the apply
 
-Outside a dry run, after the first stage the command SHALL wait until every CustomResourceDefinition the first stage applied without error reports the condition `Established=True`. When the wait does not complete, the command SHALL fail naming the CustomResourceDefinitions still pending, SHALL NOT apply the second stage, and SHALL NOT prune or write the inventory.
+Outside a dry run, after the first stage the command (`opm instance apply` and `opm module apply`) SHALL wait until every CustomResourceDefinition the first stage applied without error reports the condition `Established=True`. When the wait does not complete, the command SHALL fail naming the CustomResourceDefinitions still pending, SHALL NOT apply the second stage, and SHALL NOT prune or write the inventory.
 
 #### Scenario: A CRD that never becomes established fails the apply
 
@@ -358,7 +358,7 @@ An instance deploys the operator when any one of these SHALL hold, read from its
 
 ### Requirement: The guard runs before any object is deleted, on both branches and on a dry run
 
-`opm instance delete` SHALL NOT delete an instance that deploys the operator. The guard SHALL run after the target instance is resolved and before any object is deleted, on the CLI-owned and the operator-owned branch alike, and on a dry run with the same outcome as the real run.
+`opm instance delete` SHALL NOT delete an instance that deploys the operator while that instance is operator-owned, nor while any `ModuleInstance` in the cluster carries the `opmodel.dev/cleanup` finalizer. The guard SHALL run after the target instance is resolved and before any object is deleted, on the CLI-owned and the operator-owned branch alike, and on a dry run with the same outcome as the real run.
 
 #### Scenario: Dry run reports the same refusal
 
@@ -367,7 +367,7 @@ An instance deploys the operator when any one of these SHALL hold, read from its
 
 ### Requirement: An operator-owned target is refused with exit code 2
 
-For an instance that deploys the operator, when the target is operator-owned, the command SHALL refuse with exit code 2 and delete and patch nothing, naming the signal that matched and the remedy of setting `spec.owner` to `cli`. The operator never reconciles, finalizes or prunes the instance that deploys it, so the operator-owned delete would wait on, and report, a cleanup that does not happen.
+For an instance that deploys the operator, when the target is operator-owned, the command (`opm instance delete`) SHALL refuse with exit code 2 and delete and patch nothing, naming the signal that matched and the remedy of setting `spec.owner` to `cli`. The operator never reconciles, finalizes or prunes the instance that deploys it, so the operator-owned delete would wait on, and report, a cleanup that does not happen.
 
 #### Scenario: Operator-owned instance of the operator is refused
 
@@ -378,7 +378,7 @@ For an instance that deploys the operator, when the target is operator-owned, th
 
 ### Requirement: The guard lists ModuleInstance resources cluster-wide when the target is not operator-owned
 
-For an instance that deploys the operator that is not operator-owned, the command SHALL list `ModuleInstance` resources cluster-wide. Deleting the operator while it still owes cleanup leaves every armed instance unable to finish deletion until an operator runs again.
+For an instance that deploys the operator that is not operator-owned, the command (`opm instance delete`) SHALL list `ModuleInstance` resources cluster-wide. Deleting the operator while it still owes cleanup leaves every armed instance unable to finish deletion until an operator runs again.
 
 #### Scenario: The guard lists every ModuleInstance
 
@@ -407,7 +407,7 @@ For an instance that deploys the operator that is not operator-owned, when any `
 
 ### Requirement: A failed cluster-wide list fails closed
 
-For an instance that deploys the operator that is not operator-owned, the command SHALL list `ModuleInstance` resources cluster-wide. When the cluster-wide list fails, the command SHALL fail closed with the exit code `opm` maps that Kubernetes error to (4 for a permission or authentication denial) and delete nothing.
+For an instance that deploys the operator that is not operator-owned, the command (`opm instance delete`) SHALL list `ModuleInstance` resources cluster-wide. When the cluster-wide list fails, the command SHALL fail closed with the exit code `opm` maps that Kubernetes error to (4 for a permission or authentication denial) and delete nothing.
 
 #### Scenario: List failure fails closed
 
@@ -416,7 +416,7 @@ For an instance that deploys the operator that is not operator-owned, the comman
 
 ### Requirement: Instance delete offers no flag that removes finalizers
 
-`opm instance delete` SHALL NOT delete an instance that deploys the operator. `opm instance delete` SHALL offer no flag that removes finalizers and SHALL NOT write `spec.owner`.
+`opm instance delete` SHALL NOT delete an instance that deploys the operator while that instance is operator-owned, nor while any `ModuleInstance` in the cluster carries the `opmodel.dev/cleanup` finalizer. `opm instance delete` SHALL offer no flag that removes finalizers and SHALL NOT write `spec.owner`.
 
 #### Scenario: No finalizer flag and no owner write
 
@@ -434,7 +434,7 @@ For an instance that deploys the operator that is not operator-owned, the comman
 
 ### Requirement: Every other instance's delete is unchanged by the guard
 
-`opm instance delete` SHALL NOT delete an instance that deploys the operator. Every other instance's delete SHALL be unchanged by this requirement.
+`opm instance delete` SHALL NOT delete an instance that deploys the operator while that instance is operator-owned, nor while any `ModuleInstance` in the cluster carries the `opmodel.dev/cleanup` finalizer. Every other instance's delete SHALL be unchanged by this requirement.
 
 #### Scenario: Other instances are not guarded
 
@@ -729,7 +729,7 @@ When `opm instance delete` deletes a CLI-owned instance, every tracked resource 
 
 ### Requirement: --delete-data on an operator-managed instance warns and changes nothing
 
-On an operator-managed instance `--delete-data` SHALL NOT change what the operator does and SHALL NOT fail the command: the command SHALL print a warning, before it asks for confirmation, that says so, names `spec.dataPolicy` of the `ModuleInstance` as the setting that an operator with that field obeys for PersistentVolumeClaims, and says that an older operator deletes them.
+On an operator-managed instance `--delete-data` SHALL NOT change what the operator does and SHALL NOT fail the command (`opm instance delete`): the command SHALL print a warning, before it asks for confirmation, that says so, names `spec.dataPolicy` of the `ModuleInstance` as the setting that an operator with that field obeys for PersistentVolumeClaims, and says that an older operator deletes them.
 
 #### Scenario: Operator-managed instance
 
@@ -921,7 +921,7 @@ Every check that can refuse the delete SHALL run before the prompt: the guard fo
 
 ### Requirement: A recorded resource that the command did not find is not in the deletion plan
 
-`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the operator, built from the resources of the instance's `ModuleInstance` record that the command found in the cluster or could not read, and from the instance identity stored in the record. A recorded resource that the command did not find when it read the instance SHALL NOT be in the plan: it is not read again and not deleted.
+`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the operator, built from the resources of the instance's `ModuleInstance` record that the command found in the cluster or could not read, and from the instance identity stored in the record. A recorded resource that the command did not find when it read the instance SHALL NOT be in the plan: it is not read again and not deleted. Source: enhancement 0012.
 
 #### Scenario: A resource not found is not in the plan
 
@@ -996,7 +996,7 @@ Without `--wait`, a resource whose delete was accepted SHALL NOT count as a fail
 
 ### Requirement: With --wait the command also waits for the deleted resources to disappear
 
-With `--wait` the command SHALL also wait, bounded, for the deleted resources to disappear ("Instance delete with `--wait` waits for the deleted resources to disappear").
+With `--wait` the command (`opm instance delete`) SHALL also wait, bounded, for the deleted resources to disappear ("Instance delete with `--wait` waits for the deleted resources to disappear").
 
 #### Scenario: The wait is bounded
 
@@ -1015,7 +1015,7 @@ With `--wait` the command SHALL also wait, bounded, for the deleted resources to
 
 ### Requirement: Instance delete with `--wait` waits for the deleted resources to disappear
 
-With `--wait`, on a real run of a CLI-owned instance in which no tracked resource failed, the command SHALL, after every planned action is done and before it deletes the `ModuleInstance` record, poll each resource whose delete the API server accepted until the resource is gone or `--timeout` (default `5m0s`) has passed since the wait started. When every such resource is gone, the command SHALL delete the `ModuleInstance` record and report as it does without `--wait`.
+With `--wait`, on a real run of a CLI-owned instance in which no tracked resource failed, the command (`opm instance delete`) SHALL, after every planned action is done and before it deletes the `ModuleInstance` record, poll each resource whose delete the API server accepted until the resource is gone or `--timeout` (default `5m0s`) has passed since the wait started. When every such resource is gone, the command SHALL delete the `ModuleInstance` record and report as it does without `--wait`.
 
 #### Scenario: Deleted resources go away within the timeout
 
@@ -1035,7 +1035,7 @@ A resource is gone when its read returns NotFound, or when the live object under
 
 ### Requirement: While it waits the command prints how many deleted resources are still terminating
 
-With `--wait`, on a real run of a CLI-owned instance in which no tracked resource failed, while it waits, the command SHALL print a line that says how many of the deleted resources are still terminating each time that number drops, and at least every 30 seconds otherwise.
+With `--wait`, on a real run of a CLI-owned instance in which no tracked resource failed, while it waits, the command (`opm instance delete`) SHALL print a line that says how many of the deleted resources are still terminating each time that number drops, and at least every 30 seconds otherwise.
 
 #### Scenario: Progress while waiting
 
@@ -1044,7 +1044,7 @@ With `--wait`, on a real run of a CLI-owned instance in which no tracked resourc
 
 ### Requirement: The wait skips a resource the command did not delete
 
-With `--wait`, on a real run of a CLI-owned instance in which no tracked resource failed, the command SHALL NOT wait for a resource it did not delete: a kept `PersistentVolumeClaim`, a resource left behind, or a resource that was already absent.
+With `--wait`, on a real run of a CLI-owned instance in which no tracked resource failed, the command (`opm instance delete`) SHALL NOT wait for a resource it did not delete: a kept `PersistentVolumeClaim`, a resource left behind, or a resource that was already absent.
 
 #### Scenario: Kept claim is not waited for
 
@@ -1059,7 +1059,7 @@ With `--wait`, on a real run of a CLI-owned instance in which no tracked resourc
 
 ### Requirement: A timeout lists the resources still terminating and keeps the ModuleInstance record
 
-With `--wait`, on a real run of a CLI-owned instance in which no tracked resource failed, when the timeout passes first, the command SHALL list each resource that is still terminating, with its finalizers when it has any, SHALL NOT delete the `ModuleInstance` record, SHALL NOT print a success line, and SHALL exit 1.
+With `--wait`, on a real run of a CLI-owned instance in which no tracked resource failed, when the timeout passes first, the command (`opm instance delete`) SHALL list each resource that is still terminating, with its finalizers when it has any, SHALL NOT delete the `ModuleInstance` record, SHALL NOT print a success line, and SHALL exit 1.
 
 #### Scenario: Resource held by a finalizer times out
 
@@ -1076,7 +1076,7 @@ With `--wait`, on a real run of a CLI-owned instance in which no tracked resourc
 
 ### Requirement: --wait has no effect on a dry run, after a failed delete or on an operator-managed instance
 
-With `--dry-run`, and in a run in which a tracked resource failed, `--wait` SHALL have no effect. For an operator-managed instance `--wait` SHALL have no effect: the command waits for the `ModuleInstance` to be gone, bounded by `--timeout`, with or without it.
+With `--dry-run`, and in a run in which a tracked resource failed, `--wait` SHALL have no effect. For an operator-managed instance `--wait` SHALL have no effect: the command (`opm instance delete`) waits for the `ModuleInstance` to be gone, bounded by `--timeout`, with or without it.
 
 #### Scenario: Dry run does not wait
 

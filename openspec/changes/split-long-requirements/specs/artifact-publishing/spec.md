@@ -158,6 +158,8 @@ A failed registry operation SHALL be named by its cause, and the message SHALL k
 A failed registry operation SHALL be named by its cause, and the message SHALL keep the registry operation and the registry's or the transport's own error text:
 - any other failure answer SHALL read "registry operation failed" and SHALL NOT read "unreachable".
 
+Any other failure answer is one that is none of those of requirement "A failed registry operation with no HTTP response reads registry unreachable" and requirement "A 401 or 403 answer reads as refused credentials and exits 4".
+
 #### Scenario: Another registry answer is not called unreachable
 
 - **WHEN** the registry answers the already-published lookup with 429 or 503

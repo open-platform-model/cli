@@ -348,12 +348,21 @@ When `opm module build` or `opm module vet` runs without `--platform`, the gener
 
 ### Requirement: The dependency list of the generated platform is the closure of the pins
 
-When `opm module build` or `opm module vet` runs without `--platform`, its dependency list SHALL be the minimum-version-selection closure of those pins over the published module files, so a catalog's own dependencies that the module's tidied list omits are present. The closure SHALL read a directory-replaced module's requirements from that directory's `cue.mod/module.cue` instead of the registry. Source: cli issue 229.
+When `opm module build` or `opm module vet` runs without `--platform`, its dependency list SHALL be the minimum-version-selection closure of those pins over the published module files, so a catalog's own dependencies that the module's tidied list omits are present. The generated platform and its pins are as listed in requirement "The generated platform carries one enabled registry entry per catalog dependency". Source: cli issue 229.
 
 #### Scenario: Dependency list is a closure
 
 - **WHEN** `opm module build` or `opm module vet` runs without `--platform`
 - **THEN** the dependency list SHALL be the minimum-version-selection closure of those pins over the published module files, and the closure SHALL read a directory-replaced module's requirements from that directory's `cue.mod/module.cue` instead of the registry
+
+### Requirement: The closure reads a directory-replaced module's requirements from that directory
+
+When `opm module build` or `opm module vet` runs without `--platform`, the closure SHALL read a directory-replaced module's requirements from that directory's `cue.mod/module.cue` instead of the registry. The closure is that of requirement "The dependency list of the generated platform is the closure of the pins". Source: cli issue 229.
+
+#### Scenario: A directory-replaced module is read from its directory
+
+- **WHEN** `opm module build` or `opm module vet` runs without `--platform`
+- **THEN** the closure SHALL read a directory-replaced module's requirements from that directory's `cue.mod/module.cue` instead of the registry
 
 ### Requirement: The generated platform carries the module's replacements
 
@@ -652,7 +661,7 @@ When `opm instance build`, `opm instance vet`, `opm instance diff`, `opm instanc
 
 ### Requirement: The operator render narrows the platform-source precedence for the operator's own instance only
 
-`opm operator install`, the CRDs-only form included, SHALL render the operator module against a platform generated from the module's own committed dependency pins, and SHALL NOT read the cluster `Platform` or accept a `--platform` directory for that render. This narrows the platform-source precedence of enhancement 0006 for the operator's own instance only, so repairing the operator never depends on the Platform it serves.
+`opm operator install`, the CRDs-only form included, SHALL render the operator module against a platform generated from the module's own committed dependency pins, and SHALL NOT read the cluster `Platform` or accept a `--platform` directory for that render. This narrows the platform-source precedence of enhancement 0006 for the operator's own instance only, so repairing the operator never depends on the Platform it serves. Source: enhancement 0021.
 
 #### Scenario: The narrowing is for the operator's own instance only
 
