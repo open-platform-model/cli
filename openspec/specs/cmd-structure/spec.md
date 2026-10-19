@@ -257,7 +257,7 @@ The `internal/cmd/` package SHALL be split into sub-packages that mirror the cob
 
 ### Requirement: Controller command group registered at root level
 
-The root command SHALL register `opm controller` as a top-level command group via `cmdcontroller.NewControllerCmd(&cfg)`, following the same `GlobalConfig` dependency-injection pattern as the `module`, `instance`, and `config` groups. The group is noun-first (enhancement 0006, "Noun-first `opm controller` command group (`opm controller install [--crds-only]` / `opm controller uninstall`); supersedes D28"): there are no `opm install` or `opm uninstall` verb groups at root level. The group SHALL be registered under the name `controller` only, with no alias.
+The root command SHALL register `opm controller` as a top-level command group via `cmdcontroller.NewControllerCmd(&cfg)`, following the same `GlobalConfig` dependency-injection pattern as the `module`, `instance`, and `config` groups. The group is noun-first (enhancement 0006, "Noun-first `opm operator` command group (`opm operator install [--crds-only]` / `opm operator uninstall`); supersedes D28"): there are no `opm install` or `opm uninstall` verb groups at root level. The group SHALL be registered under the name `controller` only, with no alias.
 
 #### Scenario: Root command registers controller group
 
