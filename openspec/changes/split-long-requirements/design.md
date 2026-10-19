@@ -5882,18 +5882,20 @@ Lengths (old, new): old 952; new "The cli's CUE version moves only through a lib
 
 ### Ledger: resource-conversion, Object order follows the library weight table
 
-Form: c2 (REMOVED, ADDED under new names). New requirements: "Every CLI path orders objects by the library's kind-class weight", "Apply, delete, prune and the tree view sort through `object.Sort` and keep objects of equal weight in input order", "The `module build` and `instance build` output breaks equal weights by namespace, then name", "The library weight table orders the classes from CustomResourceDefinition to RoleBinding", "The library weight table orders the classes from Secret to the webhook configurations", "The CLI pins the library weight order in a unit test of its own".
+Form: c2 (REMOVED, ADDED under new names). New requirements: "Every CLI path orders objects by the library's kind-class weight", "Apply, delete, prune and the tree view sort through `object.Sort` and keep objects of equal weight in input order", "The `module build` and `instance build` output breaks equal weights by namespace, then name", "Library weight classes: CustomResourceDefinition to ClusterRole", "Library weight classes: StorageClass to RoleBinding", "Library weight classes: Secret to the webhook configurations", "The CLI pins the library weight order in a unit test of its own".
 
 | Old scenario name | New place (requirement, scenario name) | Changed text? |
 | --- | --- | --- |
-| Ascending order for apply | "Every CLI path orders objects by the library's kind-class weight", "Ascending order for apply" | No (byte equal, checked) |
+| Ascending order for apply | "Apply, delete, prune and the tree view sort through `object.Sort` and keep objects of equal weight in input order", "Ascending order for apply" | No (byte equal, checked) |
 | Descending order for delete | "Apply, delete, prune and the tree view sort through `object.Sort` and keep objects of equal weight in input order", "Descending order for delete" | No (byte equal, checked) |
 | Equal weights keep input order | "Apply, delete, prune and the tree view sort through `object.Sort` and keep objects of equal weight in input order", "Equal weights keep input order" | No (byte equal, checked) |
-| A claim and a Job apply after the workloads | "The library weight table orders the classes from Secret to the webhook configurations", "A claim and a Job apply after the workloads" | No (byte equal, checked) |
-| Webhook configurations apply last and delete first | "The library weight table orders the classes from Secret to the webhook configurations", "Webhook configurations apply last and delete first" | No (byte equal, checked) |
-| A class kind applies before the bindings and the namespaced objects | "The library weight table orders the classes from CustomResourceDefinition to RoleBinding", "A class kind applies before the bindings and the namespaced objects" | No (byte equal, checked) |
+| A claim and a Job apply after the workloads | "Library weight classes: Secret to the webhook configurations", "A claim and a Job apply after the workloads" | No (byte equal, checked) |
+| Webhook configurations apply last and delete first | "Library weight classes: Secret to the webhook configurations", "Webhook configurations apply last and delete first" | No (byte equal, checked) |
+| A class kind applies before the bindings and the namespaced objects | "Library weight classes: StorageClass to RoleBinding", "A class kind applies before the bindings and the namespaced objects" | No (byte equal, checked) |
 | A moved weight fails the CLI's order test | "The CLI pins the library weight order in a unit test of its own", "A moved weight fails the CLI's order test" | No (byte equal, checked) |
+| (new) | "Every CLI path orders objects by the library's kind-class weight", "A CLI path orders by the library weight" | New restatement scenario: only words of the old clause, no new case. |
 | (new) | "The `module build` and `instance build` output breaks equal weights by namespace, then name", "Build output breaks equal weights by namespace, then name" | New restatement scenario: only words of the old clause, no new case. |
+| (new) | "Library weight classes: CustomResourceDefinition to ClusterRole", "A CustomResourceDefinition applies first" | New restatement scenario: its WHEN and THEN lines are those of the old scenario "Ascending order for apply", byte for byte; only the name differs |
 
 | Old clause | New place |
 | --- | --- |
@@ -5901,13 +5903,14 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "Every CLI path ord
 | Apply, delete, prune and the tree view SHALL sort through `object.So... | body of "Apply, delete, prune and the tree view sort through `object.Sort` and keep objects of equal weight in input order", verbatim |
 | The `module build` and `instance build` output SHALL break equal wei... | body of "The `module build` and `instance build` output breaks equal weights by namespace, then name", verbatim |
 | The CLI SHALL NOT keep its own weight table. | body of "Every CLI path orders objects by the library's kind-class weight", verbatim |
-| The order follows Flux's staged apply (enhancement 0012, "Ordering i... | body of "Apply, delete, prune and the tree view sort through `object.Sort` and keep objects of equal weight in input order", verbatim (a plain sentence, no keyword; see the strength table) |
-| Ascending, the classes are: CustomResourceDefinition of `apiextensio... | body of "The library weight table orders the classes from CustomResourceDefinition to RoleBinding", with the word changes of the list "Words changed or added in unit 8a" |
-| ... Secret and ConfigMap; Service; LimitRange; ... and last Validati... | body of "The library weight table orders the classes from Secret to the webhook configurations", with the word changes of the list "Words changed or added in unit 8a" |
+| The order follows Flux's staged apply (enhancement 0012, "Ordering i... | body of "Library weight classes: CustomResourceDefinition to ClusterRole", verbatim (a plain sentence, no keyword; see the strength table) |
+| Ascending, the classes are: CustomResourceDefinition of `apiextensio... | body of "Library weight classes: CustomResourceDefinition to ClusterRole", with the word changes of the list "Words changed or added in unit 8a" |
+| ... StorageClass and every kind whose name ends in `Class`, ...; Clu... | body of "Library weight classes: StorageClass to RoleBinding", with the word changes of the list "Words changed or added in unit 8a" |
+| ... Secret and ConfigMap; Service; LimitRange; ... and last Validati... | body of "Library weight classes: Secret to the webhook configurations", with the word changes of the list "Words changed or added in unit 8a" |
 | The CLI SHALL pin this order in a unit test of its own, holding ever... | body of "The CLI pins the library weight order in a unit test of its own", verbatim |
 | The library's own weight-table guard test covers rows the library ad... | body of "The CLI pins the library weight order in a unit test of its own", verbatim (a plain sentence, no keyword; see the strength table) |
 
-Lengths (old, new): old 1934; new "Every CLI path orders objects by the library's kind-class weight" 347; "Apply, delete, prune and the tree view sort through `object.Sort` and keep objects of equal weight in input order" 394; "The `module build` and `instance build` output breaks equal weights by namespace, then name" 161; "The library weight table orders the classes from CustomResourceDefinition to RoleBinding" 463; "The library weight table orders the classes from Secret to the webhook configurations" 475; "The CLI pins the library weight order in a unit test of its own" 412.
+Lengths (old, new): old 1934; new "Every CLI path orders objects by the library's kind-class weight" 347; "Apply, delete, prune and the tree view sort through `object.Sort` and keep objects of equal weight in input order" 190; "The `module build` and `instance build` output breaks equal weights by namespace, then name" 161; "Library weight classes: CustomResourceDefinition to ClusterRole" 415; "Library weight classes: StorageClass to RoleBinding" 392; "Library weight classes: Secret to the webhook configurations" 438; "The CLI pins the library weight order in a unit test of its own" 412.
 
 ### Ledger: resource-conversion, One export feeds the apply objects and the shared render digest
 
@@ -6002,15 +6005,16 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "The pod detail blo
 | Old scenario name | New place (requirement, scenario name) | Changed text? |
 | --- | --- | --- |
 | Pod detail block format | "The pod detail block has a fixed layout", "Pod detail block format" | No (byte equal, checked) |
+| (new) | "The pod detail block has a fixed layout", "Pod detail block layout" | New scenario: its THEN line holds the format block of the old body byte for byte, indented (a fenced layout moves into a THEN line when the body names the scenario) |
 | (new) | "The pod detail block is colour-coded by ready ratio, phase, detail text and restart count", "The ready ratio is red when no pod is ready" | New restatement scenario: the case is in the old clause (red (none ready)) |
 
 | Old clause | New place |
 | --- | --- |
 | The pod detail block SHALL be rendered below the resource table, sep... | body of "The pod detail block has a fixed layout", verbatim, with a named reference to "`--details` shows a pod detail block for a NotReady workload" |
-| The format SHALL be: ``` <Kind>/<Name> (<ready>/<total> ready):     ... | body of "The pod detail block has a fixed layout", verbatim (the format block is the old block unchanged) |
+| The format SHALL be: ``` <Kind>/<Name> (<ready>/<total> ready):     ... | THEN line of the new scenario "Pod detail block layout" of "The pod detail block has a fixed layout", verbatim; the body names the scenario |
 | The ready ratio SHALL be color-coded: green (all ready), yellow (par... | body of "The pod detail block is colour-coded by ready ratio, phase, detail text and restart count", verbatim, with a named reference to "The pod detail block has a fixed layout" |
 
-Lengths (old, new): old 635; new "The pod detail block has a fixed layout" 294; "The pod detail block is colour-coded by ready ratio, phase, detail text and restart count" 471.
+Lengths (old, new): old 635; new "The pod detail block has a fixed layout" 336; "The pod detail block is colour-coded by ready ratio, phase, detail text and restart count" 471.
 
 ### Ledger: workflow-security, Every workflow declares least-privilege permissions
 
@@ -6050,15 +6054,15 @@ Lengths (old, new): old 618; new "The publish-templates job and the publish job 
 
 ### Words changed or added in unit 8a
 
-- Named references: a body ends with "(Requirement: <exact header>)" or "(Requirements: <exact header>; <exact header>)", the named reference that gives it its referent. The bodies are: `repo-automation` "Other third-party Go modules keep their weekly Dependabot updates" (to the parent "Dependabot leaves cuelang.org/go to library releases", for "Other"); `resource-conversion` the two class bodies (to each other, for the intro "Ascending, the classes"), "The CLI pins the library weight order in a unit test of its own" (to the first order body, for "this order") and "The applied objects and the render digest come from the same exported set" and "An export failure exits with the general error code and names the failing resource" (to the export body, for "the exported objects" and "the failing resource"); `resource-discovery` the traversal, skip and match bodies of `DiscoverChildren` (to the body that provides it, for "The traversal", "Non-workload parent kinds" and "Child matching") and the four later bodies of the unreadable-entry set (to the groups body and to the command body, for "this way", "the warning", "A warning" and "the tracked resources"); `status-verbose` the pod list, pod discovery, layout and colour bodies (to the `--details` body and the layout body, for "the pod detail block" and "the unhealthy workload"); `workflow-security` "publish-templates and goreleaser check out the release tag as `refs/tags/<tag>`" (to the first publishing body, for "These guards").
+- Named references: a body ends with "(Requirement: <exact header>)" or "(Requirements: <exact header>; <exact header>)", the named reference that gives it its referent. The bodies are: `repo-automation` "Other third-party Go modules keep their weekly Dependabot updates" (to the parent "Dependabot leaves cuelang.org/go to library releases", for "Other"); `resource-conversion` the three class bodies (to their neighbours, for the intro "Ascending, the classes"), "The CLI pins the library weight order in a unit test of its own" (to the first order body, for "this order") and "The applied objects and the render digest come from the same exported set" and "An export failure exits with the general error code and names the failing resource" (to the export body, for "the exported objects" and "the failing resource"); `resource-discovery` the traversal, skip and match bodies of `DiscoverChildren` (to the body that provides it, for "The traversal", "Non-workload parent kinds" and "Child matching") and the four later bodies of the unreadable-entry set (to the groups body and to the command body, for "this way", "the warning", "A warning" and "the tracked resources"); `status-verbose` the pod list, pod discovery, layout and colour bodies (to the `--details` body and the layout body, for "the pod detail block" and "the unhealthy workload"); `workflow-security` "publish-templates and goreleaser check out the release tag as `refs/tags/<tag>`" (to the first publishing body, for "These guards").
 - `repo-automation`, "`.github/labels.yml` lists the release-please, Dependabot and release-cascade labels": "It SHALL list" reads "`.github/labels.yml` SHALL list" (the subject of the first sentence of the same old requirement).
 - `repo-automation`, parent "Dependabot leaves cuelang.org/go to library releases" and "The cli's CUE version moves only through a library release": the old sentence is cut at ", so". The parent part ends with a period in place of the comma. The second part drops "so" at the cut, starts with a capital letter and reads "SHALL move" in place of "moves" (keyword).
 - `repo-automation`, the three label bodies, the three cuelang.org/go bodies, the two `workflow-security` permission bodies and the two publishing bodies: the old `Source:` line is whole in a `**Source**:` line of each new block (the citation ruling of 2026-10-20 00:40); the inline `Source:` sentence leaves the body.
-- `resource-conversion`, the two class bodies: the old sentence "Ascending, the classes are: ..." is cut at a list boundary (after "ServiceAccount, Role and RoleBinding"). The intro reads "Ascending, the classes SHALL be:" in both (keyword, subject repeated). The first part ends with a period in place of the semicolon.
+- `resource-conversion`, the three class bodies: the old sentence "Ascending, the classes are: ..." is cut at list boundaries (after "ClusterRole of `rbac.authorization.k8s.io`" and after "ServiceAccount, Role and RoleBinding"). The intro reads "Ascending, the classes SHALL be:" in all three (keyword, subject repeated). The first two parts end with a period in place of the semicolon.
 - `resource-discovery`, "`DiscoverChildren` returns children as `[]*unstructured.Unstructured` and differs from the tree ownership walk in its return contract": "It returns" reads "`DiscoverChildren` SHALL return" (subject copied from the old text, keyword). The em-dash of the Note reads a colon.
 - `resource-discovery`, "`DiscoverChildren` skips non-workload parent kinds": the em-dash reads a colon.
 - `workflow-security`, "publish-templates and goreleaser check out the release tag as `refs/tags/<tag>`": the old sentences 2 and 3 are in one body, unchanged.
-- `status-verbose`, "The pod detail block has a fixed layout": the old paragraph and the old format block (a fenced block of the old text) are in one body, unchanged.
+- `status-verbose`, "The pod detail block has a fixed layout": the old sentence "The format SHALL be:" and the fenced block of the old text move into the THEN line of the new scenario "Pod detail block layout"; the body ends with the pointer "The format is shown in the scenario `Pod detail block layout`." (the pointer of the mod-vet precedent).
 - The `health-evaluation` body "The readiness exemptions are not copies" (first commit of unit 8a): "the previous requirement" reads the exact headers of the two requirements that name the exemptions (DECISIONS.md 2026-10-20 09:50).
 
 ### Strength table of cli-B8 unit 8a
@@ -6067,7 +6071,7 @@ Plain sentences that carry an RFC 2119 keyword in the new text and had none in t
 
 | Old sentence | New body | Word added |
 | --- | --- | --- |
-| Ascending, the classes are: ... | "The library weight table orders the classes from CustomResourceDefinition to RoleBinding"; "The library weight table orders the classes from Secret to the webhook configurations" | "SHALL be" |
+| Ascending, the classes are: ... | the three class bodies "Library weight classes: ..." | "SHALL be" |
 | ... so the cli's CUE version moves only through a library release: ... | "The cli's CUE version moves only through a library release" | "SHALL move" |
 | It returns children as `[]*unstructured.Unstructured` for UID extraction (used by the events command to match `event.involvedObject.uid`). | "`DiscoverChildren` returns children as `[]*unstructured.Unstructured` and differs from the tree ownership walk in its return contract" | "SHALL return" |
 
@@ -6075,11 +6079,10 @@ Plain sentences copied unchanged, with no keyword, into a body that carries a ke
 
 | Old sentence | New body |
 | --- | --- |
-| The order follows Flux's staged apply (enhancement 0012, "..."). | "Apply, delete, prune and the tree view sort through `object.Sort` and keep objects of equal weight in input order" |
+| The order follows Flux's staged apply (enhancement 0012, "..."). | "Library weight classes: CustomResourceDefinition to ClusterRole" |
 | The library's own weight-table guard test covers rows the library adds. | "The CLI pins the library weight order in a unit test of its own" |
 | Note: `internal/kubernetes/tree.go` already implements equivalent ownership walking ... | "`DiscoverChildren` returns children as `[]*unstructured.Unstructured` and differs from the tree ownership walk in its return contract" |
 | The table rows of the traversal | "The traversal of `DiscoverChildren` is targeted, not generic" |
 | The three list items of the pod detail block | "The pod detail block lists each pod of the unhealthy workload with name, phase and detail" |
 | (The global `--verbose` flag controls log verbosity only and does not affect status output.) | "Pods of the unhealthy workload are discovered by its `.spec.selector.matchLabels`" |
-| The detail text `(ready)` and `(not ready)` ... | "The pod detail block is colour-coded by ready ratio, phase, detail text and restart count" |
 | These guards stop a mistaken or bot-branch dispatch; a person with write access can still change the workflow on a branch, ... | "publish-templates and goreleaser check out the release tag as `refs/tags/<tag>`" |

@@ -2,7 +2,7 @@
 
 ### Requirement: Object order follows the library weight table
 **Reason**: Split into requirements that each state one behavior.
-**Migration**: See "Every CLI path orders objects by the library's kind-class weight", "Apply, delete, prune and the tree view sort through `object.Sort` and keep objects of equal weight in input order", "The `module build` and `instance build` output breaks equal weights by namespace, then name", "The library weight table orders the classes from CustomResourceDefinition to RoleBinding", "The library weight table orders the classes from Secret to the webhook configurations", "The CLI pins the library weight order in a unit test of its own".
+**Migration**: See "Every CLI path orders objects by the library's kind-class weight", "Apply, delete, prune and the tree view sort through `object.Sort` and keep objects of equal weight in input order", "The `module build` and `instance build` output breaks equal weights by namespace, then name", "Library weight classes: CustomResourceDefinition to ClusterRole", "Library weight classes: StorageClass to RoleBinding", "Library weight classes: Secret to the webhook configurations", "The CLI pins the library weight order in a unit test of its own".
 
 ### Requirement: One export feeds the apply objects and the shared render digest
 **Reason**: Split into requirements that each state one behavior.
@@ -16,16 +16,19 @@ Every CLI path that orders Kubernetes objects (apply, delete, prune, the `instan
 
 The CLI SHALL NOT keep its own weight table.
 
-#### Scenario: Ascending order for apply
+#### Scenario: A CLI path orders by the library weight
 
-- **WHEN** the sort runs ascending over a Deployment, a CustomResourceDefinition and a ConfigMap
-- **THEN** the result is CustomResourceDefinition, ConfigMap, Deployment
+- **WHEN** a CLI path orders Kubernetes objects: apply, delete, prune, the `instance tree` view, the `module build` and `instance build` output, or the operator install and uninstall
+- **THEN** it SHALL order by the library's kind-class weight, `opm/k8s/object.Weight`
 
 ### Requirement: Apply, delete, prune and the tree view sort through `object.Sort` and keep objects of equal weight in input order
 
 Apply, delete, prune and the tree view SHALL sort through `object.Sort`, ascending for apply and descending for delete and prune, and SHALL keep objects of equal weight in their input order.
 
-The order follows Flux's staged apply (enhancement 0012, "Ordering is kind-class order in the Kubernetes tier; no module-internal ordering is planned, and cross-module order belongs to a future Bundle").
+#### Scenario: Ascending order for apply
+
+- **WHEN** the sort runs ascending over a Deployment, a CustomResourceDefinition and a ConfigMap
+- **THEN** the result is CustomResourceDefinition, ConfigMap, Deployment
 
 #### Scenario: Descending order for delete
 
@@ -46,20 +49,32 @@ The `module build` and `instance build` output SHALL break equal weights by name
 - **WHEN** the `module build` or `instance build` output holds objects of equal weight
 - **THEN** the output SHALL break equal weights by namespace, then name
 
-### Requirement: The library weight table orders the classes from CustomResourceDefinition to RoleBinding
+### Requirement: Library weight classes: CustomResourceDefinition to ClusterRole
 
-Ascending, the classes SHALL be: CustomResourceDefinition of `apiextensions.k8s.io`; core Namespace; ClusterRole of `rbac.authorization.k8s.io`; StorageClass and every kind whose name ends in `Class`, with any kind named CustomResourceDefinition, Namespace or ClusterRole in another group; ClusterRoleBinding; ResourceQuota; ServiceAccount, Role and RoleBinding.
-(Requirement: The library weight table orders the classes from Secret to the webhook configurations)
+The order follows Flux's staged apply (enhancement 0012, "Ordering is kind-class order in the Kubernetes tier; no module-internal ordering is planned, and cross-module order belongs to a future Bundle").
+
+Ascending, the classes SHALL be: CustomResourceDefinition of `apiextensions.k8s.io`; core Namespace; ClusterRole of `rbac.authorization.k8s.io`.
+(Requirement: Library weight classes: StorageClass to RoleBinding)
+
+#### Scenario: A CustomResourceDefinition applies first
+
+- **WHEN** the sort runs ascending over a Deployment, a CustomResourceDefinition and a ConfigMap
+- **THEN** the result is CustomResourceDefinition, ConfigMap, Deployment
+
+### Requirement: Library weight classes: StorageClass to RoleBinding
+
+Ascending, the classes SHALL be: StorageClass and every kind whose name ends in `Class`, with any kind named CustomResourceDefinition, Namespace or ClusterRole in another group; ClusterRoleBinding; ResourceQuota; ServiceAccount, Role and RoleBinding.
+(Requirements: Library weight classes: CustomResourceDefinition to ClusterRole; Library weight classes: Secret to the webhook configurations)
 
 #### Scenario: A class kind applies before the bindings and the namespaced objects
 
 - **WHEN** the sort runs ascending over a ConfigMap, a ClusterRoleBinding, a StorageClass and a ClusterRole
 - **THEN** the result is ClusterRole, StorageClass, ClusterRoleBinding, ConfigMap
 
-### Requirement: The library weight table orders the classes from Secret to the webhook configurations
+### Requirement: Library weight classes: Secret to the webhook configurations
 
 Ascending, the classes SHALL be: Secret and ConfigMap; Service; LimitRange; Deployment and StatefulSet; CronJob; PodDisruptionBudget; every other kind, which includes PersistentVolume, PersistentVolumeClaim, DaemonSet, ReplicaSet, Job, Ingress, NetworkPolicy, the autoscalers and custom resources; and last ValidatingWebhookConfiguration and MutatingWebhookConfiguration.
-(Requirement: The library weight table orders the classes from CustomResourceDefinition to RoleBinding)
+(Requirement: Library weight classes: StorageClass to RoleBinding)
 
 #### Scenario: A claim and a Job apply after the workloads
 

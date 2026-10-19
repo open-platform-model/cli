@@ -42,6 +42,7 @@ The traversal SHALL be targeted, not generic. It SHALL use knowledge of Kubernet
 | DaemonSet | Pod | - |
 | Job | Pod | - |
 | CronJob | Job | Pod |
+
 (Requirement: The resource discovery package provides `DiscoverChildren`)
 
 #### Scenario: Deployment children discovered

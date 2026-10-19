@@ -60,17 +60,23 @@ Pods SHALL be discovered by listing pods in the workload's namespace using the w
 
 The pod detail block SHALL be rendered below the resource table, separated by a blank line. Each block SHALL be headed by the workload's Kind/Name and a ready ratio, followed by indented pod lines.
 
-The format SHALL be:
-```
-<Kind>/<Name> (<ready>/<total> ready):
-    <pod-name>    <phase>    <detail>
-```
+The format is shown in the scenario `Pod detail block layout`.
 (Requirement: `--details` shows a pod detail block for a NotReady workload)
 
 #### Scenario: Pod detail block format
 
 - **WHEN** a Deployment `web` has 3 pods with 1 ready
 - **THEN** the pod detail block SHALL begin with `Deployment/web (1/3 ready):` followed by one indented line per pod
+
+#### Scenario: Pod detail block layout
+
+- **WHEN** a pod detail block is rendered
+- **THEN** The format SHALL be:
+
+  ```
+  <Kind>/<Name> (<ready>/<total> ready):
+      <pod-name>    <phase>    <detail>
+  ```
 
 ### Requirement: The pod detail block is colour-coded by ready ratio, phase, detail text and restart count
 
