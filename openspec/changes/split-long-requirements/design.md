@@ -3494,14 +3494,14 @@ New scenarios (each restates only a case the old text names):
 Words changed or added:
 - "It SHALL resolve" and "It SHALL check" read "`hack/fixtures.sh consumers <dir>...` SHALL resolve" and "`hack/fixtures.sh consumers <dir>...` SHALL check", the subject of the first sentence
 - "The script SHALL stay" reads "`hack/fixtures.sh` SHALL stay"
-- Two bodies end with "(Requirement: <header>)", the named reference that gives "also fail" and "With `FIX=1` a differing consumer" their referent: the unlisted-consumer body names the check-and-report requirement, the `FIX=1` body names the first requirement
+- Three bodies end with "(Requirement: <header>)", the named reference that gives "also fail" and "With `FIX=1` a differing consumer" their referent: the unlisted-consumer body names the check-and-report requirement, the `FIX=1` body names the first requirement, and the check-and-report body names the `FIX=1` requirement, whose exemption ("SHALL NOT fail") limits its "exits non-zero"
 - Order: "The scratch copies SHALL be removed on every exit path." now follows the sentence on the exit, because the body that reports and exits holds it
 
-Lengths (old, new): old 998; new "`hack/fixtures.sh consumers` checks each named consumer in a scratch copy against CUE's resolution" 357; "`hack/fixtures.sh consumers` checks every named consumer, prints a FAIL line for each failure and exits non-zero" 355; "A tracked cue.mod/module.cue that pins a fixture and is not named fails the check" 272; "With FIX=1 `hack/fixtures.sh consumers` writes the resolved pins and does not fail" 225; "`hack/fixtures.sh` stays byte-identical with opm-operator's copy" 105.
+Lengths (old, new): old 998; new "`hack/fixtures.sh consumers` checks each named consumer in a scratch copy against CUE's resolution" 357; "`hack/fixtures.sh consumers` checks every named consumer, prints a FAIL line for each failure and exits non-zero" 453; "A tracked cue.mod/module.cue that pins a fixture and is not named fails the check" 272; "With FIX=1 `hack/fixtures.sh consumers` writes the resolved pins and does not fail" 225; "`hack/fixtures.sh` stays byte-identical with opm-operator's copy" 105.
 
 ### Ledger: test-fixture-lineage, Old test pins are current or frozen with a reason
 
-Form: c2 (REMOVED, ADDED under new names). New requirements: "A test pin is moved to the release cascade's target unless `.cascade-frozen` lists it with a reason", "The target of a catalog pin is the newest published release in its major", "A core pin already newer than the cascade target stays", "A `cue.mod` pin moves by `cue mod get` then `cue mod tidy` and is never bumped by a hand edit", "A `.cascade-frozen` entry names the file or directory, the frozen module paths and a one-sentence reason", "A pin is frozen only when the test depends on that exact old version", "A pin that is old only because a tree was copied or an upstream release moved on is not frozen".
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A test pin is moved to the release cascade's target unless `.cascade-frozen` lists it with a reason", "The targets of a catalog pin and a core pin follow the release cascade", "A core pin already newer than the cascade target stays", "A `cue.mod` pin moves by `cue mod get` then `cue mod tidy` and is never bumped by a hand edit", "A `.cascade-frozen` entry names the file or directory, the frozen module paths and a one-sentence reason", "A pin is frozen only when the test depends on that exact old version", "A pin that is old only because a tree was copied or an upstream release moved on is not frozen".
 
 | Old scenario name | New place (requirement, scenario name) | Changed text? |
 | --- | --- | --- |
@@ -3511,7 +3511,7 @@ Form: c2 (REMOVED, ADDED under new names). New requirements: "A test pin is move
 
 New scenarios (each restates only a case the old text names):
 
-- "The target of a catalog pin is the newest published release in its major" in "The target of a catalog pin is the newest published release in its major"
+- "The target of a catalog pin is the newest published release in its major" in "The targets of a catalog pin and a core pin follow the release cascade"
 - "A core pin newer than its target stays" in "A core pin already newer than the cascade target stays"
 - "A cue.mod pin moves by cue mod get then cue mod tidy" in "A `cue.mod` pin moves by `cue mod get` then `cue mod tidy` and is never bumped by a hand edit"
 - "A golden may be listed with a reason" in "A `.cascade-frozen` entry names the file or directory, the frozen module paths and a one-sentence reason"
@@ -3521,9 +3521,9 @@ New scenarios (each restates only a case the old text names):
 | Old clause | New place |
 | --- | --- |
 | Each `opmodel.dev/core@v2` or `opmodel.dev/catalogs/*` pin in a test i... | body of "A test pin is moved to the release cascade's target unless `.cascade-frozen` lists it with a reason" |
-| - **The target.** A catalog pin's target is the newest published relea... | body of "The target of a catalog pin is the newest published release in its major" |
-| A core pin's target is the core version that the input's catalog pins,... | body of "The target of a catalog pin is the newest published release in its major" |
-| The source is workspace RELEASING.md, section "The cascade", "Consiste... | body of "The target of a catalog pin is the newest published release in its major" |
+| - **The target.** A catalog pin's target is the newest published relea... | body of "The targets of a catalog pin and a core pin follow the release cascade" |
+| A core pin's target is the core version that the input's catalog pins,... | body of "The targets of a catalog pin and a core pin follow the release cascade" |
+| The source is workspace RELEASING.md, section "The cascade", "Consiste... | body of "The targets of a catalog pin and a core pin follow the release cascade" |
 | - **No backwards moves.** A core pin already newer than that target st... | body of "A core pin already newer than the cascade target stays" |
 | - **How a pin moves.** A `cue.mod` file moves by `cue mod get` then `c... | body of "A `cue.mod` pin moves by `cue mod get` then `cue mod tidy` and is never bumped by a hand edit" |
 | A Go literal moves by editing the literal. | body of "A `cue.mod` pin moves by `cue mod get` then `cue mod tidy` and is never bumped by a hand edit" |
@@ -3536,16 +3536,16 @@ New scenarios (each restates only a case the old text names):
 | - a platform that must be refused as too old; | body of "A pin is frozen only when the test depends on that exact old version" |
 | - a platform that must show catalog version skew; | body of "A pin is frozen only when the test depends on that exact old version" |
 | - a floor that the test re-pins up to. | body of "A pin is frozen only when the test depends on that exact old version" |
-| A pin that is old only because a tree was copied from an older tree, o... | body of "A pin that is old only because a tree was copied or an upstream release moved on is not frozen" |
+| A pin that is old only because a tree was copied from an older tree, o... | body of "A test pin is moved to the release cascade's target unless `.cascade-frozen` lists it with a reason" |
 | Between an upstream release and the release cascade that follows it, a... | body of "A pin that is old only because a tree was copied or an upstream release moved on is not frozen" |
 | A literal that a test only compares as expected output and never resol... | body of "A `.cascade-frozen` entry names the file or directory, the frozen module paths and a one-sentence reason" |
 
 Words changed or added:
 - Keyword added where the sentence had none (strength table): "A catalog pin's target is" reads "SHALL be"; "stays" reads "SHALL stay"; "Each entry names" reads "Each entry SHALL name"; "A pin is frozen only when" reads "A pin SHALL be frozen only when"; "is not frozen" reads "SHALL NOT be frozen"
-- Every body but the first and the `.cascade-frozen` entries body ends with "(Requirement: <header>)", the named reference that gives "that target", "a pin" and "frozen" their referent
+- The first body ends with "(Requirement: <header of the never-backwards requirement>)(Requirement: <header of the copied-tree requirement>)", the named references to the two limits of its rule; every other body but the `.cascade-frozen` entries body ends with "(Requirement: <header>)", the named reference that gives "that target", "a pin" and "frozen" their referent
 - The bullet markers and the bold labels of the old body stay on the lines they head; the "Test inputs" bullet sits with the rule it defines
 
-Lengths (old, new): old 1846; new "A test pin is moved to the release cascade's target unless `.cascade-frozen` lists it with a reason" 320; "The target of a catalog pin is the newest published release in its major" 446; "A core pin already newer than the cascade target stays" 167; "A `cue.mod` pin moves by `cue mod get` then `cue mod tidy` and is never bumped by a hand edit" 350; "A `.cascade-frozen` entry names the file or directory, the frozen module paths and a one-sentence reason" 449; "A pin is frozen only when the test depends on that exact old version" 335; "A pin that is old only because a tree was copied or an upstream release moved on is not frozen" 349.
+Lengths (old, new): old 1846; new "A test pin is moved to the release cascade's target unless `.cascade-frozen` lists it with a reason" 500; "The targets of a catalog pin and a core pin follow the release cascade" 446; "A core pin already newer than the cascade target stays" 165; "A `cue.mod` pin moves by `cue mod get` then `cue mod tidy` and is never bumped by a hand edit" 350; "A `.cascade-frozen` entry names the file or directory, the frozen module paths and a one-sentence reason" 449; "A pin is frozen only when the test depends on that exact old version" 335; "A pin that is old only because a tree was copied or an upstream release moved on is not frozen" 349.
 
 ### Ledger: test-fixture-lineage, The shared fixture flow publishes catalog fixtures
 
@@ -3728,9 +3728,9 @@ New scenarios (each restates only a case the old text names):
 Words changed or added:
 - Keyword added where the sentence had none (strength table): "The effective applier identity is" reads "SHALL be"; "the test skips as it does today" reads "the test SHALL skip as it does today"
 - The skip body names the requirement it cited, which was removed here: "(`A cluster-required run fails instead of skipping`)" reads "(`A cluster-required run fails every precondition that would skip`)", the header of the first requirement of that split
-- Two bodies end with "(Requirement: <header of the first requirement>)", the named reference that gives "the check" and "the identity probed" their referent
+- Three bodies end with "(Requirement: <header of the first requirement>)", the named reference that gives "the effective applier identity", "the check" and "the identity probed" their referent
 
-Lengths (old, new): old 1312; new "Operator-owned e2e tests verify the operator's applier grant" 306; "The effective applier identity is the ServiceAccount named by --default-service-account when that argument is present" 243; "A denied applier check fails the test before any cluster mutation" 444; "An applier check that could not be performed skips the test" 494.
+Lengths (old, new): old 1312; new "Operator-owned e2e tests verify the operator's applier grant" 306; "The effective applier identity is the ServiceAccount named by --default-service-account when that argument is present" 319; "A denied applier check fails the test before any cluster mutation" 444; "An applier check that could not be performed skips the test" 494.
 
 ### Ledger: e2e-cluster-preconditions, The e2e suite resolves modules through the shipped default registry
 
@@ -3833,7 +3833,7 @@ Plain sentences that carry an RFC 2119 keyword in the new text and had none in t
 
 | Old sentence | New body | Word added |
 | --- | --- | --- |
-| A catalog pin's target is the newest published release in its major. | "The target of a catalog pin is the newest published release in its major" | "is" reads "SHALL be" |
+| A catalog pin's target is the newest published release in its major. | "The targets of a catalog pin and a core pin follow the release cascade" | "is" reads "SHALL be" |
 | A core pin already newer than that target stays. | "A core pin already newer than the cascade target stays" | "stays" reads "SHALL stay" |
 | Each entry names the repo-relative file or directory, the module paths frozen there, and a one-sentence reason saying why the pin must stay old. | "A `.cascade-frozen` entry names the file or directory, the frozen module paths and a one-sentence reason" | "Each entry names" reads "Each entry SHALL name" |
 | A pin is frozen only when the test depends on that exact old version. | "A pin is frozen only when the test depends on that exact old version" | "A pin is frozen" reads "A pin SHALL be frozen" |
@@ -3848,7 +3848,7 @@ Plain sentences copied unchanged, with no keyword, into a body that carries a ke
 | When a catalog member or contract type a fixture exercises is removed from the published catalog, the fixture is removed with it rather than kept unvetted; a replacement fixture is added when the replacement mechanism exists. | "A fixture does not depend on a catalog mechanism the catalog has withdrawn" |
 | The rule is mechanical, not stylistic: CUE resolves modules by longest-prefix match on the module path, ... | "A test fixture module declares its path under the testing domain" |
 | CUE keeps a dependency the consumer already lists at its listed version, so a consumer re-pinned to a new fixture version but left on an older core still passes `cue mod tidy --check` ... | "A consumer that names a fixture version pins every shared dependency as CUE resolves it" |
-| A core pin's target is the core version that the input's catalog pins, ... The source is workspace RELEASING.md, section "The cascade", "Consistent set". | "The target of a catalog pin is the newest published release in its major" |
+| A core pin's target is the core version that the input's catalog pins, ... The source is workspace RELEASING.md, section "The cascade", "Consistent set". | "The targets of a catalog pin and a core pin follow the release cascade" |
 | A `cue.mod` file moves by `cue mod get` then `cue mod tidy`, ... A Go literal moves by editing the literal. | "A `cue.mod` pin moves by `cue mod get` then `cue mod tidy` and is never bumped by a hand edit" |
 | Test inputs include a test module's `cue.mod/module.cue` and a module file a test writes from a Go literal. | "A test pin is moved to the release cascade's target unless `.cascade-frozen` lists it with a reason" |
 | The file uses the format in workspace RELEASING.md, section "Cascade files". | "A `.cascade-frozen` entry names the file or directory, the frozen module paths and a one-sentence reason" |
@@ -3856,4 +3856,3 @@ Plain sentences copied unchanged, with no keyword, into a body that carries a ke
 | The directory may be a standalone CUE module or a package inside another CUE module, such as an instance directory within a module tree. | "`opm instance build` takes one positional argument naming an instance" |
 | 2. Otherwise, an argument whose first element contains a dot is a published module path. (and list items 1 and 3) | "`opm module build` classifies its argument as a local directory or a published module path before any registry access" |
 | This covers a missing kubeconfig, an unreachable `kind-opm-dev` context, and an applier-grant check that could not be performed. | "A cluster-required run fails every precondition that would skip" |
-

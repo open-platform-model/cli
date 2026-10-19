@@ -14,7 +14,7 @@
 
 ### Requirement: Old test pins are current or frozen with a reason
 **Reason**: Split into requirements that each state one behavior.
-**Migration**: See "A test pin is moved to the release cascade's target unless `.cascade-frozen` lists it with a reason", "The target of a catalog pin is the newest published release in its major", "A core pin already newer than the cascade target stays", "A `cue.mod` pin moves by `cue mod get` then `cue mod tidy` and is never bumped by a hand edit", "A `.cascade-frozen` entry names the file or directory, the frozen module paths and a one-sentence reason", "A pin is frozen only when the test depends on that exact old version", "A pin that is old only because a tree was copied or an upstream release moved on is not frozen".
+**Migration**: See "A test pin is moved to the release cascade's target unless `.cascade-frozen` lists it with a reason", "The targets of a catalog pin and a core pin follow the release cascade", "A core pin already newer than the cascade target stays", "A `cue.mod` pin moves by `cue mod get` then `cue mod tidy` and is never bumped by a hand edit", "A `.cascade-frozen` entry names the file or directory, the frozen module paths and a one-sentence reason", "A pin is frozen only when the test depends on that exact old version", "A pin that is old only because a tree was copied or an upstream release moved on is not frozen".
 
 ### Requirement: The shared fixture flow publishes catalog fixtures
 **Reason**: Split into requirements that each state one behavior.
@@ -101,7 +101,7 @@ CUE keeps a dependency the consumer already lists at its listed version, so a co
 - **THEN** the subcommand prints the unified diff and a `FAIL` line naming the consumer, and exits non-zero
 
 ### Requirement: `hack/fixtures.sh consumers` checks every named consumer, prints a FAIL line for each failure and exits non-zero
-`hack/fixtures.sh consumers <dir>...` SHALL check every named consumer before it exits, SHALL print a `FAIL <consumer>: <reason>` line for each failure (a difference, any `cue` error, a missing `cue.mod/module.cue`, a consumer that pins no fixture), and SHALL exit non-zero when any consumer failed. The scratch copies SHALL be removed on every exit path.
+`hack/fixtures.sh consumers <dir>...` SHALL check every named consumer before it exits, SHALL print a `FAIL <consumer>: <reason>` line for each failure (a difference, any `cue` error, a missing `cue.mod/module.cue`, a consumer that pins no fixture), and SHALL exit non-zero when any consumer failed. The scratch copies SHALL be removed on every exit path. (Requirement: With FIX=1 `hack/fixtures.sh consumers` writes the resolved pins and does not fail)
 
 #### Scenario: Unresolvable fixture version is a named failure
 
@@ -134,7 +134,7 @@ With `FIX=1` a differing consumer's `module.cue` SHALL be overwritten with the r
 
 ### Requirement: A test pin is moved to the release cascade's target unless `.cascade-frozen` lists it with a reason
 Each `opmodel.dev/core@v2` or `opmodel.dev/catalogs/*` pin in a test input that tests resolve from a registry SHALL be moved to the release cascade's target, unless `.cascade-frozen` lists it with a reason.
-- **Test inputs** include a test module's `cue.mod/module.cue` and a module file a test writes from a Go literal.
+- **Test inputs** include a test module's `cue.mod/module.cue` and a module file a test writes from a Go literal. (Requirement: A core pin already newer than the cascade target stays) (Requirement: A pin that is old only because a tree was copied or an upstream release moved on is not frozen)
 
 #### Scenario: Every old core or catalog pin in a test module is accounted for
 
@@ -146,7 +146,7 @@ Each `opmodel.dev/core@v2` or `opmodel.dev/catalogs/*` pin in a test input that 
 - **WHEN** the module vet, module eval, render, instance-init, skip-unprovided and duplicate-identity tests run against the bumped trees, with the canonical registry mapping, which maps both `testing.opmodel.dev` and `opmodel.dev` to `ghcr.io/open-platform-model`
 - **THEN** they pass without skipping for an unresolvable core
 
-### Requirement: The target of a catalog pin is the newest published release in its major
+### Requirement: The targets of a catalog pin and a core pin follow the release cascade
 - **The target.** A catalog pin's target SHALL be the newest published release in its major. A core pin's target is the core version that the input's catalog pins, or, for an input that pins no catalog, the core that `templates/minimal`'s catalog pins. The source is workspace RELEASING.md, section "The cascade", "Consistent set". (Requirement: A test pin is moved to the release cascade's target unless `.cascade-frozen` lists it with a reason)
 
 #### Scenario: The target of a catalog pin is the newest published release in its major
@@ -155,7 +155,7 @@ Each `opmodel.dev/core@v2` or `opmodel.dev/catalogs/*` pin in a test input that 
 - **THEN** the target is the newest published release in its major
 
 ### Requirement: A core pin already newer than the cascade target stays
-- **No backwards moves.** A core pin already newer than that target SHALL stay. (Requirement: The target of a catalog pin is the newest published release in its major)
+- **No backwards moves.** A core pin already newer than that target SHALL stay. (Requirement: The targets of a catalog pin and a core pin follow the release cascade)
 
 #### Scenario: A core pin newer than its target stays
 

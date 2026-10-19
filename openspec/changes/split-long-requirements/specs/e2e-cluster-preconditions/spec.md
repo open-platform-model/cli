@@ -32,7 +32,7 @@ Every e2e test that relies on the operator applying workload resources for a `Mo
 - **THEN** it does not require the applier grant, since it installs and uninstalls the operator itself and applies no workloads
 
 ### Requirement: The effective applier identity is the ServiceAccount named by --default-service-account when that argument is present
-The effective applier identity SHALL be the ServiceAccount named by the controller Deployment's `--default-service-account` argument, resolved in the test namespace, when that argument is present; otherwise the controller's own ServiceAccount.
+The effective applier identity SHALL be the ServiceAccount named by the controller Deployment's `--default-service-account` argument, resolved in the test namespace, when that argument is present; otherwise the controller's own ServiceAccount. (Requirement: Operator-owned e2e tests verify the operator's applier grant)
 
 #### Scenario: The default ServiceAccount argument names the applier identity
 
