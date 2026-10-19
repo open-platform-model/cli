@@ -39,7 +39,7 @@ The exact content `cue mod tidy` of the CUE version the CLI embeds produces for 
 
 ### Requirement: `opm module tidy` and `opm catalog tidy` require no `cue` executable and start no child process
 
-`opm module tidy [path]` (alias `opm mod tidy`) and `opm catalog tidy [path]`:  the command SHALL NOT require a `cue` executable on the machine and SHALL NOT start any child process.
+`opm module tidy [path]` (alias `opm mod tidy`) and `opm catalog tidy [path]`:  The command SHALL NOT require a `cue` executable on the machine and SHALL NOT start any child process.
 
 #### Scenario: No cue binary needed
 
@@ -48,7 +48,7 @@ The exact content `cue mod tidy` of the CUE version the CLI embeds produces for 
 
 ### Requirement: `opm module tidy` and `opm catalog tidy` behave identically and only the wording of messages follows the kind
 
-`opm module tidy [path]` (alias `opm mod tidy`) and `opm catalog tidy [path]`:  the two commands SHALL behave identically; the kind only changes the wording of messages.
+`opm module tidy [path]` (alias `opm mod tidy`) and `opm catalog tidy [path]`:  The two commands SHALL behave identically; the kind only changes the wording of messages.
 
 #### Scenario: The two commands behave identically
 

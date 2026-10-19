@@ -2,7 +2,7 @@
 
 ### Requirement: Templates are published modules in a reserved segment
 **Reason**: Split into requirements that each state one behavior.
-**Migration**: See "The official templates are real CUE modules published to the reserved `opmodel.dev/templates/<name>` segment through `opm module publish`", "A template passes `opm module vet` before it is published and a template that fails a gate or the vet fails the release", "The `templates` segment is module-kind and cli-CI-published only and no gate reserves a name within it", "Publish never skips an already-published tag and the release job invokes it only for the versions its gates found unpublished", "A template's tree is exactly the module that publishes", "The artifact published at a template's version holds exactly that template's tree and any change to the template bumps its identity `Version`", "A template's `Version` is a stable SemVer and its module path is `opmodel.dev/templates/<name>@v<major>`", "The cli's PR check and release job refuse a template that breaks the tree, bump, `Version` or module path rules", "A template's identity package declares `Version` as a concrete string literal and the template tree loads through the kernel's module loader unmodified".
+**Migration**: See "The official templates are published modules in the reserved segment", "A template passes the vet and a failing template fails the release", "The `templates` segment is module-kind and cli-CI-published only and no gate reserves a name within it", "Publish never skips an already-published tag and the release job invokes it only for the versions its gates found unpublished", "A template's tree is exactly the module that publishes", "A published template version holds its tree and a change bumps `Version`", "A template's `Version` is a stable SemVer with the module path of its major", "The cli's PR check and release job refuse a template that breaks a publish gate, the vet, the tree, bump, `Version` or module path rule", "A template's identity package declares `Version` as a concrete string literal and the template tree loads through the kernel's module loader unmodified".
 
 ### Requirement: init scaffolds by fetch and re-identification
 **Reason**: Split into requirements that each state one behavior.
@@ -18,7 +18,7 @@
 
 ## ADDED Requirements
 
-### Requirement: The official templates are real CUE modules published to the reserved `opmodel.dev/templates/<name>` segment through `opm module publish`
+### Requirement: The official templates are published modules in the reserved segment
 
 The official templates, `minimal`, `standard`, `advanced`, SHALL be real CUE modules hosted in the cli repo and published to the reserved `opmodel.dev/templates/<name>` segment by the cli's release pipeline through `opm module publish`, passing every publish gate.
 
@@ -29,7 +29,7 @@ The official templates, `minimal`, `standard`, `advanced`, SHALL be real CUE mod
 - **WHEN** the cli release pipeline publishes the official templates
 - **THEN** `minimal`, `standard` and `advanced` are published to the reserved `opmodel.dev/templates/<name>` segment through `opm module publish`, passing every publish gate
 
-### Requirement: A template passes `opm module vet` before it is published and a template that fails a gate or the vet fails the release
+### Requirement: A template passes the vet and a failing template fails the release
 
 A template SHALL also pass `opm module vet` with its own `debugValues`, rendered by the `opm` the release builds, before it is published. A template that fails a gate or the vet SHALL fail the release before any template is published, and the cli release SHALL stay a draft.
 
@@ -47,7 +47,7 @@ A template SHALL also pass `opm module vet` with its own `debugValues`, rendered
 
 ### Requirement: The `templates` segment is module-kind and cli-CI-published only and no gate reserves a name within it
 
-The segment SHALL be module-kind and cli-CI-published only. No gate SHALL reserve a name within it: the publish gates admit any single-segment name made of lowercase letters, digits, dots, underscores and hyphens, `index` included. (Requirement: The official templates are real CUE modules published to the reserved `opmodel.dev/templates/<name>` segment through `opm module publish`)
+The segment SHALL be module-kind and cli-CI-published only. No gate SHALL reserve a name within it: the publish gates admit any single-segment name made of lowercase letters, digits, dots, underscores and hyphens, `index` included. (Requirement: The official templates are published modules in the reserved segment)
 
 **Source**: enhancement 0011 ("Official templates are published modules in a reserved `templates` segment").
 
@@ -78,7 +78,7 @@ A template's tree SHALL be exactly the module that publishes: it SHALL hold no s
 - **WHEN** a template's tree is read
 - **THEN** it holds no symbolic link, special file, nested module or other file its module zip leaves out
 
-### Requirement: The artifact published at a template's version holds exactly that template's tree and any change to the template bumps its identity `Version`
+### Requirement: A published template version holds its tree and a change bumps `Version`
 
 Because published versions are immutable, the artifact published at a template's version SHALL hold exactly that template's tree. Any change to a template's files, comments and `cue.mod` pins included, SHALL bump its identity `Version` before the next release.
 
@@ -89,7 +89,7 @@ Because published versions are immutable, the artifact published at a template's
 - **WHEN** a template's files, comments or `cue.mod` pins change
 - **THEN** its identity `Version` is bumped before the next release, because the artifact published at a template's version holds exactly that template's tree
 
-### Requirement: A template's `Version` is a stable SemVer and its module path is `opmodel.dev/templates/<name>@v<major>`
+### Requirement: A template's `Version` is a stable SemVer with the module path of its major
 
 A template's `Version` SHALL be a stable SemVer, and SHALL be the highest stable version published for its major (the version `opm module init` resolves) or an unpublished version above it; its module path SHALL be `opmodel.dev/templates/<name>@v<major>`.
 
@@ -100,9 +100,9 @@ A template's `Version` SHALL be a stable SemVer, and SHALL be the highest stable
 - **WHEN** a template's `Version` and module path are checked
 - **THEN** the `Version` is a stable SemVer, the highest stable version published for its major or an unpublished version above it, and the module path is `opmodel.dev/templates/<name>@v<major>`
 
-### Requirement: The cli's PR check and release job refuse a template that breaks the tree, bump, `Version` or module path rules
+### Requirement: The cli's PR check and release job refuse a template that breaks a publish gate, the vet, the tree, bump, `Version` or module path rule
 
-The cli's PR check and release job SHALL refuse a template that breaks any of these rules. (Requirements: "A template's tree is exactly the module that publishes", "The artifact published at a template's version holds exactly that template's tree and any change to the template bumps its identity `Version`", "A template's `Version` is a stable SemVer and its module path is `opmodel.dev/templates/<name>@v<major>`")
+The cli's PR check and release job SHALL refuse a template that breaks any of these rules. (Requirements: "The official templates are published modules in the reserved segment", "A template passes the vet and a failing template fails the release", "A template's tree is exactly the module that publishes", "A published template version holds its tree and a change bumps `Version`", "A template's `Version` is a stable SemVer with the module path of its major")
 
 **Source**: enhancement 0011 ("Official templates are published modules in a reserved `templates` segment").
 
@@ -187,7 +187,7 @@ A template reference that is a bare word (letters, digits, underscores) before a
 
 ### Requirement: An `@vN` suffix floats within a major and a full semver pins a tag
 
-An `@vN` suffix SHALL select the newest release within that major (stable preferred, prerelease fallback); a full semver selects the exact tag.
+An `@vN` suffix SHALL select the newest release within that major (stable preferred, prerelease fallback); a full semver selects the exact tag. (Requirement: A bare word expands into the templates segment and a reference with `/` or `.` is a literal path)
 
 #### Scenario: A suffix selects the release
 

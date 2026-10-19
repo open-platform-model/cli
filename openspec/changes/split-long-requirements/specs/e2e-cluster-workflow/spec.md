@@ -6,7 +6,7 @@
 
 ### Requirement: The suite runs with the cluster required and leaves evidence on failure
 **Reason**: Split into requirements that each state one behavior.
-**Migration**: See "The suite runs `go test ./tests/e2e/... -v` with the cluster required and the tools the cluster tests probe for present", "An operator-owned test that fails logs its ModuleInstance, the cluster Platform and the operator's logs before its cleanup deletes the evidence", "A test that times out waiting for the operator to reconcile names the ModuleInstance's `Ready` condition in its failure message", "After any failed step the job prints the operator's logs, the cluster Platform, every ModuleInstance and recent cluster events".
+**Migration**: See "The suite runs `go test ./tests/e2e/... -v` with the cluster required and the tools the cluster tests probe for present", "An operator-owned test that fails logs its ModuleInstance, the cluster Platform and the operator's logs before its cleanup deletes the evidence", "When an operator-owned test fails, a test that times out waiting for the operator to reconcile names the ModuleInstance's `Ready` condition in its failure message", "After any failed step the job prints the operator's logs, the cluster Platform, every ModuleInstance and recent cluster events".
 
 ### Requirement: The cluster is prepared with the local loop's own tasks and the pinned operator module
 **Reason**: Split into requirements that each state one behavior.
@@ -98,7 +98,7 @@ The job SHALL do the cluster-backed work (it *applies*) when at least one of the
 
 ### Requirement: The decision to apply is computed from the pull request's state, never from the triggering event alone
 
-Whether the job *applies*: The decision SHALL be computed from the pull request's state when the job runs (its head branch, its current labels and its full list of changed files), never from the triggering event alone, so runs for the same head commit, head branch and labels always reach the same decision.
+The job *applies*: The decision SHALL be computed from the pull request's state when the job runs (its head branch, its current labels and its full list of changed files), never from the triggering event alone, so runs for the same head commit, head branch and labels always reach the same decision.
 
 #### Scenario: Unrelated label does not change the outcome
 
@@ -137,13 +137,13 @@ When an operator-owned test fails, the test itself SHALL log, before its cleanup
 - **WHEN** an operator-owned test fails because the operator did not reconcile
 - **THEN** that test's output contains the operator's logs and the status of the Platform and of the test's ModuleInstance as they were when it failed, and its failure message names the ModuleInstance's `Ready` condition
 
-### Requirement: A test that times out waiting for the operator to reconcile names the ModuleInstance's `Ready` condition in its failure message
+### Requirement: When an operator-owned test fails, a test that times out waiting for the operator to reconcile names the ModuleInstance's `Ready` condition in its failure message
 
-A test that times out waiting for the operator to reconcile SHALL name the ModuleInstance's `Ready` condition in its failure message.
+When an operator-owned test fails, a test that times out waiting for the operator to reconcile SHALL name the ModuleInstance's `Ready` condition in its failure message.
 
 #### Scenario: A reconcile timeout names the Ready condition
 
-- **WHEN** a test times out waiting for the operator to reconcile
+- **WHEN** an operator-owned test fails and a test times out waiting for the operator to reconcile
 - **THEN** its failure message names the ModuleInstance's `Ready` condition
 
 ### Requirement: After any failed step the job prints the operator's logs, the cluster Platform, every ModuleInstance and recent cluster events
@@ -176,7 +176,7 @@ The job SHALL NOT restate those steps in the workflow. (Requirement: The job ins
 #### Scenario: The preparation steps are not restated
 
 - **WHEN** the job applies
-- **THEN** it does not restate those steps in the workflow
+- **THEN** it does not restate in the workflow the steps that install kind, create the `opm-dev` cluster with `task cluster:create` and prepare it with `task cluster:operator`
 
 ### Requirement: The job runs a registry container seeded with `hack/fixtures.sh seed` from which the CLI and the operator resolve `testing.opmodel.dev`
 
