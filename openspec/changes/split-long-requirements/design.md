@@ -6086,3 +6086,201 @@ Plain sentences copied unchanged, with no keyword, into a body that carries a ke
 | The three list items of the pod detail block | "The pod detail block lists each pod of the unhealthy workload with name, phase and detail" |
 | (The global `--verbose` flag controls log verbosity only and does not affect status output.) | "Pods of the unhealthy workload are discovered by its `.spec.selector.matchLabels`" |
 | These guards stop a mistaken or bot-branch dispatch; a person with write access can still change the workflow on a branch, ... | "publish-templates and goreleaser check out the release tag as `refs/tags/<tag>`" |
+
+## Ledger entries of cli-B8, unit 8b (instance-identity-labeling, mod-instance-optional, mod-list, pkg-types, platform-pull, refactoring-requirements, registry-login, secret-inventory-migration, status-wide-output)
+
+### Ledger: instance-identity-labeling, Runtime identity injected via catalog mandatory field
+
+Form: b (MODIFIED parent, ADDED split-offs). New requirements: "The catalog requires `#runtimeName` and CUE evaluation fails when the CLI omits it". The parent "Runtime identity injected via catalog mandatory field" stays, with a shorter body.
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| CLI-applied resources carry runtime identity | "Runtime identity injected via catalog mandatory field", "CLI-applied resources carry runtime identity" | No (byte equal, checked) |
+| Runtime identity stays in sync with Go constant | "Runtime identity injected via catalog mandatory field", "Runtime identity stays in sync with Go constant" | No (byte equal, checked) |
+| (new) | "The catalog requires `#runtimeName` and CUE evaluation fails when the CLI omits it", "Evaluation fails when the CLI omits #runtimeName" | New restatement scenario: the case "the CLI omits it" and "CUE evaluation MUST fail" are in the old clause |
+
+| Old clause | New place |
+| --- | --- |
+| The CLI's `mod apply` (and any other render entrypoint that produces... | body of the parent "Runtime identity injected via catalog mandatory field", verbatim |
+| The catalog declares `#runtimeName` as a mandatory field; CUE evalua... | body of "The catalog requires `#runtimeName` and CUE evaluation fails when the CLI omits it", verbatim |
+| The `#runtimeName` value drives the `app.kubernetes.io/managed-by` l... | body of the parent "Runtime identity injected via catalog mandatory field", verbatim, after the first sentence |
+
+Lengths (old, new): old 504; new "The catalog requires `#runtimeName` and CUE evaluation fails when the CLI omits it" 103; "Runtime identity injected via catalog mandatory field" 400.
+
+### Ledger: mod-instance-optional, mod build and mod apply work without an instance.cue file
+
+Form: b (MODIFIED parent, ADDED split-offs). New requirements: "The commands synthesize a ModuleInstance in memory when no instance.cue exists". The parent "mod build and mod apply work without an instance.cue file" stays, with a shorter body.
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| build succeeds on bare module with debugValues | "mod build and mod apply work without an instance.cue file", "build succeeds on bare module with debugValues" | No (byte equal, checked) |
+| apply succeeds on bare module with debugValues | "mod build and mod apply work without an instance.cue file", "apply succeeds on bare module with debugValues" | No (byte equal, checked) |
+| build with -f on bare module | "mod build and mod apply work without an instance.cue file", "build with -f on bare module" | No (byte equal, checked) |
+| (new) | "The commands synthesize a ModuleInstance in memory when no instance.cue exists", "Bare module renders through a synthesized ModuleInstance" | New restatement scenario: only words of the old clause, no new case. |
+
+| Old clause | New place |
+| --- | --- |
+| `opm mod build` and `opm mod apply` SHALL produce correct output whe... | body of the parent "mod build and mod apply work without an instance.cue file", verbatim |
+| The commands SHALL synthesize a `ModuleInstance` in memory by fillin... | body of "The commands synthesize a ModuleInstance in memory when no instance.cue exists", with the word change of the list "Words changed or added in unit 8b" |
+
+Lengths (old, new): old 548; new "The commands synthesize a ModuleInstance in memory when no instance.cue exists" 403; "mod build and mod apply work without an instance.cue file" 240.
+
+### Ledger: mod-list, List metadata extraction does not depend on inventory change history
+
+Form: b (MODIFIED parent, ADDED split-offs). New requirements: "Owner display metadata comes from the top-level `createdBy` field", "`opm instance list` does not require inventory change-history metadata". The parent "List metadata extraction does not depend on inventory change history" stays, with a shorter body.
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Display metadata sourced from persisted inventory | "List metadata extraction does not depend on inventory change history", "Display metadata sourced from persisted inventory" | No (byte equal, checked) |
+| (new) | "Owner display metadata comes from the top-level `createdBy` field", "Owner defaults to cli for legacy inventories" | New restatement scenario: the case "that field is omitted for legacy inventories" is in the old clause |
+| (new) | "`opm instance list` does not require inventory change-history metadata", "List works without change-history metadata" | New restatement scenario: only words of the old clause, no new case. |
+
+| Old clause | New place |
+| --- | --- |
+| The command SHALL extract display metadata from each persisted insta... | body of the parent "List metadata extraction does not depend on inventory change history", with the word change of the list "Words changed or added in unit 8b" |
+| Owner display metadata SHALL come from the top-level `createdBy` fie... | body of "Owner display metadata comes from the top-level `createdBy` field", verbatim, with a named reference to the parent |
+| The command SHALL NOT require inventory change-history metadata such... | body of "`opm instance list` does not require inventory change-history metadata", with the word change of the list "Words changed or added in unit 8b" and a named reference to the parent; the `<!-- Was ... -->` comment stays on the sentence it ends |
+
+Lengths (old, new): old 787; new "Owner display metadata comes from the top-level `createdBy` field" 226; "`opm instance list` does not require inventory change-history metadata" 375; "List metadata extraction does not depend on inventory change history" 368.
+
+### Ledger: pkg-types, Core types exported in pkg/
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "Shared domain types the CLI owns are exported under `pkg/errors/` and `pkg/loader/`", "The Kubernetes object wrapper, the OPM label vocabulary and the kind-class weight table are the library's", "There is no `pkg/core/` and no `pkg/resourceorder/` package", "The inventory entry, its identity comparison, the stale set and both digests are the library's", "There is no `pkg/inventory/` package", "Module and instance metadata types are the library's", "The CLI reads an acquired module's identity fields from its decoded `Metadata`", "Instance values and module metadata are read through the library's accessors", "A module's `debugValues` and `#config` are read through the library's accessors", "There is no `pkg/bundle/` package".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| External tool imports pkg/core | "There is no `pkg/core/` and no `pkg/resourceorder/` package", "External tool imports pkg/core" | No (byte equal, checked) |
+| External tool imports pkg/resourceorder | "There is no `pkg/core/` and no `pkg/resourceorder/` package", "External tool imports pkg/resourceorder" | No (byte equal, checked) |
+| External tool imports pkg/inventory | "There is no `pkg/inventory/` package", "External tool imports pkg/inventory" | No (byte equal, checked) |
+| External tool imports pkg/module | "Module and instance metadata types are the library's", "External tool imports pkg/module" | No (byte equal, checked) |
+| pkg/bundle does not exist | "There is no `pkg/bundle/` package", "pkg/bundle does not exist" | No (byte equal, checked) |
+| Scaffold reads module identity from decoded metadata | "The CLI reads an acquired module's identity fields from its decoded `Metadata`", "Scaffold reads module identity from decoded metadata" | No (byte equal, checked) |
+| Render reads the instance's values and module metadata through accessors | "Instance values and module metadata are read through the library's accessors", "Render reads the instance's values and module metadata through accessors" | No (byte equal, checked) |
+| Instance without module metadata | "Instance values and module metadata are read through the library's accessors", "Instance without module metadata" | No (byte equal, checked) |
+| debugValues read through the module | "A module's `debugValues` and `#config` are read through the library's accessors", "debugValues read through the module" | No (byte equal, checked) |
+| (new) | "Shared domain types the CLI owns are exported under `pkg/errors/` and `pkg/loader/`", "Package structure under pkg/" | New restatement scenario: only words of the old clause, no new case. |
+| (new) | "The Kubernetes object wrapper, the OPM label vocabulary and the kind-class weight table are the library's", "The CLI uses the library packages for objects, labels and order" | New restatement scenario: only words of the old clause, no new case. |
+| (new) | "The inventory entry, its identity comparison, the stale set and both digests are the library's", "The CLI uses the library inventory package" | New restatement scenario: only words of the old clause, no new case. |
+
+| Old clause | New place |
+| --- | --- |
+| Shared domain types the CLI owns SHALL be exported under `pkg/` for ... | body of "Shared domain types the CLI owns are exported under `pkg/errors/` and `pkg/loader/`", with the word change of the list "Words changed or added in unit 8b" (em-dash) |
+| The Kubernetes object wrapper, the OPM label vocabulary and the kind... | body of "The Kubernetes object wrapper, the OPM label vocabulary and the kind-class weight table are the library's", verbatim |
+| There SHALL be no `pkg/core/` and no `pkg/resourceorder/` package (e... | body of "There is no `pkg/core/` and no `pkg/resourceorder/` package", verbatim |
+| The inventory entry, its identity comparison, the stale set, the inv... | body of "The inventory entry, its identity comparison, the stale set and both digests are the library's", verbatim |
+| There SHALL be no `pkg/inventory/` package (enhancement 0012, ...) | body of "There is no `pkg/inventory/` package", verbatim |
+| Module and instance metadata types SHALL NOT be declared in `pkg/`: ... | body of "Module and instance metadata types are the library's", verbatim |
+| Where the CLI holds an acquired `*module.Module`, it SHALL read the ... | body of "The CLI reads an acquired module's identity fields from its decoded `Metadata`", verbatim |
+| The CLI SHALL read the other kernel artifact fields ... : the first ... | body of "Instance values and module metadata are read through the library's accessors", with the word change of the list "Words changed or added in unit 8b" (the list is cut after the second item) and a named reference to "The CLI reads an acquired module's identity fields from its decoded `Metadata`" |
+| The CLI SHALL read the other kernel artifact fields ... : the third ... | body of "A module's `debugValues` and `#config` are read through the library's accessors", with the intro repeated and a named reference to "The CLI reads an acquired module's identity fields from its decoded `Metadata`" |
+| There SHALL be no `pkg/bundle/` package — bundle support is not impl... | body of "There is no `pkg/bundle/` package", with the word change of the list "Words changed or added in unit 8b" (em-dash) |
+
+Lengths (old, new): old 2922; new "Shared domain types the CLI owns are exported under `pkg/errors/` and `pkg/loader/`" 278; "The Kubernetes object wrapper, the OPM label vocabulary and the kind-class weight table are the library's" 346; "There is no `pkg/core/` and no `pkg/resourceorder/` package" 395; "The inventory entry, its identity comparison, the stale set and both digests are the library's" 388; "There is no `pkg/inventory/` package" 322; "Module and instance metadata types are the library's" 285; "The CLI reads an acquired module's identity fields from its decoded `Metadata`" 223; "Instance values and module metadata are read through the library's accessors" 490; "A module's `debugValues` and `#config` are read through the library's accessors" 367; "There is no `pkg/bundle/` package" 168.
+
+### Ledger: platform-pull, opm platform pull writes the cluster's platform package to a directory
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`opm platform pull <dir>` is a cluster-facing command of the `platform` group", "`opm platform pull <dir>` writes the platform module that the cluster renders against to `<dir>`", "The module that `opm platform pull` writes is the generated module unchanged", "`opm platform pull` writes nothing to the cluster and publishes nothing".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| A pulled package reproduces the cluster's render | "`opm platform pull <dir>` writes the platform module that the cluster renders against to `<dir>`", "A pulled package reproduces the cluster's render" | No (byte equal, checked) |
+| The pulled module is the generated module | "The module that `opm platform pull` writes is the generated module unchanged", "The pulled module is the generated module" | No (byte equal, checked) |
+| (new) | "`opm platform pull <dir>` is a cluster-facing command of the `platform` group", "The pull command accepts the cluster flags" | New restatement scenario: only words of the old clause, no new case. |
+| (new) | "`opm platform pull` writes nothing to the cluster and publishes nothing", "The pull command writes nothing to the cluster" | New restatement scenario: only words of the old clause, no new case. |
+
+| Old clause | New place |
+| --- | --- |
+| The CLI SHALL provide `opm platform pull <dir>`, registered under th... | body of "`opm platform pull <dir>` is a cluster-facing command of the `platform` group", verbatim |
+| It SHALL read the cluster Platform through the same resolution the r... | body of "`opm platform pull <dir>` writes the platform module that the cluster renders against to `<dir>`", with the word change of the list "Words changed or added in unit 8b" |
+| The written module SHALL be the generated module unchanged: reserved... | body of "The module that `opm platform pull` writes is the generated module unchanged", verbatim, with a named reference to "`opm platform pull <dir>` writes the platform module that the cluster renders against to `<dir>`" |
+| The command SHALL NOT write to the cluster and SHALL NOT publish any... | body of "`opm platform pull` writes nothing to the cluster and publishes nothing", with the word change of the list "Words changed or added in unit 8b" |
+
+Lengths (old, new): old 749; new "`opm platform pull <dir>` is a cluster-facing command of the `platform` group" 178; "`opm platform pull <dir>` writes the platform module that the cluster renders against to `<dir>`" 387; "The module that `opm platform pull` writes is the generated module unchanged" 242; "`opm platform pull` writes nothing to the cluster and publishes nothing" 88.
+
+### Ledger: refactoring-requirements, Module and ModuleInstance identifiers are distinct
+
+Form: b (MODIFIED parent, ADDED split-offs). New requirements: "The identifier rule applies to internal packages only". The parent "Module and ModuleInstance identifiers are distinct" stays, with a shorter body.
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Instance-scoped function names | "Module and ModuleInstance identifiers are distinct", "Instance-scoped function names" | No (byte equal, checked) |
+| Instance-scoped type names | "Module and ModuleInstance identifiers are distinct", "Instance-scoped type names" | No (byte equal, checked) |
+| Inventory types unambiguous | "Module and ModuleInstance identifiers are distinct", "Inventory types unambiguous" | No (byte equal, checked) |
+| Dead types removed | "Module and ModuleInstance identifiers are distinct", "Dead types removed" | No (byte equal, checked) |
+| JSON backward compatibility preserved | "Module and ModuleInstance identifiers are distinct", "JSON backward compatibility preserved" | No (byte equal, checked) |
+| (new) | "The identifier rule applies to internal packages only", "User-facing terminal output is excluded" | New restatement scenario: only words of the old clause |
+
+| Old clause | New place |
+| --- | --- |
+| Internal Go identifiers (function names, type names, field names, va... | body of the parent "Module and ModuleInstance identifiers are distinct", verbatim; the `<!-- Was ... -->` comment stays on its sentence |
+| This requirement applies to internal packages only. User-facing term... | body of "The identifier rule applies to internal packages only", with the word change of the list "Words changed or added in unit 8b" (keyword) and a named reference to the parent |
+
+Lengths (old, new): old 614; new "The identifier rule applies to internal packages only" 301; "Module and ModuleInstance identifiers are distinct" 382.
+
+### Ledger: registry-login, Login writes where the push reads
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`opm registry login` stores a credential in the standard OCI/docker credential file", "`opm registry login` without a host argument resolves the configured registry mapping to its host set", "The credential is verified against the registry before the write", "The write modifies only the targeted host entry of the credential file".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Single-host mapping logs in | "`opm registry login` without a host argument resolves the configured registry mapping to its host set", "Single-host mapping logs in" | No (byte equal, checked) |
+| Multi-host mapping refuses with actions | "`opm registry login` without a host argument resolves the configured registry mapping to its host set", "Multi-host mapping refuses with actions" | No (byte equal, checked) |
+| Bad credential never lands | "The credential is verified against the registry before the write", "Bad credential never lands" | No (byte equal, checked) |
+| Shared file preserved | "The write modifies only the targeted host entry of the credential file", "Shared file preserved" | No (byte equal, checked) |
+| Non-interactive refuses | "`opm registry login` stores a credential in the standard OCI/docker credential file", "Non-interactive refuses" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| `opm registry login [host]` SHALL store a credential in the standard... | body of "`opm registry login` stores a credential in the standard OCI/docker credential file", with the word change of the list "Words changed or added in unit 8b" (em-dash) |
+| With a host argument, that host is targeted literally.  | body of "`opm registry login` without a host argument resolves the configured registry mapping to its host set", verbatim (a plain sentence, no keyword; see the strength table) |
+| Without one, the command SHALL resolve the configured registry mappi... | body of "`opm registry login` without a host argument resolves the configured registry mapping to its host set", with the word change of the list "Words changed or added in unit 8b" |
+| The credential SHALL be verified against the registry before writing... | body of "The credential is verified against the registry before the write", verbatim, with a named reference to "`opm registry login` stores a credential in the standard OCI/docker credential file" |
+| The write SHALL modify only the targeted host's entry, preserving ev... | body of "The write modifies only the targeted host entry of the credential file", verbatim, with a named reference to "`opm registry login` stores a credential in the standard OCI/docker credential file" |
+
+Lengths (old, new): old 873; new "`opm registry login` stores a credential in the standard OCI/docker credential file" 151; "`opm registry login` without a host argument resolves the configured registry mapping to its host set" 396; "The credential is verified against the registry before the write" 217; "The write modifies only the targeted host entry of the credential file" 319.
+
+### Ledger: secret-inventory-migration, No command reads a legacy inventory Secret
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "No command gets, lists, decodes, migrates or deletes a legacy inventory Secret", "An instance recorded only in a legacy Secret is not seen by the instance commands and applies as a first install".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Apply makes no request on Secrets | "No command gets, lists, decodes, migrates or deletes a legacy inventory Secret", "Apply makes no request on Secrets" | No (byte equal, checked) |
+| Instance recorded only in a legacy Secret is a first install | "An instance recorded only in a legacy Secret is not seen by the instance commands and applies as a first install", "Instance recorded only in a legacy Secret is a first install" | No (byte equal, checked) |
+| Status does not fall back to Secrets | "An instance recorded only in a legacy Secret is not seen by the instance commands and applies as a first install", "Status does not fall back to Secrets" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The CLI MUST NOT get, list, decode, migrate or delete a legacy inven... | body of "No command gets, lists, decodes, migrates or deletes a legacy inventory Secret", verbatim |
+| An instance whose only inventory is a legacy Secret has no `ModuleIn... | body of "An instance recorded only in a legacy Secret is not seen by the instance commands and applies as a first install", verbatim |
+
+Lengths (old, new): old 571; new "No command gets, lists, decodes, migrates or deletes a legacy inventory Secret" 193; "An instance recorded only in a legacy Secret is not seen by the instance commands and applies as a first install" 377.
+
+### Ledger: status-wide-output, Wide format shows replica counts for workloads
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "Wide format adds a REPLICAS column to the status table", "Replica values come from the status and spec fields of each workload kind", "A missing or zero status replica field displays as 0".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Deployment replicas in wide format | "Replica values come from the status and spec fields of each workload kind", "Deployment replicas in wide format" | No (byte equal, checked) |
+| Deployment with partial readiness | "Replica values come from the status and spec fields of each workload kind", "Deployment with partial readiness" | No (byte equal, checked) |
+| StatefulSet replicas in wide format | "Replica values come from the status and spec fields of each workload kind", "StatefulSet replicas in wide format" | No (byte equal, checked) |
+| DaemonSet replicas in wide format | "Replica values come from the status and spec fields of each workload kind", "DaemonSet replicas in wide format" | No (byte equal, checked) |
+| Non-workload resource in wide format | "Wide format adds a REPLICAS column to the status table", "Non-workload resource in wide format" | No (byte equal, checked) |
+| (new) | "A missing or zero status replica field displays as 0", "A missing status field displays as 0" | New restatement scenario: only words of the old clause, no new case. |
+
+| Old clause | New place |
+| --- | --- |
+| When the user specifies `-o wide`, the status table SHALL include a ... | body of "Wide format adds a REPLICAS column to the status table", verbatim |
+| The replica values SHALL be extracted from the resource's status and... | body of "Replica values come from the status and spec fields of each workload kind", verbatim, with a named reference to "Wide format adds a REPLICAS column to the status table" |
+| If a status field is missing or zero, it SHALL be displayed as `0`. | body of "A missing or zero status replica field displays as 0", verbatim, with a named reference to "Replica values come from the status and spec fields of each workload kind" |
+
+Lengths (old, new): old 603; new "Wide format adds a REPLICAS column to the status table" 262; "Replica values come from the status and spec fields of each workload kind" 342; "A missing or zero status replica field displays as 0" 156.
+
+### Words changed or added in unit 8b
+
+- Named references: a body ends with "(Requirement: <exact header>)", the named reference that gives it its referent. The bodies are: `mod-instance-optional` "The commands synthesize a ModuleInstance in memory when no instance.cue exists" (to the parent, for the module directory and the values condition); `mod-list` "Owner display metadata comes from the top-level `createdBy` field" and "`opm instance list` does not require inventory change-history metadata" (to the parent, for the persisted inventory record); `platform-pull` "The module that `opm platform pull` writes is the generated module unchanged" (to the pull body, for "The written module"); `pkg-types` "Instance values and module metadata are read through the library's accessors" and "A module's `debugValues` and `#config` are read through the library's accessors" (to the identity-field body, for "the other kernel artifact fields"); `refactoring-requirements` "The identifier rule applies to internal packages only" (to the parent, for "This requirement"); `registry-login` "The credential is verified against the registry before the write" and "The write modifies only the targeted host entry of the credential file" (to the storing body, for "The credential" and "The write"); `status-wide-output` "Replica values come from the status and spec fields of each workload kind" and "A missing or zero status replica field displays as 0" (to the column body and the values body, for "The replica values" and "a status field").
+- Subjects copied from the same old requirement: `mod-instance-optional`, "The commands SHALL synthesize" reads "`opm mod build` and `opm mod apply` SHALL synthesize" (the subject of the first paragraph). `mod-list`, "The command SHALL extract" and "The command SHALL NOT require" read "`opm instance list` SHALL extract" and "`opm instance list` SHALL NOT require" (the command of the scenario). `platform-pull`, "It SHALL read" and "The command SHALL NOT write" read "`opm platform pull <dir>` SHALL read" and "`opm platform pull <dir>` SHALL NOT write" (the command of the first sentence). `registry-login`, "the command SHALL resolve" reads "`opm registry login [host]` SHALL resolve" (the command of the first sentence).
+- `refactoring-requirements`, "The identifier rule applies to internal packages only": "applies" reads "SHALL apply" (keyword).
+- `pkg-types`, the list items of "Shared domain types the CLI owns are exported under `pkg/errors/` and `pkg/loader/`" and the body of "There is no `pkg/bundle/` package", and `registry-login`, "`opm registry login` stores a credential in the standard OCI/docker credential file": the em-dash reads a colon.
+- `pkg-types`, "Instance values and module metadata are read through the library's accessors": the old list is cut after its second item at a list boundary. The intro is in both parts (the old sentence is over 500 characters on its own), and the second item ends with a period in place of the semicolon.
