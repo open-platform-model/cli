@@ -97,7 +97,7 @@ openspec/                  specs, active changes and archive
 | `task lint:config` | Verify `.golangci.yml` against the committed schema, offline | After a lint config or version change |
 | `task lint:fix` | `golangci-lint run --fix` | Lint findings that auto-fix |
 | `task cite-lint` | Refuse a decision number or lone enhancement id in a comment | After a comment edit |
-| `task openspec:check` | `openspec validate --all --strict` | After a spec or change edit |
+| `task openspec:check` | `openspec validate --all` | After a spec or change edit; `--strict` is off until the long-requirement rewrite lands |
 | `task test` / `task test:unit` | All suites / `internal` and `pkg` | Default checks |
 | `task test:run TEST=Name` | One test by name | While you work |
 | `task test:e2e` / `task test:integration` | E2E / integration programs (need `kind-opm-dev`) | Cluster behavior |
