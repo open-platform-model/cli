@@ -3856,3 +3856,434 @@ Plain sentences copied unchanged, with no keyword, into a body that carries a ke
 | The directory may be a standalone CUE module or a package inside another CUE module, such as an instance directory within a module tree. | "`opm instance build` takes one positional argument naming an instance" |
 | 2. Otherwise, an argument whose first element contains a dot is a published module path. (and list items 1 and 3) | "`opm module build` classifies its argument as a local directory or a published module path before any registry access" |
 | This covers a missing kubeconfig, an unreachable `kind-opm-dev` context, and an applier-grant check that could not be performed. | "A cluster-required run fails every precondition that would skip" |
+
+### Ledger: inst-commands, instance cluster-query commands accept an instance identifier as positional argument
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "Instance cluster-query commands take one instance identifier, detected as a path, a UUID or a name from its shape", "A path identifier is acquired through the library kernel and the `--namespace` flag overrides the namespace in the file", "A path identifier whose package is not a valid instance is refused with exit code 1".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| status by instance name | "Instance cluster-query commands take one instance identifier, detected as a path, a UUID or a name from its shape", "status by instance name" | No (byte equal, checked) |
+| status by UUID | "Instance cluster-query commands take one instance identifier, detected as a path, a UUID or a name from its shape", "status by UUID" | No (byte equal, checked) |
+| status by instance path | "A path identifier is acquired through the library kernel and the `--namespace` flag overrides the namespace in the file", "status by instance path" | No (byte equal, checked) |
+| namespace flag overrides the file | "A path identifier is acquired through the library kernel and the `--namespace` flag overrides the namespace in the file", "namespace flag overrides the file" | No (byte equal, checked) |
+| path that is not a valid instance is refused | "A path identifier whose package is not a valid instance is refused with exit code 1", "path that is not a valid instance is refused" | No (byte equal, checked) |
+| delete by instance name | "Instance cluster-query commands take one instance identifier, detected as a path, a UUID or a name from its shape", "delete by instance name" | No (byte equal, checked) |
+| identifier auto-detection | "Instance cluster-query commands take one instance identifier, detected as a path, a UUID or a name from its shape", "identifier auto-detection" | No (byte equal, checked) |
+| a bare word is a name even when a directory of that name exists | "Instance cluster-query commands take one instance identifier, detected as a path, a UUID or a name from its shape", "a bare word is a name even when a directory of that name exists" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The cluster-query commands (`status`, `tree`, `events`, `delete`) unde... | body of "Instance cluster-query commands take one instance identifier, detected as a path, a UUID or a name from its shape" |
+| The CLI SHALL auto-detect whether the identifier is a path, a UUID or ... | body of "Instance cluster-query commands take one instance identifier, detected as a path, a UUID or a name from its shape" |
+| A path (an `instance.cue` file, or a directory holding one) SHALL be a... | body of "A path identifier is acquired through the library kernel and the `--namespace` flag overrides the namespace in the file" |
+| A path whose package is not a valid instance (wrong kind, no concrete ... | body of "A path identifier whose package is not a valid instance is refused with exit code 1" |
+
+Words changed or added: none; all three bodies are whole old sentences, unchanged.
+
+Lengths (old, new): old 840; new "Instance cluster-query commands take one instance identifier, detected as a path, a UUID or a name from its shape" 315; "A path identifier is acquired through the library kernel and the `--namespace` flag overrides the namespace in the file" 334; "A path identifier whose package is not a valid instance is refused with exit code 1" 189.
+
+### Ledger: inst-commands, instance render commands accept --platform flag
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "Instance render commands accept a `--platform <dir>` flag that names the highest-precedence platform source", "The platform is not specified in the instance file and there is no `--provider` flag".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| platform flag overrides the resolved platform source | "Instance render commands accept a `--platform <dir>` flag that names the highest-precedence platform source", "platform flag overrides the resolved platform source" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "There is no `--provider` flag on the render commands" in "The platform is not specified in the instance file and there is no `--provider` flag"
+
+| Old clause | New place |
+| --- | --- |
+| Render commands (`vet`, `build`, `apply`, `diff`) SHALL accept a `--pl... | body of "Instance render commands accept a `--platform <dir>` flag that names the highest-precedence platform source" |
+| The flag help SHALL say it overrides the cluster Platform and the inst... | body of "Instance render commands accept a `--platform <dir>` flag that names the highest-precedence platform source" |
+| The platform SHALL NOT be specified in the instance file, and there SH... | body of "The platform is not specified in the instance file and there is no `--provider` flag" |
+
+Words changed or added: none in the bodies; the second body ends with "(Requirement: <header of the first requirement>)", the named reference that gives "The platform" its render commands.
+
+Lengths (old, new): old 522; new "Instance render commands accept a `--platform <dir>` flag that names the highest-precedence platform source" 372; "The platform is not specified in the instance file and there is no `--provider` flag" 272.
+
+### Ledger: inst-commands, instance render commands refuse a namespace override that disagrees with the instance file
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`opm instance apply`, `build`, `diff` and `vet` refuse a namespace override that differs from the instance's `metadata.namespace`", "The namespace refusal names the source of the override, the override value, the instance's namespace and the instance argument", "An override equal to the instance's `metadata.namespace` is accepted and a configured or default namespace is not an override", "The `-n` help text of `opm instance apply`, `build`, `diff` and `vet` states the constraint on the value", "The module commands are unaffected by the namespace refusal of the instance render commands".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Flag equal to the file's namespace | "An override equal to the instance's `metadata.namespace` is accepted and a configured or default namespace is not an override", "Flag equal to the file's namespace" | No (byte equal, checked) |
+| Flag differs from the file's namespace | "`opm instance apply`, `build`, `diff` and `vet` refuse a namespace override that differs from the instance's `metadata.namespace`", "Flag differs from the file's namespace" | No (byte equal, checked) |
+| Environment variable differs from the file's namespace | "The namespace refusal names the source of the override, the override value, the instance's namespace and the instance argument", "Environment variable differs from the file's namespace" | No (byte equal, checked) |
+| Flag matches while OPM_NAMESPACE differs | "An override equal to the instance's `metadata.namespace` is accepted and a configured or default namespace is not an override", "Flag matches while OPM_NAMESPACE differs" | No (byte equal, checked) |
+| No override | "An override equal to the instance's `metadata.namespace` is accepted and a configured or default namespace is not an override", "No override" | No (byte equal, checked) |
+| Module path still honours the override | "The module commands are unaffected by the namespace refusal of the instance render commands", "Module path still honours the override" | No (byte equal, checked) |
+| Help text states the constraint | "The `-n` help text of `opm instance apply`, `build`, `diff` and `vet` states the constraint on the value", "Help text states the constraint" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The instance file owns its namespace: `metadata.namespace` is part of ... | body of "`opm instance apply`, `build`, `diff` and `vet` refuse a namespace override that differs from the instance's `metadata.namespace`" |
+| When `opm instance apply`, `build`, `diff` or `vet` resolves its names... | body of "`opm instance apply`, `build`, `diff` and `vet` refuse a namespace override that differs from the instance's `metadata.namespace`" |
+| The refusal SHALL name the source of the override (`--namespace` or `O... | body of "The namespace refusal names the source of the override, the override value, the instance's namespace and the instance argument" |
+| An override equal to `metadata.namespace` SHALL be accepted. | body of "An override equal to the instance's `metadata.namespace` is accepted and a configured or default namespace is not an override" |
+| A namespace that comes from `kubernetes.namespace` in `~/.opm/config.c... | body of "An override equal to the instance's `metadata.namespace` is accepted and a configured or default namespace is not an override" |
+| The `-n` help text of these four commands SHALL state that the value m... | body of "The `-n` help text of `opm instance apply`, `build`, `diff` and `vet` states the constraint on the value" |
+| The module commands (`opm module build`, `apply`, `vet`) SHALL be unaf... | body of "The module commands are unaffected by the namespace refusal of the instance render commands" |
+
+Words changed or added: four bodies end with "(Requirement: <header of the first requirement>)", the named reference that gives "The refusal", "An override", "these four commands" and "the override" their referent; "The module commands ... are unaffected" reads "SHALL be unaffected" (strength table).
+
+Lengths (old, new): old 1273; new "`opm instance apply`, `build`, `diff` and `vet` refuse a namespace override that differs from the instance's `metadata.namespace`" 435; "The namespace refusal names the source of the override, the override value, the instance's namespace and the instance argument" 427; "An override equal to the instance's `metadata.namespace` is accepted and a configured or default namespace is not an override" 400; "The `-n` help text of `opm instance apply`, `build`, `diff` and `vet` states the constraint on the value" 266; "The module commands are unaffected by the namespace refusal of the instance render commands" 326.
+
+### Ledger: inst-commands, Instance diff fails when a rendered resource could not be read
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`opm instance diff` treats a rendered resource it could not read or compare as a failure", "`opm instance diff` exits non-zero and prints no `No differences found` when a failure exists", "`opm instance diff` keeps NotFound as a new resource, behaves as before with no failure and warns on an unreadable tracked resource".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Every rendered resource is unreadable | "`opm instance diff` exits non-zero and prints no `No differences found` when a failure exists", "Every rendered resource is unreadable" | No (byte equal, checked) |
+| One unreadable resource beside a modified one | "`opm instance diff` treats a rendered resource it could not read or compare as a failure", "One unreadable resource beside a modified one" | No (byte equal, checked) |
+| Failures of two classes | "`opm instance diff` exits non-zero and prints no `No differences found` when a failure exists", "Failures of two classes" | No (byte equal, checked) |
+| Unreadable tracked resource that is not rendered | "`opm instance diff` keeps NotFound as a new resource, behaves as before with no failure and warns on an unreadable tracked resource", "Unreadable tracked resource that is not rendered" | No (byte equal, checked) |
+| Nothing failed and nothing differs | "`opm instance diff` keeps NotFound as a new resource, behaves as before with no failure and warns on an unreadable tracked resource", "Nothing failed and nothing differs" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| `opm instance diff` SHALL treat a rendered resource whose live read fa... | body of "`opm instance diff` treats a rendered resource it could not read or compare as a failure" |
+| For each failure the command SHALL print an error that names the resou... | body of "`opm instance diff` treats a rendered resource it could not read or compare as a failure" |
+| The command SHALL still compare the resources it can read and SHALL pr... | body of "`opm instance diff` treats a rendered resource it could not read or compare as a failure" |
+| When at least one failure exists, the `opm instance diff` command SHAL... | body of "`opm instance diff` exits non-zero and prints no `No differences found` when a failure exists" |
+| A NotFound answer for a rendered resource SHALL still mean a new resou... | body of "`opm instance diff` keeps NotFound as a new resource, behaves as before with no failure and warns on an unreadable tracked resource" |
+| With no failure the `opm instance diff` command SHALL behave as before... | body of "`opm instance diff` keeps NotFound as a new resource, behaves as before with no failure and warns on an unreadable tracked resource" |
+| A tracked resource that orphan detection could not read stays a warnin... | body of "`opm instance diff` keeps NotFound as a new resource, behaves as before with no failure and warns on an unreadable tracked resource" |
+
+Words changed or added: "the command SHALL NOT print" reads "the `opm instance diff` command SHALL NOT print" and "the command SHALL behave as before" reads "the `opm instance diff` command SHALL behave as before" (subject of the old first sentence); the second body ends with "(Requirement: <header of the first requirement>)", the referent of "failure".
+
+Lengths (old, new): old 974; new "`opm instance diff` treats a rendered resource it could not read or compare as a failure" 388; "`opm instance diff` exits non-zero and prints no `No differences found` when a failure exists" 474; "`opm instance diff` keeps NotFound as a new resource, behaves as before with no failure and warns on an unreadable tracked resource" 254.
+
+### Ledger: kind-cluster-tasks, Cluster creation task
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`cluster:create` provisions a single-node kind cluster named by `CLUSTER_NAME` from `hack/kind-config.yaml`", "`cluster:create` selects the node image from the `K8S_VERSION` Taskfile variable".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Create cluster with defaults | "`cluster:create` provisions a single-node kind cluster named by `CLUSTER_NAME` from `hack/kind-config.yaml`", "Create cluster with defaults" | No (byte equal, checked) |
+| Create cluster with custom Kubernetes version | "`cluster:create` selects the node image from the `K8S_VERSION` Taskfile variable", "Create cluster with custom Kubernetes version" | No (byte equal, checked) |
+| Create cluster with custom name | "`cluster:create` provisions a single-node kind cluster named by `CLUSTER_NAME` from `hack/kind-config.yaml`", "Create cluster with custom name" | No (byte equal, checked) |
+| Kind not installed | "`cluster:create` provisions a single-node kind cluster named by `CLUSTER_NAME` from `hack/kind-config.yaml`", "Kind not installed" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The Taskfile SHALL provide a `cluster:create` task that provisions a s... | body of "`cluster:create` provisions a single-node kind cluster named by `CLUSTER_NAME` from `hack/kind-config.yaml`" |
+| The task SHALL use the `CLUSTER_NAME` Taskfile variable (default: `opm... | body of "`cluster:create` provisions a single-node kind cluster named by `CLUSTER_NAME` from `hack/kind-config.yaml`" |
+| The `cluster:create` task SHALL use the `K8S_VERSION` Taskfile variabl... | body of "`cluster:create` selects the node image from the `K8S_VERSION` Taskfile variable" |
+| Developers MAY override this to test against a different Kubernetes ve... | body of "`cluster:create` selects the node image from the `K8S_VERSION` Taskfile variable" |
+
+Words changed or added: "The task SHALL use the `K8S_VERSION`" reads "The `cluster:create` task SHALL use the `K8S_VERSION`" (subject of the old first sentence).
+
+Lengths (old, new): old 535; new "`cluster:create` provisions a single-node kind cluster named by `CLUSTER_NAME` from `hack/kind-config.yaml`" 313; "`cluster:create` selects the node image from the `K8S_VERSION` Taskfile variable" 238.
+
+### Ledger: kind-cluster-tasks, Operator install task needs no local registry
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The `cluster:operator` task installs the pinned operator without requiring a local registry container", "The `cluster:operator` task remains idempotent and applies the cluster `Platform` singleton and the dev-only RBAC grant", "The `cluster:operator` task confirms the operator can serve the cluster by waiting for `Ready` of the Platform's current generation", "A `Ready=True` observed for an earlier generation does not satisfy the wait of `cluster:operator`", "The `cluster:operator` task fails when `Ready` is not `True` for the current generation and prints the Platform's state".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Install with no registry container running | "The `cluster:operator` task installs the pinned operator without requiring a local registry container", "Install with no registry container running" | No (byte equal, checked) |
+| Re-run is a no-op | "The `cluster:operator` task remains idempotent and applies the cluster `Platform` singleton and the dev-only RBAC grant", "Re-run is a no-op" | No (byte equal, checked) |
+| Operator that cannot build the Platform | "The `cluster:operator` task fails when `Ready` is not `True` for the current generation and prints the Platform's state", "Operator that cannot build the Platform" | No (byte equal, checked) |
+| Ready left over from an earlier generation | "A `Ready=True` observed for an earlier generation does not satisfy the wait of `cluster:operator`", "Ready left over from an earlier generation" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "Ready for the current generation confirms the operator can serve the cluster" in "The `cluster:operator` task confirms the operator can serve the cluster by waiting for `Ready` of the Platform's current generation"
+
+| Old clause | New place |
+| --- | --- |
+| The `cluster:operator` task SHALL install the pinned operator into the... | body of "The `cluster:operator` task installs the pinned operator without requiring a local registry container" |
+| Everything the flow resolves: core, the catalogs, and this repository'... | body of "The `cluster:operator` task installs the pinned operator without requiring a local registry container" |
+| The `cluster:operator` task SHALL remain idempotent, SHALL apply the c... | body of "The `cluster:operator` task remains idempotent and applies the cluster `Platform` singleton and the dev-only RBAC grant" |
+| The `cluster:operator` task SHALL confirm the operator can actually se... | body of "The `cluster:operator` task confirms the operator can serve the cluster by waiting for `Ready` of the Platform's current generation" |
+| A `Ready=True` observed for an earlier generation (the Platform the in... | body of "A `Ready=True` observed for an earlier generation does not satisfy the wait of `cluster:operator`" |
+| If `Ready` is not `True` for the current generation within the task's ... | body of "The `cluster:operator` task fails when `Ready` is not `True` for the current generation and prints the Platform's state" |
+
+Words changed or added: the em-dashes of "Everything the flow resolves" read ":" and ","; the old second paragraph is cut at the list boundary after "the dev-only RBAC grant" into two bodies, each with the subject "The `cluster:operator` task" (copied from the first sentence), and the joining "and" falls at the cut; the two bodies about the wait end with "(Requirement: <header of the confirm requirement>)", the referent of "the wait".
+
+Lengths (old, new): old 1312; new "The `cluster:operator` task installs the pinned operator without requiring a local registry container" 372; "The `cluster:operator` task remains idempotent and applies the cluster `Platform` singleton and the dev-only RBAC grant" 126; "The `cluster:operator` task confirms the operator can serve the cluster by waiting for `Ready` of the Platform's current generation" 399; "A `Ready=True` observed for an earlier generation does not satisfy the wait of `cluster:operator`" 299; "The `cluster:operator` task fails when `Ready` is not `True` for the current generation and prints the Platform's state" 447.
+
+### Ledger: kind-cluster-tasks, Local registry is an explicit opt-in for the kind flow
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A local registry for the kind flow requires setting `KIND_CUE_REGISTRY` explicitly", "When `KIND_CUE_REGISTRY` is set the `cluster:operator` task verifies, joins and passes the registry mapping as a values file", "The operator's registry is a command-line flag rendered from the registry value, not an environment variable".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Opt-in with the registry running | "When `KIND_CUE_REGISTRY` is set the `cluster:operator` task verifies, joins and passes the registry mapping as a values file", "Opt-in with the registry running" | No (byte equal, checked) |
+| Opt-in without the registry running | "When `KIND_CUE_REGISTRY` is set the `cluster:operator` task verifies, joins and passes the registry mapping as a values file", "Opt-in without the registry running" | No (byte equal, checked) |
+| Default path reports its registry source | "A local registry for the kind flow requires setting `KIND_CUE_REGISTRY` explicitly", "Default path reports its registry source" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "A pod environment variable does not set the operator's registry" in "The operator's registry is a command-line flag rendered from the registry value, not an environment variable"
+
+| Old clause | New place |
+| --- | --- |
+| Pointing the kind flow at a local registry SHALL require setting `KIND... | body of "A local registry for the kind flow requires setting `KIND_CUE_REGISTRY` explicitly" |
+| That variable SHALL default to empty. | body of "A local registry for the kind flow requires setting `KIND_CUE_REGISTRY` explicitly" |
+| When it is unset the `cluster:operator` task SHALL pass no registry va... | body of "A local registry for the kind flow requires setting `KIND_CUE_REGISTRY` explicitly" |
+| The `cluster:operator` task SHALL NOT patch the operator Deployment. | body of "A local registry for the kind flow requires setting `KIND_CUE_REGISTRY` explicitly" |
+| When `KIND_CUE_REGISTRY` is set, and only then, the `cluster:operator`... | body of "When `KIND_CUE_REGISTRY` is set the `cluster:operator` task verifies, joins and passes the registry mapping as a values file" |
+| The operator's registry is a command-line flag the module renders from... | body of "The operator's registry is a command-line flag rendered from the registry value, not an environment variable" |
+| Setting either as a pod environment variable SHALL have no effect. | body of "The operator's registry is a command-line flag rendered from the registry value, not an environment variable" |
+
+Words changed or added: "the task" reads "the `cluster:operator` task" (the task the scenarios of this requirement name) and "it" reads `KIND_CUE_REGISTRY` in the second body; "Setting either as a pod environment variable has no effect" reads "SHALL have no effect" (strength table); two bodies end with "(Requirement: <header of the first requirement>)".
+
+Lengths (old, new): old 979; new "A local registry for the kind flow requires setting `KIND_CUE_REGISTRY` explicitly" 373; "When `KIND_CUE_REGISTRY` is set the `cluster:operator` task verifies, joins and passes the registry mapping as a values file" 448; "The operator's registry is a command-line flag rendered from the registry value, not an environment variable" 433.
+
+### Ledger: kind-cluster-tasks, cluster:operator builds the CLI it installs with
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The `cluster:operator` task depends on the build task so the CLI binary it invokes exists and is current", "The `cluster:operator` task succeeds from a clean checkout and is callable unattended".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Clean tree with no binary | "The `cluster:operator` task depends on the build task so the CLI binary it invokes exists and is current", "Clean tree with no binary" | No (byte equal, checked) |
+| Binary already current | "The `cluster:operator` task depends on the build task so the CLI binary it invokes exists and is current", "Binary already current" | No (byte equal, checked) |
+| Called unattended by a test cleanup | "The `cluster:operator` task succeeds from a clean checkout and is callable unattended", "Called unattended by a test cleanup" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The `cluster:operator` task SHALL ensure the CLI binary it invokes exi... | body of "The `cluster:operator` task depends on the build task so the CLI binary it invokes exists and is current" |
+| The dependency SHALL reuse the build task's existing up-to-date check,... | body of "The `cluster:operator` task depends on the build task so the CLI binary it invokes exists and is current" |
+| The `cluster:operator` task SHALL therefore succeed from a clean check... | body of "The `cluster:operator` task succeeds from a clean checkout and is callable unattended" |
+
+Words changed or added: the em-dash of "callable unattended" reads ":"; the second body ends with "(Requirement: <header of the first requirement>)", the referent of "therefore"; the line wraps of the old text are joined.
+
+Lengths (old, new): old 613; new "The `cluster:operator` task depends on the build task so the CLI binary it invokes exists and is current" 342; "The `cluster:operator` task succeeds from a clean checkout and is callable unattended" 408.
+
+### Ledger: mod-vet, mod vet command validates module without generating manifests
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`opm mod vet` validates values against `#config` and renders the synthesized instance without outputting manifests", "`opm mod vet` accepts a module path argument and values flags for external values files", "`opm mod vet` takes its values from `debugValues` unless `-f` is provided".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Valid module passes validation using debugValues | "`opm mod vet` validates values against `#config` and renders the synthesized instance without outputting manifests", "Valid module passes validation using debugValues" | No (byte equal, checked) |
+| -f flag overrides debugValues | "`opm mod vet` takes its values from `debugValues` unless `-f` is provided", "-f flag overrides debugValues" | No (byte equal, checked) |
+| No debugValues and no -f flag | "`opm mod vet` takes its values from `debugValues` unless `-f` is provided", "No debugValues and no -f flag" | No (byte equal, checked) |
+| Open debugValues is refused at synthesis | "`opm mod vet` takes its values from `debugValues` unless `-f` is provided", "Open debugValues is refused at synthesis" | No (byte equal, checked) |
+| Values files against a module without #config | "`opm mod vet` takes its values from `debugValues` unless `-f` is provided", "Values files against a module without #config" | No (byte equal, checked) |
+| Module with CUE validation errors fails with details | "`opm mod vet` validates values against `#config` and renders the synthesized instance without outputting manifests", "Module with CUE validation errors fails with details" | No (byte equal, checked) |
+| Multiple values files with disallowed fields show per-file attribution | "`opm mod vet` accepts a module path argument and values flags for external values files", "Multiple values files with disallowed fields show per-file attribution" | No (byte equal, checked) |
+| Nested validation errors show full path with positions | "`opm mod vet` validates values against `#config` and renders the synthesized instance without outputting manifests", "Nested validation errors show full path with positions" | No (byte equal, checked) |
+| Multiple values files report schema errors and merge conflicts together | "`opm mod vet` accepts a module path argument and values flags for external values files", "Multiple values files report schema errors and merge conflicts together" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The `opm mod vet` command SHALL load the module directly, validate val... | body of "`opm mod vet` validates values against `#config` and renders the synthesized instance without outputting manifests" |
+| It SHALL NOT output manifests (YAML/JSON). | body of "`opm mod vet` validates values against `#config` and renders the synthesized instance without outputting manifests" |
+| Its purpose is a pass/fail verdict with clear diagnostics for module a... | body of "`opm mod vet` validates values against `#config` and renders the synthesized instance without outputting manifests" |
+| The `opm mod vet` command SHALL accept a module path argument (default... | body of "`opm mod vet` accepts a module path argument and values flags for external values files" |
+| When no `-f`/`--values` flag is provided, `opm mod vet` SHALL use the ... | body of "`opm mod vet` takes its values from `debugValues` unless `-f` is provided" |
+| If `-f` is provided, it SHALL override `debugValues` and use the speci... | body of "`opm mod vet` takes its values from `debugValues` unless `-f` is provided" |
+| If neither `debugValues` nor `-f` exists, the command SHALL return an ... | body of "`opm mod vet` takes its values from `debugValues` unless `-f` is provided" |
+
+Words changed or added: "The command SHALL accept" reads "The `opm mod vet` command SHALL accept" (subject of the old first sentence).
+
+Lengths (old, new): old 987; new "`opm mod vet` validates values against `#config` and renders the synthesized instance without outputting manifests" 465; "`opm mod vet` accepts a module path argument and values flags for external values files" 156; "`opm mod vet` takes its values from `debugValues` unless `-f` is provided" 378.
+
+### Ledger: mod-vet, mod vet command flags and syntax
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`opm mod vet` accepts an optional module path argument and exposes `-f`/`--values`, `-n`/`--namespace`, `--name` and `--platform`", "`--instance-name` stays accepted as a deprecated alias of `--name` on `opm mod vet`".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Default flags match expected behavior | "`opm mod vet` accepts an optional module path argument and exposes `-f`/`--values`, `-n`/`--namespace`, `--name` and `--platform`", "Default flags match expected behavior" | No (byte equal, checked) |
+| Name flag sets the synthesized instance name | "`opm mod vet` accepts an optional module path argument and exposes `-f`/`--values`, `-n`/`--namespace`, `--name` and `--platform`", "Name flag sets the synthesized instance name" | No (byte equal, checked) |
+| Deprecated alias keeps working | "`--instance-name` stays accepted as a deprecated alias of `--name` on `opm mod vet`", "Deprecated alias keeps working" | No (byte equal, checked) |
+| Both spellings together are refused | "`--instance-name` stays accepted as a deprecated alias of `--name` on `opm mod vet`", "Both spellings together are refused" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "Command syntax" in "`opm mod vet` accepts an optional module path argument and exposes `-f`/`--values`, `-n`/`--namespace`, `--name` and `--platform`"
+
+| Old clause | New place |
+| --- | --- |
+| The `opm mod vet` command SHALL accept an optional module path argumen... | body of "`opm mod vet` accepts an optional module path argument and exposes `-f`/`--values`, `-n`/`--namespace`, `--name` and `--platform`" |
+| All four affect the verdict: `-f` selects the values, `-n` and `--name... | body of "`opm mod vet` accepts an optional module path argument and exposes `-f`/`--values`, `-n`/`--namespace`, `--name` and `--platform`" |
+| The syntax is shown in the scenario `Command syntax`. | body of "`opm mod vet` accepts an optional module path argument and exposes `-f`/`--values`, `-n`/`--namespace`, `--name` and `--platform`" |
+| `--instance-name` SHALL stay accepted as a deprecated alias of `--name... | body of "`--instance-name` stays accepted as a deprecated alias of `--name` on `opm mod vet`" |
+| It SHALL NOT appear in the command's help, and its use SHALL print one... | body of "`--instance-name` stays accepted as a deprecated alias of `--name` on `opm mod vet`" |
+| Passing both `--name` and `--instance-name` SHALL be a usage error, an... | body of "`--instance-name` stays accepted as a deprecated alias of `--name` on `opm mod vet`" |
+
+Words changed or added: the body ends with "The syntax is shown in the scenario `Command syntax`.", the pointer to the new scenario `Command syntax` that holds the fenced syntax block of the old body byte for byte, indented in a THEN line (the 15:15 and 18:25 rulings: a fenced layout moves into a THEN line when the body names the scenario);
+
+Lengths (old, new): old 755; new "`opm mod vet` accepts an optional module path argument and exposes `-f`/`--values`, `-n`/`--namespace`, `--name` and `--platform`" 488; "`--instance-name` stays accepted as a deprecated alias of `--name` on `opm mod vet`" 320.
+
+### Ledger: mod-vet, mod vet exit codes
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`opm mod vet` signals its verdict through the process exit code", "`opm mod vet` maps a failed core-schema fetch as `opm module publish` does and prints the login hint on a refusal".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Exit code 0 on success | "`opm mod vet` signals its verdict through the process exit code", "Exit code 0 on success" | No (byte equal, checked) |
+| Exit code 2 on validation failure | "`opm mod vet` signals its verdict through the process exit code", "Exit code 2 on validation failure" | No (byte equal, checked) |
+| Exit code 2 on render refusal | "`opm mod vet` signals its verdict through the process exit code", "Exit code 2 on render refusal" | No (byte equal, checked) |
+| Exit code 2 when no registry is configured | "`opm mod vet` signals its verdict through the process exit code", "Exit code 2 when no registry is configured" | No (byte equal, checked) |
+| Exit code 4 when the registry refuses the credentials | "`opm mod vet` maps a failed core-schema fetch as `opm module publish` does and prints the login hint on a refusal", "Exit code 4 when the registry refuses the credentials" | No (byte equal, checked) |
+| Exit code 3 when the registry is unreachable or fails | "`opm mod vet` signals its verdict through the process exit code", "Exit code 3 when the registry is unreachable or fails" | No (byte equal, checked) |
+| A 403 on the tag lookup reads as a failed registry operation | "`opm mod vet` maps a failed core-schema fetch as `opm module publish` does and prints the login hint on a refusal", "A 403 on the tag lookup reads as a failed registry operation" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "Exit code table" in "`opm mod vet` signals its verdict through the process exit code"
+
+| Old clause | New place |
+| --- | --- |
+| The `opm mod vet` command SHALL signal its verdict through the process... | body of "`opm mod vet` signals its verdict through the process exit code" |
+| The mapping of a failed core-schema fetch SHALL be the one `opm module... | body of "`opm mod vet` maps a failed core-schema fetch as `opm module publish` does and prints the login hint on a refusal" |
+
+Words changed or added: "as the table below details" reads "as the table in the scenario `Exit code table` details" (15:15 ruling: the rule table moves into the THEN of the scenario `Exit code table`, byte for byte as old rows); the second body ends with "(Requirement: <header of the first requirement>)", the referent of the core-schema fetch.
+
+Lengths (old, new): old 1340; new "`opm mod vet` signals its verdict through the process exit code" 488; "`opm mod vet` maps a failed core-schema fetch as `opm module publish` does and prints the login hint on a refusal" 228.
+
+### Ledger: mod-vet, Identity and coordinate checks before values validation
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`opm module vet` verifies the identity package, the derived coordinates and the `cue.mod` module line before values resolution", "Failures of the identity and coordinate checks report as validation errors with exit code 2 even without `debugValues`".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Coordinate drift caught at vet | "Failures of the identity and coordinate checks report as validation errors with exit code 2 even without `debugValues`", "Coordinate drift caught at vet" | No (byte equal, checked) |
+| Replaced derivation caught at vet | "`opm module vet` verifies the identity package, the derived coordinates and the `cue.mod` module line before values resolution", "Replaced derivation caught at vet" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| `opm module vet` SHALL, after loading the module and before values res... | body of "`opm module vet` verifies the identity package, the derived coordinates and the `cue.mod` module line before values resolution" |
+| Failures SHALL report through the standard validation-error rendering ... | body of "Failures of the identity and coordinate checks report as validation errors with exit code 2 even without `debugValues`" |
+
+Words changed or added: the second body ends with "(Requirement: <header of the first requirement>)", the referent of "Failures".
+
+Lengths (old, new): old 569; new "`opm module vet` verifies the identity package, the derived coordinates and the `cue.mod` module line before values resolution" 348; "Failures of the identity and coordinate checks report as validation errors with exit code 2 even without `debugValues`" 362.
+
+### Ledger: catalog-compatibility, Compatibility Comparison
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`internal/compat.Check` reports every violation of the additive-only rule", "The comparison is a field-wise walk and not a single subsumption call", "Each violation carries the dotted path from the compared root and a stable kind discriminator", "A field that was optional and is required in the new definition reports `field made required`", "A defaulted field that loses its default and the reverse transition do not report `field made required`", "A default is compared only where an author wrote one, and the implicit default of a plain open list is not compared", "An open list's value domain is still judged at the leaf", "The default rule is applied to each pair of an open list's fixed elements", "The walk applies the provenance denylist at every depth", "Lists whose two sides have equal length are walked element-wise and lists of unequal length are judged as a leaf", "A leaf whose emitted syntax is identical on both sides reports nothing".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Field removal reported | "`internal/compat.Check` reports every violation of the additive-only rule", "Field removal reported" | No (byte equal, checked) |
+| Strict field addition reported | "`internal/compat.Check` reports every violation of the additive-only rule", "Strict field addition reported" | No (byte equal, checked) |
+| Field made required reported | "A field that was optional and is required in the new definition reports `field made required`", "Field made required reported" | No (byte equal, checked) |
+| Implicit open-list default is not compared | "A default is compared only where an author wrote one, and the implicit default of a plain open list is not compared", "Implicit open-list default is not compared" | No (byte equal, checked) |
+| Open list narrowed reports only the narrowing | "An open list's value domain is still judged at the leaf", "Open list narrowed reports only the narrowing" | No (byte equal, checked) |
+| Authored list default is still compared | "A default is compared only where an author wrote one, and the implicit default of a plain open list is not compared", "Authored list default is still compared" | No (byte equal, checked) |
+| Default inside an open list's fixed element is compared | "The default rule is applied to each pair of an open list's fixed elements", "Default inside an open list's fixed element is compared" | No (byte equal, checked) |
+| Default change reported with both values | "Each violation carries the dotted path from the compared root and a stable kind discriminator", "Default change reported with both values" | No (byte equal, checked) |
+| Domain narrowing reported at a leaf | "The comparison is a field-wise walk and not a single subsumption call", "Domain narrowing reported at a leaf" | No (byte equal, checked) |
+| Additive widening passes | "`internal/compat.Check` reports every violation of the additive-only rule", "Additive widening passes" | No (byte equal, checked) |
+| Provenance inside a member reference is ignored | "The walk applies the provenance denylist at every depth", "Provenance inside a member reference is ignored" | No (byte equal, checked) |
+| Unchanged guarded leaf is silent | "A leaf whose emitted syntax is identical on both sides reports nothing", "Unchanged guarded leaf is silent" | No (byte equal, checked) |
+| Equal-length lists are walked | "Lists whose two sides have equal length are walked element-wise and lists of unequal length are judged as a leaf", "Equal-length lists are walked" | No (byte equal, checked) |
+| Unequal-length lists are a leaf | "Lists whose two sides have equal length are walked element-wise and lists of unequal length are judged as a leaf", "Unequal-length lists are a leaf" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "A defaulted field that loses its default reports `default removed`, not `field made required`" in "A defaulted field that loses its default and the reverse transition do not report `field made required`"
+
+| Old clause | New place |
+| --- | --- |
+| The CLI SHALL provide a pure comparison (`internal/compat.Check`) that... | body of "`internal/compat.Check` reports every violation of the additive-only rule" |
+| The comparison (`internal/compat.Check`) SHALL be a field-wise walk: s... | body of "The comparison is a field-wise walk and not a single subsumption call" |
+| Each violation SHALL carry the dotted path from the compared root and ... | body of "Each violation carries the dotted path from the compared root and a stable kind discriminator" |
+| A field is "required" for this rule when it carries the required const... | body of "A field that was optional and is required in the new definition reports `field made required`" |
+| A field that carried the optional constraint (`?`) in the prior defini... | body of "A field that was optional and is required in the new definition reports `field made required`" |
+| A defaulted field that loses its default is the default rule's finding... | body of "A defaulted field that loses its default and the reverse transition do not report `field made required`" |
+| The reverse transition (required to optional, or an optional field gai... | body of "A defaulted field that loses its default and the reverse transition do not report `field made required`" |
+| A default is compared only where an author wrote one: a value whose di... | body of "A default is compared only where an author wrote one, and the implicit default of a plain open list is not compared" |
+| The implicit default CUE gives a plain open list (the list closed at i... | body of "A default is compared only where an author wrote one, and the implicit default of a plain open list is not compared" |
+| An open list's value domain SHALL still be judged at the leaf, so narr... | body of "An open list's value domain is still judged at the leaf" |
+| Defaults written inside an open list's fixed elements (`[*"a" \| string... | body of "The default rule is applied to each pair of an open list's fixed elements" |
+| The walk SHALL apply the provenance denylist of enhancement 0010 at ev... | body of "The walk applies the provenance denylist at every depth" |
+| Lists whose two sides have equal length SHALL be walked element-wise s... | body of "Lists whose two sides have equal length are walked element-wise and lists of unequal length are judged as a leaf" |
+| A leaf whose emitted syntax is identical on both sides SHALL report no... | body of "A leaf whose emitted syntax is identical on both sides reports nothing" |
+
+Words changed or added: "The comparison SHALL be" reads "The comparison (`internal/compat.Check`) SHALL be" (subject of the old first sentence); the em-dashes of that sentence read ":" and ","; "An open list's value domain is still judged" reads "SHALL still be judged" (strength table); the bodies for the violation, the made-required kind, the loss of a default, the open list, the walk and the leaf end with "(Requirement: <header>)", the named reference that gives "Each violation", "this rule", "this one's", "The walk", "that rule" and "the default rule" their referent.
+
+Lengths (old, new): old 2972; new "`internal/compat.Check` reports every violation of the additive-only rule" 434; "The comparison is a field-wise walk and not a single subsumption call" 423; "Each violation carries the dotted path from the compared root and a stable kind discriminator" 258; "A field that was optional and is required in the new definition reports `field made required`" 424; "A defaulted field that loses its default and the reverse transition do not report `field made required`" 330; "A default is compared only where an author wrote one, and the implicit default of a plain open list is not compared" 454; "An open list's value domain is still judged at the leaf" 244; "The default rule is applied to each pair of an open list's fixed elements" 442; "The walk applies the provenance denylist at every depth" 476; "Lists whose two sides have equal length are walked element-wise and lists of unequal length are judged as a leaf" 225; "A leaf whose emitted syntax is identical on both sides reports nothing" 161.
+
+### Ledger: catalog-compatibility, Level Classification
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The CLI classifies a primitive's `apiVersion` on the `vNalphaM | vNbetaM | vN` ladder, exposes whether a level is enforced and pins the grammar against core", "The level-aware entry point `CheckAtLevel` returns no violations for an alpha `apiVersion` and an error for an `apiVersion` the grammar rejects", "The CLI provides a total, transitive ordering over valid `apiVersion` strings".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Alpha is not gated | "The level-aware entry point `CheckAtLevel` returns no violations for an alpha `apiVersion` and an error for an `apiVersion` the grammar rejects", "Alpha is not gated" | No (byte equal, checked) |
+| Beta and GA are gated | "The CLI classifies a primitive's `apiVersion` on the `vNalphaM | vNbetaM | vN` ladder, exposes whether a level is enforced and pins the grammar against core", "Beta and GA are gated" | No (byte equal, checked) |
+| Unparseable apiVersion is an error | "The level-aware entry point `CheckAtLevel` returns no violations for an alpha `apiVersion` and an error for an `apiVersion` the grammar rejects", "Unparseable apiVersion is an error" | No (byte equal, checked) |
+| Ordering is transitive | "The CLI provides a total, transitive ordering over valid `apiVersion` strings", "Ordering is transitive" | No (byte equal, checked) |
+| Grammar parity with core is pinned | "The CLI classifies a primitive's `apiVersion` on the `vNalphaM | vNbetaM | vN` ladder, exposes whether a level is enforced and pins the grammar against core", "Grammar parity with core is pinned" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The CLI SHALL classify a primitive's `apiVersion` on the `vNalphaM \| v... | body of "The CLI classifies a primitive's `apiVersion` on the `vNalphaM | vNbetaM | vN` ladder, exposes whether a level is enforced and pins the grammar against core" |
+| The grammar SHALL be pinned against core's own declaration by a parity... | body of "The CLI classifies a primitive's `apiVersion` on the `vNalphaM | vNbetaM | vN` ladder, exposes whether a level is enforced and pins the grammar against core" |
+| The level-aware entry point (`CheckAtLevel`) SHALL return no violation... | body of "The level-aware entry point `CheckAtLevel` returns no violations for an alpha `apiVersion` and an error for an `apiVersion` the grammar rejects" |
+| The CLI SHALL provide a total, transitive ordering over valid `apiVers... | body of "The CLI provides a total, transitive ordering over valid `apiVersion` strings" |
+
+Words changed or added: the em-dashes of "an error, not a violation" read ","; "The grammar SHALL be pinned" is moved next to the sentence that defines "the grammar" (the first sentence).
+
+Lengths (old, new): old 775; new "The CLI classifies a primitive's `apiVersion` on the `vNalphaM | vNbetaM | vN` ladder, exposes whether a level is enforced and pins the grammar against core" 437; "The level-aware entry point `CheckAtLevel` returns no violations for an alpha `apiVersion` and an error for an `apiVersion` the grammar rejects" 228; "The CLI provides a total, transitive ordering over valid `apiVersion` strings" 106.
+
+### Ledger: catalog-compatibility, Template Version Selection
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The CLI provides a stable-preferring version selector over a published-version list that is pure", "The stable-preferring version selector is not exported and is not the compatibility gate's predecessor selection", "The publish gate's predecessor is found by the literal backward scan of the published history", "The literal predecessor rule is implemented in `internal/publish` over the registry's version enumeration", "The documentation of the selector states how it differs from the predecessor selection of the publish gate".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Stable preferred over higher prerelease | "The CLI provides a stable-preferring version selector over a published-version list that is pure", "Stable preferred over higher prerelease" | No (byte equal, checked) |
+| Prerelease-only fallback | "The CLI provides a stable-preferring version selector over a published-version list that is pure", "Prerelease-only fallback" | No (byte equal, checked) |
+| Unparseable entry is skipped | "The CLI provides a stable-preferring version selector over a published-version list that is pure", "Unparseable entry is skipped" | No (byte equal, checked) |
+| The gate does not use it | "The publish gate's predecessor is found by the literal backward scan of the published history", "The gate does not use it" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "The selector is not exported and is not in the compatibility package" in "The stable-preferring version selector is not exported and is not the compatibility gate's predecessor selection"
+- "The literal predecessor rule is implemented in `internal/publish`" in "The literal predecessor rule is implemented in `internal/publish` over the registry's version enumeration"
+- "The selector documentation states the distinction" in "The documentation of the selector states how it differs from the predecessor selection of the publish gate"
+
+| Old clause | New place |
+| --- | --- |
+| The CLI SHALL provide a stable-preferring version selector over a publ... | body of "The CLI provides a stable-preferring version selector over a published-version list that is pure" |
+| Selection SHALL be pure: enumeration and fetching are the caller's. | body of "The CLI provides a stable-preferring version selector over a published-version list that is pure" |
+| The selector SHALL NOT be exported: template resolution is its only ca... | body of "The stable-preferring version selector is not exported and is not the compatibility gate's predecessor selection" |
+| This selector is NOT the compatibility gate's predecessor selection, a... | body of "The stable-preferring version selector is not exported and is not the compatibility gate's predecessor selection" |
+| Enhancement 0011 ("Predecessor selection is D9's literal rule: a backw... | body of "The publish gate's predecessor is found by the literal backward scan of the published history" |
+| Enhancement 0011 ("Predecessor selection is D9's literal rule: a backw... | body of "The literal predecessor rule is implemented in `internal/publish` over the registry's version enumeration" |
+| A stable-preferring selector coincides with that rule only on a prerel... | body of "The documentation of the selector states how it differs from the predecessor selection of the publish gate" |
+| The documentation of the selector SHALL state this distinction, becaus... | body of "The documentation of the selector states how it differs from the predecessor selection of the publish gate" |
+
+Words changed or added: the em-dash of "Selection SHALL be pure" reads ":"; the long sentence about enhancement 0011 is cut at the list boundary of its dash list: the first body ends after the scan list (its em-dash reads ":"), the second body repeats the subject up to "the literal rule" and takes "implemented in `internal/publish` ..." (its em-dash reads ","), and the third body takes the part after the semicolon as a sentence ("a stable-preferring selector" reads "A stable-preferring selector"); "is found" reads "SHALL be found" in both bodies that repeat the subject (strength table); the last body ends with "(Requirement: <header of the first 0011 requirement>)", the referent of "that rule".
+
+Lengths (old, new): old 1504; new "The CLI provides a stable-preferring version selector over a published-version list that is pure" 435; "The stable-preferring version selector is not exported and is not the compatibility gate's predecessor selection" 193; "The publish gate's predecessor is found by the literal backward scan of the published history" 473; "The literal predecessor rule is implemented in `internal/publish` over the registry's version enumeration" 350; "The documentation of the selector states how it differs from the predecessor selection of the publish gate" 437.
+
+### Strength table of cli-B5 unit 5b
+
+Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text:
+
+| Old sentence | New body | Word added |
+| --- | --- | --- |
+| The module commands (`opm module build`, `apply`, `vet`) are unaffected: they synthesize the instance in the override namespace, so the override and `metadata.namespace` agree. | "The module commands are unaffected by the namespace refusal of the instance render commands" | "are unaffected" reads "SHALL be unaffected" |
+| Setting either as a pod environment variable has no effect. | "The operator's registry is a command-line flag rendered from the registry value, not an environment variable" | "has no effect" reads "SHALL have no effect" |
+| An open list's value domain is still judged at the leaf, so narrowing it keeps reporting `domain narrowed`. | "An open list's value domain is still judged at the leaf" | "is still judged" reads "SHALL still be judged" |
+| Enhancement 0011 (...) settled that the publish gate's predecessor is found by the literal rule ... | "The publish gate's predecessor is found by the literal backward scan of the published history" | "is found" reads "SHALL be found" |
+| Enhancement 0011 (...) settled that the publish gate's predecessor is found by the literal rule ... implemented in `internal/publish` over the registry's version enumeration | "The literal predecessor rule is implemented in `internal/publish` over the registry's version enumeration" | "is found" reads "SHALL be found" |
+
+Plain sentences copied unchanged, with no keyword, into a body that carries a keyword in another sentence:
+
+| Old sentence | New body |
+| --- | --- |
+| The instance file owns its namespace: `metadata.namespace` is part of the instance's identity. | "`opm instance apply`, `build`, `diff` and `vet` refuse a namespace override that differs from the instance's `metadata.namespace`" |
+| A tracked resource that orphan detection could not read stays a warning that does not change the exit code. | "`opm instance diff` keeps NotFound as a new resource, behaves as before with no failure and warns on an unreadable tracked resource" |
+| Everything the flow resolves: core, the catalogs, and this repository's fixture modules, is published on GHCR, and the pinned operator's built-in `--registry` default routes both `opmodel.dev/*` and `testing.opmodel.dev/*` there. | "The `cluster:operator` task installs the pinned operator without requiring a local registry container" |
+| The operator's registry is a command-line flag the module renders from that value, not an environment variable: `--registry` wins over `OPM_REGISTRY`, which is read only when the flag is empty, and the operator overwrites `CUE_REGISTRY` in its own process environment. | "The operator's registry is a command-line flag rendered from the registry value, not an environment variable" |
+| Its purpose is a pass/fail verdict with clear diagnostics for module authors: identity, values, and whether the module's components render with the catalogs it declares. | "`opm mod vet` validates values against `#config` and renders the synthesized instance without outputting manifests" |
+| All four affect the verdict: `-f` selects the values, `-n` and `--name` set the synthesized instance's namespace and name for the render, and `--platform` renders against that platform module instead of the module-deps platform. | "`opm mod vet` accepts an optional module path argument and exposes `-f`/`--values`, `-n`/`--namespace`, `--name` and `--platform`" |
+| A field is "required" for this rule when it carries the required constraint (`!`) or is a regular field with no default. | "A field that was optional and is required in the new definition reports `field made required`" |
+| A defaulted field that loses its default is the default rule's finding (`default removed`), not this one's. | "A defaulted field that loses its default and the reverse transition do not report `field made required`" |
+| A default is compared only where an author wrote one: a value whose disjunction marks a default with `*`. | "A default is compared only where an author wrote one, and the implicit default of a plain open list is not compared" |
+| A stable-preferring selector coincides with that rule only on a prerelease-only history and would miss breaks that prerelease pinners (blessed by enhancement 0010: a subscription names exactly one catalog build) can see. | "The documentation of the selector states how it differs from the predecessor selection of the publish gate" |
