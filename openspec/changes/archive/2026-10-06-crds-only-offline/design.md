@@ -33,7 +33,7 @@ namespace, no values, deps-only) and keeps the `CustomResourceDefinition` object
 `config/crd/bases` files do not. With those labels:
 
 - the apply guard of a later full install accepts the existing CRDs as OPM's;
-- the CRDs-only and full CRD steps apply the same objects, so revised enhancement 0021 ("The operator's install artifact is a registry module on its own version train") ("the same CRDs the full install of
+- the CRDs-only and full CRD steps apply the same objects, so revised enhancement 0021, which says "the same CRDs the full install of
   that version applies, without reaching a registry or reading the controller's instance") holds for the pinned
   version.
 

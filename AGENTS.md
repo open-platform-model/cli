@@ -64,10 +64,10 @@ internal/dockercfg/        read-modify-write of the docker credential file (`reg
 internal/exit/             exit codes: 0 ok, 1 general, 2 validation, 3 connectivity, 4 permission, 5 not found
 internal/instinit/         the `opm instance init` package generator
 internal/inventory/        instance inventory records, ownership, discovery and prune gates
+internal/controller/       `opm controller install` and `uninstall`; its pin file is written by `hack/controller-pin`
 internal/kubernetes/       cluster ops: status, apply, delete, events
 internal/modref/           published-module resolution: path grammar, `--version` selector, core-compatible walk;
                            apart from `scaffold` because their template grammar and selector differ on purpose
-internal/controller/         `opm controller install` and `uninstall`; its pin file is written by `hack/controller-pin`
 internal/output/           terminal formatting, log output, tables, manifests
 internal/platform/         platform-source resolution and the Platform seed for `controller install`
 internal/publish/          identity-driven publish pipeline: gates, refusals, plan, registry push
@@ -78,7 +78,7 @@ pkg/errors/                shared structured errors; import as `oerrors`
 pkg/loader/                local-replacement provenance (module root, local-module replacements)
 templates/                 official template modules (`minimal`, `standard`, `advanced`)
 hack/docskit-dump/         program docs-kit runs for the command reference; not linked into `opm`
-hack/controller-pin/         writes the controller pin file; not linked into `opm`
+hack/controller-pin/       writes the controller pin file; not linked into `opm`
 hack/platform/             maintained platform module for offline tests
 tests/fixtures/            fixture modules on `testing.opmodel.dev`; `tests/e2e/` end-to-end Go tests
 tests/integration/         integration programs run with `go run`
