@@ -6,7 +6,7 @@ CRDs-only install is the bootstrap for clusters where the CLI drives module life
 the offline installer (opm-suite-installer) runs it under a no-network rule: there it cannot reach a registry at all.
 The owner decided on 2026-10-06 that the CRDs-only form works fully offline from CRDs the CLI carries, pinned with the
 controller module, while every other install path stays module-based. Enhancement 0021 records it as revised
-0021:D11:R1 and 0021:D11:R7 (revised 2026-10-06).
+enhancement 0021 (revised 2026-10-06).
 
 ## What Changes
 
@@ -53,9 +53,9 @@ None.
   directory.
 - `.github/workflows/pr.yml`'s integration job keeps running `opm controller install --crds-only`; it now needs no
   registry for that step.
-- Delivers the cli side of 0021:D11:R1/R7 (revised 2026-10-06): the CLI carries no controller manifest beyond the CRDs
+- Delivers the cli side of enhancement 0021 ("The operator's install artifact is a registry module on its own version train") (revised 2026-10-06): the CLI carries no controller manifest beyond the CRDs
   of its pinned module version, and the CRDs-only form applies them without a registry or the controller's instance.
-  The change depends on the revised 0021:D11 reaching enhancements main.
+  The change depends on the revised enhancement 0021 ("The operator's install artifact is a registry module on its own version train") reaching enhancements main.
 
 ## Enhancement
 

@@ -107,7 +107,7 @@ Instance ownership SHALL be determined from the `ModuleInstance` CR's `spec.owne
 
 ### Requirement: One tool owns an instance at a time
 
-The CLI and the controller SHALL treat ownership as exclusive, coordinated through the `ModuleInstance` CR's `spec.owner` field. The CLI MUST NOT act as the resource reconciler (apply, prune, inventory write, status write) for an instance whose `spec.owner` is not `cli`. The controller skips render/apply/prune for `spec.owner: cli` instances (controller-side contract, enhancement 0006 D3/A4).
+The CLI and the controller SHALL treat ownership as exclusive, coordinated through the `ModuleInstance` CR's `spec.owner` field. The CLI MUST NOT act as the resource reconciler (apply, prune, inventory write, status write) for an instance whose `spec.owner` is not `cli`. The controller skips render/apply/prune for `spec.owner: cli` instances (controller-side contract, enhancement 0006).
 
 #### Scenario: CLI sees controller-owned instance
 
