@@ -4287,3 +4287,430 @@ Plain sentences copied unchanged, with no keyword, into a body that carries a ke
 | A defaulted field that loses its default is the default rule's finding (`default removed`), not this one's. | "A defaulted field that loses its default and the reverse transition do not report `field made required`" |
 | A default is compared only where an author wrote one: a value whose disjunction marks a default with `*`. | "A default is compared only where an author wrote one, and the implicit default of a plain open list is not compared" |
 | A stable-preferring selector coincides with that rule only on a prerelease-only history and would miss breaks that prerelease pinners (blessed by enhancement 0010: a subscription names exactly one catalog build) can see. | "The documentation of the selector states how it differs from the predecessor selection of the publish gate" |
+
+
+## Ledger entries of cli-B6, unit 6a (published-module-resolution, template-modules, dependency-tidy, e2e-cluster-workflow)
+
+### Ledger: published-module-resolution, A published module is named by a major-free module path
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A published module path is a CUE module path without a major suffix and the version selector chooses the major", "A published module path with an `@` suffix or a URL scheme is refused with exit code 2".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Major suffix refused | "A published module path with an `@` suffix or a URL scheme is refused with exit code 2", "Major suffix refused" | No (byte equal, checked) |
+| OCI URL refused | "A published module path with an `@` suffix or a URL scheme is refused with exit code 2", "OCI URL refused" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "A major-free module path" in "A published module path is a CUE module path without a major suffix and the version selector chooses the major"
+
+| Old clause | New place |
+| --- | --- |
+| A published module path SHALL be a CUE module path without a major suf... | body of "A published module path is a CUE module path without a major suffix and the version selector chooses the major" |
+| Source line (whole) | body of "A published module path is a CUE module path without a major suffix and the version selector chooses the major (as `**Source**`)" |
+| A path carrying an `@` suffix SHALL be refused with exit code 2 before... | body of "A published module path with an `@` suffix or a URL scheme is refused with exit code 2" |
+| A path with a URL scheme (`oci://`, `https://`) SHALL be refused with ... | body of "A published module path with an `@` suffix or a URL scheme is refused with exit code 2" |
+| Source line (whole) | body of "A published module path with an `@` suffix or a URL scheme is refused with exit code 2 (as `**Source**`)" |
+
+Words changed or added: none.
+
+Lengths (old, new): old 886; new "A published module path is a CUE module path without a major suffix and the version selector chooses the major" 319; "A published module path with an `@` suffix or a URL scheme is refused with exit code 2" 384.
+
+### Ledger: published-module-resolution, The version selector floats within a major or pins a tag
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`--version` accepts exactly the forms `vN` and `X.Y.Z` or `X.Y.Z-<prerelease>` and any other value is refused with exit code 2", "The newest release within a major is the newest stable version, else the newest prerelease that is not a development build", "An exact pin names a published tag, development builds included, and a pin the registry does not hold is refused with exit code 2".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Major float prefers stable | "The newest release within a major is the newest stable version, else the newest prerelease that is not a development build", "Major float prefers stable" | No (byte equal, checked) |
+| Prerelease-only major | "The newest release within a major is the newest stable version, else the newest prerelease that is not a development build", "Prerelease-only major" | No (byte equal, checked) |
+| Exact pin | "An exact pin names a published tag, development builds included, and a pin the registry does not hold is refused with exit code 2", "Exact pin" | No (byte equal, checked) |
+| Malformed selector | "`--version` accepts exactly the forms `vN` and `X.Y.Z` or `X.Y.Z-<prerelease>` and any other value is refused with exit code 2", "Malformed selector" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| `--version` SHALL accept exactly two forms: `vN` (for example `v1`) se... | body of "`--version` accepts exactly the forms `vN` and `X.Y.Z` or `X.Y.Z-<prerelease>` and any other value is refused with exit code 2" |
+| Any other value, including `v1.0.4`, SHALL be refused with exit code 2... | body of "`--version` accepts exactly the forms `vN` and `X.Y.Z` or `X.Y.Z-<prerelease>` and any other value is refused with exit code 2" |
+| Source line (whole) | body of "`--version` accepts exactly the forms `vN` and `X.Y.Z` or `X.Y.Z-<prerelease>` and any other value is refused with exit code 2 (as `**Source**`)" |
+| The newest release within a major is the newest stable version; when t... | body of "The newest release within a major is the newest stable version, else the newest prerelease that is not a development build" |
+| Source line (whole) | body of "The newest release within a major is the newest stable version, else the newest prerelease that is not a development build (as `**Source**`)" |
+| An exact pin SHALL name a published tag, development builds included; ... | body of "An exact pin names a published tag, development builds included, and a pin the registry does not hold is refused with exit code 2" |
+| Source line (whole) | body of "An exact pin names a published tag, development builds included, and a pin the registry does not hold is refused with exit code 2 (as `**Source**`)" |
+
+Words changed or added: the body ends with "(Requirement: `--version` accepts exactly the forms `vN` and `X.Y.Z` or `X.Y.Z-<prerelease>` and any other value is refused with exit code 2)", the named reference that gives it its referent.
+
+Lengths (old, new): old 1093; new "`--version` accepts exactly the forms `vN` and `X.Y.Z` or `X.Y.Z-<prerelease>` and any other value is refused with exit code 2" 355; "The newest release within a major is the newest stable version, else the newest prerelease that is not a development build" 352; "An exact pin names a published tag, development builds included, and a pin the registry does not hold is refused with exit code 2" 350.
+
+### Ledger: published-module-resolution, No selector selects the highest core-compatible major
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "Without `--version` the command walks the majors from highest to lowest and selects the first major on the core major the CLI renders against", "A major with no selectable release, no core dependency or a different core major is skipped, and the command exits 2 when every major is skipped".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Newer major on an incompatible core is skipped | "A major with no selectable release, no core dependency or a different core major is skipped, and the command exits 2 when every major is skipped", "Newer major on an incompatible core is skipped" | No (byte equal, checked) |
+| Major without a core dependency is skipped | "A major with no selectable release, no core dependency or a different core major is skipped, and the command exits 2 when every major is skipped", "Major without a core dependency is skipped" | No (byte equal, checked) |
+| Nothing compatible | "A major with no selectable release, no core dependency or a different core major is skipped, and the command exits 2 when every major is skipped", "Nothing compatible" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "The first core-compatible major is selected" in "Without `--version` the command walks the majors from highest to lowest and selects the first major on the core major the CLI renders against"
+
+| Old clause | New place |
+| --- | --- |
+| Without `--version`, the command SHALL list the module's published ver... | body of "Without `--version` the command walks the majors from highest to lowest and selects the first major on the core major the CLI renders against" |
+| Source line (whole) | body of "Without `--version` the command walks the majors from highest to lowest and selects the first major on the core major the CLI renders against (as `**Source**`)" |
+| When every major is skipped, the command SHALL exit 2 naming each majo... | body of "A major with no selectable release, no core dependency or a different core major is skipped, and the command exits 2 when every major is skipped" |
+| A major is skipped when it holds no selectable release, declares no `o... | body of "A major with no selectable release, no core dependency or a different core major is skipped, and the command exits 2 when every major is skipped" |
+| Source line (whole) | body of "A major with no selectable release, no core dependency or a different core major is skipped, and the command exits 2 when every major is skipped (as `**Source**`)" |
+
+Words changed or added: the body ends with "(Requirement: Without `--version` the command walks the majors from highest to lowest and selects the first major on the core major the CLI renders against)", the named reference that gives it its referent.
+
+Lengths (old, new): old 804; new "Without `--version` the command walks the majors from highest to lowest and selects the first major on the core major the CLI renders against" 391; "A major with no selectable release, no core dependency or a different core major is skipped, and the command exits 2 when every major is skipped" 393.
+
+### Ledger: published-module-resolution, Resolution reports the choice and never corrupts command output
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "After resolving, the command reports the choice and the skipped higher majors on standard error", "Resolution routes through the CLI's registry configuration and the command exits 3 naming the module path and the registry when the registry cannot be reached".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Report names the selection | "After resolving, the command reports the choice and the skipped higher majors on standard error", "Report names the selection" | No (byte equal, checked) |
+| Unreachable registry | "Resolution routes through the CLI's registry configuration and the command exits 3 naming the module path and the registry when the registry cannot be reached", "Unreachable registry" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| After resolving, the command SHALL report one line naming the module p... | body of "After resolving, the command reports the choice and the skipped higher majors on standard error" |
+| Source line (whole) | body of "After resolving, the command reports the choice and the skipped higher majors on standard error (as `**Source**`)" |
+| Resolution SHALL route through the CLI's registry configuration (`--re... | body of "Resolution routes through the CLI's registry configuration and the command exits 3 naming the module path and the registry when the registry cannot be reached" |
+| Source line (whole) | body of "Resolution routes through the CLI's registry configuration and the command exits 3 naming the module path and the registry when the registry cannot be reached (as `**Source**`)" |
+
+Words changed or added: none.
+
+Lengths (old, new): old 812; new "After resolving, the command reports the choice and the skipped higher majors on standard error" 391; "Resolution routes through the CLI's registry configuration and the command exits 3 naming the module path and the registry when the registry cannot be reached" 238.
+
+### Ledger: template-modules, Templates are published modules in a reserved segment
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The official templates are real CUE modules published to the reserved `opmodel.dev/templates/<name>` segment through `opm module publish`", "A template passes `opm module vet` before it is published and a template that fails a gate or the vet fails the release", "The `templates` segment is module-kind and cli-CI-published only and no gate reserves a name within it", "Publish never skips an already-published tag and the release job invokes it only for the versions its gates found unpublished", "A template's tree is exactly the module that publishes", "The artifact published at a template's version holds exactly that template's tree and any change to the template bumps its identity `Version`", "A template's `Version` is a stable SemVer and its module path is `opmodel.dev/templates/<name>@v<major>`", "The cli's PR check and release job refuse a template that breaks the tree, bump, `Version` or module path rules", "A template's identity package declares `Version` as a concrete string literal and the template tree loads through the kernel's module loader unmodified".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Templates are gated artifacts | "A template passes `opm module vet` before it is published and a template that fails a gate or the vet fails the release", "Templates are gated artifacts" | No (byte equal, checked) |
+| Release job is idempotent by filtering | "Publish never skips an already-published tag and the release job invokes it only for the versions its gates found unpublished", "Release job is idempotent by filtering" | No (byte equal, checked) |
+| Template identity is a literal the kernel loads | "A template's identity package declares `Version` as a concrete string literal and the template tree loads through the kernel's module loader unmodified", "Template identity is a literal the kernel loads" | No (byte equal, checked) |
+| Template renders its own debugValues | "A template passes `opm module vet` before it is published and a template that fails a gate or the vet fails the release", "Template renders its own debugValues" | No (byte equal, checked) |
+| Template tree is exactly its published module | "The cli's PR check and release job refuse a template that breaks the tree, bump, `Version` or module path rules", "Template tree is exactly its published module" | No (byte equal, checked) |
+| Template version is the one init resolves | "The cli's PR check and release job refuse a template that breaks the tree, bump, `Version` or module path rules", "Template version is the one init resolves" | No (byte equal, checked) |
+| No name in the segment is reserved | "The `templates` segment is module-kind and cli-CI-published only and no gate reserves a name within it", "No name in the segment is reserved" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "Official templates are published through the release pipeline" in "The official templates are real CUE modules published to the reserved `opmodel.dev/templates/<name>` segment through `opm module publish`"
+- "A template tree holds only what its module zip keeps" in "A template's tree is exactly the module that publishes"
+- "A change to a template bumps its identity Version" in "The artifact published at a template's version holds exactly that template's tree and any change to the template bumps its identity `Version`"
+- "Template Version and module path" in "A template's `Version` is a stable SemVer and its module path is `opmodel.dev/templates/<name>@v<major>`"
+
+| Old clause | New place |
+| --- | --- |
+| The official templates, `minimal`, `standard`, `advanced`, SHALL be re... | body of "The official templates are real CUE modules published to the reserved `opmodel.dev/templates/<name>` segment through `opm module publish`" |
+| Source line (whole) | body of "The official templates are real CUE modules published to the reserved `opmodel.dev/templates/<name>` segment through `opm module publish` (as `**Source**`)" |
+| A template SHALL also pass `opm module vet` with its own `debugValues`... | body of "A template passes `opm module vet` before it is published and a template that fails a gate or the vet fails the release" |
+| Source line (whole) | body of "A template passes `opm module vet` before it is published and a template that fails a gate or the vet fails the release (as `**Source**`)" |
+| The segment is module-kind and cli-CI-published only. | body of "The `templates` segment is module-kind and cli-CI-published only and no gate reserves a name within it" |
+| No gate reserves a name within it: the publish gates admit any single-... | body of "The `templates` segment is module-kind and cli-CI-published only and no gate reserves a name within it" |
+| Source line (whole) | body of "The `templates` segment is module-kind and cli-CI-published only and no gate reserves a name within it (as `**Source**`)" |
+| Publish itself never skips an already-published tag; the release job S... | body of "Publish never skips an already-published tag and the release job invokes it only for the versions its gates found unpublished" |
+| Source line (whole) | body of "Publish never skips an already-published tag and the release job invokes it only for the versions its gates found unpublished (as `**Source**`)" |
+| A template's tree SHALL be exactly the module that publishes: it SHALL... | body of "A template's tree is exactly the module that publishes" |
+| Source line (whole) | body of "A template's tree is exactly the module that publishes (as `**Source**`)" |
+| Because published versions are immutable, the artifact published at a ... | body of "The artifact published at a template's version holds exactly that template's tree and any change to the template bumps its identity `Version`" |
+| Source line (whole) | body of "The artifact published at a template's version holds exactly that template's tree and any change to the template bumps its identity `Version` (as `**Source**`)" |
+| A template's `Version` SHALL be a stable SemVer, and SHALL be the high... | body of "A template's `Version` is a stable SemVer and its module path is `opmodel.dev/templates/<name>@v<major>`" |
+| Source line (whole) | body of "A template's `Version` is a stable SemVer and its module path is `opmodel.dev/templates/<name>@v<major>` (as `**Source**`)" |
+| The cli's PR check and release job refuse a template that breaks any o... | body of "The cli's PR check and release job refuse a template that breaks the tree, bump, `Version` or module path rules" |
+| Source line (whole) | body of "The cli's PR check and release job refuse a template that breaks the tree, bump, `Version` or module path rules (as `**Source**`)" |
+| A template's identity package SHALL declare `Version` as a concrete st... | body of "A template's identity package declares `Version` as a concrete string literal and the template tree loads through the kernel's module loader unmodified" |
+| Source line (whole) | body of "A template's identity package declares `Version` as a concrete string literal and the template tree loads through the kernel's module loader unmodified (as `**Source**`)" |
+
+Words changed or added: the body ends with "(Requirement: The official templates are real CUE modules published to the reserved `opmodel.dev/templates/<name>` segment through `opm module publish`)", the named reference that gives it its referent; the body ends with "(Requirements: "A template's tree is exactly the module that publishes", "The artifact published at a template's version holds exactly that template's tree and any change to the template bumps its identity `Version`", "A template's `Version` is a stable SemVer and its module path is `opmodel.dev/templates/<name>@v<major>`")", the named reference that gives it its referent; the em-dashes of the old text read ",".
+
+Lengths (old, new): old 2038; new "The official templates are real CUE modules published to the reserved `opmodel.dev/templates/<name>` segment through `opm module publish`" 264; "A template passes `opm module vet` before it is published and a template that fails a gate or the vet fails the release" 274; "The `templates` segment is module-kind and cli-CI-published only and no gate reserves a name within it" 384; "Publish never skips an already-published tag and the release job invokes it only for the versions its gates found unpublished" 135; "A template's tree is exactly the module that publishes" 162; "The artifact published at a template's version holds exactly that template's tree and any change to the template bumps its identity `Version`" 260; "A template's `Version` is a stable SemVer and its module path is `opmodel.dev/templates/<name>@v<major>`" 255; "The cli's PR check and release job refuse a template that breaks the tree, bump, `Version` or module path rules" 416; "A template's identity package declares `Version` as a concrete string literal and the template tree loads through the kernel's module loader unmodified" 269.
+
+### Ledger: template-modules, init scaffolds by fetch and re-identification
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`opm mod init <new-module-path> [template]` fetches the template module, copies its source tree and re-identifies it to the new path, leaving metadata untouched", "The scaffold carries nothing of the template's identity and a scaffolded module passes `opm module vet`, loads through the kernel's module loader and passes the `publish --dry-run` gates", "Init with no template on a directory that already holds a module tree repairs that tree and adopts the version the tree states", "Init requires a reachable registry for an uncached template, refuses offline naming the expansion and the registry tried, and embeds no fallback template".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Scaffold is publishable and leak-free | "The scaffold carries nothing of the template's identity and a scaffolded module passes `opm module vet`, loads through the kernel's module loader and passes the `publish --dry-run` gates", "Scaffold is publishable and leak-free" | No (byte equal, checked) |
+| Scaffold identity is a literal | "`opm mod init <new-module-path> [template]` fetches the template module, copies its source tree and re-identifies it to the new path, leaving metadata untouched", "Scaffold identity is a literal" | No (byte equal, checked) |
+| Offline refuses honestly | "Init requires a reachable registry for an uncached template, refuses offline naming the expansion and the registry tried, and embeds no fallback template", "Offline refuses honestly" | No (byte equal, checked) |
+| Repair adopts the version the tree states | "Init with no template on a directory that already holds a module tree repairs that tree and adopts the version the tree states", "Repair adopts the version the tree states" | No (byte equal, checked) |
+| Repair refuses a tree that states no version | "Init with no template on a directory that already holds a module tree repairs that tree and adopts the version the tree states", "Repair refuses a tree that states no version" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| `opm mod init <new-module-path> [template]` SHALL fetch the template m... | body of "`opm mod init <new-module-path> [template]` fetches the template module, copies its source tree and re-identifies it to the new path, leaving metadata untouched" |
+| Metadata SHALL be untouched, it derives from the identity package. | body of "`opm mod init <new-module-path> [template]` fetches the template module, copies its source tree and re-identifies it to the new path, leaving metadata untouched" |
+| The template's own identity SHALL NOT appear anywhere in the scaffold. | body of "The scaffold carries nothing of the template's identity and a scaffolded module passes `opm module vet`, loads through the kernel's module loader and passes the `publish --dry-run` gates" |
+| A scaffolded module SHALL pass `opm module vet`, load through the kern... | body of "The scaffold carries nothing of the template's identity and a scaffolded module passes `opm module vet`, loads through the kernel's module loader and passes the `publish --dry-run` gates" |
+| When repair has to create a missing identity package, `Version` SHALL ... | body of "Init with no template on a directory that already holds a module tree repairs that tree and adopts the version the tree states" |
+| Init with no template, on a directory that already holds a module tree... | body of "Init with no template on a directory that already holds a module tree repairs that tree and adopts the version the tree states" |
+| Repair leaves the `Version` of an identity file that exists untouched. | body of "Init with no template on a directory that already holds a module tree repairs that tree and adopts the version the tree states" |
+| Init requires a reachable registry for an uncached template and SHALL ... | body of "Init requires a reachable registry for an uncached template, refuses offline naming the expansion and the registry tried, and embeds no fallback template" |
+
+Words changed or added: the body ends with "(Requirement: `opm mod init <new-module-path> [template]` fetches the template module, copies its source tree and re-identifies it to the new path, leaving metadata untouched)", the named reference that gives it its referent; the em-dashes of the old text read ",".
+
+Lengths (old, new): old 1223; new "`opm mod init <new-module-path> [template]` fetches the template module, copies its source tree and re-identifies it to the new path, leaving metadata untouched" 423; "The scaffold carries nothing of the template's identity and a scaffolded module passes `opm module vet`, loads through the kernel's module loader and passes the `publish --dry-run` gates" 414; "Init with no template on a directory that already holds a module tree repairs that tree and adopts the version the tree states" 409; "Init requires a reachable registry for an uncached template, refuses offline naming the expansion and the registry tried, and embeds no fallback template" 159.
+
+### Ledger: template-modules, Shortcut expansion is syntactic and safe
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A bare word expands into the templates segment and a reference with `/` or `.` is a literal path", "An `@vN` suffix floats within a major and a full semver pins a tag", "No suffix selects a default major for an official template only", "`--from` accepts the same forms explicitly and any published module as a clone source, and `-t/--template` is an alias", "A template-only invocation prompts for the new module path interactively and refuses non-interactively".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Bare word expands, path never does | "A bare word expands into the templates segment and a reference with `/` or `.` is a literal path", "Bare word expands, path never does" | No (byte equal, checked) |
+| Typo fails inside the segment | "A bare word expands into the templates segment and a reference with `/` or `.` is a literal path", "Typo fails inside the segment" | No (byte equal, checked) |
+| Interactive form asks for the path | "A template-only invocation prompts for the new module path interactively and refuses non-interactively", "Interactive form asks for the path" | No (byte equal, checked) |
+| Only official templates get a default major | "No suffix selects a default major for an official template only", "Only official templates get a default major" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "A suffix selects the release" in "An `@vN` suffix floats within a major and a full semver pins a tag"
+- "--from takes the same forms and -t is an alias" in "`--from` accepts the same forms explicitly and any published module as a clone source, and `-t/--template` is an alias"
+
+| Old clause | New place |
+| --- | --- |
+| A template reference that is a bare word (letters, digits, underscores... | body of "A bare word expands into the templates segment and a reference with `/` or `.` is a literal path" |
+| An `@vN` suffix selects the newest release within that major (stable p... | body of "An `@vN` suffix floats within a major and a full semver pins a tag" |
+| no suffix selects the default major of the official template the bare ... | body of "No suffix selects a default major for an official template only" |
+| `--from` accepts the same forms explicitly and any published module as... | body of "`--from` accepts the same forms explicitly and any published module as a clone source, and `-t/--template` is an alias" |
+| A template-only invocation SHALL prompt for the new module path intera... | body of "A template-only invocation prompts for the new module path interactively and refuses non-interactively" |
+
+Words changed or added: the body ends with "(Requirement: A bare word expands into the templates segment and a reference with `/` or `.` is a literal path)", the named reference that gives it its referent; the body ends with "(Requirements: "A bare word expands into the templates segment and a reference with `/` or `.` is a literal path", "An `@vN` suffix floats within a major and a full semver pins a tag", "No suffix selects a default major for an official template only")", the named reference that gives it its referent.
+
+Lengths (old, new): old 836; new "A bare word expands into the templates segment and a reference with `/` or `.` is a literal path" 245; "An `@vN` suffix floats within a major and a full semver pins a tag" 143; "No suffix selects a default major for an official template only" 344; "`--from` accepts the same forms explicitly and any published module as a clone source, and `-t/--template` is an alias" 378; "A template-only invocation prompts for the new module path interactively and refuses non-interactively" 107.
+
+### Ledger: template-modules, Module tree layout
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "A module tree contains `cue.mod/module.cue` and `identity/identity.cue`, the module body is a single CUE package at the tree root and every root `.cue` file carries the same `package` clause", "A module tree has no `values.cue` and its default values for validation and debugging live in the `debugValues` field".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Scaffold carries the mandatory files | "A module tree contains `cue.mod/module.cue` and `identity/identity.cue`, the module body is a single CUE package at the tree root and every root `.cue` file carries the same `package` clause", "Scaffold carries the mandatory files" | No (byte equal, checked) |
+| No values.cue is required | "A module tree has no `values.cue` and its default values for validation and debugging live in the `debugValues` field", "No values.cue is required" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| A module tree SHALL contain `cue.mod/module.cue` (the CUE module file)... | body of "A module tree contains `cue.mod/module.cue` and `identity/identity.cue`, the module body is a single CUE package at the tree root and every root `.cue` file carries the same `package` clause" |
+| The official templates use `module.cue` and `components.cue` by conven... | body of "A module tree contains `cue.mod/module.cue` and `identity/identity.cue`, the module body is a single CUE package at the tree root and every root `.cue` file carries the same `package` clause" |
+| There SHALL be no `values.cue`: default values for validation and debu... | body of "A module tree has no `values.cue` and its default values for validation and debugging live in the `debugValues` field" |
+
+Words changed or added: the body ends with "(Requirement: A module tree contains `cue.mod/module.cue` and `identity/identity.cue`, the module body is a single CUE package at the tree root and every root `.cue` file carries the same `package` clause)", the named reference that gives it its referent.
+
+Lengths (old, new): old 537; new "A module tree contains `cue.mod/module.cue` and `identity/identity.cue`, the module body is a single CUE package at the tree root and every root `.cue` file carries the same `package` clause" 396; "A module tree has no `values.cue` and its default values for validation and debugging live in the `debugValues` field" 356.
+
+### Ledger: dependency-tidy, Tidy produces the files cue mod tidy would
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "`opm module tidy` and `opm catalog tidy` rewrite the dependency block of `cue.mod/module.cue` to the exact content `cue mod tidy` produces", "The exact content `cue mod tidy` produces holds every needed dependency at the version minimum version selection picks and no other", "`opm module tidy` and `opm catalog tidy` require no `cue` executable and start no child process", "`opm module tidy` and `opm catalog tidy` behave identically and only the wording of messages follows the kind", "Tidy does not read or validate the artifact's OPM identity, schema conformance or declared version".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Missing dependency is added | "The exact content `cue mod tidy` produces holds every needed dependency at the version minimum version selection picks and no other", "Missing dependency is added" | No (byte equal, checked) |
+| Unused dependency is removed | "The exact content `cue mod tidy` produces holds every needed dependency at the version minimum version selection picks and no other", "Unused dependency is removed" | No (byte equal, checked) |
+| Parity with cue mod tidy | "`opm module tidy` and `opm catalog tidy` rewrite the dependency block of `cue.mod/module.cue` to the exact content `cue mod tidy` produces", "Parity with cue mod tidy" | No (byte equal, checked) |
+| No cue binary needed | "`opm module tidy` and `opm catalog tidy` require no `cue` executable and start no child process", "No cue binary needed" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "The two commands behave identically" in "`opm module tidy` and `opm catalog tidy` behave identically and only the wording of messages follows the kind"
+- "Tidy ignores the OPM identity" in "Tidy does not read or validate the artifact's OPM identity, schema conformance or declared version"
+
+| Old clause | New place |
+| --- | --- |
+| `opm module tidy [path]` (alias `opm mod tidy`) and `opm catalog tidy ... | body of "`opm module tidy` and `opm catalog tidy` rewrite the dependency block of `cue.mod/module.cue` to the exact content `cue mod tidy` produces" |
+| the exact content `cue mod tidy` of the CUE version the CLI embeds pro... | body of "The exact content `cue mod tidy` produces holds every needed dependency at the version minimum version selection picks and no other" |
+| That means every dependency an import in the module needs, at the vers... | body of "The exact content `cue mod tidy` produces holds every needed dependency at the version minimum version selection picks and no other" |
+| The command SHALL NOT require a `cue` executable on the machine and SH... | body of "`opm module tidy` and `opm catalog tidy` require no `cue` executable and start no child process" |
+| The two commands SHALL behave identically; the kind only changes the w... | body of "`opm module tidy` and `opm catalog tidy` behave identically and only the wording of messages follows the kind" |
+| Tidy is a CUE module operation: it SHALL NOT read or validate the arti... | body of "Tidy does not read or validate the artifact's OPM identity, schema conformance or declared version" |
+
+Words changed or added: capital letter at the start of "The exact content `cue mod tidy` of the CUE version the CLI ..."; capital letter at the start of "the command SHALL NOT require a `cue` executable on the mach..."; capital letter at the start of "the two commands SHALL behave identically; the kind only cha..."; the body starts with "`opm module tidy [path]` (alias `opm mod tidy`) and `opm catalog tidy [path]`: " (words of the same spec, copied from the old text) so that it states its own subject.
+
+Lengths (old, new): old 909; new "`opm module tidy` and `opm catalog tidy` rewrite the dependency block of `cue.mod/module.cue` to the exact content `cue mod tidy` produces" 317; "The exact content `cue mod tidy` produces holds every needed dependency at the version minimum version selection picks and no other" 374; "`opm module tidy` and `opm catalog tidy` require no `cue` executable and start no child process" 182; "`opm module tidy` and `opm catalog tidy` behave identically and only the wording of messages follows the kind" 169; "Tidy does not read or validate the artifact's OPM identity, schema conformance or declared version" 130.
+
+### Ledger: dependency-tidy, Tidy targets an explicit module root
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The optional `path` argument of tidy names the module root and tidy searches no parent directory", "Tidy refuses a path that is not a module root with exit 2 before any registry access".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Default path | "The optional `path` argument of tidy names the module root and tidy searches no parent directory", "Default path" | No (byte equal, checked) |
+| Not a module root | "Tidy refuses a path that is not a module root with exit 2 before any registry access", "Not a module root" | No (byte equal, checked) |
+
+| Old clause | New place |
+| --- | --- |
+| The optional `path` argument SHALL name the module root directory and ... | body of "The optional `path` argument of tidy names the module root and tidy searches no parent directory" |
+| The command SHALL tidy that directory only; it SHALL NOT search parent... | body of "The optional `path` argument of tidy names the module root and tidy searches no parent directory" |
+| A path that does not exist, is not a directory, or has no `cue.mod/mod... | body of "Tidy refuses a path that is not a module root with exit 2 before any registry access" |
+| The refusal names the absolute path it checked; for `opm module tidy` ... | body of "Tidy refuses a path that is not a module root with exit 2 before any registry access" |
+
+Words changed or added: the body starts with "`opm module tidy` and `opm catalog tidy`: " (words of the same spec, copied from the old text) so that it states its own subject.
+
+Lengths (old, new): old 570; new "The optional `path` argument of tidy names the module root and tidy searches no parent directory" 252; "Tidy refuses a path that is not a module root with exit 2 before any registry access" 360.
+
+### Ledger: dependency-tidy, Tidy reports the outcome, not the steps
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "On success tidy prints one line saying whether it changed anything and rewrites no file of an already-tidy module", "Output from the embedded CUE tooling reaches the terminal only through the command's own error message", "Tidy exit codes are 0 tidied, already tidy or check passed, 1 resolution or registry failure and 2 not tidy or not a module root".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Update reported | "On success tidy prints one line saying whether it changed anything and rewrites no file of an already-tidy module", "Update reported" | No (byte equal, checked) |
+| Already tidy is a no-op | "On success tidy prints one line saying whether it changed anything and rewrites no file of an already-tidy module", "Already tidy is a no-op" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "Embedded tooling output stays off the terminal" in "Output from the embedded CUE tooling reaches the terminal only through the command's own error message"
+- "Exit codes by outcome" in "Tidy exit codes are 0 tidied, already tidy or check passed, 1 resolution or registry failure and 2 not tidy or not a module root"
+
+| Old clause | New place |
+| --- | --- |
+| On success the command SHALL print one line saying whether it changed ... | body of "On success tidy prints one line saying whether it changed anything and rewrites no file of an already-tidy module" |
+| An already-tidy module SHALL NOT have any file rewritten or its mtime ... | body of "On success tidy prints one line saying whether it changed anything and rewrites no file of an already-tidy module" |
+| Output from the embedded CUE tooling SHALL NOT reach the terminal exce... | body of "Output from the embedded CUE tooling reaches the terminal only through the command's own error message" |
+| Exit codes: 0 tidied, already tidy, or check passed; 1 dependency reso... | body of "Tidy exit codes are 0 tidied, already tidy or check passed, 1 resolution or registry failure and 2 not tidy or not a module root" |
+
+Words changed or added: the body starts with "`opm module tidy` and `opm catalog tidy`: " (words of the same spec, copied from the old text) so that it states its own subject.
+
+Lengths (old, new): old 579; new "On success tidy prints one line saying whether it changed anything and rewrites no file of an already-tidy module" 346; "Output from the embedded CUE tooling reaches the terminal only through the command's own error message" 156; "Tidy exit codes are 0 tidied, already tidy or check passed, 1 resolution or registry failure and 2 not tidy or not a module root" 213.
+
+### Ledger: e2e-cluster-workflow, The job applies to operator-facing pull requests, cascade pull requests and release pull requests
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The workflow runs one job named `E2E (kind, embedded operator)` on pull requests targeting `main` and on `workflow_dispatch`", "The job applies on `workflow_dispatch`, on `release-please--` and `deps/cascade` head branches and on the `deps-cascade` label", "The job applies when a pull request changes a file under `internal/operator/`, `internal/cmd/operator/`, `templates/` or `hack/platform/`", "The job applies when a pull request changes the workflow file, its decision script, `Taskfile.yml` or `hack/fixtures.sh`", "The job applies when a pull request changes `hack/kind-config.yaml`, `hack/kind-platform.yaml`, `hack/kind-operator-rbac.yaml` or `hack/opm-config.cue`", "The job applies when a pull request changes a Go file directly under `tests/e2e/` or anything under `tests/e2e/testdata/operator-owned/`", "The decision to apply is computed from the pull request's state, never from the triggering event alone", "A pull request that is no longer open does not apply".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| Operator pin bump applies | "The job applies when a pull request changes a file under `internal/operator/`, `internal/cmd/operator/`, `templates/` or `hack/platform/`", "Operator pin bump applies" | No (byte equal, checked) |
+| Release pull request applies | "The job applies on `workflow_dispatch`, on `release-please--` and `deps/cascade` head branches and on the `deps-cascade` label", "Release pull request applies" | No (byte equal, checked) |
+| Label added after opening | "The job applies on `workflow_dispatch`, on `release-please--` and `deps/cascade` head branches and on the `deps-cascade` label", "Label added after opening" | No (byte equal, checked) |
+| Unrelated label does not change the outcome | "The decision to apply is computed from the pull request's state, never from the triggering event alone", "Unrelated label does not change the outcome" | No (byte equal, checked) |
+| Cascade branch applies without its label | "The job applies on `workflow_dispatch`, on `release-please--` and `deps/cascade` head branches and on the `deps-cascade` label", "Cascade branch applies without its label" | No (byte equal, checked) |
+| Change to the preparation task applies | "The job applies when a pull request changes the workflow file, its decision script, `Taskfile.yml` or `hack/fixtures.sh`", "Change to the preparation task applies" | No (byte equal, checked) |
+| Operator command change applies | "The job applies when a pull request changes a file under `internal/operator/`, `internal/cmd/operator/`, `templates/` or `hack/platform/`", "Operator command change applies" | No (byte equal, checked) |
+| Merged release pull request does not apply | "A pull request that is no longer open does not apply", "Merged release pull request does not apply" | No (byte equal, checked) |
+| Unrelated pull request | "The job applies when a pull request changes a file under `internal/operator/`, `internal/cmd/operator/`, `templates/` or `hack/platform/`", "Unrelated pull request" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "The job is named and triggered as the ruleset requires" in "The workflow runs one job named `E2E (kind, embedded operator)` on pull requests targeting `main` and on `workflow_dispatch`"
+- "Change to a kind file applies" in "The job applies when a pull request changes `hack/kind-config.yaml`, `hack/kind-platform.yaml`, `hack/kind-operator-rbac.yaml` or `hack/opm-config.cue`"
+- "Change to a Go file under tests/e2e applies" in "The job applies when a pull request changes a Go file directly under `tests/e2e/` or anything under `tests/e2e/testdata/operator-owned/`"
+
+| Old clause | New place |
+| --- | --- |
+| The workflow SHALL run one job, named `E2E (kind, embedded operator)` ... | body of "The workflow runs one job named `E2E (kind, embedded operator)` on pull requests targeting `main` and on `workflow_dispatch`" |
+| The job SHALL do the cluster-backed work (it *applies*) when at least ... | body of "The job applies on `workflow_dispatch`, on `release-please--` and `deps/cascade` head branches and on the `deps-cascade` label" |
+| - the run was started by `workflow_dispatch`; - the pull request's hea... | body of "The job applies on `workflow_dispatch`, on `release-please--` and `deps/cascade` head branches and on the `deps-cascade` label" |
+| The job SHALL do the cluster-backed work (it *applies*) when at least ... | body of "The job applies when a pull request changes a file under `internal/operator/`, `internal/cmd/operator/`, `templates/` or `hack/platform/`" |
+| - the pull request changes a file under `internal/operator/`, `interna... | body of "The job applies when a pull request changes a file under `internal/operator/`, `internal/cmd/operator/`, `templates/` or `hack/platform/`" |
+| The job SHALL do the cluster-backed work (it *applies*) when at least ... | body of "The job applies when a pull request changes the workflow file, its decision script, `Taskfile.yml` or `hack/fixtures.sh`" |
+| - | body of "The job applies when a pull request changes the workflow file, its decision script, `Taskfile.yml` or `hack/fixtures.sh`" |
+| the pull request changes one of the job's own inputs: the workflow fil... | body of "The job applies when a pull request changes the workflow file, its decision script, `Taskfile.yml` or `hack/fixtures.sh`" |
+| The job SHALL do the cluster-backed work (it *applies*) when at least ... | body of "The job applies when a pull request changes `hack/kind-config.yaml`, `hack/kind-platform.yaml`, `hack/kind-operator-rbac.yaml` or `hack/opm-config.cue`" |
+| - | body of "The job applies when a pull request changes `hack/kind-config.yaml`, `hack/kind-platform.yaml`, `hack/kind-operator-rbac.yaml` or `hack/opm-config.cue`" |
+| the pull request changes one of the job's own inputs: | body of "The job applies when a pull request changes `hack/kind-config.yaml`, `hack/kind-platform.yaml`, `hack/kind-operator-rbac.yaml` or `hack/opm-config.cue`" |
+| `hack/kind-config.yaml`, `hack/kind-platform.yaml`, `hack/kind-operato... | body of "The job applies when a pull request changes `hack/kind-config.yaml`, `hack/kind-platform.yaml`, `hack/kind-operator-rbac.yaml` or `hack/opm-config.cue`" |
+| The job SHALL do the cluster-backed work (it *applies*) when at least ... | body of "The job applies when a pull request changes a Go file directly under `tests/e2e/` or anything under `tests/e2e/testdata/operator-owned/`" |
+| - | body of "The job applies when a pull request changes a Go file directly under `tests/e2e/` or anything under `tests/e2e/testdata/operator-owned/`" |
+| the pull request changes one of the job's own inputs: | body of "The job applies when a pull request changes a Go file directly under `tests/e2e/` or anything under `tests/e2e/testdata/operator-owned/`" |
+| any Go file directly under `tests/e2e/` (the cluster-backed tests and ... | body of "The job applies when a pull request changes a Go file directly under `tests/e2e/` or anything under `tests/e2e/testdata/operator-owned/`" |
+| The decision SHALL be computed from the pull request's state when the ... | body of "The decision to apply is computed from the pull request's state, never from the triggering event alone" |
+| A pull request that is no longer open (read live: closed or merged) SH... | body of "A pull request that is no longer open does not apply" |
+
+Words changed or added: the body gains "Whether the job *applies*:".
+
+Lengths (old, new): old 1833; new "The workflow runs one job named `E2E (kind, embedded operator)` on pull requests targeting `main` and on `workflow_dispatch`" 325; "The job applies on `workflow_dispatch`, on `release-please--` and `deps/cascade` head branches and on the `deps-cascade` label" 334; "The job applies when a pull request changes a file under `internal/operator/`, `internal/cmd/operator/`, `templates/` or `hack/platform/`" 211; "The job applies when a pull request changes the workflow file, its decision script, `Taskfile.yml` or `hack/fixtures.sh`" 352; "The job applies when a pull request changes `hack/kind-config.yaml`, `hack/kind-platform.yaml`, `hack/kind-operator-rbac.yaml` or `hack/opm-config.cue`" 252; "The job applies when a pull request changes a Go file directly under `tests/e2e/` or anything under `tests/e2e/testdata/operator-owned/`" 339; "The decision to apply is computed from the pull request's state, never from the triggering event alone" 307; "A pull request that is no longer open does not apply" 205.
+
+### Ledger: e2e-cluster-workflow, The suite runs with the cluster required and leaves evidence on failure
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The suite runs `go test ./tests/e2e/... -v` with the cluster required and the tools the cluster tests probe for present", "An operator-owned test that fails logs its ModuleInstance, the cluster Platform and the operator's logs before its cleanup deletes the evidence", "A test that times out waiting for the operator to reconcile names the ModuleInstance's `Ready` condition in its failure message", "After any failed step the job prints the operator's logs, the cluster Platform, every ModuleInstance and recent cluster events".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| A cluster test cannot skip | "The suite runs `go test ./tests/e2e/... -v` with the cluster required and the tools the cluster tests probe for present", "A cluster test cannot skip" | No (byte equal, checked) |
+| Lifecycle test takes the full-rollout path | "The suite runs `go test ./tests/e2e/... -v` with the cluster required and the tools the cluster tests probe for present", "Lifecycle test takes the full-rollout path" | No (byte equal, checked) |
+| Failure leaves diagnostics | "An operator-owned test that fails logs its ModuleInstance, the cluster Platform and the operator's logs before its cleanup deletes the evidence", "Failure leaves diagnostics" | No (byte equal, checked) |
+| Preparation failure leaves diagnostics | "After any failed step the job prints the operator's logs, the cluster Platform, every ModuleInstance and recent cluster events", "Preparation failure leaves diagnostics" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "A reconcile timeout names the Ready condition" in "A test that times out waiting for the operator to reconcile names the ModuleInstance's `Ready` condition in its failure message"
+
+| Old clause | New place |
+| --- | --- |
+| When the job applies, it SHALL run `go test ./tests/e2e/... -v` with t... | body of "The suite runs `go test ./tests/e2e/... -v` with the cluster required and the tools the cluster tests probe for present" |
+| When an operator-owned test fails, the test itself SHALL log, before i... | body of "An operator-owned test that fails logs its ModuleInstance, the cluster Platform and the operator's logs before its cleanup deletes the evidence" |
+| Later tests (the operator lifecycle test tears the operator, CRDs and ... | body of "An operator-owned test that fails logs its ModuleInstance, the cluster Platform and the operator's logs before its cleanup deletes the evidence" |
+| a test that times out waiting for the operator to reconcile SHALL name... | body of "A test that times out waiting for the operator to reconcile names the ModuleInstance's `Ready` condition in its failure message" |
+| After any failed step, including a preparation step before the suite s... | body of "After any failed step the job prints the operator's logs, the cluster Platform, every ModuleInstance and recent cluster events" |
+
+Words changed or added: capital letter at the start of "A test that times out waiting for the operator to reconcile ...".
+
+Lengths (old, new): old 1075; new "The suite runs `go test ./tests/e2e/... -v` with the cluster required and the tools the cluster tests probe for present" 346; "An operator-owned test that fails logs its ModuleInstance, the cluster Platform and the operator's logs before its cleanup deletes the evidence" 375; "A test that times out waiting for the operator to reconcile names the ModuleInstance's `Ready` condition in its failure message" 133; "After any failed step the job prints the operator's logs, the cluster Platform, every ModuleInstance and recent cluster events" 214.
+
+### Ledger: e2e-cluster-workflow, The cluster is prepared with the local loop's own tasks and the pinned operator module
+
+Form: c2 (REMOVED, ADDED under new names). New requirements: "The job installs kind, creates the `opm-dev` cluster with `task cluster:create` and prepares it with `task cluster:operator`", "The job does not restate the kind installation, cluster creation and operator preparation steps in the workflow", "The job runs a registry container seeded with `hack/fixtures.sh seed` from which the CLI and the operator resolve `testing.opmodel.dev`".
+
+| Old scenario name | New place (requirement, scenario name) | Changed text? |
+| --- | --- | --- |
+| The pinned operator module is what runs | "The job installs kind, creates the `opm-dev` cluster with `task cluster:create` and prepares it with `task cluster:operator`", "The pinned operator module is what runs" | No (byte equal, checked) |
+| Bumped fixture before it is published | "The job runs a registry container seeded with `hack/fixtures.sh seed` from which the CLI and the operator resolve `testing.opmodel.dev`", "Bumped fixture before it is published" | No (byte equal, checked) |
+| Stalled Platform fails the preparation | "The job installs kind, creates the `opm-dev` cluster with `task cluster:create` and prepares it with `task cluster:operator`", "Stalled Platform fails the preparation" | No (byte equal, checked) |
+
+New scenarios (each restates only a case the old text names):
+
+- "The preparation steps are not restated" in "The job does not restate the kind installation, cluster creation and operator preparation steps in the workflow"
+
+| Old clause | New place |
+| --- | --- |
+| When the job applies, it SHALL install kind at the version and checksu... | body of "The job installs kind, creates the `opm-dev` cluster with `task cluster:create` and prepares it with `task cluster:operator`" |
+| The job SHALL NOT restate those steps in the workflow. | body of "The job does not restate the kind installation, cluster creation and operator preparation steps in the workflow" |
+| The job SHALL run a registry container seeded from the tree with `hack... | body of "The job runs a registry container seeded with `hack/fixtures.sh seed` from which the CLI and the operator resolve `testing.opmodel.dev`" |
+
+Words changed or added: the body ends with "(Requirement: The job installs kind, creates the `opm-dev` cluster with `task cluster:create` and prepares it with `task cluster:operator`)", the named reference that gives it its referent.
+
+Lengths (old, new): old 975; new "The job installs kind, creates the `opm-dev` cluster with `task cluster:create` and prepares it with `task cluster:operator`" 469; "The job does not restate the kind installation, cluster creation and operator preparation steps in the workflow" 194; "The job runs a registry container seeded with `hack/fixtures.sh seed` from which the CLI and the operator resolve `testing.opmodel.dev`" 450.
+
+### Strength table of cli-B6 unit 6a
+
+Plain sentences that carry an RFC 2119 keyword in the new text and had none in the old text:
+
+| Old sentence | New body | Word added |
+| --- | --- | --- |
+| The newest release within a major is the newest stable version; when the major has no stable version, the newest prerelease that is not a development build (for... | "The newest release within a major is the newest stable version, else the newest prerelease that is not a development build" | "SHALL be" |
+| A major is skipped when it holds no selectable release, declares no `opmodel.dev/core` dependency, or declares a different core major. | "A major with no selectable release, no core dependency or a different core major is skipped, and the command exits 2 when every major is skipped" | "SHALL be" |
+| The segment is module-kind and cli-CI-published only. | "The `templates` segment is module-kind and cli-CI-published only and no gate reserves a name within it" | "SHALL be" |
+| No gate reserves a name within it: the publish gates admit any single-segment name made of lowercase letters, digits, dots, underscores and hyphens, `index` inc... | "The `templates` segment is module-kind and cli-CI-published only and no gate reserves a name within it" | "SHALL reserve" |
+| The cli's PR check and release job refuse a template that breaks any of these rules. | "The cli's PR check and release job refuse a template that breaks the tree, bump, `Version` or module path rules" | "SHALL refuse" |
+| Init with no template, on a directory that already holds a module tree, repairs that tree instead of scaffolding. | "Init with no template on a directory that already holds a module tree repairs that tree and adopts the version the tree states" | "SHALL repair" |
+| Repair leaves the `Version` of an identity file that exists untouched. | "Init with no template on a directory that already holds a module tree repairs that tree and adopts the version the tree states" | "SHALL leave" |
+| An `@vN` suffix selects the newest release within that major (stable preferred, prerelease fallback); a full semver selects the exact tag | "An `@vN` suffix floats within a major and a full semver pins a tag" | "SHALL select" |
+| no suffix selects the default major of the official template the bare word names, and no other reference has a default major: an unknown bare word and a literal... | "No suffix selects a default major for an official template only" | "SHALL select" |
+| `--from` accepts the same forms explicitly and any published module as a clone source; `-t/--template` is an alias. | "`--from` accepts the same forms explicitly and any published module as a clone source, and `-t/--template` is an alias" | "SHALL accept"; "SHALL be" |
+| The official templates use `module.cue` and `components.cue` by convention, and every root `.cue` file carries the same `package` clause. | "A module tree contains `cue.mod/module.cue` and `identity/identity.cue`, the module body is a single CUE package at the tree root and every root `.cue` file carries the same `package` clause" | "SHALL carry"; "SHALL use" |
+| That means every dependency an import in the module needs, at the version minimum version selection picks; a dependency imported for the first time at its lates... | "The exact content `cue mod tidy` produces holds every needed dependency at the version minimum version selection picks and no other" | "SHALL mean" |
+| Exit codes: 0 tidied, already tidy, or check passed; 1 dependency resolution or registry failure; 2 not tidy under `--check`, or the target is not a module root... | "Tidy exit codes are 0 tidied, already tidy or check passed, 1 resolution or registry failure and 2 not tidy or not a module root" | "SHALL be" |
+
+Plain sentences copied unchanged, with no keyword, into a body that carries a keyword in another sentence:
+
+| Old sentence | New body |
+| --- | --- |
+| the exact content `cue mod tidy` of the CUE version the CLI embeds produces for the same tree and registry | "The exact content `cue mod tidy` produces holds every needed dependency at the version minimum version selection picks and no other" |
+| The refusal names the absolute path it checked; for `opm module tidy` on an existing directory without `cue.mod`, it also points at `opm module init` (no catalo... | "Tidy refuses a path that is not a module root with exit 2 before any registry access" |
+| - the run was started by `workflow_dispatch`; - the pull request's head branch starts with `release-please--`; - the pull request's head branch is the cascade b... | "The job applies on `workflow_dispatch`, on `release-please--` and `deps/cascade` head branches and on the `deps-cascade` label" |
+| - the pull request changes a file under `internal/operator/`, `internal/cmd/operator/`, `templates/` or `hack/platform/`; | "The job applies when a pull request changes a file under `internal/operator/`, `internal/cmd/operator/`, `templates/` or `hack/platform/`" |
+| the pull request changes one of the job's own inputs: the workflow file itself, its decision script `.github/scripts/e2e-cluster-applies.sh`, `Taskfile.yml` (wh... | "The job applies when a pull request changes the workflow file, its decision script, `Taskfile.yml` or `hack/fixtures.sh`" |
+| the pull request changes one of the job's own inputs: | "The job applies when a pull request changes `hack/kind-config.yaml`, `hack/kind-platform.yaml`, `hack/kind-operator-rbac.yaml` or `hack/opm-config.cue`" |
+| `hack/kind-config.yaml`, `hack/kind-platform.yaml`, `hack/kind-operator-rbac.yaml`, `hack/opm-config.cue` | "The job applies when a pull request changes `hack/kind-config.yaml`, `hack/kind-platform.yaml`, `hack/kind-operator-rbac.yaml` or `hack/opm-config.cue`" |
+| the pull request changes one of the job's own inputs: | "The job applies when a pull request changes a Go file directly under `tests/e2e/` or anything under `tests/e2e/testdata/operator-owned/`" |
+| any Go file directly under `tests/e2e/` (the cluster-backed tests and the suite's shared helpers such as `TestMain` and `runOPMWithEnv`), or anything under `tes... | "The job applies when a pull request changes a Go file directly under `tests/e2e/` or anything under `tests/e2e/testdata/operator-owned/`" |
+| Later tests (the operator lifecycle test tears the operator, CRDs and every ModuleInstance down and reinstalls) leave nothing of that state for a step after the... | "An operator-owned test that fails logs its ModuleInstance, the cluster Platform and the operator's logs before its cleanup deletes the evidence" |

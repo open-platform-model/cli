@@ -35,10 +35,10 @@
 
 ## 6. cli-B6: published-module-resolution (4), template-modules (4), dependency-tidy (3), e2e-cluster-workflow (3), errors-domain (3), flag-conventions (3), inventory-ownership (3), log-output-style (3), apply-preflight-gates (2), 28 requirements
 
-- [ ] 6.1 List the 28 long requirements of the nine specs and confirm the count
-- [ ] 6.2 Write the delta files for the nine specs and append their ledger subsections
-- [ ] 6.3 Grep for old headers; run the byte check per rewritten requirement
-- [ ] 6.4 Run the gate with N=168 and the per-spec validation; `task lint` and `task test` green, then commit `docs(openspec): split the long requirements of nine resolution, convention and workflow specs`
+- [x] 6.1 List the 28 long requirements of the nine specs and confirm the count (unit 6a, `published-module-resolution` 4, `template-modules` 4, `dependency-tidy` 3 and `e2e-cluster-workflow` 3: 14 long requirements)
+- [x] 6.2 Write the delta files for the nine specs and append their ledger subsections (unit 6a, `published-module-resolution` 4, `template-modules` 4, `dependency-tidy` 3 and `e2e-cluster-workflow` 3)
+- [x] 6.3 Grep for old headers; run the byte check per rewritten requirement (unit 6a, `published-module-resolution` 4, `template-modules` 4, `dependency-tidy` 3 and `e2e-cluster-workflow` 3)
+- [x] 6.4 Run the gate with N=168 and the per-spec validation; `task lint` and `task test` green, then commit `docs(openspec): split the long requirements of nine resolution, convention and workflow specs` (unit 6a: gate with N=154, the per-spec validation of `published-module-resolution`, `template-modules`, `dependency-tidy` and `e2e-cluster-workflow`, `task lint` and `task test:unit` ran (the cluster-backed `task test` did not run), and the commit `docs(openspec): split the long requirements of published-module-resolution, template-modules, dependency-tidy and e2e-cluster-workflow` was made; the other five specs of group 6 are not done and the gate with N=168 has not run)
 
 ## 7. cli-B7: pr-workflow (3), catalog-registry-check, ci-workflow, config, config-commands, config-types, docs-bundle, health-evaluation, instance-building, k8s-helpers, mod-apply, module-synthetic-instance, release-gates (2 each), command-reference (1), 28 requirements
 
