@@ -6,7 +6,7 @@
 
 ### Requirement: Gates and refusal catalog
 **Reason**: Split into requirements that each state one behavior.
-**Migration**: See "Publish accumulates every refusal and refuses with exit code 2", "Each refusal follows one fixed shape", "One cause yields one refusal", "The loadability, identity and derivation gates", "The cue.mod, source, tag and package-name gates", "The domain, local-override and already-published gates".
+**Migration**: See "Publish accumulates every refusal and refuses with exit code 2", "Each refusal follows one fixed shape", "One cause yields one refusal", "Publish evaluates the gates of the gate list".
 
 ### Requirement: Exit codes
 **Reason**: Split into requirements that each state one behavior.
@@ -93,27 +93,9 @@ One cause SHALL yield one refusal.
 - **WHEN** a module's identity `Version` is a defaulted disjunction
 - **THEN** publish reports exactly one refusal for it, the kernel loader's, and the identity gates still derive the tag from the default so the rest of the plan prints
 
-### Requirement: The loadability, identity and derivation gates
+### Requirement: Publish evaluates the gates of the gate list
 
-The gates SHALL be: kernel loadability (modules only: the kernel's module loader accepts the tree; its refusal is surfaced verbatim and is the only refusal that cause yields); identity concreteness (a defaulted field counts as concrete at its default for tag derivation; an absent field or file is never publishable); `metadata` ↔ identity-package derivation.
-
-#### Scenario: The loadability and identity gates run
-
-- **WHEN** publish evaluates its gates
-- **THEN** the gates SHALL be: kernel loadability, identity concreteness and `metadata` ↔ identity-package derivation
-
-### Requirement: The cue.mod, source, tag and package-name gates
-
-The gates SHALL be: `cue.mod` `module:` ↔ declared path agreement (no `cue.mod` at all refuses, pointing at `opm mod init` — publish never creates or edits `cue.mod`); `source: {kind: "self"}` presence; tag equals the effective declared version and the tag major equals the path major; the module package name equals `metadata.name`.
-
-#### Scenario: The cue.mod and tag gates run
-
-- **WHEN** publish evaluates its gates
-- **THEN** the gates SHALL be: `cue.mod` `module:` ↔ declared path agreement, `source: {kind: "self"}` presence, tag equals the effective declared version and the tag major equals the path major, the module package name equals `metadata.name`
-
-### Requirement: The domain, local-override and already-published gates
-
-The gates SHALL be: namespace and kind-segment checks on owned domains only; local-override presence; already-published tag.
+The gates SHALL be those listed in scenario "The ten gates of the gate list".
 
 #### Scenario: Already published is always a refusal
 
@@ -125,6 +107,11 @@ The gates SHALL be: namespace and kind-segment checks on owned domains only; loc
 
 - **WHEN** a third-party artifact under its own domain is published
 - **THEN** no namespace or kind-segment gate refuses it
+
+#### Scenario: The ten gates of the gate list
+
+- **WHEN** publish evaluates its gates
+- **THEN** The gates SHALL be: kernel loadability (modules only: the kernel's module loader accepts the tree; its refusal is surfaced verbatim and is the only refusal that cause yields); identity concreteness (a defaulted field counts as concrete at its default for tag derivation; an absent field or file is never publishable); `metadata` ↔ identity-package derivation; `cue.mod` `module:` ↔ declared path agreement (no `cue.mod` at all refuses, pointing at `opm mod init` — publish never creates or edits `cue.mod`); `source: {kind: "self"}` presence; tag equals the effective declared version and the tag major equals the path major; the module package name equals `metadata.name`; namespace and kind-segment checks on owned domains only; local-override presence; already-published tag.
 
 ### Requirement: Publish exits 0, 2, 4, 3 or 1 by outcome
 
@@ -309,7 +296,7 @@ A package absent at a given published version is the scan's negative signal, nev
 
 ### Requirement: The CLI takes fetch decisions from the library's typed classification
 
-A transport failure during predecessor enumeration or package loading SHALL abort as a connectivity error with no partial verdict — the artifact was never judged. The CLI SHALL take these decisions from the library's typed fetch classification and from the fetched build's contents, and SHALL NOT match a registry error's message text itself. Source: enhancement 0021 ("A beta line reaches GA only when its exit criteria hold").
+The CLI SHALL take the decisions of requirements "A transport failure or a missing dependency aborts the walk as a connectivity error" and "A package absent at a published version is the scan's negative signal" from the library's typed fetch classification and from the fetched build's contents, and SHALL NOT match a registry error's message text itself. Source: enhancement 0021 ("A beta line reaches GA only when its exit criteria hold").
 
 #### Scenario: Decisions come from the typed fetch classification
 

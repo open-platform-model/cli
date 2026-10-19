@@ -231,7 +231,7 @@ Before deleting each tracked resource, `opm instance delete` SHALL delete the re
 
 ### Requirement: Each delete carries a precondition on the UID of the object that was read
 
-Before deleting each tracked resource, `opm instance delete` SHALL read the live object again. Each delete SHALL carry a precondition on the UID of the object that was read; a delete the API server refuses on that precondition SHALL count as a failure for that resource and SHALL NOT be reported as deleted.
+Before deleting each tracked resource, `opm instance delete` SHALL read the live object again. Each delete SHALL carry a precondition on the UID of the object that was read; a delete the API server refuses on that precondition SHALL count as a failure for that resource and SHALL NOT be reported as deleted. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
 
 #### Scenario: A refused precondition is a failure
 
@@ -240,7 +240,7 @@ Before deleting each tracked resource, `opm instance delete` SHALL read the live
 
 ### Requirement: A resource that is already gone is no failure and any other read error is
 
-Before deleting each tracked resource, `opm instance delete` SHALL read the live object again. A resource that is already gone, whether its re-read or its delete call returns NotFound, SHALL count neither as deleted nor as a failure. Any other read error SHALL count as a failure for that resource, so the `ModuleInstance` record is kept and a re-run retries.
+Before deleting each tracked resource, `opm instance delete` SHALL read the live object again. A resource that is already gone, whether its re-read or its delete call returns NotFound, SHALL count neither as deleted nor as a failure. Any other read error SHALL count as a failure for that resource, so the `ModuleInstance` record is kept and a re-run retries. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
 
 #### Scenario: Already gone counts neither as deleted nor as a failure
 
@@ -358,7 +358,7 @@ An instance deploys the operator when any one of these SHALL hold, read from its
 
 ### Requirement: The guard runs before any object is deleted, on both branches and on a dry run
 
-The guard SHALL run after the target instance is resolved and before any object is deleted, on the CLI-owned and the operator-owned branch alike, and on a dry run with the same outcome as the real run.
+`opm instance delete` SHALL NOT delete an instance that deploys the operator. The guard SHALL run after the target instance is resolved and before any object is deleted, on the CLI-owned and the operator-owned branch alike, and on a dry run with the same outcome as the real run.
 
 #### Scenario: Dry run reports the same refusal
 
@@ -367,7 +367,7 @@ The guard SHALL run after the target instance is resolved and before any object 
 
 ### Requirement: An operator-owned target is refused with exit code 2
 
-When the target is operator-owned, the command SHALL refuse with exit code 2 and delete and patch nothing, naming the signal that matched and the remedy of setting `spec.owner` to `cli`. The operator never reconciles, finalizes or prunes the instance that deploys it, so the operator-owned delete would wait on, and report, a cleanup that does not happen.
+For an instance that deploys the operator, when the target is operator-owned, the command SHALL refuse with exit code 2 and delete and patch nothing, naming the signal that matched and the remedy of setting `spec.owner` to `cli`. The operator never reconciles, finalizes or prunes the instance that deploys it, so the operator-owned delete would wait on, and report, a cleanup that does not happen.
 
 #### Scenario: Operator-owned instance of the operator is refused
 
@@ -378,16 +378,16 @@ When the target is operator-owned, the command SHALL refuse with exit code 2 and
 
 ### Requirement: The guard lists ModuleInstance resources cluster-wide when the target is not operator-owned
 
-When the target is not operator-owned, the command SHALL list `ModuleInstance` resources cluster-wide. Deleting the operator while it still owes cleanup leaves every armed instance unable to finish deletion until an operator runs again.
+For an instance that deploys the operator that is not operator-owned, the command SHALL list `ModuleInstance` resources cluster-wide. Deleting the operator while it still owes cleanup leaves every armed instance unable to finish deletion until an operator runs again.
 
 #### Scenario: The guard lists every ModuleInstance
 
-- **WHEN** the target is not operator-owned
+- **WHEN** `opm instance delete` targets an instance that deploys the operator that is not operator-owned
 - **THEN** the command SHALL list `ModuleInstance` resources cluster-wide
 
 ### Requirement: An armed instance blocks the delete with exit code 2
 
-When the target is not operator-owned, the command SHALL list `ModuleInstance` resources cluster-wide. When any carries `opmodel.dev/cleanup`, the command SHALL refuse with exit code 2, delete and patch nothing, and name each such instance as `namespace/name`, marking the target itself when it is one of them, and name `opm operator uninstall` with its `--remove-finalizers` choice and that choice's consequence (the named instances' workloads are orphaned).
+For an instance that deploys the operator that is not operator-owned, when any `ModuleInstance` in the cluster carries `opmodel.dev/cleanup`, the command SHALL refuse with exit code 2, delete and patch nothing, and name each such instance as `namespace/name`, marking the target itself when it is one of them, and name `opm operator uninstall` with its `--remove-finalizers` choice and that choice's consequence (the named instances' workloads are orphaned).
 
 #### Scenario: Refused while an instance waits on the operator's cleanup
 
@@ -407,7 +407,7 @@ When the target is not operator-owned, the command SHALL list `ModuleInstance` r
 
 ### Requirement: A failed cluster-wide list fails closed
 
-When the target is not operator-owned, the command SHALL list `ModuleInstance` resources cluster-wide. When the cluster-wide list fails, the command SHALL fail closed with the exit code `opm` maps that Kubernetes error to (4 for a permission or authentication denial) and delete nothing.
+For an instance that deploys the operator that is not operator-owned, the command SHALL list `ModuleInstance` resources cluster-wide. When the cluster-wide list fails, the command SHALL fail closed with the exit code `opm` maps that Kubernetes error to (4 for a permission or authentication denial) and delete nothing.
 
 #### Scenario: List failure fails closed
 
@@ -416,11 +416,11 @@ When the target is not operator-owned, the command SHALL list `ModuleInstance` r
 
 ### Requirement: Instance delete offers no flag that removes finalizers
 
-`opm instance delete` SHALL offer no flag that removes finalizers and SHALL NOT write `spec.owner`.
+`opm instance delete` SHALL NOT delete an instance that deploys the operator. `opm instance delete` SHALL offer no flag that removes finalizers and SHALL NOT write `spec.owner`.
 
 #### Scenario: No finalizer flag and no owner write
 
-- **WHEN** `opm instance delete` runs
+- **WHEN** `opm instance delete` targets an instance that deploys the operator
 - **THEN** it SHALL offer no flag that removes finalizers and SHALL NOT write `spec.owner`
 
 ### Requirement: The yes flag and its deprecated alias do not bypass either refusal
@@ -434,7 +434,7 @@ When the target is not operator-owned, the command SHALL list `ModuleInstance` r
 
 ### Requirement: Every other instance's delete is unchanged by the guard
 
-Every other instance's delete SHALL be unchanged by this requirement.
+`opm instance delete` SHALL NOT delete an instance that deploys the operator. Every other instance's delete SHALL be unchanged by this requirement.
 
 #### Scenario: Other instances are not guarded
 
@@ -566,7 +566,7 @@ An apply that one of the checks listed in requirement "Create-namespace creates 
 
 ### Requirement: While the namespace is missing the apply sends no read into it
 
-While the namespace is missing, the apply SHALL treat it as holding nothing and SHALL NOT send a read into it: it SHALL NOT read the `ModuleInstance` record, so the apply is a first install, and the ownership guard SHALL skip every rendered object in that namespace. Rendered cluster-scoped objects and objects in other namespaces SHALL be checked as usual.
+With `--create-namespace`, `opm instance apply` and `opm module apply` SHALL read first whether the instance namespace exists. While the namespace is missing, the apply SHALL treat it as holding nothing and SHALL NOT send a read into it: it SHALL NOT read the `ModuleInstance` record, so the apply is a first install, and the ownership guard SHALL skip every rendered object in that namespace. Rendered cluster-scoped objects and objects in other namespaces SHALL be checked as usual.
 
 #### Scenario: A missing namespace is a first install and is not read
 
@@ -859,7 +859,7 @@ When `spec.prune` is set and the inventory tracks at least one PersistentVolumeC
 
 ### Requirement: The prompt says the operator deletes the claims and their data when the CRD has no policy field or the policy is Delete
 
-When the CRD has no such field (the field of requirement "With prune set and a tracked claim the prompt says one of four things decided by the CRD"), the operator does not know it: the prompt SHALL say so and SHALL say that the operator deletes the tracked resources, PersistentVolumeClaims and their data included, whatever the instance carries. When `spec.dataPolicy` is `Delete`, it SHALL say the same and name the value.
+When `spec.prune` is set and the inventory tracks at least one PersistentVolumeClaim, the prompt SHALL say one of four things. When the installed `ModuleInstance` CRD has no `spec.dataPolicy` field, the operator does not know it: the prompt SHALL say so and SHALL say that the operator deletes the tracked resources, PersistentVolumeClaims and their data included, whatever the instance carries. When `spec.dataPolicy` is `Delete`, it SHALL say the same and name the value.
 
 #### Scenario: Prompt for an operator-managed instance with prune set
 
@@ -930,7 +930,7 @@ Every check that can refuse the delete SHALL run before the prompt: the guard fo
 
 ### Requirement: The command acts on a tracked resource only as the deletion plan names
 
-`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the operator. It SHALL read a tracked resource, delete it or leave it in place only when the plan names that action as the next one, and it SHALL send each delete with the propagation policy and the precondition the plan names.
+`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the operator. It SHALL read a tracked resource, delete it or leave it in place only when the plan names that action as the next one, and it SHALL send each delete with the propagation policy and the precondition the plan names. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
 
 #### Scenario: Actions and delete options come from the plan
 
@@ -939,7 +939,7 @@ Every check that can refuse the delete SHALL run before the prompt: the guard fo
 
 ### Requirement: The deletion plan does not hold a PersistentVolumeClaim that the command keeps
 
-`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the operator. The plan SHALL NOT hold a `PersistentVolumeClaim` that the command keeps ("Instance delete keeps a tracked PersistentVolumeClaim unless `--delete-data` is set").
+`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the operator. The plan SHALL NOT hold a `PersistentVolumeClaim` that the command keeps ("Instance delete keeps a tracked PersistentVolumeClaim unless `--delete-data` is set"). Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
 
 #### Scenario: A kept claim is outside the plan
 
@@ -948,7 +948,7 @@ Every check that can refuse the delete SHALL run before the prompt: the guard fo
 
 ### Requirement: The ModuleInstance record is deleted only when the plan's release verdict allows it
 
-`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the operator. The command SHALL delete the `ModuleInstance` record only when the plan's release verdict allows it, which is when every planned resource was deleted or left in place and none failed.
+`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the operator. The command SHALL delete the `ModuleInstance` record only when the plan's release verdict allows it, which is when every planned resource was deleted or left in place and none failed. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
 
 #### Scenario: The release verdict holds the record
 
@@ -957,7 +957,7 @@ Every check that can refuse the delete SHALL run before the prompt: the guard fo
 
 ### Requirement: A dry run follows the same plan and deletes nothing
 
-`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the operator. A dry run SHALL follow the same plan, SHALL send no delete, and SHALL NOT delete the record.
+`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the operator. A dry run SHALL follow the same plan, SHALL send no delete, and SHALL NOT delete the record. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
 
 #### Scenario: A dry run sends no delete
 
@@ -966,7 +966,7 @@ Every check that can refuse the delete SHALL run before the prompt: the guard fo
 
 ### Requirement: The output lines and exit codes stay as the other requirements state them
 
-`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the operator. The output lines, their wording and the exit codes of the command SHALL stay as the other requirements of this capability state them. The operator-owned delete path SHALL NOT be affected.
+`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the operator. The output lines, their wording and the exit codes of the command SHALL stay as the other requirements of this capability state them. The operator-owned delete path SHALL NOT be affected. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
 
 #### Scenario: Output and exit codes are unchanged
 

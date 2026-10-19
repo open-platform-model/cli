@@ -429,7 +429,7 @@ When `opm module build` or `opm module vet` runs without `--platform`, the CLI S
 
 ### Requirement: The same generator serves every other render
 
-When `opm module build` or `opm module vet` runs without `--platform`, the CLI SHALL generate a platform module from the module's committed `cue.mod/module.cue` and render against it. The same generator SHALL serve the deps fallback of every other render (see "Renders fall back to their own deps").
+When `opm module build` or `opm module vet` runs without `--platform`, the CLI SHALL generate a platform module from the module's committed `cue.mod/module.cue` and render against it. The same generator SHALL serve the deps fallback of every other render (see "Renders fall back to their own deps"). Source: cli issue 229.
 
 #### Scenario: One generator for every render
 
