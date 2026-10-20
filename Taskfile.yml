@@ -412,10 +412,10 @@ tasks:
   openspec:install:
     desc: Install the openspec CLI at the version CI pins
     cmds:
-      - npm install -g @fission-ai/openspec@1.12.0
+      - npm install -g --ignore-scripts @fission-ai/openspec@1.14.1
 
   openspec:check:
-    desc: Validate every main spec and active change under openspec strict mode
+    desc: Validate every main spec and active change with --strict
     preconditions:
       - sh: command -v openspec >/dev/null
         msg: "openspec not found: run `task openspec:install` (needs npm)"
