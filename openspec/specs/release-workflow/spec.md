@@ -6,107 +6,12 @@
 
 ## Requirements
 
-### Requirement: Binaries publish only when a release was created
-The `goreleaser` job SHALL `need` release-please and publish-templates and run only when `releases_created == 'true'` or the run is a manual `workflow_dispatch`, with `contents: write` and the repository `GITHUB_TOKEN`; `contents: write` is also what lets it see a draft release, which GitHub hides from read-only tokens. Before building it SHALL read the draft state of the GitHub Release for the tag and SHALL proceed only when the release is a draft. When the release is published it SHALL fail with a message that the release is already published and the next patch release must be cut instead. When no GitHub Release exists for the tag it SHALL fail with a message that names the tag and says to re-run the release-please job of the run that merged the release PR. When the lookup itself fails for any other reason it SHALL fail with that error and SHALL NOT report the release as published. After the draft check and before building, it SHALL fail unless the publish-templates job succeeded, with a message that the release stays a draft, so no release is published without its template modules. It SHALL run in a concurrency group per tag that never cancels a running job. Otherwise it SHALL check out `tag_name`, or the `tag` input on a manual run, with `fetch-depth: 0`, set up Go 1.26.0, and run `goreleaser release --clean`. The manual run is the recovery for a draft release whose tag exists without all of its assets, including one held back by a transient template failure; it SHALL NOT change a published release. Source: enhancement 0021 ("Release tags are immutable").
-
-#### Scenario: Skipped on a non-release push
-- **WHEN** release-please reports no release created
-- **THEN** the goreleaser job does not run and no assets are attached
-
-#### Scenario: Runs on the release tag
-- **WHEN** release-please reports a release created and the publish-templates job succeeded
-- **THEN** goreleaser builds from the tagged commit with full git history available
-
-#### Scenario: Manual recovery builds an existing tag
-- **WHEN** the workflow is run by hand with `tag` set to an existing release tag whose GitHub Release is still a draft
-- **THEN** release-please is skipped, the publish-templates job gates and publishes that tag's templates, and goreleaser builds that tag, attaches its assets to the existing draft, and publishes it
-
-#### Scenario: Manual recovery refuses a published release
-- **WHEN** the workflow is run by hand with `tag` set to a release that is already published
-- **THEN** the goreleaser job fails before building, names the tag, and says to cut the next patch release, and the published release and its tag are unchanged
-
-#### Scenario: Manual recovery for a tag without a release
-- **WHEN** the workflow is run by hand with `tag` set to a tag that exists but has no GitHub Release
-- **THEN** the goreleaser job fails before building, names the tag, says to re-run the release-please job, and does not say the release is published
-
-#### Scenario: Template failure keeps the release a draft
-- **WHEN** the publish-templates job fails for a release whose GitHub Release is still a draft
-- **THEN** the goreleaser job fails after the draft check and before building, attaches no asset, and the release stays a draft
-
-### Requirement: Goreleaser produces per-platform archives, checksums and changelog
-Goreleaser SHALL build `opm` for linux/amd64, linux/arm64, darwin/amd64, darwin/arm64 and windows/amd64 (windows/arm64 excluded), package each as an archive named `opm-<os>-<arch>` bundling `LICENSE`, and attach the archives, `checksums.txt` (SHA256 digests) and `LICENSE` to the GitHub Release. Its changelog SHALL group commits into Features, Bug Fixes, Performance, Refactoring and Other, excluding subjects starting with `docs:`, `test:`, `ci:` or `chore:`. Goreleaser SHALL attach to release-please's draft release (`release.use_existing_draft: true`, matched by a release name equal to the tag) instead of creating a release, SHALL upload every asset while the release is still a draft, replacing an asset a failed earlier run left on that draft, and SHALL publish the release as its last step. The configuration SHALL NOT set `release.draft`, a `release.name_template` that departs from the tag, or `release.replace_existing_draft`. Goreleaser SHALL set the GitHub Release's prerelease flag from the tag (`release.prerelease: auto`): a tag with a SemVer prerelease suffix SHALL be marked Pre-release and SHALL NOT become the repository's Latest release. It SHALL keep the release notes release-please already wrote on the existing GitHub Release (`release.mode: keep-existing`). Source: enhancement 0021 ("Release tags are immutable").
-
-#### Scenario: Five archives and checksums attached
-- **WHEN** goreleaser completes
-- **THEN** the GitHub Release assets include the five `opm-<os>-<arch>` archives, `checksums.txt` and `LICENSE`
-
-#### Scenario: Changelog grouped by type
-- **WHEN** goreleaser generates its changelog
-- **THEN** entries are grouped by conventional commit type with the excluded types absent
-
-#### Scenario: Beta tag flagged as a pre-release
-- **WHEN** goreleaser publishes the assets for `v1.0.0-beta.1`
-- **THEN** the GitHub Release is marked Pre-release, is not the Latest release, and still carries release-please's notes
-
-#### Scenario: Release published only with all assets
-- **WHEN** release-please has created a draft release and goreleaser runs for its tag
-- **THEN** goreleaser attaches to release-please's draft for the tag and creates no GitHub Release of its own, the release stays a draft until every asset is attached, and goreleaser then publishes it
-
 ### Requirement: Version ldflags are injected at build time
 The goreleaser build SHALL inject `Version`, `GitCommit`, and `BuildDate` via ldflags matching the variables in `internal/version/version.go`.
 
 #### Scenario: Version command reflects release tag
 - **WHEN** a released binary runs `opm version`
 - **THEN** the output shows the tag version, commit SHA, and build date
-
-### Requirement: Template modules publish on release
-The `publish-templates` job SHALL `need` release-please, run only when `releases_created == 'true'` or the run is a manual `workflow_dispatch`, check out `tag_name` (or the `tag` input on a manual run), build `opm` from it, install the cue version that the tag's `go.mod` requires for `cuelang.org/go`, log in to GHCR with the repository `GITHUB_TOKEN`, and run `.github/scripts/publish-templates.sh` with `packages: write`. It SHALL finish before the goreleaser job builds. Before it publishes any template, the script SHALL run every gate of the pr-workflow requirement "Template publish gates run dry-run" on every template tree, with the `opm` built from the tag:
-- the identity, the tree layout, `opm module tidy --check` and `opm module vet`;
-- the tree equals its module zip;
-- the `opm module publish --dry-run` gates, with already-published as the only acceptable refusal;
-- the version order, and for an already-published version the content check: the artifact GHCR holds at that version SHALL contain exactly the tree's files.
-
-If any template fails a gate, or a fetch, listing, verification or comparison fails, the script SHALL publish nothing and fail. Otherwise it SHALL act on each template's gate verdict without reading GHCR again: it SHALL publish every template whose version the gates found unpublished, and skip every template found published and identical. A version that becomes published between the gates and the push SHALL make `opm module publish` refuse and the job fail, never be skipped unchecked. A release with no template changed publishes nothing and succeeds, and a re-run after a partial publish skips what the earlier attempt pushed. A change to a template's files, its `cue.mod` pins included, SHALL therefore bump that template's identity `Version` to a stable version above the highest published one, or the release fails before publishing any template and stays a draft.
-
-#### Scenario: No template version bumped
-- **WHEN** every template's declared version is already on GHCR as the highest stable version of its major, and each published artifact holds exactly its template's tree
-- **THEN** nothing is published and the job succeeds
-
-#### Scenario: Template fails a gate
-- **WHEN** a template tree violates a publish gate
-- **THEN** the job fails, no template is published, and the release is marked with a failed job and stays a draft
-
-#### Scenario: Bumped template publishes
-- **WHEN** a release carries a template whose identity `Version` is a stable version above every stable version GHCR holds for its major, and every gate passes
-- **THEN** the job publishes that template at that version through `opm module publish`
-
-#### Scenario: A template that does not vet blocks every template publish
-- **WHEN** a release carries two bumped templates and one of them fails `opm module vet`
-- **THEN** neither template is published
-- **AND** the job fails naming the template that failed
-
-#### Scenario: Changed template at a published version fails before any publish
-- **WHEN** a template's tree differs from the artifact GHCR holds at its declared version
-- **THEN** no template is published
-- **AND** the job fails naming the template, printing the difference and naming `opm module version set`
-
-#### Scenario: Re-run after a partial publish completes
-- **WHEN** the job runs again for the same tag after an earlier attempt pushed one of two templates whose versions this release raised
-- **THEN** the pushed template, now identical on GHCR, is skipped, the other template is published, and the job succeeds
-
-#### Scenario: A version published during the run is not skipped
-- **WHEN** the gates found a template version unpublished and another run publishes that version before this run pushes it
-- **THEN** `opm module publish` refuses the push, the job fails, and no later template in the run is published
-
-#### Scenario: A template whose zip omits a file publishes nothing
-- **WHEN** a release carries a bumped template whose tree holds a file its module zip leaves out, such as a symbolic link
-- **THEN** no template is published
-- **AND** the job fails naming the template and the file
-
-#### Scenario: A prerelease or older template version publishes nothing
-- **WHEN** a release carries a template whose version is a prerelease, or is not above the highest stable version GHCR holds for its major while unpublished, or is below it while published
-- **THEN** no template is published
-- **AND** the job fails naming the template
 
 ### Requirement: Workflow targets GitHub-hosted runner
 The release workflow SHALL specify `runs-on: ubuntu-latest` for all jobs.
@@ -137,69 +42,333 @@ No job, step or script of the release workflow SHALL move, delete or re-create a
 - **WHEN** a `docs(...)` commit and a `fix(...)` commit land on `main`
 - **THEN** the release PR's changelog lists the fix and omits the docs commit
 
-### Requirement: Release-please runs on pushes to main
-The release workflow SHALL trigger on `push` to `main` and on `workflow_dispatch` with one required `tag` input, and never on a tag push. On a push, the `release-please` job SHALL run first, authenticated as the opm-release-please App with no `GITHUB_TOKEN` fallback, driven by `release-please-config.json` and `.release-please-manifest.json`: a Go package named `opm` on a `v`-prefixed, `beta` prerelease version line with `CHANGELOG.md` as the changelog. The configuration SHALL set `draft: true` and `force-tag-creation: true`, so release-please creates the git tag at the release commit itself and leaves the GitHub Release as a draft for goreleaser to fill and publish. The job SHALL expose `releases_created` and `tag_name` as outputs for the downstream jobs. On a manual run the `release-please` job SHALL be skipped. Source: enhancement 0021 ("Release tags are immutable").
+### Requirement: The goreleaser job runs only for a created release or a manual run
+
+The `goreleaser` job SHALL `need` release-please and publish-templates and run only when `releases_created == 'true'` or the run is a manual `workflow_dispatch`, with `contents: write` and the repository `GITHUB_TOKEN`; `contents: write` is also what lets it see a draft release, which GitHub hides from read-only tokens. Source: enhancement 0021 ("Release tags are immutable").
+
+#### Scenario: Skipped on a non-release push
+- **WHEN** release-please reports no release created
+- **THEN** the goreleaser job does not run and no assets are attached
+
+### Requirement: The goreleaser job needs a draft release
+
+Before building, the `goreleaser` job SHALL read the draft state of the GitHub Release for the tag and SHALL proceed only when the release is a draft. When the release is published the `goreleaser` job SHALL fail with a message that the release is already published and the next patch release must be cut instead. Source: enhancement 0021 ("Release tags are immutable").
+
+#### Scenario: Manual recovery refuses a published release
+- **WHEN** the workflow is run by hand with `tag` set to a release that is already published
+- **THEN** the goreleaser job fails before building, names the tag, and says to cut the next patch release, and the published release and its tag are unchanged
+
+### Requirement: The goreleaser job fails without a release for the tag
+
+When no GitHub Release exists for the tag the `goreleaser` job SHALL fail with a message that names the tag and says to re-run the release-please job of the run that merged the release PR. Source: enhancement 0021 ("Release tags are immutable").
+
+#### Scenario: Manual recovery for a tag without a release
+- **WHEN** the workflow is run by hand with `tag` set to a tag that exists but has no GitHub Release
+- **THEN** the goreleaser job fails before building, names the tag, says to re-run the release-please job, and does not say the release is published
+
+### Requirement: A failed draft lookup is no published release
+
+Before building, the `goreleaser` job SHALL read the draft state of the GitHub Release for the tag. When the lookup itself fails for any other reason the `goreleaser` job SHALL fail with that error and SHALL NOT report the release as published. (Requirement: The goreleaser job fails without a release for the tag) Source: enhancement 0021 ("Release tags are immutable").
+
+#### Scenario: A failed lookup is not reported as published
+- **WHEN** the lookup itself fails for any other reason
+- **THEN** the `goreleaser` job SHALL fail with that error and SHALL NOT report the release as published
+
+### Requirement: The goreleaser job needs publish-templates to succeed
+
+After the draft check and before building, the `goreleaser` job SHALL fail unless the publish-templates job succeeded, with a message that the release stays a draft, so no release is published without its template modules. Source: enhancement 0021 ("Release tags are immutable").
+
+#### Scenario: Template failure keeps the release a draft
+- **WHEN** the publish-templates job fails for a release whose GitHub Release is still a draft
+- **THEN** the goreleaser job fails after the draft check and before building, attaches no asset, and the release stays a draft
+
+### Requirement: The goreleaser job runs in a concurrency group per tag
+
+The `goreleaser` job SHALL run in a concurrency group per tag that never cancels a running job. Source: enhancement 0021 ("Release tags are immutable").
+
+#### Scenario: The job runs in a concurrency group per tag
+- **WHEN** the `goreleaser` job runs
+- **THEN** it SHALL run in a concurrency group per tag that never cancels a running job
+
+### Requirement: The goreleaser job checks out the tag and runs goreleaser
+
+In every other case than those of requirements "The goreleaser job needs a draft release", "The goreleaser job fails without a release for the tag", "A failed draft lookup is no published release" and "The goreleaser job needs publish-templates to succeed", the `goreleaser` job SHALL check out `tag_name`, or the `tag` input on a manual run, with `fetch-depth: 0`, set up Go 1.26.0, and run `goreleaser release --clean`. Source: enhancement 0021 ("Release tags are immutable").
+
+#### Scenario: Runs on the release tag
+- **WHEN** release-please reports a release created and the publish-templates job succeeded
+- **THEN** goreleaser builds from the tagged commit with full git history available
+
+### Requirement: A manual run recovers a draft release and never changes a published one
+
+The manual run is the recovery for a draft release whose tag exists without all of its assets, including one held back by a transient template failure; it SHALL NOT change a published release. Source: enhancement 0021 ("Release tags are immutable").
+
+#### Scenario: Manual recovery builds an existing tag
+- **WHEN** the workflow is run by hand with `tag` set to an existing release tag whose GitHub Release is still a draft
+- **THEN** release-please is skipped, the publish-templates job gates and publishes that tag's templates, and goreleaser builds that tag, attaches its assets to the existing draft, and publishes it
+
+### Requirement: Goreleaser builds five platform archives and attaches them with the checksums
+
+Goreleaser SHALL build `opm` for linux/amd64, linux/arm64, darwin/amd64, darwin/arm64 and windows/amd64 (windows/arm64 excluded), package each as an archive named `opm-<os>-<arch>` bundling `LICENSE`, and attach the archives, `checksums.txt` (SHA256 digests) and `LICENSE` to the GitHub Release. Source: enhancement 0021 ("Release tags are immutable").
+
+#### Scenario: Five archives and checksums attached
+- **WHEN** goreleaser completes
+- **THEN** the GitHub Release assets include the five `opm-<os>-<arch>` archives, `checksums.txt` and `LICENSE`
+
+### Requirement: Goreleaser groups the changelog by commit type
+
+The changelog of Goreleaser SHALL group commits into Features, Bug Fixes, Performance, Refactoring and Other, excluding subjects starting with `docs:`, `test:`, `ci:` or `chore:`. Source: enhancement 0021 ("Release tags are immutable").
+
+#### Scenario: Changelog grouped by type
+- **WHEN** goreleaser generates its changelog
+- **THEN** entries are grouped by conventional commit type with the excluded types absent
+
+### Requirement: Goreleaser attaches to release-please's draft release and publishes it last
+
+Goreleaser SHALL attach to release-please's draft release (`release.use_existing_draft: true`, matched by a release name equal to the tag) instead of creating a release, SHALL upload every asset while the release is still a draft, replacing an asset a failed earlier run left on that draft, and SHALL publish the release as its last step. Source: enhancement 0021 ("Release tags are immutable").
+
+#### Scenario: Release published only with all assets
+- **WHEN** release-please has created a draft release and goreleaser runs for its tag
+- **THEN** goreleaser attaches to release-please's draft for the tag and creates no GitHub Release of its own, the release stays a draft until every asset is attached, and goreleaser then publishes it
+
+### Requirement: The goreleaser configuration sets no draft, no renamed release and no replaced draft
+
+The goreleaser configuration SHALL NOT set `release.draft`, a `release.name_template` that departs from the tag, or `release.replace_existing_draft`. Source: enhancement 0021 ("Release tags are immutable").
+
+#### Scenario: The configuration leaves the draft, name and replace keys unset
+- **WHEN** goreleaser is configured
+- **THEN** the configuration SHALL NOT set `release.draft`, a `release.name_template` that departs from the tag, or `release.replace_existing_draft`
+
+### Requirement: Goreleaser sets the prerelease flag from the tag
+
+Goreleaser SHALL set the GitHub Release's prerelease flag from the tag (`release.prerelease: auto`): a tag with a SemVer prerelease suffix SHALL be marked Pre-release and SHALL NOT become the repository's Latest release. Source: enhancement 0021 ("Release tags are immutable").
+
+#### Scenario: Beta tag flagged as a pre-release
+- **WHEN** goreleaser publishes the assets for `v1.0.0-beta.1`
+- **THEN** the GitHub Release is marked Pre-release, is not the Latest release, and still carries release-please's notes
+
+### Requirement: Goreleaser keeps the release notes release-please wrote
+
+Goreleaser SHALL keep the release notes release-please already wrote on the existing GitHub Release (`release.mode: keep-existing`). Source: enhancement 0021 ("Release tags are immutable").
+
+#### Scenario: Release-please notes are kept
+- **WHEN** goreleaser publishes the assets of a release
+- **THEN** it SHALL keep the release notes release-please already wrote on the existing GitHub Release (`release.mode: keep-existing`)
+
+### Requirement: The publish-templates job runs the publish script before goreleaser builds
+
+The `publish-templates` job SHALL `need` release-please, run only when `releases_created == 'true'` or the run is a manual `workflow_dispatch`, check out `tag_name` (or the `tag` input on a manual run), build `opm` from it, install the cue version that the tag's `go.mod` requires for `cuelang.org/go`, log in to GHCR with the repository `GITHUB_TOKEN`, and run `.github/scripts/publish-templates.sh` with `packages: write`. It SHALL finish before the goreleaser job builds.
+
+#### Scenario: The job finishes before goreleaser builds
+- **WHEN** the `publish-templates` job runs
+- **THEN** it SHALL finish before the goreleaser job builds
+
+### Requirement: The script runs the identity, layout, tidy, vet and zip gates on every template tree
+
+Before the `publish-templates` job publishes any template, the script SHALL run every gate of the pr-workflow requirement "Template publish gates run dry-run" on every template tree, with the `opm` built from the tag: the identity, the tree layout, `opm module tidy --check` and `opm module vet`; the tree equals its module zip.
+
+#### Scenario: A template that does not vet blocks every template publish
+- **WHEN** a release carries two bumped templates and one of them fails `opm module vet`
+- **THEN** neither template is published
+- **AND** the job fails naming the template that failed
+
+#### Scenario: A template whose zip omits a file publishes nothing
+- **WHEN** a release carries a bumped template whose tree holds a file its module zip leaves out, such as a symbolic link
+- **THEN** no template is published
+- **AND** the job fails naming the template and the file
+
+### Requirement: The script runs the dry-run publish gates, the version order and the content check on every template tree
+
+Before the `publish-templates` job publishes any template, the script SHALL run every gate of the pr-workflow requirement "Template publish gates run dry-run" on every template tree, with the `opm` built from the tag: the `opm module publish --dry-run` gates, with already-published as the only acceptable refusal; the version order, and for an already-published version the content check: the artifact GHCR holds at that version SHALL contain exactly the tree's files.
+
+#### Scenario: Changed template at a published version fails before any publish
+- **WHEN** a template's tree differs from the artifact GHCR holds at its declared version
+- **THEN** no template is published
+- **AND** the job fails naming the template, printing the difference and naming `opm module version set`
+
+#### Scenario: A prerelease or older template version publishes nothing
+- **WHEN** a release carries a template whose version is a prerelease, or is not above the highest stable version GHCR holds for its major while unpublished, or is below it while published
+- **THEN** no template is published
+- **AND** the job fails naming the template
+
+### Requirement: A failed gate publishes nothing and otherwise the script acts on each gate verdict
+
+If any template fails a gate, or a fetch, listing, verification or comparison fails, the script (`.github/scripts/publish-templates.sh`) SHALL publish nothing and fail. Otherwise it SHALL act on each template's gate verdict without reading GHCR again: it SHALL publish every template whose version the gates found unpublished, and skip every template found published and identical.
+
+#### Scenario: Template fails a gate
+- **WHEN** a template tree violates a publish gate
+- **THEN** the job fails, no template is published, and the release is marked with a failed job and stays a draft
+
+#### Scenario: Bumped template publishes
+- **WHEN** a release carries a template whose identity `Version` is a stable version above every stable version GHCR holds for its major, and every gate passes
+- **THEN** the job publishes that template at that version through `opm module publish`
+
+### Requirement: A version published between the gates and the push is not skipped unchecked
+
+A version that becomes published between the gates and the push SHALL make `opm module publish` refuse and the job (`publish-templates`) fail, never be skipped unchecked.
+
+#### Scenario: A version published during the run is not skipped
+- **WHEN** the gates found a template version unpublished and another run publishes that version before this run pushes it
+- **THEN** `opm module publish` refuses the push, the job fails, and no later template in the run is published
+
+### Requirement: A release with no template changed publishes nothing
+
+A release with no template changed SHALL publish nothing and succeed, and a re-run after a partial publish SHALL skip what the earlier attempt pushed.
+
+#### Scenario: No template version bumped
+- **WHEN** every template's declared version is already on GHCR as the highest stable version of its major, and each published artifact holds exactly its template's tree
+- **THEN** nothing is published and the job succeeds
+
+#### Scenario: Re-run after a partial publish completes
+- **WHEN** the job runs again for the same tag after an earlier attempt pushed one of two templates whose versions this release raised
+- **THEN** the pushed template, now identical on GHCR, is skipped, the other template is published, and the job succeeds
+
+### Requirement: A change to a template's files bumps its identity Version
+
+A change to a template's files, its `cue.mod` pins included, SHALL therefore bump that template's identity `Version` to a stable version above the highest published one, or the release fails before publishing any template and stays a draft.
+
+#### Scenario: A changed template without a bump fails the release
+- **WHEN** a change to a template's files, its `cue.mod` pins included, lands without a bump of that template's identity `Version`
+- **THEN** the release fails before publishing any template and stays a draft
+
+### Requirement: The release workflow triggers on push to main and on manual dispatch with a tag
+
+The release workflow SHALL trigger on `push` to `main` and on `workflow_dispatch` with one required `tag` input, and never on a tag push. Source: enhancement 0021 ("Release tags are immutable").
+
+#### Scenario: Triggers of the release workflow
+- **WHEN** the release workflow is configured
+- **THEN** it SHALL trigger on `push` to `main` and on `workflow_dispatch` with one required `tag` input, and never on a tag push
+
+### Requirement: On a push the release-please job runs first as the opm-release-please App
+
+On a push, the `release-please` job SHALL run first, authenticated as the opm-release-please App with no `GITHUB_TOKEN` fallback, driven by `release-please-config.json` and `.release-please-manifest.json`: a Go package named `opm` on a `v`-prefixed, `beta` prerelease version line with `CHANGELOG.md` as the changelog. Source: enhancement 0021 ("Release tags are immutable").
 
 #### Scenario: Release-please on a push without a merged release PR
 - **WHEN** a commit that is not a release PR merge lands on main
 - **THEN** release-please updates or opens the release PR and the goreleaser and publish-templates jobs are skipped
 
-#### Scenario: Release-please on a merged release PR
-- **WHEN** the release PR merges to main
-- **THEN** release-please creates the tag at the release commit and a draft GitHub Release, and reports `releases_created == 'true'` with the new `tag_name`
-
 #### Scenario: Releases without a release-as key stay on the beta line
 - **WHEN** the manifest holds `1.0.0-beta.1`, `release-please-config.json` carries no `release-as` key, and a releasable commit lands on main
 - **THEN** release-please proposes `1.0.0-beta.2`
 
-### Requirement: A version line moves only through a release-as key
-A forced version, such as a move to a new version line (for example `1.0.0-alpha.27` to `1.0.0-beta.1`), SHALL be a `release-as` value on the `.` package in `release-please-config.json`, set by a normal pull request. The key SHALL take effect only together with a releasable commit (a visible type: `feat`, `fix`, `perf`, `revert`, `deps` or `refactor`) on `main` since the last release, because release-please opens no release PR for hidden-type commits alone, whatever the key says; so the key pull request SHALL itself carry a releasable type, or land after a releasable commit since the last release. Because release-please re-applies a configured `release-as` on every run, the key SHALL be removed before any later release PR merges. Outside the span from the key pull request to the pull request that removes it, the configuration SHALL carry no `release-as` value. A `Release-As:` footer in a pull request body or a branch commit message SHALL NOT be relied on, because the `BLANK` squash message keeps it off `main`. A `BEGIN_COMMIT_OVERRIDE` block in a pull request body SHALL NOT be used, because release-please would take it as the commit message and apply its footers. Source: workspace RELEASING.md, section "Owner settings" (owner decision 2026-10-02).
+### Requirement: The release-please configuration sets draft and force-tag-creation
+
+The configuration of `release-please-config.json` SHALL set `draft: true` and `force-tag-creation: true`, so release-please creates the git tag at the release commit itself and leaves the GitHub Release as a draft for goreleaser to fill and publish. Source: enhancement 0021 ("Release tags are immutable").
+
+#### Scenario: Release-please on a merged release PR
+- **WHEN** the release PR merges to main
+- **THEN** release-please creates the tag at the release commit and a draft GitHub Release, and reports `releases_created == 'true'` with the new `tag_name`
+
+### Requirement: The release-please job exposes releases_created and tag_name as outputs
+
+The `release-please` job SHALL expose `releases_created` and `tag_name` as outputs for the downstream jobs. Source: enhancement 0021 ("Release tags are immutable").
+
+#### Scenario: Outputs for the downstream jobs
+- **WHEN** the `release-please` job runs
+- **THEN** it SHALL expose `releases_created` and `tag_name` as outputs for the downstream jobs
+
+### Requirement: On a manual run the release-please job is skipped
+
+On a manual run the `release-please` job SHALL be skipped. Source: enhancement 0021 ("Release tags are immutable").
+
+#### Scenario: Manual run skips release-please
+- **WHEN** the workflow is run by hand
+- **THEN** the `release-please` job SHALL be skipped
+
+### Requirement: A forced version is a release-as value set by a normal pull request
+
+A forced version, such as a move to a new version line (for example `1.0.0-alpha.27` to `1.0.0-beta.1`), SHALL be a `release-as` value on the `.` package in `release-please-config.json`, set by a normal pull request. Source: workspace RELEASING.md, section "Owner settings" (owner decision 2026-10-02).
 
 #### Scenario: A release-as key forces the line change
 - **WHEN** the manifest holds `1.0.0-alpha.27`, a pull request that sets `release-as` to `1.0.0-beta.1` in `release-please-config.json` merges to main, and it or another commit since the last release has a releasable type
 - **THEN** release-please opens or retitles the release PR as `chore(main): release 1.0.0-beta.1`
 
+### Requirement: The release-as key takes effect only with a releasable commit
+
+The `release-as` key SHALL take effect only together with a releasable commit (a visible type: `feat`, `fix`, `perf`, `revert`, `deps` or `refactor`) on `main` since the last release, because release-please opens no release PR for hidden-type commits alone, whatever the key says; so the key pull request SHALL itself carry a releasable type, or land after a releasable commit since the last release. Source: workspace RELEASING.md, section "Owner settings" (owner decision 2026-10-02).
+
 #### Scenario: A key pull request of a hidden type alone opens no release PR
 - **WHEN** the only commit on main since the last release is a `chore(...)`, `build(...)` or `ci(...)` pull request that sets `release-as`
 - **THEN** release-please opens no release PR, and the forced version waits for the next releasable commit
+
+### Requirement: The release-as key is removed before any later release PR merges
+
+Because release-please re-applies a configured `release-as` on every run, the `release-as` key SHALL be removed before any later release PR merges. Outside the span from the key pull request to the pull request that removes it, the configuration SHALL carry no `release-as` value. Source: workspace RELEASING.md, section "Owner settings" (owner decision 2026-10-02).
 
 #### Scenario: The key is removed once its release is cut
 - **WHEN** the release PR for the `release-as` version has merged and that version is tagged
 - **THEN** a pull request removes the `release-as` key before any later release PR merges, and later releasable commits advance the line normally
 
+### Requirement: A Release-As footer is not relied on
+
+A `Release-As:` footer in a pull request body or a branch commit message SHALL NOT be relied on, because the `BLANK` squash message keeps it off `main`. Source: workspace RELEASING.md, section "Owner settings" (owner decision 2026-10-02).
+
 #### Scenario: A footer forces nothing
 - **WHEN** a pull request whose body or branch commit message carries `Release-As: 1.1.0-beta.1`, and whose body has no `BEGIN_COMMIT_OVERRIDE` block, merges to main under the `BLANK` squash message
 - **THEN** the squash commit on main carries only the pull request title, and release-please proposes the next version from that title alone
 
-### Requirement: A breaking change is marked by a bang in the pull request title
-A breaking change SHALL be marked by `!` in the pull request title (`feat!:`, `fix(deps)!:`), which is the squash commit title once `squash_merge_commit_title` is `PR_TITLE`. Until that owner setting lands, a one-commit pull request squashes under its commit subject, so that subject SHALL carry the same `!`. A `BREAKING CHANGE:` footer in a pull request body or a branch commit message SHALL NOT be relied on, because the `BLANK` squash message keeps it off `main`; the migration note goes in the pull request body, and in the user docs when users need it to upgrade, and the release pull request's `CHANGELOG.md` SHALL be edited by hand to carry it as the last step before that release pull request merges, and the edit SHALL be redone if anything landed on `main` since, because release-please rebuilds the release pull request on every push to `main` and drops a hand edit. A `BEGIN_COMMIT_OVERRIDE` block in a pull request body SHALL NOT be used, because release-please would take it as the commit message. Source: workspace RELEASING.md, section "Owner settings" (owner decision 2026-10-02).
+### Requirement: A BEGIN_COMMIT_OVERRIDE block is not used
+
+A `BEGIN_COMMIT_OVERRIDE` block in a pull request body SHALL NOT be used, because release-please would take it as the commit message and apply its footers. Source: workspace RELEASING.md, section "Owner settings" (owner decision 2026-10-02).
+
+#### Scenario: An override block is not used
+- **WHEN** a pull request body carries a `BEGIN_COMMIT_OVERRIDE` block
+- **THEN** it SHALL NOT be used, because release-please would take it as the commit message and apply its footers
+
+### Requirement: A breaking change is marked by a bang in the pull request title or the one commit subject
+
+A breaking change SHALL be marked by `!` in the pull request title (`feat!:`, `fix(deps)!:`), which is the squash commit title once `squash_merge_commit_title` is `PR_TITLE`. Until that owner setting lands, a one-commit pull request squashes under its commit subject, so that subject SHALL carry the same `!`. Source: workspace RELEASING.md, section "Owner settings" (owner decision 2026-10-02).
 
 #### Scenario: Breaking change marked in the title
 - **WHEN** a pull request titled `feat!: ...` squash-merges to main while the manifest holds `1.0.0-beta.3`
 - **THEN** release-please lists it under breaking changes and proposes `1.0.0-beta.4`, advancing the `-beta.N` counter
 
+### Requirement: A BREAKING CHANGE footer is not relied on
+
+A `BREAKING CHANGE:` footer in a pull request body or a branch commit message SHALL NOT be relied on, because the `BLANK` squash message keeps it off `main`. Source: workspace RELEASING.md, section "Owner settings" (owner decision 2026-10-02).
+
 #### Scenario: A breaking footer alone marks nothing
 - **WHEN** a pull request titled `feat: ...` whose body carries a `BREAKING CHANGE:` footer and no `BEGIN_COMMIT_OVERRIDE` block squash-merges to main under the `BLANK` squash message
 - **THEN** the squash commit carries only the title, and release-please files it as an ordinary feature
 
-### Requirement: Downstream repos are notified after a release is published
-`.github/workflows/release.yml` SHALL have a `notify-downstream` job, its last, that `needs` release-please and goreleaser. It SHALL run only when goreleaser succeeded, the run's ref is `main`, and the repository variable `CASCADE_NOTIFY` is not `off`. It SHALL run on a release run and on a manual recovery run alike, because release-please is skipped on the manual run. It SHALL NOT depend on the docs bundle job. It is a caller-owned job: it SHALL run on `ubuntu-latest`, declare `environment: cascade`, have a 20-minute timeout, grant only `contents: read`, and have exactly one step, the shared `open-platform-model/.github` `cascade-notify` action at the repository's pinned `.github` commit, with the inputs `tag` (`tag_name` from release-please, or the `tag` input on a manual run), `client-id: ${{ vars.CASCADE_APP_CLIENT_ID }}` and `private-key: ${{ secrets.CASCADE_APP_PRIVATE_KEY }}`. The action mints the dispatch token and chooses the targets: catalog_opm and opm-operator, as release-tool edges. Source: workspace RELEASING.md, sections "Notify after publish" and "Stop switches"; Phase 3 wiring contract (version 3.1) §4.5 and §4.6.
+### Requirement: The migration note goes in the pull request body
+
+The migration note of a breaking change SHALL go in the pull request body, and in the user docs when users need it to upgrade. Source: workspace RELEASING.md, section "Owner settings" (owner decision 2026-10-02).
+
+#### Scenario: Migration note placement
+- **WHEN** a breaking change needs a migration note
+- **THEN** the migration note goes in the pull request body, and in the user docs when users need it to upgrade
+
+### Requirement: The release pull request CHANGELOG is edited by hand and the edit is redone
+
+The release pull request's `CHANGELOG.md` SHALL be edited by hand to carry the migration note as the last step before that release pull request merges. The edit SHALL be redone if anything landed on `main` since, because release-please rebuilds the release pull request on every push to `main` and drops a hand edit. Source: workspace RELEASING.md, section "Owner settings" (owner decision 2026-10-02).
+
+#### Scenario: A hand edit of the release pull request's changelog
+- **WHEN** a breaking change is merged to `main`
+- **THEN** the release pull request's `CHANGELOG.md` SHALL be edited by hand to carry the migration note as the last step before that release pull request merges, and the edit SHALL be redone if anything landed on `main` since
+
+### Requirement: A BEGIN_COMMIT_OVERRIDE block is not used for a breaking change
+
+A `BEGIN_COMMIT_OVERRIDE` block in a pull request body SHALL NOT be used, because release-please would take it as the commit message. Source: workspace RELEASING.md, section "Owner settings" (owner decision 2026-10-02).
+
+#### Scenario: An override block marks nothing
+- **WHEN** a pull request body carries a `BEGIN_COMMIT_OVERRIDE` block
+- **THEN** it SHALL NOT be used, because release-please would take it as the commit message
+
+### Requirement: The release workflow ends with a notify-downstream job
+
+`.github/workflows/release.yml` SHALL have a `notify-downstream` job, its last, that `needs` release-please and goreleaser. Source: workspace RELEASING.md, sections "Notify after publish" and "Stop switches"; Phase 3 wiring contract (version 3.1) §4.5 and §4.6.
 
 #### Scenario: Release run notifies after publishing
 - **WHEN** a push to `main` cuts a release, and publish-templates and goreleaser succeed
 - **THEN** the notify job runs after goreleaser in the `cascade` Environment with the release's tag, and catalog_opm and opm-operator each receive one `upstream-released` dispatch naming the cli and that tag
 
+### Requirement: The notify job runs only after goreleaser succeeded, on main, unless notifying is switched off
+
+The `notify-downstream` job SHALL run only when goreleaser succeeded, the run's ref is `main`, and the repository variable `CASCADE_NOTIFY` is not `off`. Source: workspace RELEASING.md, sections "Notify after publish" and "Stop switches"; Phase 3 wiring contract (version 3.1) §4.5 and §4.6.
+
 #### Scenario: A release left a draft notifies nothing
 - **WHEN** publish-templates fails, so goreleaser fails and the release stays a draft
 - **THEN** the notify job does not run
-
-#### Scenario: Manual recovery that finishes a draft notifies once
-- **WHEN** the workflow is run by hand on `main` with `tag` set to a draft release, and goreleaser publishes it
-- **THEN** the notify job runs with that tag
-
-#### Scenario: Manual run on a published release does not notify again
-- **WHEN** the workflow is run by hand with `tag` set to a release that is already published
-- **THEN** goreleaser fails its draft check and the notify job does not run
 
 #### Scenario: Manual run from another branch does not notify
 - **WHEN** the workflow is run by hand from a branch other than `main`
@@ -213,20 +382,68 @@ A breaking change SHALL be marked by `!` in the pull request title (`feat!:`, `f
 - **WHEN** the repository variable `CASCADE_NOTIFY` is `off` and a release is published
 - **THEN** the notify job is skipped and no dispatch is sent
 
+### Requirement: The notify job runs on a manual recovery run and does not depend on the docs bundle job
+
+The `notify-downstream` job SHALL run on a release run and on a manual recovery run alike, because release-please is skipped on the manual run. The `notify-downstream` job SHALL NOT depend on the docs bundle job. Source: workspace RELEASING.md, sections "Notify after publish" and "Stop switches"; Phase 3 wiring contract (version 3.1) §4.5 and §4.6.
+
+#### Scenario: Manual recovery that finishes a draft notifies once
+- **WHEN** the workflow is run by hand on `main` with `tag` set to a draft release, and goreleaser publishes it
+- **THEN** the notify job runs with that tag
+
+#### Scenario: Manual run on a published release does not notify again
+- **WHEN** the workflow is run by hand with `tag` set to a release that is already published
+- **THEN** goreleaser fails its draft check and the notify job does not run
+
 #### Scenario: A failed docs bundle does not suppress the notify
 - **WHEN** goreleaser publishes the release and the docs bundle job fails
 - **THEN** the notify job still runs
 
-### Requirement: Only the release-please job reads the release App key, inside the release Environment
+### Requirement: The notify job is caller-owned with a fixed runner, Environment, timeout and permission
 
-The `release-please` job of `release.yml` SHALL be the only job in the repository that reads `secrets.RELEASE_APP_PRIVATE_KEY`, and SHALL read it only as the `private-key` input of `actions/create-github-app-token`. That job SHALL declare `environment: release`, the Environment whose deployment branch policy allows `main` only, and SHALL run only when the event is a `push` and the ref is `refs/heads/main`. It SHALL grant the `GITHUB_TOKEN` no permission (`permissions: {}`), because it acts only through the App token. No other job SHALL declare the `release` Environment. Source: owner decision 29 (2026-10-04); security pass finding GOV-2.
+The `notify-downstream` job is a caller-owned job: it SHALL run on `ubuntu-latest`, declare `environment: cascade`, have a 20-minute timeout, grant only `contents: read`. Source: workspace RELEASING.md, sections "Notify after publish" and "Stop switches"; Phase 3 wiring contract (version 3.1) §4.5 and §4.6.
+
+#### Scenario: The notify job is caller-owned
+- **WHEN** the `notify-downstream` job is declared
+- **THEN** it is a caller-owned job: it SHALL run on `ubuntu-latest`, declare `environment: cascade`, have a 20-minute timeout, grant only `contents: read`
+
+### Requirement: The notify job has exactly one step, the shared cascade-notify action
+
+The notify-downstream job SHALL have exactly one step, the shared `open-platform-model/.github` `cascade-notify` action at the repository's pinned `.github` commit, with the inputs `tag` (`tag_name` from release-please, or the `tag` input on a manual run), `client-id: ${{ vars.CASCADE_APP_CLIENT_ID }}` and `private-key: ${{ secrets.CASCADE_APP_PRIVATE_KEY }}`. Source: workspace RELEASING.md, sections "Notify after publish" and "Stop switches"; Phase 3 wiring contract (version 3.1) §4.5 and §4.6.
+
+#### Scenario: The notify job has one step
+- **WHEN** the `notify-downstream` job is declared
+- **THEN** it SHALL have exactly one step, the shared `open-platform-model/.github` `cascade-notify` action at the repository's pinned `.github` commit, with the inputs `tag`, `client-id` and `private-key`
+
+### Requirement: The cascade-notify action mints the dispatch token and chooses the targets
+
+The `cascade-notify` action SHALL mint the dispatch token and choose the targets: catalog_opm and opm-operator, as release-tool edges. Source: workspace RELEASING.md, sections "Notify after publish" and "Stop switches"; Phase 3 wiring contract (version 3.1) §4.5 and §4.6.
+
+#### Scenario: The action chooses the targets
+- **WHEN** the `cascade-notify` action runs
+- **THEN** it mints the dispatch token and chooses the targets: catalog_opm and opm-operator, as release-tool edges
+
+### Requirement: Only the release-please job reads the release App key
+
+The `release-please` job of `release.yml` SHALL be the only job in the repository that reads `secrets.RELEASE_APP_PRIVATE_KEY`, and SHALL read it only as the `private-key` input of `actions/create-github-app-token`. Source: owner decision 29 (2026-10-04); security pass finding GOV-2.
+
+#### Scenario: A manual run does not reach the key
+
+- **WHEN** the workflow is run by hand with a `tag`
+- **THEN** the release-please job is skipped and no job reads the release App key
+
+### Requirement: The release Environment is declared by the release-please job alone, on pushes to main
+
+The `release-please` job SHALL declare `environment: release`, the Environment whose deployment branch policy allows `main` only, and SHALL run only when the event is a `push` and the ref is `refs/heads/main`. No other job SHALL declare the `release` Environment. Source: owner decision 29 (2026-10-04); security pass finding GOV-2.
 
 #### Scenario: A push to main mints the token inside the Environment
 
 - **WHEN** a commit lands on `main`
 - **THEN** the release-please job runs as a deployment to the `release` Environment and mints the App token there
 
-#### Scenario: A manual run does not reach the key
+### Requirement: The release-please job grants the GITHUB_TOKEN no permission
 
-- **WHEN** the workflow is run by hand with a `tag`
-- **THEN** the release-please job is skipped and no job reads the release App key
+The `release-please` job SHALL grant the `GITHUB_TOKEN` no permission (`permissions: {}`), because it acts only through the App token. Source: owner decision 29 (2026-10-04); security pass finding GOV-2.
+
+#### Scenario: The job grants the GITHUB_TOKEN nothing
+- **WHEN** the `release-please` job runs
+- **THEN** it SHALL grant the `GITHUB_TOKEN` no permission (`permissions: {}`), because it acts only through the App token

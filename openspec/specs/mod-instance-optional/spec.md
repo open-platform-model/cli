@@ -5,9 +5,8 @@ Defines the behavior of `opm mod build` and `opm mod apply` when no `instance.cu
 ## Requirements
 
 ### Requirement: mod build and mod apply work without an instance.cue file
-`opm mod build` and `opm mod apply` SHALL produce correct output when run against a module directory that contains no `instance.cue` file, provided that either `debugValues` is defined in the module or an explicit `-f` values file is given.
 
-The commands SHALL synthesize a `ModuleInstance` in memory by filling `#config` with the provided values and extracting `#components` from the resulting module value. The full render pipeline (matching, transformer execution, resource generation) SHALL execute identically to the `instance.cue`-backed path.
+`opm mod build` and `opm mod apply` SHALL produce correct output when run against a module directory that contains no `instance.cue` file, provided that either `debugValues` is defined in the module or an explicit `-f` values file is given.
 
 #### Scenario: build succeeds on bare module with debugValues
 - **WHEN** `opm mod build .` is run in a module directory with no `instance.cue`
@@ -76,3 +75,14 @@ When `instance.cue` is absent AND no `-f` flag is given AND the module does not 
 - **AND** no `-f` flag is provided
 - **THEN** the command SHALL fail with exit code non-zero
 - **AND** the error message SHALL mention both options: adding `debugValues` to the module OR using `-f <values-file>`
+
+### Requirement: The commands synthesize a ModuleInstance in memory when no instance.cue exists
+
+`opm mod build` and `opm mod apply` SHALL synthesize a `ModuleInstance` in memory by filling `#config` with the provided values and extracting `#components` from the resulting module value. The full render pipeline (matching, transformer execution, resource generation) SHALL execute identically to the `instance.cue`-backed path.
+(Requirement: mod build and mod apply work without an instance.cue file)
+
+#### Scenario: Bare module renders through a synthesized ModuleInstance
+
+- **WHEN** `opm mod build` runs in a module directory with no `instance.cue` and values are provided
+- **THEN** the command SHALL synthesize a `ModuleInstance` in memory by filling `#config` with the provided values and extracting `#components` from the resulting module value
+- **AND** the full render pipeline (matching, transformer execution, resource generation) SHALL execute identically to the `instance.cue`-backed path

@@ -1,0 +1,179 @@
+## REMOVED Requirements
+
+### Requirement: Operator applier grant is verified before operator-owned tests
+**Reason**: Split into requirements that each state one behavior.
+**Migration**: See "Operator-owned e2e tests verify the operator's applier grant", "The effective applier identity is the ServiceAccount named by --default-service-account when that argument is present", "A denied applier check fails the test before any cluster mutation", "An applier check that could not be performed skips the test".
+
+### Requirement: The e2e suite resolves modules through the shipped default registry
+**Reason**: Split into requirements that each state one behavior.
+**Migration**: See "The cluster-backed e2e suite resolves published modules through the registry mapping the CLI ships as its default", "The e2e suite's stub home configuration takes its registry from the shipped default by reference", "A test that needs to write to a registry provides one it owns for the duration of that test".
+
+### Requirement: A destructive test that cannot restore the cluster fails its own run
+**Reason**: Split into requirements that each state one behavior.
+**Migration**: See "A destructive test restores the dev cluster's operator before the run ends and fails the run when it cannot", "The failure of a destructive test names the restore step, the underlying error and the repair command".
+
+### Requirement: A cluster-required run fails instead of skipping
+**Reason**: Split into requirements that each state one behavior.
+**Migration**: See "A cluster-required run fails every precondition that would skip", "The failure of a cluster-required run starts with OPM_E2E_REQUIRE_CLUSTER=1: and names the cause", "Precondition messages read correctly as either a skip or a failure", "OPM_E2E_REQUIRE_CLUSTER changes no test that does not use the cluster and takes precedence over the skip clause of the grant check".
+
+## ADDED Requirements
+
+### Requirement: Operator-owned e2e tests verify the operator's applier grant
+Every e2e test that relies on the operator applying workload resources for a `ModuleInstance` SHALL first verify that the operator's effective applier identity is permitted to `patch` `services` (core API group) and `deployments` (`apps`) in the test namespace, using the cluster's own authorization check.
+
+#### Scenario: Cluster prepared by task cluster:operator
+
+- **WHEN** `task cluster:operator` has been run and an operator-owned e2e test starts
+- **THEN** the precondition passes silently and the test proceeds
+
+#### Scenario: Lifecycle test is exempt
+
+- **WHEN** the operator lifecycle e2e test runs on a cluster with no operator installed
+- **THEN** it does not require the applier grant, since it installs and uninstalls the operator itself and applies no workloads
+
+### Requirement: The effective applier identity is the ServiceAccount named by --default-service-account when that argument is present
+The effective applier identity SHALL be the ServiceAccount named by the controller Deployment's `--default-service-account` argument, resolved in the test namespace, when that argument is present; otherwise the controller's own ServiceAccount. (Requirement: Operator-owned e2e tests verify the operator's applier grant)
+
+#### Scenario: The default ServiceAccount argument names the applier identity
+
+- **WHEN** the controller Deployment's `--default-service-account` argument is present
+- **THEN** the effective applier identity SHALL be the ServiceAccount it names, resolved in the test namespace
+
+#### Scenario: Without the argument the controller ServiceAccount is the applier identity
+
+- **WHEN** the controller Deployment has no `--default-service-account` argument
+- **THEN** the effective applier identity SHALL be the controller's own ServiceAccount
+
+### Requirement: A denied applier check fails the test before any cluster mutation
+If the check reports denial, the test SHALL fail before performing any cluster mutation, with a message that names the identity probed, the denied verb and resource, and the remedy `task cluster:operator` (which applies `hack/kind-operator-rbac.yaml`). A denial SHALL be distinguished from a check that could not be performed: only an explicit `no` answer is a denial. (Requirement: Operator-owned e2e tests verify the operator's applier grant)
+
+#### Scenario: Operator installed without the dev grant
+
+- **WHEN** the operator was installed with `opm operator install` alone and an operator-owned e2e test starts
+- **THEN** the test fails immediately, its message names `system:serviceaccount:opm-operator-system:opm-operator-controller-manager`, the denied `patch services`, and `task cluster:operator` as the remedy
+- **AND** no `ModuleInstance` or workload has been created by the test
+
+### Requirement: An applier check that could not be performed skips the test
+If the check itself cannot be performed (no cluster, kubectl failure, no `impersonate` permission for the test user) and `OPM_E2E_REQUIRE_CLUSTER` is not `1`, the existing cluster-reachability precondition applies and the test SHALL skip as it does today, with the check's error in the skip message; with `OPM_E2E_REQUIRE_CLUSTER=1` it fails instead (`A cluster-required run fails every precondition that would skip`). (Requirement: Operator-owned e2e tests verify the operator's applier grant)
+
+#### Scenario: Check cannot be performed
+
+- **WHEN** `OPM_E2E_REQUIRE_CLUSTER` is unset and the test user may not impersonate ServiceAccounts, so `kubectl auth can-i --as=...` errors instead of answering
+- **THEN** the test skips, naming the kubectl error, rather than reporting a denial
+
+### Requirement: The cluster-backed e2e suite resolves published modules through the registry mapping the CLI ships as its default
+The cluster-backed e2e suite SHALL resolve published modules through the registry mapping the CLI ships as its default, and SHALL NOT depend on a registry process that no part of the suite starts.
+A registry that a test does not itself provide SHALL NOT be a precondition of the suite: no test may require a developer to start one by hand.
+
+#### Scenario: A test that chooses no registry uses the shipped default
+
+- **WHEN** an e2e test runs the CLI without selecting a registry of its own, and no local registry
+  process is running
+- **THEN** the CLI resolves `opmodel.dev` modules through the shipped default mapping
+- **AND** the invocation SHALL NOT fail reporting that a published catalog has no published release
+
+#### Scenario: The operator lifecycle test seeds a Platform
+
+- **WHEN** the operator lifecycle e2e test installs the operator on a prepared cluster with no local
+  registry running
+- **THEN** the catalog version the install seeds the cluster `Platform` with resolves successfully
+- **AND** the test proceeds to its assertions rather than failing on registry resolution
+
+### Requirement: The e2e suite's stub home configuration takes its registry from the shipped default by reference
+The suite's stub home configuration SHALL take its registry from that shipped default by reference rather than restating an address, so that an invocation which does not choose a registry for itself resolves exactly as an end user's would and the suite cannot drift from what the CLI ships. (Requirement: The cluster-backed e2e suite resolves published modules through the registry mapping the CLI ships as its default)
+
+#### Scenario: No unreachable registry address is named
+
+- **WHEN** the e2e suite's own configuration and helpers are inspected for a hardcoded local
+  registry address
+- **THEN** no such address is named as a default any test would fall through to
+- **AND** the default the suite does fall through to is the shipped one, taken by reference, so it
+  cannot be changed in one place and not the other
+
+### Requirement: A test that needs to write to a registry provides one it owns for the duration of that test
+A test that needs to write to a registry, publishing a module, or scaffolding from a template it publishes first, SHALL provide one it owns for the duration of that test, routing only the domains it writes to at that registry and leaving `opmodel.dev` resolving from the shipped default.
+Such a registry SHALL require no external process, port reservation or container, and SHALL be released when the test ends.
+
+#### Scenario: A publishing test owns its registry
+
+- **WHEN** an e2e test publishes a module
+- **THEN** it publishes to a registry it started for that test, needing no external process
+- **AND** that registry is released when the test ends, leaving nothing running
+
+### Requirement: A destructive test restores the dev cluster's operator before the run ends and fails the run when it cannot
+An e2e test that tears down the shared dev cluster's operator SHALL restore it before the run ends, and SHALL fail the run when it cannot. Reporting the failure without failing SHALL NOT satisfy this requirement: a run that leaves the cluster unable to serve the operator-owned tests MUST NOT exit successfully, because the next run's failure would otherwise appear as an unrelated product error far from its cause.
+
+#### Scenario: Restore fails
+
+- **WHEN** a destructive e2e test completes its assertions but the step that rebuilds the dev
+  operator fails
+- **THEN** the test run SHALL fail
+- **AND** the message names the failed restore, the underlying error, and the repair command
+
+#### Scenario: Restore succeeds
+
+- **WHEN** the same test completes and the rebuild step succeeds
+- **THEN** the run reports no failure from the restore
+- **AND** a subsequent operator-owned test finds a reconciling operator
+
+#### Scenario: A poisoned cluster is never reported as success
+
+- **WHEN** a destructive e2e run ends with the cluster's operator or CRDs absent because the restore
+  did not complete
+- **THEN** that run's exit status SHALL be non-zero
+
+### Requirement: The failure of a destructive test names the restore step, the underlying error and the repair command
+The failure message SHALL name the restore step that did not complete, the underlying error, and the command a developer runs to repair the cluster by hand. (Requirement: A destructive test restores the dev cluster's operator before the run ends and fails the run when it cannot)
+
+#### Scenario: The failure message names the restore step, the error and the repair command
+
+- **WHEN** a destructive e2e test fails the run because the step that rebuilds the dev operator did not complete
+- **THEN** the failure message SHALL name the restore step that did not complete, the underlying error, and the command a developer runs to repair the cluster by hand
+
+### Requirement: A cluster-required run fails every precondition that would skip
+When the environment variable `OPM_E2E_REQUIRE_CLUSTER` is set to `1`, every precondition in the e2e suite that would otherwise skip a test for want of a usable cluster SHALL fail that test instead. This covers a missing kubeconfig, an unreachable `kind-opm-dev` context, and an applier-grant check that could not be performed.
+When the variable is unset or has any other value, those preconditions SHALL skip as they do without this requirement.
+
+#### Scenario: Developer machine without a cluster
+
+- **WHEN** `OPM_E2E_REQUIRE_CLUSTER` is unset and no kind cluster is running
+- **THEN** the cluster-backed tests skip as before, and the rest of the suite runs
+
+### Requirement: The failure of a cluster-required run starts with OPM_E2E_REQUIRE_CLUSTER=1: and names the cause
+The failure message SHALL start with `OPM_E2E_REQUIRE_CLUSTER=1:` and SHALL name the cause; for a missing kubeconfig or an unreachable context it SHALL also name the `kind-opm-dev` context and the remedy `task cluster:create`, and for a grant check that could not be performed it SHALL name the kubectl error. (Requirement: A cluster-required run fails every precondition that would skip)
+
+#### Scenario: Required cluster has no kubeconfig
+
+- **WHEN** `OPM_E2E_REQUIRE_CLUSTER=1` is set and the user's home has no `.kube/config`
+- **THEN** each cluster-backed test fails, its message starting `OPM_E2E_REQUIRE_CLUSTER=1:` and naming the missing kubeconfig, the `kind-opm-dev` context and `task cluster:create`
+
+#### Scenario: Required cluster unreachable
+
+- **WHEN** `OPM_E2E_REQUIRE_CLUSTER=1` is set and the `kind-opm-dev` context does not answer
+- **THEN** each cluster-backed test fails, its message starting `OPM_E2E_REQUIRE_CLUSTER=1:` and naming the context and `task cluster:create`
+
+### Requirement: Precondition messages read correctly as either a skip or a failure
+Precondition messages SHALL read correctly as either a skip or a failure, so none of them says "skipping". (Requirement: A cluster-required run fails every precondition that would skip)
+
+#### Scenario: No precondition message says skipping
+
+- **WHEN** a precondition message of the e2e suite is read as a skip or as a failure
+- **THEN** it SHALL read correctly as either, and none of them says "skipping"
+
+### Requirement: OPM_E2E_REQUIRE_CLUSTER changes no test that does not use the cluster and takes precedence over the skip clause of the grant check
+The environment variable `OPM_E2E_REQUIRE_CLUSTER` SHALL NOT change any test that does not use the cluster, and SHALL NOT change the outcome of a precondition that already fails (an explicit applier-grant denial, a missing reconciling operator). When the variable is `1`, the requirement `A cluster-required run fails every precondition that would skip` takes precedence over the skip clause of `An applier check that could not be performed skips the test`.
+
+#### Scenario: Grant check cannot be performed in a required run
+
+- **WHEN** `OPM_E2E_REQUIRE_CLUSTER=1` is set and `kubectl auth can-i --as=...` errors instead of answering
+- **THEN** the operator-owned test fails naming the kubectl error, rather than skipping
+
+#### Scenario: A precondition that already fails keeps its outcome
+
+- **WHEN** `OPM_E2E_REQUIRE_CLUSTER=1` is set and a precondition already fails, as an explicit applier-grant denial or a missing reconciling operator does
+- **THEN** the variable SHALL NOT change the outcome of that precondition
+
+#### Scenario: A test that does not use the cluster is unchanged
+
+- **WHEN** `OPM_E2E_REQUIRE_CLUSTER=1` is set and a test does not use the cluster
+- **THEN** the variable SHALL NOT change that test

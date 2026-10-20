@@ -4,106 +4,6 @@ Defines the behavior of the `opm module apply` (alias `opm mod apply`) subcomman
 
 ## Requirements
 
-### Requirement: `opm module apply` deploys a module package via the synthetic instance flow
-
-The CLI SHALL provide a `module apply` subcommand (with alias `mod apply`) under the `module` command group that accepts an optional positional argument (the module-package directory, defaulting to `"."`) and deploys the synthesized `#ModuleInstance` to a Kubernetes cluster. The subcommand SHALL accept only directory inputs. <!-- Was: synthetic release flow / #ModuleRelease (enhancement 0002, "Hard rename, no alias window; `semver: major` (resolves OQ3, OQ4)") -->
-
-The subcommand SHALL produce the same cluster-side effects as `opm instance apply` after the render stage: server-side apply of all rendered resources, inventory record read/write keyed on the instance UUID, stale-resource pruning, ownership checks, and dry-run support. <!-- Was: opm release apply, release UUID -->
-
-#### Scenario: Default to current directory
-
-- **WHEN** the user runs `opm module apply` with no positional argument from inside a module package directory
-- **THEN** the subcommand SHALL synthesize a `#ModuleInstance` from that directory and apply the result to the cluster
-
-#### Scenario: File argument rejected
-
-- **WHEN** the user runs `opm module apply ./my-module/module.cue`
-- **THEN** the subcommand SHALL return an error stating that `module apply` expects a directory
-- **AND** SHALL point the user to `opm instance apply <file>` for instance files
-
-### Requirement: Flag surface matches `opm instance apply` plus `--name`
-
-The `module apply` subcommand SHALL accept the following flags with the listed behavior:
-
-| Flag | Type | Default | Behavior |
-| --- | --- | --- | --- |
-| `-f`, `--values` | repeatable string | empty | Values files overriding the module's `debugValues` |
-| `--platform` | string | resolved by precedence | Platform module directory override |
-| `--name` | string | `<module>-debug` | Synthetic `metadata.name` override |
-| `-n`, `--namespace` | string | from config | Target namespace (also propagates to synthetic `metadata.namespace`) |
-| `--kubeconfig` | string | from env/config | Path to kubeconfig file |
-| `--context` | string | current-context | Kubernetes context to use |
-| `--dry-run` | bool | false | Server-side dry-run; no cluster changes |
-| `--create-namespace` | bool | false | Create the target namespace if it does not exist |
-| `--no-prune` | bool | false | Skip pruning of stale resources |
-| `--force` | bool | false | Allow a 0-resource render to prune previously tracked resources |
-| `--wait` | bool | false | After a successful apply and inventory write, block until every applied resource is healthy; ignored on `--dry-run` |
-| `--timeout` | duration | 5m | Bound on the CustomResourceDefinition establish wait, counted from the start of the apply; on the `--wait` readiness wait, which gets a full `--timeout` of its own; and on the operator-reconcile wait for an operator-managed instance |
-
-#### Scenario: Values files override debugValues
-
-- **WHEN** the user runs `opm module apply ./my-module -f overrides.cue`
-- **THEN** the subcommand SHALL use `overrides.cue` as the source of values
-- **AND** SHALL NOT fall back to the module's `debugValues`
-
-#### Scenario: Namespace flag participates in instance identity
-
-- **WHEN** the user runs `opm module apply ./foo -n staging`
-- **AND** the user later runs `opm module apply ./foo -n production`
-- **THEN** the two invocations SHALL produce two distinct instance UUIDs
-- **AND** SHALL write two independent inventory records in their respective namespaces
-
-#### Scenario: Name flag participates in instance identity
-
-- **WHEN** the user runs `opm module apply ./foo --name myapp`
-- **AND** the user later runs `opm module apply ./foo` (no `--name`)
-- **THEN** the two invocations SHALL produce two distinct instance UUIDs
-- **AND** SHALL not interfere with each other's inventory
-
-#### Scenario: Dry-run makes no cluster changes
-
-- **WHEN** the user runs `opm module apply ./my-module --dry-run`
-- **THEN** the subcommand SHALL perform a server-side dry-run apply
-- **AND** SHALL NOT write or modify any inventory record
-- **AND** SHALL NOT prune any resources
-- **AND** SHALL log a summary of resources that would be applied
-
-#### Scenario: Wait blocks until the applied resources are healthy
-
-- **WHEN** the user runs `opm module apply ./my-module --wait` against a CLI-managed instance
-- **THEN** after the apply and inventory write the subcommand SHALL poll every applied resource until each is healthy per the library's `health.IsHealthy(health.Evaluate(...))` from `opm/k8s/health`
-- **AND** SHALL print a success line and exit 0 once all are healthy
-- **WHEN** `--timeout` elapses first, or an applied resource has disappeared
-- **THEN** the subcommand SHALL exit non-zero with an error that lists the resources not yet healthy
-- **AND** the applied resources and the inventory SHALL be left in place
-
-#### Scenario: Wait is skipped on dry-run
-
-- **WHEN** the user runs `opm module apply ./my-module --wait --dry-run`
-- **THEN** the subcommand SHALL NOT poll the cluster for readiness
-
-#### Scenario: Create-namespace auto-creates the target namespace
-
-- **WHEN** the user runs `opm module apply ./my-module -n new-ns --create-namespace`
-- **AND** namespace `new-ns` does not exist
-- **THEN** the subcommand SHALL create the `new-ns` namespace before applying resources
-
-#### Scenario: No-prune preserves stale resources
-
-- **WHEN** a previous inventory recorded resources that are no longer rendered
-- **AND** the user runs `opm module apply ./my-module --no-prune`
-- **THEN** the stale resources SHALL be left in the cluster
-- **AND** the inventory SHALL still be updated to reflect the new resource set
-
-#### Scenario: Force allows 0-resource render to prune all
-
-- **WHEN** a previous inventory has N>0 entries
-- **AND** the user runs `opm module apply ./my-module` with a module that now renders 0 resources
-- **AND** `--force` is NOT provided
-- **THEN** the subcommand SHALL refuse to proceed and SHALL return an error explaining the situation
-- **WHEN** the same conditions hold and `--force` IS provided
-- **THEN** the subcommand SHALL prune all previously tracked resources
-
 ### Requirement: Instance identity is derived in CUE, not the CLI
 
 The synthetic instance's `metadata.uuid` SHALL be computed by the catalog's CUE schema (`SHA1(OPMNamespace, "<moduleUUID>:<name>:<namespace>")`) and SHALL NOT be generated, randomized, or persisted by the CLI itself. The CLI SHALL read the computed UUID from the rendered `ModuleInstance` and use it as the `instanceID` passed to the apply workflow. <!-- Was: synthetic release, ModuleRelease, releaseID (enhancement 0002: hard rename with no alias window; instance files are `instance.cue`) -->
@@ -147,3 +47,163 @@ The subcommand SHALL validate and synthesize the `#ModuleInstance` before openin
 - **AND** the user runs `opm module apply ./broken-module`
 - **THEN** the subcommand SHALL exit with the validation-error exit code
 - **AND** SHALL NOT issue any apiserver requests
+
+### Requirement: The `module apply` subcommand accepts an optional module-package directory and deploys the synthesized `#ModuleInstance`
+
+The CLI SHALL provide a `module apply` subcommand (with alias `mod apply`) under the `module` command group that accepts an optional positional argument (the module-package directory, defaulting to `"."`) and deploys the synthesized `#ModuleInstance` to a Kubernetes cluster. <!-- Was: synthetic release flow / #ModuleRelease (enhancement 0002, "Hard rename, no alias window; `semver: major` (resolves OQ3, OQ4)") -->
+
+#### Scenario: Default to current directory
+
+- **WHEN** the user runs `opm module apply` with no positional argument from inside a module package directory
+- **THEN** the subcommand SHALL synthesize a `#ModuleInstance` from that directory and apply the result to the cluster
+
+### Requirement: The `module apply` subcommand accepts only directory inputs
+
+The subcommand SHALL accept only directory inputs. <!-- Was: synthetic release flow / #ModuleRelease (enhancement 0002, "Hard rename, no alias window; `semver: major` (resolves OQ3, OQ4)") -->
+(Requirement: The `module apply` subcommand accepts an optional module-package directory and deploys the synthesized `#ModuleInstance`)
+
+#### Scenario: File argument rejected
+
+- **WHEN** the user runs `opm module apply ./my-module/module.cue`
+- **THEN** the subcommand SHALL return an error stating that `module apply` expects a directory
+- **AND** SHALL point the user to `opm instance apply <file>` for instance files
+
+### Requirement: The `module apply` subcommand produces the same cluster-side effects as `opm instance apply` after the render stage
+
+The subcommand SHALL produce the same cluster-side effects as `opm instance apply` after the render stage: server-side apply of all rendered resources, inventory record read/write keyed on the instance UUID, stale-resource pruning, ownership checks, and dry-run support. <!-- Was: opm release apply, release UUID -->
+(Requirement: The `module apply` subcommand accepts an optional module-package directory and deploys the synthesized `#ModuleInstance`)
+
+#### Scenario: Dry-run is one of the cluster-side effects
+
+- **WHEN** the user runs `opm module apply ./my-module --dry-run`
+- **THEN** the subcommand SHALL perform a server-side dry-run apply
+- **AND** SHALL NOT write or modify any inventory record
+- **AND** SHALL NOT prune any resources
+- **AND** SHALL log a summary of resources that would be applied
+
+### Requirement: `opm module apply` accepts the flags `-f` and `--platform`
+
+The `module apply` subcommand SHALL accept the following flags with the listed behavior:
+
+| Flag | Type | Default | Behavior |
+| --- | --- | --- | --- |
+| `-f`, `--values` | repeatable string | empty | Values files overriding the module's `debugValues` |
+| `--platform` | string | resolved by precedence | Platform module directory override |
+
+#### Scenario: Values files override debugValues
+
+- **WHEN** the user runs `opm module apply ./my-module -f overrides.cue`
+- **THEN** the subcommand SHALL use `overrides.cue` as the source of values
+- **AND** SHALL NOT fall back to the module's `debugValues`
+
+### Requirement: `opm module apply` accepts the flags `--name` and `-n`
+
+The `module apply` subcommand SHALL accept the following flags with the listed behavior:
+
+| Flag | Type | Default | Behavior |
+| --- | --- | --- | --- |
+| `--name` | string | `<module>-debug` | Synthetic `metadata.name` override |
+| `-n`, `--namespace` | string | from config | Target namespace (also propagates to synthetic `metadata.namespace`) |
+
+#### Scenario: Namespace flag participates in instance identity
+
+- **WHEN** the user runs `opm module apply ./foo -n staging`
+- **AND** the user later runs `opm module apply ./foo -n production`
+- **THEN** the two invocations SHALL produce two distinct instance UUIDs
+- **AND** SHALL write two independent inventory records in their respective namespaces
+
+#### Scenario: Name flag participates in instance identity
+
+- **WHEN** the user runs `opm module apply ./foo --name myapp`
+- **AND** the user later runs `opm module apply ./foo` (no `--name`)
+- **THEN** the two invocations SHALL produce two distinct instance UUIDs
+- **AND** SHALL not interfere with each other's inventory
+
+### Requirement: `opm module apply` accepts the flags `--kubeconfig`, `--context` and `--dry-run`
+
+The `module apply` subcommand SHALL accept the following flags with the listed behavior:
+
+| Flag | Type | Default | Behavior |
+| --- | --- | --- | --- |
+| `--kubeconfig` | string | from env/config | Path to kubeconfig file |
+| `--context` | string | current-context | Kubernetes context to use |
+| `--dry-run` | bool | false | Server-side dry-run; no cluster changes |
+
+#### Scenario: Dry-run makes no cluster changes
+
+- **WHEN** the user runs `opm module apply ./my-module --dry-run`
+- **THEN** the subcommand SHALL perform a server-side dry-run apply
+- **AND** SHALL NOT write or modify any inventory record
+- **AND** SHALL NOT prune any resources
+- **AND** SHALL log a summary of resources that would be applied
+
+### Requirement: `opm module apply` accepts the flags `--create-namespace`, `--no-prune` and `--force`
+
+The `module apply` subcommand SHALL accept the following flags with the listed behavior:
+
+| Flag | Type | Default | Behavior |
+| --- | --- | --- | --- |
+| `--create-namespace` | bool | false | Create the target namespace if it does not exist |
+| `--no-prune` | bool | false | Skip pruning of stale resources |
+| `--force` | bool | false | Allow a 0-resource render to prune previously tracked resources |
+
+#### Scenario: Create-namespace auto-creates the target namespace
+
+- **WHEN** the user runs `opm module apply ./my-module -n new-ns --create-namespace`
+- **AND** namespace `new-ns` does not exist
+- **THEN** the subcommand SHALL create the `new-ns` namespace before applying resources
+
+#### Scenario: No-prune preserves stale resources
+
+- **WHEN** a previous inventory recorded resources that are no longer rendered
+- **AND** the user runs `opm module apply ./my-module --no-prune`
+- **THEN** the stale resources SHALL be left in the cluster
+- **AND** the inventory SHALL still be updated to reflect the new resource set
+
+#### Scenario: Force allows 0-resource render to prune all
+
+- **WHEN** a previous inventory has N>0 entries
+- **AND** the user runs `opm module apply ./my-module` with a module that now renders 0 resources
+- **AND** `--force` is NOT provided
+- **THEN** the subcommand SHALL refuse to proceed and SHALL return an error explaining the situation
+- **WHEN** the same conditions hold and `--force` IS provided
+- **THEN** the subcommand SHALL prune all previously tracked resources
+
+### Requirement: `opm module apply` accepts the flag `--wait`
+
+The `module apply` subcommand SHALL accept the following flags with the listed behavior:
+
+| Flag | Type | Default | Behavior |
+| --- | --- | --- | --- |
+| `--wait` | bool | false | After a successful apply and inventory write, block until every applied resource is healthy; ignored on `--dry-run` |
+
+#### Scenario: Wait blocks until the applied resources are healthy
+
+- **WHEN** the user runs `opm module apply ./my-module --wait` against a CLI-managed instance
+- **THEN** after the apply and inventory write the subcommand SHALL poll every applied resource until each is healthy per the library's `health.IsHealthy(health.Evaluate(...))` from `opm/k8s/health`
+- **AND** SHALL print a success line and exit 0 once all are healthy
+- **WHEN** `--timeout` elapses first, or an applied resource has disappeared
+- **THEN** the subcommand SHALL exit non-zero with an error that lists the resources not yet healthy
+- **AND** the applied resources and the inventory SHALL be left in place
+
+#### Scenario: Wait is skipped on dry-run
+
+- **WHEN** the user runs `opm module apply ./my-module --wait --dry-run`
+- **THEN** the subcommand SHALL NOT poll the cluster for readiness
+
+### Requirement: `opm module apply` accepts the flag `--timeout`
+
+The `module apply` subcommand SHALL accept the following flags with the listed behavior:
+
+| Flag | Type | Default | Behavior |
+| --- | --- | --- | --- |
+| `--timeout` | duration | 5m | Bound on the CustomResourceDefinition establish wait, counted from the start of the apply; on the `--wait` readiness wait, which gets a full `--timeout` of its own; and on the operator-reconcile wait for an operator-managed instance |
+
+#### Scenario: The timeout bounds the readiness wait
+
+- **WHEN** the user runs `opm module apply ./my-module --wait` against a CLI-managed instance
+- **THEN** after the apply and inventory write the subcommand SHALL poll every applied resource until each is healthy per the library's `health.IsHealthy(health.Evaluate(...))` from `opm/k8s/health`
+- **AND** SHALL print a success line and exit 0 once all are healthy
+- **WHEN** `--timeout` elapses first, or an applied resource has disappeared
+- **THEN** the subcommand SHALL exit non-zero with an error that lists the resources not yet healthy
+- **AND** the applied resources and the inventory SHALL be left in place

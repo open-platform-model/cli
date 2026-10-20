@@ -5,20 +5,6 @@ Repository-wide rules for GitHub Actions tokens and caches, so the repository's 
 
 ## Requirements
 
-### Requirement: Every workflow declares least-privilege permissions
-
-Every file under `.github/workflows/` SHALL declare `permissions` at workflow level, either `{}` or read-only scopes, and every job that needs more SHALL grant exactly the scopes its steps use, so the repository's default `GITHUB_TOKEN` can be read-only without breaking a job. `release.yml` SHALL declare `permissions: {}` at workflow level, and its jobs SHALL grant: release-please none; goreleaser `contents: write` and `packages: write`; publish-templates `contents: read` and `packages: write`; publish-docs `contents: read`, `packages: write` and `id-token: write`; notify-downstream `contents: read`. Source: owner decision 30 (2026-10-04); security pass finding GOV-3.
-
-#### Scenario: The default token turns read-only
-
-- **WHEN** the repository's default workflow permissions are set to read
-- **THEN** every workflow runs with the scopes it declares, and no job loses a scope it uses
-
-#### Scenario: A workflow without a permissions key
-
-- **WHEN** a reviewer reads any workflow file
-- **THEN** it has a top-level `permissions` key
-
 ### Requirement: Publishing jobs restore no Actions cache
 
 A job that holds `packages: write` or `contents: write` and builds or publishes an artifact SHALL NOT restore or save a GitHub Actions cache: every `actions/setup-go` step in it SHALL set `cache: false`, and it SHALL use no `actions/cache` step and no `type=gha` build cache. This covers the goreleaser and publish-templates jobs of `release.yml` and the publish job of `publish-fixtures.yml`. Source: security pass finding CAS-R3.
@@ -51,14 +37,50 @@ A workflow triggered by `pull_request` SHALL NOT grant a write scope to a job th
 - **WHEN** a pull request changes `.tasks/cascade/cascade.sh`
 - **THEN** GitHub requests a review from the code owners
 
-### Requirement: Publishing jobs run only from main and only on a tag
+### Requirement: Every workflow file declares `permissions` at workflow level and each job grants exactly the scopes its steps use
 
-The publish-templates job of `release.yml` and the publish job of `publish-fixtures.yml` SHALL run only when `github.ref` is `refs/heads/main`, also on `workflow_dispatch`, so a dispatch from another branch cannot publish with `packages: write`. publish-templates and goreleaser SHALL check out the release tag as `refs/tags/<tag>`, so a branch name in the `tag` input fails the checkout. These guards stop a mistaken or bot-branch dispatch; a person with write access can still change the workflow on a branch, which code-owner review and the `release` Environment address. Source: security pass review of cli PR 306.
+Every file under `.github/workflows/` SHALL declare `permissions` at workflow level, either `{}` or read-only scopes, and every job that needs more SHALL grant exactly the scopes its steps use, so the repository's default `GITHUB_TOKEN` can be read-only without breaking a job.
+
+**Source**: owner decision 30 (2026-10-04); security pass finding GOV-3.
+
+#### Scenario: The default token turns read-only
+
+- **WHEN** the repository's default workflow permissions are set to read
+- **THEN** every workflow runs with the scopes it declares, and no job loses a scope it uses
+
+#### Scenario: A workflow without a permissions key
+
+- **WHEN** a reviewer reads any workflow file
+- **THEN** it has a top-level `permissions` key
+
+### Requirement: `release.yml` declares `permissions: {}` and grants each job the scopes it lists
+
+`release.yml` SHALL declare `permissions: {}` at workflow level, and its jobs SHALL grant: release-please none; goreleaser `contents: write` and `packages: write`; publish-templates `contents: read` and `packages: write`; publish-docs `contents: read`, `packages: write` and `id-token: write`; notify-downstream `contents: read`.
+
+**Source**: owner decision 30 (2026-10-04); security pass finding GOV-3.
+
+#### Scenario: A release job holds only its listed scopes
+
+- **WHEN** a reviewer reads the `permissions` of `release.yml`
+- **THEN** the workflow level SHALL be `permissions: {}` and its jobs SHALL grant: release-please none; goreleaser `contents: write` and `packages: write`; publish-templates `contents: read` and `packages: write`; publish-docs `contents: read`, `packages: write` and `id-token: write`; notify-downstream `contents: read`
+
+### Requirement: The publish-templates job and the publish job of `publish-fixtures.yml` run only from main
+
+The publish-templates job of `release.yml` and the publish job of `publish-fixtures.yml` SHALL run only when `github.ref` is `refs/heads/main`, also on `workflow_dispatch`, so a dispatch from another branch cannot publish with `packages: write`.
+
+**Source**: security pass review of cli PR 306.
 
 #### Scenario: A manual release run from a branch
 
 - **WHEN** a maintainer dispatches `release.yml` from a branch other than `main` with a draft's tag
 - **THEN** publish-templates is skipped, and goreleaser keeps the release a draft because the templates did not publish
+
+### Requirement: publish-templates and goreleaser check out the release tag as `refs/tags/<tag>`
+
+publish-templates and goreleaser SHALL check out the release tag as `refs/tags/<tag>`, so a branch name in the `tag` input fails the checkout. These guards stop a mistaken or bot-branch dispatch; a person with write access can still change the workflow on a branch, which code-owner review and the `release` Environment address.
+(Requirement: The publish-templates job and the publish job of `publish-fixtures.yml` run only from main)
+
+**Source**: security pass review of cli PR 306.
 
 #### Scenario: A branch name as the tag input
 

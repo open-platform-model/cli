@@ -1,0 +1,78 @@
+## REMOVED Requirements
+
+### Requirement: The label sync keeps bot-managed and cascade labels
+**Reason**: Split into requirements that each state one behavior.
+**Migration**: See "`.github/labels.yml` lists every label that a tool applies to this repository's pull requests", "`.github/labels.yml` lists the release-please, Dependabot and release-cascade labels", "Bot-managed labels keep the color and description they carry in the repository today".
+
+## MODIFIED Requirements
+
+### Requirement: Dependabot leaves cuelang.org/go to library releases
+
+The Dependabot `gomod` update SHALL ignore the dependencies `cuelang.org/go` and `cuelabs.dev/go/oci/ociregistry` (the CUE team's OCI module, whose version the library's `go.mod` sets, `cuelang.org/go` setting only a floor, so it reaches the cli through the library bump and moves with library releases).
+
+**Source**: library ADR-013, decision j4 (`adr/013-kernel-plan-walkthrough-decisions.md` in the library repository), extended to `cuelabs.dev/go/oci/ociregistry` by the supervisor's round-1 triage; workspace RELEASING.md, section "Pin classes".
+
+#### Scenario: New CUE release
+- **WHEN** a new `cuelang.org/go` version is published and Dependabot's weekly `gomod` run executes
+- **THEN** Dependabot opens no pull request for `cuelang.org/go` or `cuelabs.dev/go/oci/ociregistry`
+
+#### Scenario: CUE arrives with a library release
+- **WHEN** a library release that requires a newer `cuelang.org/go` is pinned by the cascade's library bump
+- **THEN** that bump pull request moves `cuelang.org/go` in `go.mod` and `go.sum` to at least the version the library requires, and the cascade reports the move as a warning (`.tasks/cascade/cascade.sh`, Phase C)
+
+#### Scenario: Other third-party modules still update
+- **WHEN** a newer `k8s.io/client-go` is published
+- **THEN** Dependabot still proposes the bump
+
+## ADDED Requirements
+
+### Requirement: `.github/labels.yml` lists every label that a tool applies to this repository's pull requests
+
+`.github/labels.yml` SHALL list every label that a tool applies to this repository's pull requests, because the label sync deletes any repository label the file does not list.
+
+**Source**: workspace RELEASING.md, section "The cascade" (subsection Labels).
+
+#### Scenario: Pull-request dry run shows no deletion
+- **WHEN** a pull request edits `.github/labels.yml`
+- **THEN** the label sync's dry run lists no deletion of a label any tool applies
+
+### Requirement: `.github/labels.yml` lists the release-please, Dependabot and release-cascade labels
+
+`.github/labels.yml` SHALL list the release-please labels `autorelease: pending` and `autorelease: tagged`, the Dependabot labels `dependencies`, `go` and `github_actions`, and the release-cascade labels `deps-cascade`, `deps-cascade:conflict`, `deps-cascade:hold`, `deps-cascade:breaking` and `need-human-review`.
+
+**Source**: workspace RELEASING.md, section "The cascade" (subsection Labels).
+
+#### Scenario: Cascade labels exist before the cascade runs
+- **WHEN** the label sync has run on `main`
+- **THEN** each of the five release-cascade labels exists in the repository
+
+### Requirement: Bot-managed labels keep the color and description they carry in the repository today
+
+Bot-managed labels SHALL keep the color and description they carry in the repository today, so a sync changes nothing about them.
+
+**Source**: workspace RELEASING.md, section "The cascade" (subsection Labels).
+
+#### Scenario: Sync after a labels.yml change deletes no bot label
+- **WHEN** a change to `.github/labels.yml` merges and the label sync runs with deletion enabled
+- **THEN** `autorelease: pending`, `autorelease: tagged`, `dependencies`, `go` and `github_actions` still exist with unchanged color and description
+
+### Requirement: The cli's CUE version moves only through a library release
+
+The cli's CUE version SHALL move only through a library release: the library bumps CUE in its own pull request, and the cli picks the new version up when the release cascade (or a hand-made `fix(deps)` pull request) moves the library pin, whose `go get` of the library raises `cuelang.org/go` by minimal version selection (kept by `go mod tidy`).
+
+**Source**: library ADR-013, decision j4 (`adr/013-kernel-plan-walkthrough-decisions.md` in the library repository), extended to `cuelabs.dev/go/oci/ociregistry` by the supervisor's round-1 triage; workspace RELEASING.md, section "Pin classes".
+
+#### Scenario: A library release moves CUE in the cli
+- **WHEN** a library release that requires a newer `cuelang.org/go` is pinned by the cascade's library bump
+- **THEN** that bump pull request moves `cuelang.org/go` in `go.mod` and `go.sum` to at least the version the library requires, and the cascade reports the move as a warning (`.tasks/cascade/cascade.sh`, Phase C)
+
+### Requirement: Other third-party Go modules keep their weekly Dependabot updates
+
+Other third-party Go modules SHALL keep their weekly updates.
+(Requirement: Dependabot leaves cuelang.org/go to library releases)
+
+**Source**: library ADR-013, decision j4 (`adr/013-kernel-plan-walkthrough-decisions.md` in the library repository), extended to `cuelabs.dev/go/oci/ociregistry` by the supervisor's round-1 triage; workspace RELEASING.md, section "Pin classes".
+
+#### Scenario: A newer k8s.io/client-go is still proposed
+- **WHEN** a newer `k8s.io/client-go` is published
+- **THEN** Dependabot still proposes the bump
