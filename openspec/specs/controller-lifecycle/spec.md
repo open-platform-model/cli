@@ -414,7 +414,7 @@ A later full install of the pinned module version SHALL record those CRDs withou
 
 ### Requirement: CRDs-only install judges each CRD by the apply guard
 
-`opm controller install --crds-only` SHALL NOT adopt, relabel or migrate a CRD by itself. Every existing CRD it would apply is judged by the apply guard (capability `apply-pruning`, "Ownership guard judges every apply and dry run") as on a full install: with the instance UUID the embedded CRDs carry, and with the inventory of the controller's instance record when that record exists. (Requirement: CRDs-only install applies the CRDs pinned with the CLI, without a registry)
+`opm controller install --crds-only` SHALL NOT adopt, relabel or migrate a CRD by itself. Every existing CRD it would apply is judged by the apply guard (capability `apply-pruning`, "The ownership guard judges every apply") as on a full install: with the instance UUID the embedded CRDs carry, and with the inventory of the controller's instance record when that record exists. (Requirement: CRDs-only install applies the CRDs pinned with the CLI, without a registry)
 
 #### Scenario: CRDs OPM does not manage are refused, not adopted
 

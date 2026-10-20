@@ -638,7 +638,7 @@ A full `opm controller install` SHALL render the controller module against a pla
 
 ### Requirement: The CRDs-only form renders nothing at install time
 
-The CRDs-only form of `opm controller install` SHALL render nothing at install time: it applies the CRDs the pin task rendered from the pinned version in the same way. Source: enhancement 0021 ("The controller's install artifact is a registry module on its own version train").
+The CRDs-only form of `opm controller install` SHALL render nothing at install time: it applies the CRDs the pin task rendered from the pinned version. Source: enhancement 0021 ("The controller's install artifact is a registry module on its own version train").
 
 #### Scenario: CRDs-only install renders nothing
 
