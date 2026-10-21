@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0-beta.12](https://github.com/open-platform-model/cli/compare/v1.0.0-beta.11...v1.0.0-beta.12) (2026-10-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* the command `opm operator` is now `opm controller`, and `--crds-only` refuses `--version`.
+
+### Code Refactoring
+
+* rename the operator command and package to the controller ([#379](https://github.com/open-platform-model/cli/issues/379)) ([105cade](https://github.com/open-platform-model/cli/commit/105cadee506e20b1b715b9a1d4158499d3b6c2cf))
+
 ## [1.0.0-beta.11](https://github.com/open-platform-model/cli/compare/v1.0.0-beta.10...v1.0.0-beta.11) (2026-10-11)
 
 
