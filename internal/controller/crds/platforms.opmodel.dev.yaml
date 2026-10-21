@@ -10,7 +10,7 @@ metadata:
     app.kubernetes.io/name: crds
     component.opmodel.dev/name: crds
     module-instance.opmodel.dev/name: opm-controller
-    module-instance.opmodel.dev/uuid: 1cd6781f-9620-510e-a701-55b62683ad64
+    module-instance.opmodel.dev/uuid: a4461b4c-4976-5db8-a704-2d8b9dfc9cc6
     module.opmodel.dev/name: opm_controller
     module.opmodel.dev/uuid: 41b2be28-7f47-59da-a8ba-04ff60a5e2a8
     module.opmodel.dev/version: 0.1.0
@@ -88,12 +88,12 @@ spec:
                       description: |-
                         Version names exactly one published catalog build as a bare SemVer
                         string (e.g. "2.0.0-alpha.3") — the platform module IS the resolution
-                        (0010:D14); there is no range or allow/deny vocabulary. The
+                        (enhancement 0010); there is no range or allow/deny vocabulary. The
                         version's major must agree with the subscription key's `@vN` suffix.
                         The controller uses it twice: as the generated cue.mod pin and as the
                         entry's stamped expected version, which unifies with the imported
                         catalog's own version so wrong bytes fail the build naming the entry
-                        (0019:D13).
+                        (enhancement 0019).
                         CRD-required is safe against the stored pre-reshape singleton: API
                         server validation ratcheting keeps status-subresource patches working
                         against a stored object lacking the field (measured in
@@ -107,13 +107,13 @@ spec:
                   Registry is the set of catalog subscriptions keyed by major-suffixed
                   catalog CUE module path (e.g. "opmodel.dev/catalogs/opm@v2"), projecting
                   core #Platform.#registry. The key's major must agree with the major of
-                  the subscribed version (0010:D14).
+                  the subscribed version (enhancement 0010).
                 type: object
               skewPolicy:
                 description: |-
                   SkewPolicy is the controller's response to catalog version skew: a
                   module whose cue.mod requires a newer build of an OPM-namespace path
-                  (core or a catalog) than the platform pins (0019:D7/D18).
+                  (core or a catalog) than the platform pins (enhancement 0019).
                   "Warn" (the default when unset) renders against the platform's build
                   and reports the skew as a RenderWarning event on the workload; "Refuse"
                   refuses the render before evaluation and the workload reports
@@ -237,7 +237,7 @@ spec:
                 description: |-
                   controllerVersion is the version of the controller that last patched this
                   Platform's status, stamped on every reconcile regardless of outcome
-                  (0006:D24). The CLI reads it as the version-skew ceiling;
+                  (enhancement 0006). The CLI reads it as the version-skew ceiling;
                   absence means no controller has reconciled the Platform (solo cluster).
                 type: string
               observedGeneration:
@@ -246,7 +246,7 @@ spec:
               packageIdentity:
                 description: |-
                   packageIdentity identifies the generated platform package by the two
-                  inputs it is a function of (0015:D13): this CR's
+                  inputs it is a function of (enhancement 0015): this CR's
                   generation and the sorted set of active claims' catalog coordinates.
                   The same inputs always produce the same value and any change to either
                   produces a different one.

@@ -7,10 +7,6 @@ package controller
 // only with 'task controller:pin VERSION=<version>'.
 const PinnedModuleVersion = "0.1.0"
 
-// TODO(cutover): run `task controller:pin VERSION=0.1.0` once
-// opmodel.dev/modules/opm_controller 0.1.0 is published; it rewrites this
-// file and the value below.
-
 // PinnedControllerVersion is the controller release PinnedModuleVersion deploys, as the
 // module's controller package states it, "v"-prefixed.
-const PinnedControllerVersion = "v1.0.0-beta.8"
+const PinnedControllerVersion = "v1.0.0-beta.9"
