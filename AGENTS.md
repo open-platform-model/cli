@@ -36,8 +36,8 @@ The remote has no `v1` or `release/*` branch (checked 2026-10-14).
 - `internal/cuemod` is the only site of `os.Chdir` and `os.Setenv`. `cmd/cue` reads the module root
   from the working directory and the registry from `CUE_REGISTRY`, so `Tidy` sets both under a
   package mutex and restores them on every return path.
-- The operator pin file in `internal/operator/` is written only by `hack/operator-pin` (`task
-  operator:pin VERSION=<module version>`). Do not hand-edit it.
+- The controller pin file in `internal/controller/` is written only by `hack/controller-pin` (`task
+  controller:pin VERSION=<module version>`). Do not hand-edit it.
 - Ship changes as sections that each merge green with their own commit (`CONSTITUTION.md` has the
   principle). Prefer updating an existing package over a new abstraction, unless duplication or
   coupling justifies it.
@@ -52,7 +52,7 @@ The remote has no `v1` or `release/*` branch (checked 2026-10-14).
 ```text
 adr/                       Architecture Decision Records
 cmd/opm/                   entrypoint and root command wiring
-internal/cmd/              Cobra commands: module, catalog, instance, config, operator, registry, platform;
+internal/cmd/              Cobra commands: module, catalog, instance, config, controller, registry, platform;
                            `module`/`catalog` carry `version set`; `module` carries `template list` and `init`;
                            `registry` carries `login`; `instance` carries `init`
 internal/cmdutil/          shared flags, annotations, argument resolution, command-facing helpers
@@ -64,12 +64,12 @@ internal/dockercfg/        read-modify-write of the docker credential file (`reg
 internal/exit/             exit codes: 0 ok, 1 general, 2 validation, 3 connectivity, 4 permission, 5 not found
 internal/instinit/         the `opm instance init` package generator
 internal/inventory/        instance inventory records, ownership, discovery and prune gates
+internal/controller/       `opm controller install` and `uninstall`; its pin file is written by `hack/controller-pin`
 internal/kubernetes/       cluster ops: status, apply, delete, events
 internal/modref/           published-module resolution: path grammar, `--version` selector, core-compatible walk;
                            apart from `scaffold` because their template grammar and selector differ on purpose
-internal/operator/         `opm operator install` and `uninstall`; its pin file is written by `hack/operator-pin`
 internal/output/           terminal formatting, log output, tables, manifests
-internal/platform/         platform-source resolution and the Platform seed for `operator install`
+internal/platform/         platform-source resolution and the Platform seed for `controller install`
 internal/publish/          identity-driven publish pipeline: gates, refusals, plan, registry push
 internal/scaffold/         fetch-based `module init` engine: template refs, re-identification, repair
 internal/version/          build version values
@@ -78,7 +78,7 @@ pkg/errors/                shared structured errors; import as `oerrors`
 pkg/loader/                local-replacement provenance (module root, local-module replacements)
 templates/                 official template modules (`minimal`, `standard`, `advanced`)
 hack/docskit-dump/         program docs-kit runs for the command reference; not linked into `opm`
-hack/operator-pin/         writes the operator pin file; not linked into `opm`
+hack/controller-pin/       writes the controller pin file; not linked into `opm`
 hack/platform/             maintained platform module for offline tests
 tests/fixtures/            fixture modules on `testing.opmodel.dev`; `tests/e2e/` end-to-end Go tests
 tests/integration/         integration programs run with `go run`
@@ -102,10 +102,10 @@ openspec/                  specs, active changes and archive
 | `task test:run TEST=Name` | One test by name | While you work |
 | `task test:e2e` / `task test:integration` | E2E / integration programs (need `kind-opm-dev`) | Cluster behavior |
 | `task test:fixtures` | Reproduce the PR fixtures job locally | After a fixture change |
-| `task cluster:create` / `cluster:operator` / `cluster:delete` | Make, prepare, remove the `opm-dev` kind cluster | Cluster tests |
+| `task cluster:create` / `cluster:controller` / `cluster:delete` | Make, prepare, remove the `opm-dev` kind cluster | Cluster tests |
 | `task docs:bundle` / `docs:bundle:check` | Build / check the docs bundle | After a help or docs page change |
 | `task cascade:wiring:check` | Offline cascade wiring check | After a workflow change |
-| `task operator:pin VERSION=...` | Rewrite the operator pin file | Move the operator pin |
+| `task controller:pin VERSION=...` | Rewrite the controller pin file | Move the controller pin |
 | `task -x deps:cascade` (`:title`, `:body`, `:test`) | Move upstream pins in the working tree; `-x` is required | Cascade work |
 | `task check` | `fmt`, `vet`, `lint`, `cite-lint`, `openspec:check`, `docs:bundle:check`, all tests | Before you finish |
 

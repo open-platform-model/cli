@@ -53,7 +53,7 @@ type Options struct {
 
 	// Kernel is the invocation's kernel. The kernel-load gate acquires the
 	// module tree through it (Kernel.AcquireModuleFromDir — the same verb
-	// `opm module build` and the operator use), classifying a refusal by the
+	// `opm module build` and the controller use), classifying a refusal by the
 	// shape-gate sentinels the library's errors package declares. The caller
 	// supplies the one kernel it already built for the invocation, carrying
 	// the registry mapping; the gate constructs none of its own. Required by

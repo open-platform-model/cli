@@ -21,12 +21,12 @@ opmodel.dev consumes it, and how to recover a release that has none. The design 
 
 - the command reference, which docs-kit renders from the dump of `hack/docskit-dump` (the cobra command
   tree through `github.com/open-platform-model/docs-kit/cobradump`; with `pins`, the library, core and
-  opm-operator versions this build compiles in);
+  opm-controller versions this build compiles in);
 - the authored pages under `docs/site/`;
-- in its manifest, the library, core and opm-operator versions the cli pins.
+- in its manifest, the library, core and opm-controller versions the cli pins.
 
 `hack/docskit-dump` is not linked into `opm`. Its test keeps the pins equal to `go.mod`, the library's
-the library's schema loader and the operator pin file in `internal/operator/`.
+the library's schema loader and the controller pin file in `internal/controller/`.
 
 ## Workflows
 
@@ -39,7 +39,7 @@ the library's schema loader and the operator pin file in `internal/operator/`.
 
 opmodel.dev anchors a site version on the bundle and pulls the bundles of exactly the versions it
 pins. It refuses a pin that has none. So a cli release must not merge until core, the library and
-opm-operator have bundles for every version it pins (docs-kit gate G2-pins).
+opm-controller have bundles for every version it pins (docs-kit gate G2-pins).
 
 Help text reaches the site only through a release. A revision applies Markdown and comment changes
 only.
@@ -71,7 +71,7 @@ after opmodel.dev runs that release. Dependabot ignores both, and the
   pins lack a bundle in `ghcr.io/open-platform-model/docs`. The lookup is
   a script in `.github/scripts/`.
 - `pr.yml`'s `Lint` job also runs that script as a warning (`--warn --moved-from <base>`) on every PR
-  that moves the library or `PinnedOperatorVersion`, the cascade PR included, so a missing bundle
+  that moves the library or `PinnedControllerVersion`, the cascade PR included, so a missing bundle
   shows up before the release PR.
 
 ## Pitfalls

@@ -2,7 +2,7 @@ name: Docs
 
 # The cli docs bundle (docs-kit.cue): the command reference docs-kit
 # generates from hack/docskit-dump's dump of the cobra commands, the authored
-# pages under docs/site/, and the library, core and opm-operator versions the
+# pages under docs/site/, and the library, core and opm-controller versions the
 # cli pins, built, signed and published by docs-kit's reusable publish.yml
 # (docs-kit docs/contracts.md C5). opmodel.dev pulls it from
 # ghcr.io/open-platform-model/docs/cli as the anchor of a site version.

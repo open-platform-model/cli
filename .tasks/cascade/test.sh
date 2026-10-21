@@ -77,8 +77,8 @@ commit_setup() {
 }
 
 LIB=github.com/open-platform-model/library
-OP=github.com/open-platform-model/opm-operator
-MOD=opmodel.dev/modules/opm_operator@v0
+OP=github.com/open-platform-model/opm-controller
+MOD=opmodel.dev/modules/opm_controller@v0
 CAT=opmodel.dev/catalogs/opm@v4
 CORE=opmodel.dev/core@v2
 POD=testing.opmodel.dev/modules/cli/podinfo@v0
@@ -109,7 +109,7 @@ current_rows() {
   while IFS=$'\t' read -r key _ _ v _; do
     case "$key" in
       "$LIB") printf 'newest\tgo\t%s\t%s\n' "$key" "$v" ;;
-      "$OP") printf 'newest\trelease\topm-operator\t%s\n' "$v" ;;
+      "$OP") printf 'newest\trelease\topm-controller\t%s\n' "$v" ;;
       *) printf 'newest\tcue\t%s\t%s\n' "$key" "$v" ;;
     esac
     case "$key" in "$CAT") cat=$v ;; "$CORE") core=$v ;; esac
@@ -190,7 +190,7 @@ LIB_TREE=""
 LIB_OLD=""
 while IFS=$'\t' read -r key _ _ v _; do
   case "$key" in
-    # The operator module pin and the operator release it records stay put.
+    # The controller module pin and the controller release it records stay put.
     "$OP" | "$MOD") continue ;;
     "$LIB")
       # No row: the name is derived, so a failure here is a defect of
@@ -430,18 +430,18 @@ else
 fi
 
 # S16 module-only move: only PinnedModuleVersion moves, to a module release
-# that deploys the same operator (enhancement 0021); the title counts one moved pin
-# and the body has a row for the module and none for the operator release.
+# that deploys the same controller (enhancement 0021); the title counts one moved pin
+# and the body has a row for the module and none for the controller release.
 # Needs the real resolver for title and body, which read no registry.
 if [ -z "${CASCADE_RESOLVER_REAL:-}" ]; then
   skip "S16 module-only move" "CASCADE_RESOLVER_REAL is not set"
 else
   d=$(sandbox s16)
   commit_setup "$d"
-  perl -pi -e 's/^const PinnedModuleVersion = "[^"]+"$/const PinnedModuleVersion = "0.99.0"/' "$d/internal/operator/pin.go"
+  perl -pi -e 's/^const PinnedModuleVersion = "[^"]+"$/const PinnedModuleVersion = "0.99.0"/' "$d/internal/controller/pin.go"
   title=$(cd "$d" && CASCADE_RESOLVER="$CASCADE_RESOLVER_REAL" task -x deps:cascade:title 2>"$TMP/s16.err") || true
   body=$(cd "$d" && CASCADE_RESOLVER="$CASCADE_RESOLVER_REAL" task -x deps:cascade:body 2>>"$TMP/s16.err") || true
-  if [ "$title" != "fix(deps): bump opm-operator module to v0.99.0" ]; then
+  if [ "$title" != "fix(deps): bump opm-controller module to v0.99.0" ]; then
     fail "S16 module-only move" "title '$title': $(tail -n 2 "$TMP/s16.err" | tr '\n' ' ')"
   elif [ "$(grep -c '^| .* (`' <<<"$body" || true)" != 1 ] || ! grep -qF "$MOD" <<<"$body"; then
     fail "S16 module-only move" "the body does not have exactly one row, for $MOD"
@@ -456,25 +456,25 @@ fi
 # Network scenarios (CASCADE_TEST_SET=all): the task's go get and cue mod get
 # resolve the tree's versions from the Go proxy and GHCR, or from a warm cache.
 # The older catalog and core are real; the older library is the tree's own
-# under a lower name (older_lib). setup_older leaves the operator module pin at the tree's version:
+# under a lower name (older_lib). setup_older leaves the controller module pin at the tree's version:
 # no older module release exists yet (0.1.0 is the first). S17 moves it alone,
 # from an unpublished 0.0.9, so the lane runs against the real registry. Once
 # an older release exists, add an "older" row for it, move it in setup_older
-# with task operator:pin, and count it in S5.
+# with task controller:pin, and count it in S5.
 
 CUE_DIRS=(
   templates/minimal templates/standard templates/advanced hack/platform "$PODDIR"
-  examples tests/e2e/testdata/operator-owned
+  examples tests/e2e/testdata/controller-owned
   internal/instinit/testdata/initvalues internal/workflow/render/testdata/skip-unprovided
   tests/e2e/testdata/duplicate-identities tests/integration/module-apply/testdata
   tests/fixtures/valid/simple-module tests/fixtures/valid/module-with-debug-values
 )
-CONSUMERS=(examples tests/e2e/testdata/operator-owned)
+CONSUMERS=(examples tests/e2e/testdata/controller-owned)
 # GOLDEN: what the first run leaves changed against the original tree once every
 # pin is back at the tree's value (design.md D10; spike 1.4).
 GOLDEN=$(printf '%s\n' templates/minimal/identity/identity.cue templates/standard/identity/identity.cue \
   templates/advanced/identity/identity.cue "$PODDIR/identity/identity.cue" \
-  examples/cue.mod/module.cue tests/e2e/testdata/operator-owned/cue.mod/module.cue | LC_ALL=C sort)
+  examples/cue.mod/module.cue tests/e2e/testdata/controller-owned/cue.mod/module.cue | LC_ALL=C sort)
 
 next_patch() { awk -F. -v OFS=. '{ $NF = $NF + 1; print }' <<<"$1"; }
 # set_v FILE KEY VERSION: rewrite KEY's v: in a module.cue as text, untidy on purpose.
@@ -515,7 +515,7 @@ setup_go() {
   fi
 }
 # setup_older DIR CATALOG CORE [PODINFO]: move every pin the task moves back to
-# the given versions (library to $LIB_OLD; the operator module pin stays).
+# the given versions (library to $LIB_OLD; the controller module pin stays).
 # On failure it returns 1 with the failed step in SETUP_WHY.
 setup_older() {
   local d="$1" c m
@@ -600,7 +600,7 @@ if [ "$SET" = all ]; then
     elif other=$(grep -vE -e "$opm_build" -e '^mod tidy$' -e '^get ' "$TMP/s2/go.log") ; then
       # Anything else (run, test, another build) would run code the move pulled in.
       fail "S2 older pins" "the task ran go $(tr '\n' ';' <<<"$other")"
-    elif [ -e "$d/.git/cascade/opm-src" ] || [ -e "$d/.git/cascade/operator-pin-src" ]; then
+    elif [ -e "$d/.git/cascade/opm-src" ] || [ -e "$d/.git/cascade/controller-pin-src" ]; then
       fail "S2 older pins" "the task left a source export behind"
     elif grep -q '^published oci open-platform-model/docs/' "$TMP/s2/log"; then
       # The docs-bundle check runs hack/docskit-dump, which links the moved
@@ -639,7 +639,7 @@ if [ "$SET" = all ]; then
           "test	examples/cue.mod/module.cue" "test	tests/fixtures/modules/podinfo/identity/identity.cue" \
           "test	internal/instinit/testdata/initvalues/cue.mod/module.cue" \
           "test	internal/cmd/platform/check_test.go" "shipped	templates/minimal/cue.mod/module.cue" \
-          "shipped	internal/operator/pin.go" "shipped	go.mod")
+          "shipped	internal/controller/pin.go" "shipped	go.mod")
         got=$(cut -f2 <<<"$want" | (cd "$d" && "$CASCADE_RESOLVER_REAL" classify --classes .tasks/cascade/classes)) || got="classify failed"
         if [ "$got" = "$want" ]; then
           pass "S5 classes"
@@ -660,18 +660,18 @@ if [ "$SET" = all ]; then
   fi
 
   # S17 module pin moves: the module pin is below the newest release, so the
-  # task builds hack/operator-pin from the merge base, walks select down from
+  # task builds hack/controller-pin from the merge base, walks select down from
   # the resolver's answer against GHCR, and writes the pin through the binary;
   # nothing else moves.
   d=$(sandbox s17)
-  pin=internal/operator/pin.go
+  pin=internal/controller/pin.go
   want_mod=$(sed -n 's/^const PinnedModuleVersion = "\(.*\)"$/\1/p' "$d/$pin")
-  want_op=$(sed -n 's/^const PinnedOperatorVersion = "\(.*\)"$/\1/p' "$d/$pin")
+  want_op=$(sed -n 's/^const PinnedControllerVersion = "\(.*\)"$/\1/p' "$d/$pin")
   current_rows "$d" >"$TMP/s17/table"
   perl -pi -e 's/^const PinnedModuleVersion = "[^"]+"$/const PinnedModuleVersion = "0.0.9"/;
-    s/^const PinnedOperatorVersion = "[^"]+"$/const PinnedOperatorVersion = "v0.0.9"/' "$d/$pin"
+    s/^const PinnedControllerVersion = "[^"]+"$/const PinnedControllerVersion = "v0.0.9"/' "$d/$pin"
   if ! grep -qx 'const PinnedModuleVersion = "0.0.9"' "$d/$pin" ||
-    ! grep -qx 'const PinnedOperatorVersion = "v0.0.9"' "$d/$pin"; then
+    ! grep -qx 'const PinnedControllerVersion = "v0.0.9"' "$d/$pin"; then
     fail "S17 module pin moves" "the setup edit did not apply"
   else
     commit_setup "$d"
@@ -681,20 +681,20 @@ if [ "$SET" = all ]; then
     chmod +x "$TMP/s17/bin/go"
     : >"$TMP/s17/go.log"
     PATH="$TMP/s17/bin:$PATH" run "$d" "$TMP/s17/table" "$TMP/s17/log"
-    pin_build='^build -C /.*/\.git/cascade/operator-pin-src -buildvcs=false -o /.*/\.git/cascade/bin/operator-pin \./hack/operator-pin$'
+    pin_build='^build -C /.*/\.git/cascade/controller-pin-src -buildvcs=false -o /.*/\.git/cascade/bin/controller-pin \./hack/controller-pin$'
     if [ "$RUN_RC" != 0 ]; then
       fail "S17 module pin moves" "exit $RUN_RC, want 0: $(why)"
     elif ! grep -qE -- "$pin_build" "$TMP/s17/go.log"; then
-      fail "S17 module pin moves" "operator-pin was not built from the merge base's export: $(tr '\n' ';' <"$TMP/s17/go.log")"
+      fail "S17 module pin moves" "controller-pin was not built from the merge base's export: $(tr '\n' ';' <"$TMP/s17/go.log")"
     elif other=$(grep -vE -e "$pin_build" "$TMP/s17/go.log"); then
       fail "S17 module pin moves" "the task ran go $(tr '\n' ';' <<<"$other")"
     elif ! grep -qx "const PinnedModuleVersion = \"$want_mod\"" "$d/$pin" ||
-      ! grep -qx "const PinnedOperatorVersion = \"$want_op\"" "$d/$pin"; then
+      ! grep -qx "const PinnedControllerVersion = \"$want_op\"" "$d/$pin"; then
       fail "S17 module pin moves" "\`$pin\` pins $(grep '^const Pinned' "$d/$pin" | tr '\n' ' '), want $want_mod and $want_op"
     elif [ "$(g "$d" status --porcelain --untracked-files=all)" != " M $pin" ]; then
       fail "S17 module pin moves" "changed paths: $(g "$d" status --porcelain --untracked-files=all | tr '\n' ' ')"
-    elif [ -e "$d/.git/cascade/operator-pin-src" ]; then
-      fail "S17 module pin moves" "the task left the operator-pin source export behind"
+    elif [ -e "$d/.git/cascade/controller-pin-src" ]; then
+      fail "S17 module pin moves" "the task left the controller-pin source export behind"
     else
       pass "S17 module pin moves"
     fi

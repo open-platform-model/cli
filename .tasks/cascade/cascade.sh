@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # cascade.sh: task deps:cascade. Moves the cli's upstream pins (library, the
-# operator module pin in internal/operator/pin.go, and the opm catalog and core
+# controller module pin in internal/controller/pin.go, and the opm catalog and core
 # in the templates and test trees) to the newest published versions the release
 # cascade allows, in the working tree only: no commit, no branch, no push.
 #
@@ -10,7 +10,7 @@
 # ($CASCADE_RESOLVER) answers every version question.
 #
 # It runs no code from a moved dependency: the only Go programs it builds are
-# opm and hack/operator-pin, from an export of the merge base $M, never from
+# opm and hack/controller-pin, from an export of the merge base $M, never from
 # the work tree. In merge
 # mode the work tree is deps/cascade with main merged in, so it may already
 # pin a library an earlier run moved; the merge base is main. The docs-bundle
@@ -33,8 +33,8 @@ RES=$CASCADE_RESOLVER
 cd "$(git rev-parse --show-toplevel)"
 
 LIB=github.com/open-platform-model/library
-MOD=opmodel.dev/modules/opm_operator@v0
-PIN=internal/operator/pin.go
+MOD=opmodel.dev/modules/opm_controller@v0
+PIN=internal/controller/pin.go
 CAT=opmodel.dev/catalogs/opm@v4
 CORE=opmodel.dev/core@v2
 POD=testing.opmodel.dev/modules/cli/podinfo@v0
@@ -49,7 +49,7 @@ CUE_DIRS=(
   hack/platform
   tests/fixtures/modules/podinfo
   examples
-  tests/e2e/testdata/operator-owned
+  tests/e2e/testdata/controller-owned
   internal/instinit/testdata/initvalues
   internal/workflow/render/testdata/skip-unprovided
   tests/e2e/testdata/duplicate-identities
@@ -58,7 +58,7 @@ CUE_DIRS=(
   tests/fixtures/valid/module-with-debug-values
 )
 # The podinfo fixture's consumers (design.md D7).
-CONSUMERS=(examples tests/e2e/testdata/operator-owned)
+CONSUMERS=(examples tests/e2e/testdata/controller-owned)
 PODDIR=tests/fixtures/modules/podinfo
 # Version-advance modules and their coordinates (design.md D6).
 ADV_DIRS=(templates/minimal templates/standard templates/advanced "$PODDIR")
@@ -264,7 +264,7 @@ report() { # report DISPLAY FROM TO
 # ---------------------------------------------------------------------------
 # Phase A: resolve. Every call that decides a target runs here, before any
 # edit, so an error leaves the tree unchanged (contract §5.2 rule 5). The
-# operator module lane builds hack/operator-pin from the merge base here, not
+# controller module lane builds hack/controller-pin from the merge base here, not
 # in Phase B, because its select walk decides the target; still before any edit.
 
 r check-files --repo-root .
@@ -276,11 +276,11 @@ newest "$LIB" go "$LIB" --current "$LIB_CUR" --repo-root .
 LIB_T=$NEW
 report library "$LIB_CUR" "$LIB_T"
 
-# The operator module: the newest published release in the pinned major whose
-# operator MAJOR.MINOR is not above the cli's, the rule install applies to a
-# target (enhancement 0021). The resolver answers the newest release; operator-pin
-# walks down from it, reading each candidate's operator package (no render).
-# operator-pin is built from the merge base, and also writes the pin in Phase C.
+# The controller module: the newest published release in the pinned major whose
+# controller MAJOR.MINOR is not above the cli's, the rule install applies to a
+# target (enhancement 0021). The resolver answers the newest release; controller-pin
+# walks down from it, reading each candidate's controller package (no render).
+# controller-pin is built from the merge base, and also writes the pin in Phase C.
 MOD_CUR=$(sed -n 's/^const PinnedModuleVersion = "\(.*\)"$/\1/p' "$PIN")
 [ -n "$MOD_CUR" ] || die "\`$PIN\` has no PinnedModuleVersion"
 MOD_CUR=v$MOD_CUR
@@ -288,17 +288,17 @@ newest "$MOD" cue "$MOD" --current "$MOD_CUR" --repo-root .
 MOD_T=""
 if [ -n "$NEW" ]; then
   CLI_V=$(jq -er '."."' .release-please-manifest.json) || die "cannot read the cli version from .release-please-manifest.json"
-  build_base ./hack/operator-pin operator-pin
+  build_base ./hack/controller-pin controller-pin
   SEL_RC=0
-  SEL=$("$STATE/bin/operator-pin" select "$NEW" "$CLI_V") || SEL_RC=$?
+  SEL=$("$STATE/bin/controller-pin" select "$NEW" "$CLI_V") || SEL_RC=$?
   case "$SEL_RC" in
     0) if [ "v$SEL" != "$MOD_CUR" ]; then MOD_T=v$SEL; fi ;;
-    3) warn "$MOD" "no \`$MOD\` release up to \`$NEW\` deploys an operator the cli \`$CLI_V\` can drive; the pin stays" ;;
-    *) die "\`hack/operator-pin select $NEW $CLI_V\` failed (exit $SEL_RC)" "$SEL_RC" ;;
+    3) warn "$MOD" "no \`$MOD\` release up to \`$NEW\` deploys a controller the cli \`$CLI_V\` can drive; the pin stays" ;;
+    *) die "\`hack/controller-pin select $NEW $CLI_V\` failed (exit $SEL_RC)" "$SEL_RC" ;;
   esac
   if [ -n "$MOD_T" ]; then vcmp "$MOD_T" "$MOD_CUR"; if [ "$CMP" != 1 ]; then MOD_T=""; fi; fi
 fi
-report "opm-operator module" "$MOD_CUR" "$MOD_T"
+report "opm-controller module" "$MOD_CUR" "$MOD_T"
 
 CAT_REP=$(cue_dep_v "$REP/cue.mod/module.cue" "$CAT")
 [ -n "$CAT_REP" ] || die "\`$REP/cue.mod/module.cue\` pins no \`$CAT\`"
@@ -491,7 +491,7 @@ fi
 # cannot stop the task from producing its diff (contract rule 11).
 
 # cue only when a cue.mod runs get and tidy, opm only for a version advance,
-# so a library- or operator-module-only run needs neither.
+# so a library- or controller-module-only run needs neither.
 for d in "${CUE_DIRS[@]}"; do
   if [ -n "${MOVES[$d]}" ]; then command -v cue >/dev/null || die "cue is not on PATH"; break; fi
 done
@@ -503,7 +503,7 @@ fi
 # Phase C: edit (contract §5.2 rule 12 and §6.4). A failure here exits
 # non-zero and may leave a partly edited tree; callers discard it.
 
-# 1. Shipped: library, then the operator module pin.
+# 1. Shipped: library, then the controller module pin.
 if [ -n "$LIB_T" ]; then
   before=$(go_requires)
   go get "$LIB@$LIB_T"
@@ -518,8 +518,8 @@ if [ -n "$LIB_T" ]; then
   done <<<"$after"
 fi
 if [ -n "$MOD_T" ]; then
-  # task operator:pin's program, built from the merge base in Phase A.
-  "$STATE/bin/operator-pin" "${MOD_T#v}" >&2
+  # task controller:pin's program, built from the merge base in Phase A.
+  "$STATE/bin/controller-pin" "${MOD_T#v}" >&2
 fi
 
 # 2. Catalog and core: templates first, then the test trees (CUE_DIRS order).

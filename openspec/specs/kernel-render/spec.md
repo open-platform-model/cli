@@ -2,13 +2,13 @@
 
 ## Purpose
 
-The CLI renders every instance through the `library` kernel — the same kernel the operator runs — replacing the CLI's own render/match pipeline (enhancement 0006, "The CLI replaces its own render/match pipeline entirely with the `library` kernel").
+The CLI renders every instance through the `library` kernel — the same kernel the controller runs — replacing the CLI's own render/match pipeline (enhancement 0006, "The CLI replaces its own render/match pipeline entirely with the `library` kernel").
 
 ## Requirements
 
 ### Requirement: Runtime identity in rendered output
 
-The CLI SHALL inject its runtime identity (`opm-cli`) into the kernel render context, so rendered resources carry the CLI's runtime provenance the same way operator-rendered resources carry `opm-controller`.
+The CLI SHALL inject its runtime identity (`opm-cli`) into the kernel render context, so rendered resources carry the CLI's runtime provenance the same way controller-rendered resources carry `opm-controller`.
 
 #### Scenario: Runtime label distinguishes actor
 
@@ -29,9 +29,9 @@ The CLI SHALL render instances exclusively through `github.com/open-platform-mod
 - **WHEN** a render fails with unresolved demands or unmatched components
 - **THEN** the command exits as a validation failure with the kernel's message; a transform error or an over-subscribed provider contract exits the same way, with the diagnostics printed beside the refusal
 
-### Requirement: The CLI carries no matching, execution or finalization of its own and imports no opm-operator package
+### Requirement: The CLI carries no matching, execution or finalization of its own and imports no opm-controller package
 
-The CLI MUST NOT carry its own component-matching, transformer-execution, or render-finalization implementation, MUST NOT hold any built platform value between renders, and MUST NOT import `opm-operator` Go packages (enhancement 0006, "The CLI imports `library` only; it does not import `opm-operator` (no controller-runtime, no Flux); supersedes D4's dependency direction").
+The CLI MUST NOT carry its own component-matching, transformer-execution, or render-finalization implementation, MUST NOT hold any built platform value between renders, and MUST NOT import `opm-controller` Go packages (enhancement 0006, "The CLI imports `library` only; it does not import `opm-operator` (no controller-runtime, no Flux); supersedes D4's dependency direction").
 
 #### Scenario: No CLI-side match implementation
 
@@ -50,7 +50,7 @@ After a successful render and before any resource, digest or output is built, th
 
 ### Requirement: A shared apply identity is refused as a validation failure
 
-After a successful render and before any resource, digest or output is built, the CLI SHALL refuse the render as a validation failure carrying the library's error when any identity is shared, so a build refuses exactly what an apply would have written twice and the CLI and the operator refuse the same module with the same wording (enhancement 0015, "One registration per module").
+After a successful render and before any resource, digest or output is built, the CLI SHALL refuse the render as a validation failure carrying the library's error when any identity is shared, so a build refuses exactly what an apply would have written twice and the CLI and the controller refuse the same module with the same wording (enhancement 0015, "One registration per module").
 
 #### Scenario: Two registrations in one module are refused by every render
 
@@ -144,37 +144,37 @@ The CLI MUST NOT fill values into an evaluated instance from Go.
 
 ### Requirement: The last applied render digest is the library's shared render digest
 
-`status.lastAppliedRenderDigest` SHALL be computed over the kernel's rendered objects with the library's shared render digest, `opm/k8s/inventory.RenderDigest`, which the operator also uses.
+`status.lastAppliedRenderDigest` SHALL be computed over the kernel's rendered objects with the library's shared render digest, `opm/k8s/inventory.RenderDigest`, which the controller also uses.
 
 #### Scenario: The digest is computed by the shared function
 - **WHEN** the CLI computes `status.lastAppliedRenderDigest`
-- **THEN** it SHALL be computed over the kernel's rendered objects with the library's shared render digest, `opm/k8s/inventory.RenderDigest`, which the operator also uses
+- **THEN** it SHALL be computed over the kernel's rendered objects with the library's shared render digest, `opm/k8s/inventory.RenderDigest`, which the controller also uses
 
 ### Requirement: The digest leaves out the value of the managed-by label
 
-`status.lastAppliedRenderDigest` SHALL leave the value of the `app.kubernetes.io/managed-by` label out, so the CLI (`opm-cli`) and the operator (`opm-controller`) digest the same render to the same value, while any other difference in an object, another label included, changes it (enhancement 0012, "Labels are stamped by the CUE render; the shared render digest ignores the runtime-name label value").
+`status.lastAppliedRenderDigest` SHALL leave the value of the `app.kubernetes.io/managed-by` label out, so the CLI (`opm-cli`) and the controller (`opm-controller`) digest the same render to the same value, while any other difference in an object, another label included, changes it (enhancement 0012, "Labels are stamped by the CUE render; the shared render digest ignores the runtime-name label value").
 
 #### Scenario: The runtime name does not move the digest
 
 - **WHEN** two renders produce the same objects except that one stamps `app.kubernetes.io/managed-by: opm-cli` and the other `opm-controller`
 - **THEN** their render digests SHALL be identical
 
-### Requirement: A registry-gated check verifies that the CLI and operator render digests are identical
+### Requirement: A registry-gated check verifies that the CLI and controller render digests are identical
 
-A registry-gated integration check SHALL verify that the CLI's local-dir staging path and the operator's registry-acquisition call sequence, both ending in `Kernel.Render` against the same platform module, produce identical render digests for the same instance (enhancement 0006 ("The OQ1 render-digest parity experiment is deferred into the C2 kernel-adoption slice; closes the last `draft → accepted` gate") gate).
+A registry-gated integration check SHALL verify that the CLI's local-dir staging path and the controller's registry-acquisition call sequence, both ending in `Kernel.Render` against the same platform module, produce identical render digests for the same instance (enhancement 0006 ("The OQ1 render-digest parity experiment is deferred into the C2 kernel-adoption slice; closes the last `draft → accepted` gate") gate).
 
 #### Scenario: Parity for the same inputs
 
-- **WHEN** the parity check renders a fixture instance via the CLI kernel path and via the operator's call sequence against the same platform module
+- **WHEN** the parity check renders a fixture instance via the CLI kernel path and via the controller's call sequence against the same platform module
 - **THEN** the two render digests SHALL be identical
 
 ### Requirement: Evaluator-version skew applies to a future cross-binary comparison
 
-Evaluator-version skew reporting SHALL apply to a future cross-binary comparison, where the CLI and operator binaries embed separate CUE evaluators; the in-binary check renders both paths with one evaluator and cannot exhibit skew.
+Evaluator-version skew reporting SHALL apply to a future cross-binary comparison, where the CLI and controller binaries embed separate CUE evaluators; the in-binary check renders both paths with one evaluator and cannot exhibit skew.
 
 #### Scenario: Skew reported explicitly (cross-binary check, slice C3)
 
-- **WHEN** the future cross-binary parity comparison runs while the `cli` and `opm-operator` binaries embed different `cuelang.org/go` minor versions
+- **WHEN** the future cross-binary parity comparison runs while the `cli` and `opm-controller` binaries embed different `cuelang.org/go` minor versions
 - **THEN** the check SHALL fail with a message naming the evaluator-version skew as the suspected cause
 
 ### Requirement: Every render enables the kernel's local replacements
@@ -321,15 +321,15 @@ When a render is refused for unresolved demands and at least one of them is mark
 - **WHEN** `opm instance apply` resolves the cluster `Platform` and is refused for a required provider-fulfilled trait no registration provides
 - **THEN** the hint SHALL name installing a provider, `--platform <dir>` and `--skip-unprovided`
 
-### Requirement: Instance apply and module apply refuse --skip-unprovided for an operator-managed instance
+### Requirement: Instance apply and module apply refuse --skip-unprovided for a controller-managed instance
 
-`opm instance apply` and `opm module apply` SHALL refuse `--skip-unprovided` for an instance an operator manages, with a validation error saying the operator renders that instance and never skips, before any spec is written.
+`opm instance apply` and `opm module apply` SHALL refuse `--skip-unprovided` for an instance a controller manages, with a validation error saying the controller renders that instance and never skips, before any spec is written.
 
-#### Scenario: An operator-managed instance refuses the flag
+#### Scenario: A controller-managed instance refuses the flag
 
-- **WHEN** `opm instance apply --skip-unprovided` targets an instance whose ModuleInstance an operator owns
+- **WHEN** `opm instance apply --skip-unprovided` targets an instance whose ModuleInstance a controller owns
 - **THEN** the command SHALL fail with exit code 2 before writing the spec
-- **AND** the message SHALL say the operator renders the instance and does not skip demands
+- **AND** the message SHALL say the controller renders the instance and does not skip demands
 
 ### Requirement: A platform pinning an older core fails as a validation failure with the library message
 

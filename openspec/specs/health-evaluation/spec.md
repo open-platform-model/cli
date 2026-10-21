@@ -60,9 +60,9 @@ This SHALL cover `opm instance status`, `opm instance list`, `opm instance tree`
 - **THEN** its row SHALL read `NotReady`, the value `health.Evaluate` returns for it
 - **AND** the command SHALL exit 2
 
-### Requirement: The Established wait and the operator install dispatch by kind stay in the cli
+### Requirement: The Established wait and the controller install dispatch by kind stay in the cli
 
-Three readiness checks are not decisions of the package and SHALL stay in the cli: the CustomResourceDefinition `Established` wait, the operator install wait's dispatch by kind (which judges a Deployment through `health.Evaluate` and treats other non-CRD kinds as ready once they exist).
+Three readiness checks are not decisions of the package and SHALL stay in the cli: the CustomResourceDefinition `Established` wait, the controller install wait's dispatch by kind (which judges a Deployment through `health.Evaluate` and treats other non-CRD kinds as ready once they exist).
 (Requirement: The cli takes every readiness decision from the library health package)
 
 **Source**: enhancement 0012 ("The Kubernetes runtime decisions live in a fenced tier, `opm/k8s`, beside the kernel and inside the library module").
@@ -98,8 +98,8 @@ No non-test Go file in the cli SHALL declare a copy of the package's decisions: 
 
 ### Requirement: The readiness exemptions are not copies
 
-The exemptions named in the requirements "The Established wait and the operator install dispatch by kind stay in the cli" and "The tree child rows and the status colouring stay in the cli" SHALL NOT be copies.
-(Requirements: The Established wait and the operator install dispatch by kind stay in the cli; The tree child rows and the status colouring stay in the cli)
+The exemptions named in the requirements "The Established wait and the controller install dispatch by kind stay in the cli" and "The tree child rows and the status colouring stay in the cli" SHALL NOT be copies.
+(Requirements: The Established wait and the controller install dispatch by kind stay in the cli; The tree child rows and the status colouring stay in the cli)
 
 **Source**: enhancement 0012 ("The Kubernetes runtime decisions live in a fenced tier, `opm/k8s`, beside the kernel and inside the library module").
 

@@ -117,12 +117,12 @@ With `FIX=1` a differing consumer's `module.cue` SHALL be overwritten with the r
 - **WHEN** the subcommand runs with `FIX=1` and a consumer differs
 - **THEN** that consumer's `module.cue` equals the resolved one afterwards and the run exits zero
 
-### Requirement: `hack/fixtures.sh` stays byte-identical with opm-operator's copy
-`hack/fixtures.sh` SHALL stay byte-identical with opm-operator's copy; each repo names its own consumers.
+### Requirement: `hack/fixtures.sh` stays byte-identical with opm-controller's copy
+`hack/fixtures.sh` SHALL stay byte-identical with opm-controller's copy; each repo names its own consumers.
 
-#### Scenario: The script is byte-identical with opm-operator's copy
+#### Scenario: The script is byte-identical with opm-controller's copy
 
-- **WHEN** `hack/fixtures.sh` is compared with opm-operator's copy
+- **WHEN** `hack/fixtures.sh` is compared with opm-controller's copy
 - **THEN** the two files SHALL be byte-identical, and each repo names its own consumers
 
 ### Requirement: A test pin is moved to the release cascade's target unless `.cascade-frozen` lists it with a reason
@@ -231,14 +231,14 @@ A catalog fixture SHALL go through `opm catalog publish` (and `opm catalog versi
 - **THEN** it SHALL NOT report it as an unlisted consumer
 
 ### Requirement: `tests/fixtures/fixtures.go` reads a catalog fixture's coordinate from its identity package
-`tests/fixtures/fixtures.go` SHALL read a catalog fixture's coordinate from its identity package through `LoadCatalog` and `MustCatalog`. Both files SHALL stay byte-identical with opm-operator's copies. (Requirement: `hack/fixtures.sh` treats each directory under a catalog fixture root as a catalog fixture)
+`tests/fixtures/fixtures.go` SHALL read a catalog fixture's coordinate from its identity package through `LoadCatalog` and `MustCatalog`. Both files SHALL stay byte-identical with opm-controller's copies. (Requirement: `hack/fixtures.sh` treats each directory under a catalog fixture root as a catalog fixture)
 
 #### Scenario: A catalog fixture's coordinate comes from its identity package
 
 - **WHEN** `tests/fixtures/fixtures.go` reads a catalog fixture's coordinate
 - **THEN** it SHALL read it from the fixture's identity package through `LoadCatalog` and `MustCatalog`
 
-#### Scenario: The fixture files are byte-identical with opm-operator's copies
+#### Scenario: The fixture files are byte-identical with opm-controller's copies
 
-- **WHEN** `hack/fixtures.sh` and `tests/fixtures/fixtures.go` are compared with opm-operator's copies
+- **WHEN** `hack/fixtures.sh` and `tests/fixtures/fixtures.go` are compared with opm-controller's copies
 - **THEN** both files SHALL be byte-identical

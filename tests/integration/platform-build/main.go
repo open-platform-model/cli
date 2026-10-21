@@ -6,7 +6,7 @@
 // Verifies the repo's maintained platform module (hack/platform/, the module
 // the kind dev flow and the offline tests pass with --platform) resolves as a
 // --platform directory, builds through the kernel's shape-gated directory
-// acquisition (AcquirePlatformFromDir, the operator's own ingestion path)
+// acquisition (AcquirePlatformFromDir, the controller's own ingestion path)
 // against the registry in OPM_REGISTRY, and that every #registry entry's
 // derived version is the catalog build the module's cue.mod pins.
 //

@@ -7,7 +7,7 @@ Fixes the meaning of the flags and exit codes that several `opm` commands share,
 
 ### Requirement: Every confirming command accepts yes
 
-Every command that asks the user to confirm an action SHALL accept `--yes` with the shorthand `-y`, default false, and with it SHALL NOT prompt. Today these are `opm instance delete` and `opm module init`. `--yes` SHALL NOT bypass any refusal: the operator guards of `opm instance delete` hold with it.
+Every command that asks the user to confirm an action SHALL accept `--yes` with the shorthand `-y`, default false, and with it SHALL NOT prompt. Today these are `opm instance delete` and `opm module init`. `--yes` SHALL NOT bypass any refusal: the controller guards of `opm instance delete` hold with it.
 
 #### Scenario: Instance delete with yes does not prompt
 

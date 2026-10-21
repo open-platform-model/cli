@@ -24,7 +24,7 @@ type GuardInput struct {
 	// InstanceUUID is the identity of the render.
 	InstanceUUID string
 	// RefuseLetGo makes an object adopted by another instance a refusal.
-	// Only `opm operator install` sets it: it needs every object it renders.
+	// Only `opm controller install` sets it: it needs every object it renders.
 	RefuseLetGo bool
 }
 

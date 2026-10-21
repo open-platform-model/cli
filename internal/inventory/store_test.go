@@ -64,7 +64,7 @@ func TestRecordFromUnstructured_FullMapping(t *testing.T) {
 	assert.Equal(t, "web", rec.Inventory.Entries[0].Component)
 }
 
-// spec.dataPolicy is the operator's field. The record carries it as written,
+// spec.dataPolicy is the controller's field. The record carries it as written,
 // so the command that reports it can show an unknown value as it is; an absent
 // or wrong-typed value reads as empty.
 func TestRecordFromUnstructured_DataPolicyIsReadAsWritten(t *testing.T) {

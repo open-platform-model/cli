@@ -1,7 +1,7 @@
 name: Deps cascade
 
 # The release-cascade receiver (workspace RELEASING.md, "The receiver" and
-# "Two-job split"). An upstream release (library, opm-operator or
+# "Two-job split"). An upstream release (library, opm-controller or
 # catalog_opm) dispatches upstream-released here; the daily sweep and a
 # manual run cover a dispatch that never arrived.
 #

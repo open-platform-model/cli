@@ -17,13 +17,13 @@ The CLI SHALL read every OPM label key and managed-by value, and decide whether 
 
 ### Requirement: Every CLI path orders objects by the library's kind-class weight
 
-Every CLI path that orders Kubernetes objects (apply, delete, prune, the `instance tree` view, the `module build` and `instance build` output, and the operator install and uninstall, which apply and delete through the same paths) SHALL order by the library's kind-class weight, `opm/k8s/object.Weight`.
+Every CLI path that orders Kubernetes objects (apply, delete, prune, the `instance tree` view, the `module build` and `instance build` output, and the controller install and uninstall, which apply and delete through the same paths) SHALL order by the library's kind-class weight, `opm/k8s/object.Weight`.
 
 The CLI SHALL NOT keep its own weight table.
 
 #### Scenario: A CLI path orders by the library weight
 
-- **WHEN** a CLI path orders Kubernetes objects: apply, delete, prune, the `instance tree` view, the `module build` and `instance build` output, or the operator install and uninstall
+- **WHEN** a CLI path orders Kubernetes objects: apply, delete, prune, the `instance tree` view, the `module build` and `instance build` output, or the controller install and uninstall
 - **THEN** it SHALL order by the library's kind-class weight, `opm/k8s/object.Weight`
 
 ### Requirement: Apply, delete, prune and the tree view sort through `object.Sort` and keep objects of equal weight in input order

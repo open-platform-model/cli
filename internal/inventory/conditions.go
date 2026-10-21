@@ -4,9 +4,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-// ConditionTypeReady is the ModuleInstance status condition the operator sets
+// ConditionTypeReady is the ModuleInstance status condition the controller sets
 // to report reconcile outcome. The CLI only ever reads it (enhancement 0006:
-// conditions are operator-owned status).
+// conditions are controller-owned status).
 const ConditionTypeReady = "Ready"
 
 // Condition status values, matching metav1.ConditionStatus.
@@ -22,7 +22,7 @@ type Condition struct {
 	Status  string
 	Reason  string
 	Message string
-	// ObservedGeneration is the condition's own observedGeneration. Operators
+	// ObservedGeneration is the condition's own observedGeneration. Controllers
 	// may omit it; 0 means "not stated" and the CR-level
 	// status.observedGeneration is the authority (see Record.ReadyFor).
 	ObservedGeneration int64
@@ -63,13 +63,13 @@ func (r *Record) FindCondition(condType string) *Condition {
 }
 
 // ReadyCondition returns the Ready condition regardless of which generation it
-// reports on, or nil when the operator has not written one.
+// reports on, or nil when the controller has not written one.
 func (r *Record) ReadyCondition() *Condition {
 	return r.FindCondition(ConditionTypeReady)
 }
 
 // ReadyFor returns the Ready condition only when it reports on generation or
-// newer — the signal that the operator has finished reconciling a specific
+// newer — the signal that the controller has finished reconciling a specific
 // write rather than reporting a stale verdict from before it. A condition that
 // states no observedGeneration of its own is attributed to the CR-level
 // status.observedGeneration.

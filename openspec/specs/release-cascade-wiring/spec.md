@@ -12,7 +12,7 @@ How the cli joins the release cascade: after a release, `release.yml` notifies d
 **Source**: workspace RELEASING.md, sections "The receiver", "Two-job split" and "Gates"; Phase 3 wiring contract (version 3.1) §5 and §5.2.
 
 #### Scenario: An upstream release starts the receiver
-- **WHEN** library, opm-operator or catalog_opm publishes a release and its notify job dispatches `upstream-released` to the cli
+- **WHEN** library, opm-controller or catalog_opm publishes a release and its notify job dispatches `upstream-released` to the cli
 - **THEN** a `Deps cascade` run starts on `main` and runs the shared receiver against this repository
 
 #### Scenario: The daily sweep runs without a dispatch

@@ -81,7 +81,7 @@ func TestApplySpec_OwnershipFlipCarriesTheWholeOwnedSpec(t *testing.T) {
 	generation, err := ApplySpec(context.Background(), client, SpecInput{
 		Name:          "podinfo",
 		Namespace:     "demo",
-		Owner:         OwnerOperator,
+		Owner:         OwnerController,
 		ModulePath:    "opmodel.dev/modules/podinfo@v0",
 		ModuleVersion: "0.1.0",
 		Values:        map[string]any{"replicas": 3},
@@ -90,7 +90,7 @@ func TestApplySpec_OwnershipFlipCarriesTheWholeOwnedSpec(t *testing.T) {
 	assert.Equal(t, int64(9), generation, "the flip must report the resulting generation for the reconcile wait")
 
 	spec := rec.specOf(t)
-	assert.Equal(t, OwnerOperator, spec["owner"])
+	assert.Equal(t, OwnerController, spec["owner"])
 
 	module, ok := spec["module"].(map[string]any)
 	require.True(t, ok, "spec.module must be present — omitting it prunes a required field")
@@ -103,15 +103,15 @@ func TestApplySpec_OwnershipFlipCarriesTheWholeOwnedSpec(t *testing.T) {
 }
 
 // The thin editor restates the owner it read rather than omitting it. Omitting
-// would release the field and let the API server prune the operator's
+// would release the field and let the API server prune the controller's
 // ownership marker.
-func TestApplySpec_ThinEditorPreservesTheOperatorOwner(t *testing.T) {
+func TestApplySpec_ThinEditorPreservesTheControllerOwner(t *testing.T) {
 	client, rec := newApplyPatchClient(t, 4)
 
 	_, err := ApplySpec(context.Background(), client, SpecInput{
 		Name:          "podinfo",
 		Namespace:     "demo",
-		Owner:         OwnerOperator, // the value read from the live CR
+		Owner:         OwnerController, // the value read from the live CR
 		ModulePath:    "opmodel.dev/modules/podinfo@v0",
 		ModuleVersion: "0.2.0",
 		Values:        map[string]any{"replicas": 2},
@@ -119,13 +119,13 @@ func TestApplySpec_ThinEditorPreservesTheOperatorOwner(t *testing.T) {
 	require.NoError(t, err)
 
 	spec := rec.specOf(t)
-	assert.Equal(t, OwnerOperator, spec["owner"],
-		"the edit must restate the operator's ownership, not drop it")
+	assert.Equal(t, OwnerController, spec["owner"],
+		"the edit must restate the controller's ownership, not drop it")
 	assert.NotContains(t, rec.body, "status", "the CLI never writes status in thin-editor mode")
 }
 
 // An absent owner stays absent: the CRD reads a missing spec.owner as
-// operator-managed, so omitting the key leaves that meaning intact rather than
+// controller-managed, so omitting the key leaves that meaning intact rather than
 // writing an empty string the enum would reject.
 func TestApplySpec_EmptyOwnerOmitsTheField(t *testing.T) {
 	client, rec := newApplyPatchClient(t, 1)

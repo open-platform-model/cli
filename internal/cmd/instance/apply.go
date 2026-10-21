@@ -40,16 +40,16 @@ func NewInstanceApplyCmd(cfg *config.GlobalConfig) *cobra.Command {
 		Long: `Deploy an OPM instance file to a Kubernetes cluster using server-side apply.
 
 Apply records what it deployed in a ModuleInstance custom resource, so the
-ModuleInstance CRD must be installed first (run 'opm operator install
+ModuleInstance CRD must be installed first (run 'opm controller install
 --crds-only'). Apply fails fast with a hint if it is missing or out of date.
 
 Pruning keeps PersistentVolumeClaims: a claim the module no longer renders
 stays in the cluster and in the inventory, is listed with the status "kept",
 and does not fail the apply. Pass --delete-data to prune such claims and the
-data on them; a claim kept by an earlier apply is pruned then too. On an
-operator-managed instance the operator decides what is pruned: an operator
+data on them; a claim kept by an earlier apply is pruned then too. On a
+controller-managed instance the controller decides what is pruned: a controller
 that has spec.dataPolicy keeps PersistentVolumeClaims unless that field of the
-instance is Delete, an older operator prunes them, and --delete-data does not
+instance is Delete, an older controller prunes them, and --delete-data does not
 change either.
 
 Arguments:
@@ -88,9 +88,9 @@ Examples:
 	c.MarkFlagsMutuallyExclusive("no-prune", "delete-data")
 	c.Flags().BoolVar(&forceFlag, "force", false, "Allow empty render to prune all previously tracked resources")
 	c.Flags().BoolVar(&waitFlag, "wait", false,
-		"Wait until every applied resource is healthy before returning (skipped on --dry-run; operator-managed instances always wait for the operator)")
+		"Wait until every applied resource is healthy before returning (skipped on --dry-run; controller-managed instances always wait for the controller)")
 	c.Flags().DurationVar(&timeoutFlag, "timeout", inventory.DefaultReconcileTimeout,
-		"Bound on the CustomResourceDefinition establish wait (counted from the start of the apply), on the --wait readiness wait, and on the operator-reconcile wait (operator-managed instances)")
+		"Bound on the CustomResourceDefinition establish wait (counted from the start of the apply), on the --wait readiness wait, and on the controller-reconcile wait (controller-managed instances)")
 
 	return c
 }

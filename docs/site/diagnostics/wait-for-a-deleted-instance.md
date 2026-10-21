@@ -77,6 +77,6 @@ To stop tracking the instance without waiting, run the command again without `--
 
 `opm` never removes a finalizer from a resource.
 
-## Operator-managed instances
+## Controller-managed instances
 
-For an instance that the operator manages, `opm instance delete` deletes only the `ModuleInstance`, and it always waits until the `ModuleInstance` is gone. `--timeout` bounds that wait too. `--wait` changes nothing there. The command does not read the resources that the operator prunes.
+For an instance that the controller manages, `opm instance delete` deletes only the `ModuleInstance`, and it always waits until the `ModuleInstance` is gone. `--timeout` bounds that wait too. `--wait` changes nothing there. The command does not read the resources that the controller prunes.

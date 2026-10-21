@@ -89,11 +89,11 @@ func makeModuleInstanceCRD(hasOwner, hasInventory bool) *unstructured.Unstructur
 }
 
 // makePlatform builds the cluster Platform singleton with an optional
-// status.operatorVersion.
-func makePlatform(operatorVersion string) *unstructured.Unstructured {
+// status.controllerVersion.
+func makePlatform(controllerVersion string) *unstructured.Unstructured {
 	status := map[string]any{}
-	if operatorVersion != "" {
-		status["operatorVersion"] = operatorVersion
+	if controllerVersion != "" {
+		status["controllerVersion"] = controllerVersion
 	}
 	return &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": inventory.APIVersionModuleInstance,

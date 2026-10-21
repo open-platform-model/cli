@@ -19,7 +19,7 @@ const (
 //
 // The match is on group and kind, so a kind of the same name in another API
 // group is not protected by accident. The rule is the library's
-// ownership.SafetyExcluded, shared with the operator.
+// ownership.SafetyExcluded, shared with the controller.
 func IsProtectedKind(group, kind string) bool {
 	return ownership.SafetyExcluded(group, kind)
 }

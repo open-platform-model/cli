@@ -1,7 +1,7 @@
 # deps-cascade Specification
 
 ## Purpose
-`task deps:cascade` moves the cli's upstream pins (library, the opm-operator module, and the opm catalog and core in the templates and test trees) to the newest published versions the release cascade allows. Its title and body tasks describe the result for the rolling `deps/cascade` pull request. The design is in workspace RELEASING.md, section "The cascade". The shared resolver in `open-platform-model/.github` answers every version question.
+`task deps:cascade` moves the cli's upstream pins (library, the opm-controller module, and the opm catalog and core in the templates and test trees) to the newest published versions the release cascade allows. Its title and body tasks describe the result for the rolling `deps/cascade` pull request. The design is in workspace RELEASING.md, section "The cascade". The shared resolver in `open-platform-model/.github` answers every version question.
 
 ## Requirements
 
@@ -11,8 +11,8 @@
 
 #### Scenario: Older pins move to the published set
 
-- **WHEN** library, the operator module, the catalog and core are older than the newest published versions, and `task -x deps:cascade` runs
-- **THEN** `go.mod`, `go.sum`, `internal/operator/pin.go`, every listed `cue.mod/module.cue` and `hack/kind-platform.yaml` carry the resolved versions
+- **WHEN** library, the controller module, the catalog and core are older than the newest published versions, and `task -x deps:cascade` runs
+- **THEN** `go.mod`, `go.sum`, `internal/controller/pin.go`, every listed `cue.mod/module.cue` and `hack/kind-platform.yaml` carry the resolved versions
 - **AND** core in each file equals the core that file's catalog pins
 - **AND** the task exits 0
 
@@ -28,25 +28,25 @@
 - **WHEN** the Go proxy serves a newer library version in its major
 - **THEN** `github.com/open-platform-model/library` in `go.mod` SHALL move to it through `go get <module>@<exact version>` followed by `go mod tidy`
 
-### Requirement: The operator module pin moves only through hack/operator-pin
+### Requirement: The controller module pin moves only through hack/controller-pin
 
-`task -x deps:cascade` SHALL move the following pins in the working tree only. **opm-operator module.** The operator module pin in `internal/operator/pin.go` (`PinnedModuleVersion` and `PinnedOperatorVersion`) SHALL move only through `hack/operator-pin <v>`, the program behind `task operator:pin VERSION=<v>`, built from the merge base like `opm`. The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves".
+`task -x deps:cascade` SHALL move the following pins in the working tree only. **opm-controller module.** The controller module pin in `internal/controller/pin.go` (`PinnedModuleVersion` and `PinnedControllerVersion`) SHALL move only through `hack/controller-pin <v>`, the program behind `task controller:pin VERSION=<v>`, built from the merge base like `opm`. The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves".
 
-#### Scenario: The operator pin moves through the program
-- **WHEN** the operator module pin moves
-- **THEN** it SHALL move only through `hack/operator-pin <v>`, the program behind `task operator:pin VERSION=<v>`, built from the merge base like `opm`
+#### Scenario: The controller pin moves through the program
+- **WHEN** the controller module pin moves
+- **THEN** it SHALL move only through `hack/controller-pin <v>`, the program behind `task controller:pin VERSION=<v>`, built from the merge base like `opm`
 
-### Requirement: The operator module target is the newest release whose operator version is not above the cli's own
+### Requirement: The controller module target is the newest release whose controller version is not above the cli's own
 
-`task -x deps:cascade` SHALL move the following pins in the working tree only. **opm-operator module.** The target is the newest published release of `opmodel.dev/modules/opm_operator` in the pinned major whose stated operator version, read from the module's source without a render, has a `MAJOR.MINOR` not above the cli's own, the same rule install applies to a target module version. The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves".
+`task -x deps:cascade` SHALL move the following pins in the working tree only. **opm-controller module.** The target is the newest published release of `opmodel.dev/modules/opm_controller` in the pinned major whose stated controller version, read from the module's source without a render, has a `MAJOR.MINOR` not above the cli's own, the same rule install applies to a target module version. The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves".
 
 #### Scenario: The target stays within the cli MAJOR.MINOR
-- **WHEN** the operator module pin moves
-- **THEN** the target is the newest published release of `opmodel.dev/modules/opm_operator` in the pinned major whose stated operator version has a `MAJOR.MINOR` not above the cli's own
+- **WHEN** the controller module pin moves
+- **THEN** the target is the newest published release of `opmodel.dev/modules/opm_controller` in the pinned major whose stated controller version has a `MAJOR.MINOR` not above the cli's own
 
 ### Requirement: The catalog and core pins cover a fixed set of cue.mod/module.cue files
 
-**Catalog and core as a consistent set.** The consistent set SHALL cover the `cue.mod/module.cue` files of the three templates, `hack/platform`, `examples`, `tests/fixtures/modules/podinfo`, `tests/e2e/testdata/operator-owned`, `internal/instinit/testdata/initvalues`. The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves".
+**Catalog and core as a consistent set.** The consistent set SHALL cover the `cue.mod/module.cue` files of the three templates, `hack/platform`, `examples`, `tests/fixtures/modules/podinfo`, `tests/e2e/testdata/controller-owned`, `internal/instinit/testdata/initvalues`. The source is workspace RELEASING.md, sections "The cascade" and "What each repo's task moves".
 
 #### Scenario: The set of files
 - **WHEN** the task moves the catalog and core as a consistent set
@@ -226,11 +226,11 @@ The task (`task -x deps:cascade`) SHALL write a version only when it is greater 
 
 ### Requirement: The podinfo pin in the two consumers follows the fixture version without cue mod get or tidy
 
-The podinfo pin in `examples/cue.mod/module.cue` and `tests/e2e/testdata/operator-owned/cue.mod/module.cue` SHALL follow the fixture's new version in the same run, as a text rewrite made after their catalog and core moved. No `cue mod get` or `cue mod tidy` SHALL follow that rewrite. Source: workspace RELEASING.md, section "The cascade", "The receiver" ("Version advances happen once per PR").
+The podinfo pin in `examples/cue.mod/module.cue` and `tests/e2e/testdata/controller-owned/cue.mod/module.cue` SHALL follow the fixture's new version in the same run, as a text rewrite made after their catalog and core moved. No `cue mod get` or `cue mod tidy` SHALL follow that rewrite. Source: workspace RELEASING.md, section "The cascade", "The receiver" ("Version advances happen once per PR").
 
 #### Scenario: The consumers follow the fixture
 - **WHEN** the fixture gets a new version
-- **THEN** the podinfo pin in `examples/cue.mod/module.cue` and `tests/e2e/testdata/operator-owned/cue.mod/module.cue` SHALL follow it in the same run, as a text rewrite made after their catalog and core moved
+- **THEN** the podinfo pin in `examples/cue.mod/module.cue` and `tests/e2e/testdata/controller-owned/cue.mod/module.cue` SHALL follow it in the same run, as a text rewrite made after their catalog and core moved
 
 ### Requirement: A consumer pinning an unpublished podinfo version is pointed at the merge base version for cue mod get and tidy
 
@@ -247,7 +247,7 @@ When a consumer's catalog or core moves while it pins a podinfo version that is 
 
 #### Scenario: A shipped move titles as fix(deps)
 
-- **WHEN** a run moved library, the operator module to a version deploying a newer operator, the catalog and core
+- **WHEN** a run moved library, the controller module to a version deploying a newer controller, the catalog and core
 - **THEN** `task -x deps:cascade:title` prints `fix(deps): bump 5 upstream pins`
 
 #### Scenario: Test-only paths title as test(fixtures)
@@ -264,14 +264,14 @@ When a consumer's catalog or core moves while it pins a podinfo version that is 
 - **WHEN** a run moved four pins
 - **THEN** `task -x deps:cascade:body` prints the title and labels markers, one table row per moved pin, and `## Notes` as the last section
 
-### Requirement: The pins script reports the library and operator pins
+### Requirement: The pins script reports the library and controller pins
 
-`.tasks/cascade/pins.sh <ref>` SHALL report five pins, each `v`-prefixed: `github.com/open-platform-model/library` from `go.mod`; `github.com/open-platform-model/opm-operator` from `PinnedOperatorVersion` in `internal/operator/pin.go`; `opmodel.dev/modules/opm_operator@v0` from `PinnedModuleVersion` in `internal/operator/pin.go`, so a module release that deploys the same operator still shows as a moved pin. Source: workspace RELEASING.md, section "The cascade", "Title from diff class".
+`.tasks/cascade/pins.sh <ref>` SHALL report five pins, each `v`-prefixed: `github.com/open-platform-model/library` from `go.mod`; `github.com/open-platform-model/opm-controller` from `PinnedControllerVersion` in `internal/controller/pin.go`; `opmodel.dev/modules/opm_controller@v0` from `PinnedModuleVersion` in `internal/controller/pin.go`, so a module release for the same controller still shows as a moved pin. Source: workspace RELEASING.md, section "The cascade", "Title from diff class".
 
 #### Scenario: A module-only pin move is reported
 
-- **WHEN** a run moved only the operator module pin, to a module version that deploys the same operator version
-- **THEN** `task -x deps:cascade:title` prints a `fix(deps)` title counting one moved pin, and `task -x deps:cascade:body` prints one table row for `opmodel.dev/modules/opm_operator@v0` and none for `github.com/open-platform-model/opm-operator`
+- **WHEN** a run moved only the controller module pin, to a module version that deploys the same controller version
+- **THEN** `task -x deps:cascade:title` prints a `fix(deps)` title counting one moved pin, and `task -x deps:cascade:body` prints one table row for `opmodel.dev/modules/opm_controller@v0` and none for `github.com/open-platform-model/opm-controller`
 
 ### Requirement: The pins script reports the catalog and core pins
 
@@ -376,7 +376,7 @@ The full set of `task -x deps:cascade:test` SHALL run in `.github/workflows/casc
 
 ### Requirement: The cascade task runs no program that links a moved Go dependency
 
-`task deps:cascade` SHALL NOT build or run a program that links a moved Go dependency: the only Go programs it runs are the `opm` and the `hack/operator-pin` it builds, before any pin moves, from the merge base with `CASCADE_BASE` (default `origin/main`), never from the work tree, which in merge mode may already carry an earlier run's library move.
+`task deps:cascade` SHALL NOT build or run a program that links a moved Go dependency: the only Go programs it runs are the `opm` and the `hack/controller-pin` it builds, before any pin moves, from the merge base with `CASCADE_BASE` (default `origin/main`), never from the work tree, which in merge mode may already carry an earlier run's library move.
 
 #### Scenario: A library move runs no library code
 
@@ -386,7 +386,7 @@ The full set of `task -x deps:cascade:test` SHALL run in `.github/workflows/casc
 #### Scenario: Merge mode builds opm from the merge base
 
 - **WHEN** a run on a `deps/cascade` branch that already pins a moved library, with `main` merged in, needs a version advance
-- **THEN** the task builds `opm` from the merge base's tree, which pins `main`'s library, and runs `go` for nothing else but `get`, `mod tidy` and the builds of `opm` and `hack/operator-pin` from the merge base
+- **THEN** the task builds `opm` from the merge base's tree, which pins `main`'s library, and runs `go` for nothing else but `get`, `mod tidy` and the builds of `opm` and `hack/controller-pin` from the merge base
 
 ### Requirement: The cascade task appends a warning without failing in two cases
 

@@ -20,7 +20,7 @@ The registry model asserts things **only about domains OPM owns** (enhancement 0
 | `opmodel.dev/modules/<name>` | First-party modules. **Flat**: one snake-case leaf, no nesting | Module release pipelines via `opm module publish` | The publish namespace gate refuses nested paths and non-snake leaves (enhancement 0011) |
 | `opmodel.dev/templates/<name>` | Official module templates, the modules `opm mod init` clones | The `cli` repo's release CI, exclusively | Reserved segment (enhancement 0011); the name `index` is reserved within it; publish gates admit the segment as module-kind |
 | `opmodel.dev/platforms/…` | **Reserved, unpublished.** No platform is published or fetched from a registry today | Nobody | A namespace claim, not a publisher (enhancement 0011) |
-| `testing.opmodel.dev/*` | Fixtures and experiments, never production artifacts. Current occupants include the operator's test-module fleet (`testing.opmodel.dev/modules/operator/*`) | Owning repos' CI | Convention plus the gates' identity checks; nothing here carries a compatibility promise |
+| `testing.opmodel.dev/*` | Fixtures and experiments, never production artifacts. Current occupants include the controller's test-module fleet (`testing.opmodel.dev/modules/controller/*`) | Owning repos' CI | Convention plus the gates' identity checks; nothing here carries a compatibility promise |
 | `community.opmodel.dev/m/<owner>/<name>` | Community modules under per-owner paths | The owning community publisher | Identity gates; the owner segment is the namespace (enhancement 0011) |
 | Anything else | Yours | You | Identity and content gates only, no namespace assertions |
 

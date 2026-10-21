@@ -54,7 +54,7 @@ refused: <headline>
 
 ### The kernel would refuse to load the module
 
-<!-- Headline: "the kernel would refuse to load this module", evidence row "loader <error>". Modules only; skipped while an identity field is open or absent. Publish loads the tree through the same kernel acquire that `opm module build` and the operator use. The action depends on the loader's error: a missing required field ("Make the field a concrete literal in identity/identity.cue and reference it from metadata"), the wrong kind ("Publish the artifact with its own command: opm catalog publish for a catalog"), an invalid package ("exactly one CUE package at the module root"), otherwise "Fix the loader error above and re-run: opm module publish --dry-run". Check against: cli/internal/publish/kernel_gate.go, library/opm/errors/sentinels.go -->
+<!-- Headline: "the kernel would refuse to load this module", evidence row "loader <error>". Modules only; skipped while an identity field is open or absent. Publish loads the tree through the same kernel acquire that `opm module build` and the controller use. The action depends on the loader's error: a missing required field ("Make the field a concrete literal in identity/identity.cue and reference it from metadata"), the wrong kind ("Publish the artifact with its own command: opm catalog publish for a catalog"), an invalid package ("exactly one CUE package at the module root"), otherwise "Fix the loader error above and re-run: opm module publish --dry-run". Check against: cli/internal/publish/kernel_gate.go, library/opm/errors/sentinels.go -->
 
 ### The cue.mod file does not declare its source
 

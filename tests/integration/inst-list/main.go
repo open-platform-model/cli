@@ -141,33 +141,33 @@ func main() {
 	// ----------------------------------------------------------------
 	// Scenario 2b: Ownership visibility in summaries
 	// ----------------------------------------------------------------
-	step(3, "Ownership visibility - operator-owned and cli-owned instances resolve correctly")
+	step(3, "Ownership visibility - controller-owned and cli-owned instances resolve correctly")
 
-	// Re-mark app-three as operator-owned by rewriting its spec.owner. Ownership
+	// Re-mark app-three as controller-owned by rewriting its spec.owner. Ownership
 	// now derives from the CR's spec.owner, not a record's createdBy.
 	_, err = inventory.ApplySpec(ctx, client, inventory.SpecInput{
 		Name:          instanceThree,
 		Namespace:     nsB,
-		Owner:         inventory.OwnerOperator,
+		Owner:         inventory.OwnerController,
 		ModulePath:    modulePath,
 		ModuleVersion: moduleVersion,
 	})
-	check("marking app-three operator-owned", err)
+	check("marking app-three controller-owned", err)
 
-	operatorRead, err := inventory.GetRecord(ctx, client, instanceThree, nsB)
-	check("reading operator-owned inventory", err)
+	controllerRead, err := inventory.GetRecord(ctx, client, instanceThree, nsB)
+	check("reading controller-owned inventory", err)
 	cliRead, err := inventory.GetRecord(ctx, client, instanceTwo, nsA)
 	check("reading cli-owned inventory", err)
 
-	operatorSummary := query.BuildInstanceSummary(operatorRead)
+	controllerSummary := query.BuildInstanceSummary(controllerRead)
 	cliSummary := query.BuildInstanceSummary(cliRead)
-	if operatorSummary.Owner != "operator" {
-		failf("expected operator-owned summary owner, got %q", operatorSummary.Owner)
+	if controllerSummary.Owner != "controller" {
+		failf("expected controller-owned summary owner, got %q", controllerSummary.Owner)
 	}
 	if cliSummary.Owner != "cli" {
 		failf("expected cli summary owner, got %q", cliSummary.Owner)
 	}
-	fmt.Println("   OK: operator-owned instances show owner=operator and cli-owned show owner=cli")
+	fmt.Println("   OK: controller-owned instances show owner=controller and cli-owned show owner=cli")
 
 	// ----------------------------------------------------------------
 	// Scenario 3: Empty namespace

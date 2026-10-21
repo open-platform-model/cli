@@ -123,7 +123,7 @@ type: "kubernetes"
 // container plus the backup trait, and on labels alone mirror would be the
 // broader of the two. Without the label this platform is
 // undiscriminatedPlatform below, and the "many suppliers, still routable"
-// claim would be read on a platform the operator refuses for a different
+// claim would be read on a platform the controller refuses for a different
 // reason.
 const catalogFulfilledPluralityPlatform = routablePlatform + `
 _veleroMirror: c.#ComponentTransformer & {
@@ -631,7 +631,7 @@ func TestPlatformCheck_CatalogFulfilledPluralityIsNotOverSubscription(t *testing
 	assert.NotContains(t, report, "over-subscribed contracts")
 	assert.Contains(t, report, "routable:  yes")
 	// The suppliers are told apart by mirror's required label, so the
-	// platform this assertion is made on is one the operator generates from
+	// platform this assertion is made on is one the controller generates from
 	// (enhancement 0015).
 	assert.Contains(t, report, "discriminated: yes")
 	assert.NotContains(t, report, "comparable transformer pairs")

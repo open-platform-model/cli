@@ -14,13 +14,13 @@ import (
 	"github.com/open-platform-model/library/opm/k8s/lifecycle"
 )
 
-// DeleteDataOperatorManagedNote is the warning every command prints when
-// --delete-data is set for an operator-managed instance. The flag steers only
-// what opm itself deletes; there the operator deletes. An operator that has
+// DeleteDataControllerManagedNote is the warning every command prints when
+// --delete-data is set for a controller-managed instance. The flag steers only
+// what opm itself deletes; there the controller deletes. A controller that has
 // spec.dataPolicy obeys that field, and one released before it prunes claims.
-const DeleteDataOperatorManagedNote = "--delete-data does not change what the operator does with an operator-managed instance: " +
-	"an operator that has spec.dataPolicy keeps PersistentVolumeClaims unless that field of the ModuleInstance is Delete, " +
-	"and an older operator deletes them"
+const DeleteDataControllerManagedNote = "--delete-data does not change what the controller does with a controller-managed instance: " +
+	"a controller that has spec.dataPolicy keeps PersistentVolumeClaims unless that field of the ModuleInstance is Delete, " +
+	"and an older controller deletes them"
 
 // DeleteRequest is a CLI-owned instance delete: the instance's recorded
 // inventory, already read from the cluster, and its record.
@@ -101,7 +101,7 @@ func logDeleteResult(deleteResult *kubernetes.DeleteResult, instanceLog *log.Log
 // here: the caller reports the result's Terminating. Already absent objects count as
 // deleted. A record delete that fails is returned as a *RecordDeleteError
 // and is not logged here: the caller reports it and must not report success.
-// `opm instance delete` and `opm operator uninstall` share it. The caller
+// `opm instance delete` and `opm controller uninstall` share it. The caller
 // reports the result.
 func DeleteRecorded(ctx context.Context, req DeleteRequest) (*kubernetes.DeleteResult, error) {
 	instanceLog := req.Log

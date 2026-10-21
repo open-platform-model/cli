@@ -201,7 +201,7 @@ func TestPrintValidationError_UsesGroupedFormatting(t *testing.T) {
 // A duplicate-identity refusal reaches the user in the CLI's two streams:
 // the library's header line under render failed, every shared identity with
 // both producing components as details. The words are the library's, so the
-// operator refuses the same module identically; only the split is the CLI's.
+// controller refuses the same module identically; only the split is the CLI's.
 func TestPrintValidationError_DuplicateIdentitiesSplitsHeaderAndRows(t *testing.T) {
 	dupErr := &object.DuplicateIdentitiesError{Duplicates: []object.Duplicate{{
 		Identity: object.Identity{

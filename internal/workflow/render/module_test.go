@@ -372,13 +372,13 @@ func TestModuleOpts_DepsOnlyNeverReadsThePlatform(t *testing.T) {
 
 // An explicit Namespace outranks the --namespace flag and the environment.
 func TestSyntheticIdentity_ExplicitNamespace(t *testing.T) {
-	mod := &module.Module{Metadata: &module.ModuleMetadata{Name: "opm_operator"}}
+	mod := &module.Module{Metadata: &module.ModuleMetadata{Name: "opm_controller"}}
 	k8s := &config.ResolvedKubernetesConfig{}
 	k8s.Namespace.Value = "from-flag"
 	k8s.Namespace.Source = config.SourceFlag
 
-	_, _, ns := syntheticIdentity(mod, ModuleOpts{K8sConfig: k8s, Namespace: "opm-operator-system"}, "from-flag")
-	assert.Equal(t, "opm-operator-system", ns)
+	_, _, ns := syntheticIdentity(mod, ModuleOpts{K8sConfig: k8s, Namespace: "opm-system"}, "from-flag")
+	assert.Equal(t, "opm-system", ns)
 
 	_, _, ns = syntheticIdentity(mod, ModuleOpts{K8sConfig: k8s}, "from-flag")
 	assert.Equal(t, "from-flag", ns)

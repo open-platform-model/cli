@@ -1,12 +1,12 @@
 ## Purpose
 
-The gate battery that runs on the CLI's real (non-dry-run) apply path before any resource is written: CRD presence, CRD field-presence floor, operator-version ceiling, and the status-RBAC pre-flight. Enhancement 0006 ("CRD/operator version skew: CLI-≥-cluster invariant, gate-only (CRD field-presence floor + operator-version ceiling via `Platform.status`); resolves OQ4", "No `--install-crds` flag; missing CRDs fail with a hint to run `opm install crds`; resolves OQ7", "Status-subresource RBAC (opt-in `--rbac` emission + a pre-flight access check, both as edge-case safety nets); resolves OQ3" and "Slice B2 ships install/uninstall only: the missing-CRD apply gate moves to C1; the CLI-wide field manager constant becomes `opm-cli` in B2") — these gates give the `ModuleInstance` CRD its role as a hard prerequisite for CLI apply.
+The gate battery that runs on the CLI's real (non-dry-run) apply path before any resource is written: CRD presence, CRD field-presence floor, controller-version ceiling, and the status-RBAC pre-flight. Enhancement 0006 ("CRD/operator version skew: CLI-≥-cluster invariant, gate-only (CRD field-presence floor + operator-version ceiling via `Platform.status`); resolves OQ4", "No `--install-crds` flag; missing CRDs fail with a hint to run `opm install crds`; resolves OQ7", "Status-subresource RBAC (opt-in `--rbac` emission + a pre-flight access check, both as edge-case safety nets); resolves OQ3" and "Slice B2 ships install/uninstall only: the missing-CRD apply gate moves to C1; the CLI-wide field manager constant becomes `opm-cli` in B2") — these gates give the `ModuleInstance` CRD its role as a hard prerequisite for CLI apply.
 
 ## Requirements
 
 ### Requirement: Missing-CRD gate with install hint
 
-Before applying any resource, the CLI SHALL verify the `moduleinstances.opmodel.dev` CustomResourceDefinition exists. When absent, apply SHALL fail with the one-line hint: `ModuleInstance CRD not found — run 'opm operator install --crds-only'`, and do nothing else.
+Before applying any resource, the CLI SHALL verify the `moduleinstances.opmodel.dev` CustomResourceDefinition exists. When absent, apply SHALL fail with the one-line hint: `ModuleInstance CRD not found — run 'opm controller install --crds-only'`, and do nothing else.
 
 #### Scenario: CRD absent
 
@@ -16,7 +16,7 @@ Before applying any resource, the CLI SHALL verify the `moduleinstances.opmodel.
 
 ### Requirement: CRD field-presence floor
 
-Before applying, the CLI SHALL verify the installed `ModuleInstance` CRD's served storage-version schema contains the `spec.owner` and `status.inventory` properties. When either is missing, apply SHALL refuse with: `ModuleInstance CRD is missing required fields — run 'opm operator install --crds-only'`.
+Before applying, the CLI SHALL verify the installed `ModuleInstance` CRD's served storage-version schema contains the `spec.owner` and `status.inventory` properties. When either is missing, apply SHALL refuse with: `ModuleInstance CRD is missing required fields — run 'opm controller install --crds-only'`.
 
 #### Scenario: Outdated CRD refused
 
@@ -30,7 +30,7 @@ Before applying, the CLI SHALL verify the installed `ModuleInstance` CRD's serve
 
 ### Requirement: Status-RBAC pre-flight
 
-In CLI-executor mode, before applying any resource, the CLI SHALL issue a `SelfSubjectAccessReview` for `patch` on `moduleinstances/status` in the target namespace. On denial, apply SHALL abort with an actionable error explaining that inventory cannot be recorded and naming the remedies (grant `moduleinstances/status`, or `opm operator install --crds-only --rbac`). The pre-flight guarantees resources are never deployed without a recordable inventory.
+In CLI-executor mode, before applying any resource, the CLI SHALL issue a `SelfSubjectAccessReview` for `patch` on `moduleinstances/status` in the target namespace. On denial, apply SHALL abort with an actionable error explaining that inventory cannot be recorded and naming the remedies (grant `moduleinstances/status`, or `opm controller install --crds-only --rbac`). The pre-flight guarantees resources are never deployed without a recordable inventory.
 
 #### Scenario: Denied status access aborts before apply
 
@@ -43,52 +43,52 @@ In CLI-executor mode, before applying any resource, the CLI SHALL issue a `SelfS
 - **WHEN** the SSAR reports the access is allowed
 - **THEN** apply SHALL proceed with no additional output
 
-### Requirement: Before applying, the CLI compares the operator version of the `Platform` to its own version on MAJOR.MINOR only
+### Requirement: Before applying, the CLI compares the controller version of the `Platform` to its own version on MAJOR.MINOR only
 
-Before applying, the CLI SHALL read the cluster-scoped singleton `Platform` and compare `status.operatorVersion` to its own version on MAJOR.MINOR only: the patch number, the prerelease suffix and any build metadata SHALL be ignored on both sides, because the CLI and the operator share MAJOR.MINOR and release patches and prerelease counters independently.
+Before applying, the CLI SHALL read the cluster-scoped singleton `Platform` and compare `status.controllerVersion` to its own version on MAJOR.MINOR only: the patch number, the prerelease suffix and any build metadata SHALL be ignored on both sides, because the CLI and the controller share MAJOR.MINOR and release patches and prerelease counters independently.
 
-**Source**: enhancement 0021 ("The CLI's ceiling on operator versions compares `MAJOR.MINOR` only").
+**Source**: enhancement 0021 ("The CLI's ceiling on controller versions compares `MAJOR.MINOR` only").
 
 #### Scenario: Newer prerelease counter on the same line passes
 
-- **WHEN** `status.operatorVersion` is `1.0.0-beta.3` and the CLI version is `1.0.0-beta.2`
+- **WHEN** `status.controllerVersion` is `1.0.0-beta.3` and the CLI version is `1.0.0-beta.2`
 - **THEN** the ceiling check SHALL pass and apply SHALL proceed
 
-#### Scenario: Beta operator against an alpha CLI of the same line passes
+#### Scenario: Beta controller against an alpha CLI of the same line passes
 
-- **WHEN** `status.operatorVersion` is `1.0.0-beta.1` and the CLI version is `1.0.0-alpha.27`
+- **WHEN** `status.controllerVersion` is `1.0.0-beta.1` and the CLI version is `1.0.0-alpha.27`
 - **THEN** the ceiling check SHALL pass and apply SHALL proceed
 
-#### Scenario: Newer operator patch passes
+#### Scenario: Newer controller patch passes
 
-- **WHEN** `status.operatorVersion` is `1.0.4` and the CLI version is `1.0.1`
+- **WHEN** `status.controllerVersion` is `1.0.4` and the CLI version is `1.0.1`
 - **THEN** the ceiling check SHALL pass and apply SHALL proceed
 
-### Requirement: Apply refuses with an upgrade-the-CLI error when the operator's MAJOR.MINOR is greater than the CLI's MAJOR.MINOR
+### Requirement: Apply refuses with an upgrade-the-CLI error when the controller's MAJOR.MINOR is greater than the CLI's MAJOR.MINOR
 
-If the operator's MAJOR.MINOR is greater than the CLI's MAJOR.MINOR, apply SHALL refuse with an error telling the user to upgrade the CLI; the error SHALL name both full versions as read. (Requirement: Before applying, the CLI compares the operator version of the `Platform` to its own version on MAJOR.MINOR only)
+If the controller's MAJOR.MINOR is greater than the CLI's MAJOR.MINOR, apply SHALL refuse with an error telling the user to upgrade the CLI; the error SHALL name both full versions as read. (Requirement: Before applying, the CLI compares the controller version of the `Platform` to its own version on MAJOR.MINOR only)
 
-**Source**: enhancement 0021 ("The CLI's ceiling on operator versions compares `MAJOR.MINOR` only").
+**Source**: enhancement 0021 ("The CLI's ceiling on controller versions compares `MAJOR.MINOR` only").
 
 #### Scenario: Older CLI refused
 
-- **WHEN** `status.operatorVersion` is `1.2.0` and the CLI version is `1.1.0`
+- **WHEN** `status.controllerVersion` is `1.2.0` and the CLI version is `1.1.0`
 - **THEN** apply SHALL exit non-zero with an upgrade-the-CLI error
 
-#### Scenario: Newer operator minor refused
+#### Scenario: Newer controller minor refused
 
-- **WHEN** `status.operatorVersion` is `1.1.0` (or `1.1.0-beta.1`) and the CLI version is `1.0.0`
+- **WHEN** `status.controllerVersion` is `1.1.0` (or `1.1.0-beta.1`) and the CLI version is `1.0.0`
 - **THEN** apply SHALL exit non-zero with an upgrade-the-CLI error naming both versions
 
-### Requirement: The operator-version ceiling check is skipped when the Platform or the field is absent or when reading the Platform fails due to RBAC
+### Requirement: The controller-version ceiling check is skipped when the Platform or the field is absent or when reading the Platform fails due to RBAC
 
-If the Platform or the field is absent, the check SHALL be skipped (solo cluster semantics). If reading the Platform fails due to RBAC, the check SHALL be skipped with a warning (a namespace-scoped user must remain able to apply). (Requirement: Before applying, the CLI compares the operator version of the `Platform` to its own version on MAJOR.MINOR only)
+If the Platform or the field is absent, the check SHALL be skipped (solo cluster semantics). If reading the Platform fails due to RBAC, the check SHALL be skipped with a warning (a namespace-scoped user must remain able to apply). (Requirement: Before applying, the CLI compares the controller version of the `Platform` to its own version on MAJOR.MINOR only)
 
-**Source**: enhancement 0021 ("The CLI's ceiling on operator versions compares `MAJOR.MINOR` only").
+**Source**: enhancement 0021 ("The CLI's ceiling on controller versions compares `MAJOR.MINOR` only").
 
 #### Scenario: Solo cluster skips the ceiling
 
-- **WHEN** no `Platform` CR exists or `status.operatorVersion` is absent
+- **WHEN** no `Platform` CR exists or `status.controllerVersion` is absent
 - **THEN** the ceiling check SHALL be skipped and apply SHALL proceed
 
 #### Scenario: Platform read denied degrades to warning
@@ -96,33 +96,33 @@ If the Platform or the field is absent, the check SHALL be skipped (solo cluster
 - **WHEN** reading the `Platform` returns a forbidden error
 - **THEN** the ceiling check SHALL be skipped with a warning and apply SHALL proceed
 
-### Requirement: The operator-version ceiling check is skipped with a warning when the CLI version or the operator version is not valid semver
+### Requirement: The controller-version ceiling check is skipped with a warning when the CLI version or the controller version is not valid semver
 
-If the CLI's own version is not valid semver (dev build), the check SHALL be skipped with a warning. If the operator version is not valid semver, the check SHALL be skipped with a warning. (Requirement: Before applying, the CLI compares the operator version of the `Platform` to its own version on MAJOR.MINOR only)
+If the CLI's own version is not valid semver (dev build), the check SHALL be skipped with a warning. If the controller version is not valid semver, the check SHALL be skipped with a warning. (Requirement: Before applying, the CLI compares the controller version of the `Platform` to its own version on MAJOR.MINOR only)
 
-**Source**: enhancement 0021 ("The CLI's ceiling on operator versions compares `MAJOR.MINOR` only").
+**Source**: enhancement 0021 ("The CLI's ceiling on controller versions compares `MAJOR.MINOR` only").
 
 #### Scenario: Dev build skips with warning
 
 - **WHEN** the CLI version is `dev`
 - **THEN** the ceiling check SHALL be skipped and a warning SHALL be printed
 
-### Requirement: The instance apply that `opm operator install` performs for the operator's own instance skips the operator-version ceiling check
+### Requirement: The instance apply that `opm controller install` performs for the controller's own instance skips the controller-version ceiling check
 
-The instance apply that `opm operator install` performs for the operator's own instance SHALL skip this check, because install replaces the operator the Platform reports rather than driving it; install applies the same `MAJOR.MINOR` rule to the operator version of the module it installs instead (see the `operator-lifecycle` capability). (Requirement: Before applying, the CLI compares the operator version of the `Platform` to its own version on MAJOR.MINOR only)
+The instance apply that `opm controller install` performs for the controller's own instance SHALL skip this check, because install replaces the controller the Platform reports rather than driving it; install applies the same `MAJOR.MINOR` rule to the controller version of the module it installs instead (see the `controller-lifecycle` capability). (Requirement: Before applying, the CLI compares the controller version of the `Platform` to its own version on MAJOR.MINOR only)
 
-**Source**: enhancement 0021 ("The CLI's ceiling on operator versions compares `MAJOR.MINOR` only").
+**Source**: enhancement 0021 ("The CLI's ceiling on controller versions compares `MAJOR.MINOR` only").
 
-#### Scenario: Older CLI repairs a newer operator
+#### Scenario: Older CLI repairs a newer controller
 
-- **WHEN** `Platform/cluster` reports `status.operatorVersion` `1.1.0`, the CLI is `1.0.0`, and `opm operator install` targets a module that deploys operator `1.0.2`
+- **WHEN** `Platform/cluster` reports `status.controllerVersion` `1.1.0`, the CLI is `1.0.0`, and `opm controller install` targets a module that deploys controller `1.0.2`
 - **THEN** no ceiling refusal occurs and install proceeds
 
-### Requirement: Every other apply keeps the operator-version ceiling check and the operator's instance still runs the CRD gates
+### Requirement: Every other apply keeps the controller-version ceiling check and the controller's instance still runs the CRD gates
 
-Every other apply SHALL keep the check, and the CRD-presence and CRD field-floor gates SHALL still run for the operator's instance. (Requirement: The instance apply that `opm operator install` performs for the operator's own instance skips the operator-version ceiling check)
+Every other apply SHALL keep the check, and the CRD-presence and CRD field-floor gates SHALL still run for the controller's instance. (Requirement: The instance apply that `opm controller install` performs for the controller's own instance skips the controller-version ceiling check)
 
-**Source**: enhancement 0021 ("The CLI's ceiling on operator versions compares `MAJOR.MINOR` only").
+**Source**: enhancement 0021 ("The CLI's ceiling on controller versions compares `MAJOR.MINOR` only").
 
 #### Scenario: Ordinary apply against the same cluster still refused
 
@@ -131,7 +131,7 @@ Every other apply SHALL keep the check, and the CRD-presence and CRD field-floor
 
 ### Requirement: The gates run in a fixed order, all before the first resource write
 
-The gates SHALL run in the order: CRD presence, CRD field floor, operator-version ceiling (skipped only for the operator's own instance during `opm operator install`), ownership resolution, status-RBAC pre-flight, the ownership guard over every rendered resource (capability `apply-pruning`), all before the first resource write.
+The gates SHALL run in the order: CRD presence, CRD field floor, controller-version ceiling (skipped only for the controller's own instance during `opm controller install`), ownership resolution, status-RBAC pre-flight, the ownership guard over every rendered resource (capability `apply-pruning`), all before the first resource write.
 
 #### Scenario: Gates precede all writes
 
@@ -140,7 +140,7 @@ The gates SHALL run in the order: CRD presence, CRD field floor, operator-versio
 
 ### Requirement: Dry-run applies skip four gates and still resolve ownership and run the ownership guard
 
-Dry-run applies SHALL skip the CRD presence, CRD field floor, operator-version ceiling and status-RBAC gates (they write nothing those gates protect). A dry run SHALL still resolve ownership and SHALL still run the ownership guard, so that it previews the refusal of the real run (capability `apply-pruning`).
+Dry-run applies SHALL skip the CRD presence, CRD field floor, controller-version ceiling and status-RBAC gates (they write nothing those gates protect). A dry run SHALL still resolve ownership and SHALL still run the ownership guard, so that it previews the refusal of the real run (capability `apply-pruning`).
 
 #### Scenario: Dry-run skips gates
 

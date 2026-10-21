@@ -7,9 +7,9 @@ import (
 )
 
 // The ModuleInstance and Platform CRD coordinates. These are hardcoded rather
-// than imported from opm-operator's types package — the CLI has no Go module
-// dependency on opm-operator (enhancement 0006). This package is the single
-// definition; other CLI packages (e.g. internal/operator) consume it from here
+// than imported from opm-controller's types package — the CLI has no Go module
+// dependency on opm-controller (enhancement 0006). This package is the single
+// definition; other CLI packages (e.g. internal/controller) consume it from here
 // instead of keeping private copies.
 const (
 	// GroupOpmodel is the API group for the ModuleInstance and Platform CRDs.
@@ -35,10 +35,10 @@ const (
 	// APIVersionModuleInstance is the apiVersion string written on the CR document.
 	APIVersionModuleInstance = GroupOpmodel + "/" + VersionV1Alpha1
 
-	// CleanupFinalizer is the operator's finalizer on the ModuleInstance CR. It
-	// blocks the CR's removal until the operator has pruned the instance's
-	// workloads — which is what makes an operator-owned delete a CR delete
-	// (enhancement 0006), and what wedges the CR if no operator is running.
+	// CleanupFinalizer is the controller's finalizer on the ModuleInstance CR. It
+	// blocks the CR's removal until the controller has pruned the instance's
+	// workloads — which is what makes a controller-owned delete a CR delete
+	// (enhancement 0006), and what wedges the CR if no controller is running.
 	CleanupFinalizer = GroupOpmodel + "/cleanup"
 )
 
@@ -46,8 +46,8 @@ const (
 const (
 	// OwnerCLI marks an instance the CLI manages as the direct-resource executor.
 	OwnerCLI = "cli"
-	// OwnerOperator marks an instance the operator reconciles.
-	OwnerOperator = "operator"
+	// OwnerController marks an instance the controller reconciles.
+	OwnerController = "controller"
 )
 
 const (

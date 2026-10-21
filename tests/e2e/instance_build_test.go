@@ -662,7 +662,7 @@ func TestE2E_InstanceBuild_DirectoryAndFileBuildIdentically(t *testing.T) {
 	if os.Getenv("OPM_SKIP_REGISTRY_TESTS") != "" {
 		t.Skip("skipping registry-backed e2e tests")
 	}
-	dir, err := filepath.Abs(filepath.Join("testdata", "operator-owned"))
+	dir, err := filepath.Abs(filepath.Join("testdata", "controller-owned"))
 	require.NoError(t, err)
 	home := seedRenderHome(t)
 

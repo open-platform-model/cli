@@ -125,11 +125,11 @@ func isNumericIdentifier(id string) bool {
 // and the one flag that changes the answer.
 func catalogRefusal(registry, modulePath, highest string, prerelease bool) publish.Refusal {
 	kind := "release"
-	action := "Subscribe to the newest prerelease instead:  opm operator install --catalog-prerelease\n" +
-		"Or install without seeding a Platform:      opm operator install --skip-platform"
+	action := "Subscribe to the newest prerelease instead:  opm controller install --catalog-prerelease\n" +
+		"Or install without seeding a Platform:      opm controller install --skip-platform"
 	if prerelease {
 		kind = "prerelease"
-		action = "Install without seeding a Platform:  opm operator install --skip-platform"
+		action = "Install without seeding a Platform:  opm controller install --skip-platform"
 	}
 
 	seen := highest
@@ -149,7 +149,7 @@ func catalogRefusal(registry, modulePath, highest string, prerelease bool) publi
 	}
 }
 
-// DefaultCatalogPath is the catalog `opm operator install` seeds a
+// DefaultCatalogPath is the catalog `opm controller install` seeds a
 // Platform with, re-exported here so callers resolving a
 // version and callers building a subscription name the same value.
 const DefaultCatalogPath = config.DefaultCatalogPath

@@ -92,7 +92,7 @@ What is published SHALL be exactly the committed tree — no copied build direct
 
 ### Requirement: Module publish loads the tree through the kernel's module loader
 
-For a module, publish SHALL additionally load the tree through the kernel's module loader, the same loader `opm module build` and the operator use, and SHALL refuse with the loader's own error when the loader refuses. Publish SHALL NOT judge a module loadable by any test the kernel does not apply.
+For a module, publish SHALL additionally load the tree through the kernel's module loader, the same loader `opm module build` and the controller use, and SHALL refuse with the loader's own error when the loader refuses. Publish SHALL NOT judge a module loadable by any test the kernel does not apply.
 
 #### Scenario: A module the kernel refuses is refused by publish
 

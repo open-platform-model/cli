@@ -98,7 +98,7 @@ type SpecInput struct {
 	Name      string
 	Namespace string
 	// Owner is the spec.owner marker. Empty omits the field entirely, which
-	// the CRD reads as operator-managed — use it only to leave an already
+	// the CRD reads as controller-managed — use it only to leave an already
 	// absent owner absent, never to "not change" a set one (that prunes it).
 	Owner         string
 	ModulePath    string
@@ -286,12 +286,12 @@ func recordFromUnstructured(obj *unstructured.Unstructured) *Record {
 		rec.SpecValues = values
 	}
 
-	//nolint:errcheck // best-effort read; absent or wrong-typed spec.prune reads as false, matching the operator's own default
+	//nolint:errcheck // best-effort read; absent or wrong-typed spec.prune reads as false, matching the controller's own default
 	if prune, ok, _ := unstructured.NestedBool(obj.Object, "spec", "prune"); ok {
 		rec.Prune = prune
 	}
 
-	//nolint:errcheck // best-effort read; absent or wrong-typed spec.dataPolicy reads as empty, which the operator treats as Keep
+	//nolint:errcheck // best-effort read; absent or wrong-typed spec.dataPolicy reads as empty, which the controller treats as Keep
 	if dataPolicy, ok, _ := unstructured.NestedString(obj.Object, "spec", "dataPolicy"); ok {
 		rec.DataPolicy = dataPolicy
 	}

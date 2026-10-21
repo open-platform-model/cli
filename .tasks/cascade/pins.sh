@@ -42,15 +42,15 @@ if has go.mod; then
   row "$lib" library "$(read_file go.mod | awk -v m="$lib" '$1 == m {print $2; exit}')"
 fi
 
-# The operator module pin and the operator release it deploys, both from
-# internal/operator/pin.go: a module release that deploys the same operator
+# The controller module pin and the controller release it deploys, both from
+# internal/controller/pin.go: a module release that deploys the same controller
 # still shows as a moved pin (enhancement 0021).
-pin=internal/operator/pin.go
+pin=internal/controller/pin.go
 if has "$pin"; then
-  row github.com/open-platform-model/opm-operator opm-operator \
-    "$(read_file "$pin" | sed -n 's/^const PinnedOperatorVersion = "\(.*\)"$/\1/p')"
+  row github.com/open-platform-model/opm-controller opm-controller \
+    "$(read_file "$pin" | sed -n 's/^const PinnedControllerVersion = "\(.*\)"$/\1/p')"
   mv=$(read_file "$pin" | sed -n 's/^const PinnedModuleVersion = "\(.*\)"$/\1/p')
-  row opmodel.dev/modules/opm_operator@v0 "opm-operator module" "${mv:+v$mv}"
+  row opmodel.dev/modules/opm_controller@v0 "opm-controller module" "${mv:+v$mv}"
 fi
 
 rep=templates/minimal/cue.mod/module.cue

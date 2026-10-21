@@ -284,7 +284,7 @@ func TestExecute_NamespaceAppearedDuringTheChecks(t *testing.T) {
 	assert.Empty(t, cluster.writes())
 }
 
-// A caller that wrote to the cluster before the apply (opm operator install)
+// A caller that wrote to the cluster before the apply (opm controller install)
 // gets the refusals without the claim that nothing was changed.
 func TestExecute_RefusalAfterCallerWritesClaimsNothing(t *testing.T) {
 	reads := map[string]string{"moduleinstances": "cannot read the ModuleInstance record", "configmaps": "cannot check whether ConfigMap/app"}

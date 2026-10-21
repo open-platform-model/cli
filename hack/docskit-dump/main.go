@@ -21,7 +21,7 @@ import (
 	"github.com/open-platform-model/library/opm/schema"
 
 	"github.com/open-platform-model/cli/internal/cmd"
-	"github.com/open-platform-model/cli/internal/operator"
+	"github.com/open-platform-model/cli/internal/controller"
 )
 
 const (
@@ -53,9 +53,9 @@ func run(args []string, w io.Writer) error {
 
 // pins returns the versions this build compiles in, each bare SemVer without
 // "v": the library module the program links, the core release that
-// library's schema loader pins, and the operator release the cli's pinned
-// operator module deploys. They come from the cli's go.mod, the library's
-// opm/schema/loader.go and internal/operator/pin.go; main_test.go keeps the
+// library's schema loader pins, and the controller release the cli's pinned
+// controller module deploys. They come from the cli's go.mod, the library's
+// opm/schema/loader.go and internal/controller/pin.go; main_test.go keeps the
 // compiled values equal to those source pins.
 func pins() (map[string]string, error) {
 	info, ok := debug.ReadBuildInfo()
@@ -71,9 +71,9 @@ func pins() (map[string]string, error) {
 		return nil, err
 	}
 	return map[string]string{
-		"library":      strings.TrimPrefix(lib, "v"),
-		"core":         core,
-		"opm-operator": strings.TrimPrefix(operator.PinnedOperatorVersion, "v"),
+		"library":        strings.TrimPrefix(lib, "v"),
+		"core":           core,
+		"opm-controller": strings.TrimPrefix(controller.PinnedControllerVersion, "v"),
 	}, nil
 }
 

@@ -1,0 +1,88 @@
+package controller
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"github.com/open-platform-model/cli/internal/inventory"
+	"github.com/open-platform-model/cli/internal/kubernetes"
+)
+
+// NotReadyError reports that the controller is not installed, or installed but
+// not serving. Pending names the resources that failed their readiness
+// predicate — the CRDs that are not Established and the controller Deployment
+// that has not rolled out.
+type NotReadyError struct {
+	Pending []string
+	// Hint is the caller-supplied consequence line: why this particular
+	// command refuses to proceed without a running controller.
+	Hint string
+}
+
+func (e *NotReadyError) Error() string {
+	msg := fmt.Sprintf("the opm controller is not ready (%s)", strings.Join(e.Pending, ", "))
+	if e.Hint != "" {
+		msg += " — " + e.Hint
+	}
+	return msg + "; install or repair it with 'opm controller install', then retry"
+}
+
+// CheckReady reports whether the controller is installed and serving: its CRDs
+// Established and its controller Deployment rolled out. It is the single-shot
+// form of the readiness machinery Install waits on (enhancement 0006 built it for this
+// reuse): a gate, not a wait, so a down controller fails fast instead of burning
+// a timeout.
+//
+// It locates the controller by its fixed names (names.go) and reads nothing
+// else: no instance record, no Namespace. Those names hold for every install
+// of the controller module. Any read
+// that fails counts that object as not ready, so a caller proceeds only on a
+// positive finding.
+func CheckReady(ctx context.Context, client *kubernetes.Client) error {
+	_, err := ReadyModuleInstanceCRD(ctx, client)
+	return err
+}
+
+// ReadyModuleInstanceCRD is CheckReady for a caller that also needs what the
+// gate read: on a ready controller it returns the live ModuleInstance CRD, so
+// that a question about the controller's API (SpecFieldSupport) costs no second
+// read and cannot see another object than the gate saw. It refuses exactly
+// when CheckReady refuses.
+func ReadyModuleInstanceCRD(ctx context.Context, client *kubernetes.Client) (*unstructured.Unstructured, error) {
+	var crd *unstructured.Unstructured
+	keep := func(live *unstructured.Unstructured) bool {
+		if live.GetKind() == kindCustomResourceDefinition && live.GetName() == inventory.CRDNameModuleInstances {
+			crd = live
+		}
+		return DefaultPredicate(live)
+	}
+	pending := pendingObjects(ctx, client, fixedTargets(), keep)
+	if len(pending) > 0 {
+		return nil, &NotReadyError{Pending: kubernetes.DescribeObjectList(pending)}
+	}
+	return crd, nil
+}
+
+// fixedTargets are the objects whose liveness defines "the controller is
+// serving": the CRDs in crdNames and the controller Deployment. Supporting
+// objects (RBAC, Service, Namespace) are left out: a rolled-out Deployment
+// implies them, and they add noise to the refusal message.
+func fixedTargets() []*unstructured.Unstructured {
+	targets := make([]*unstructured.Unstructured, 0, len(crdNames)+1)
+	for _, name := range crdNames {
+		crd := &unstructured.Unstructured{}
+		crd.SetAPIVersion("apiextensions.k8s.io/v1")
+		crd.SetKind(kindCustomResourceDefinition)
+		crd.SetName(name)
+		targets = append(targets, crd)
+	}
+	deploy := &unstructured.Unstructured{}
+	deploy.SetAPIVersion("apps/v1")
+	deploy.SetKind(kindDeployment)
+	deploy.SetName(ControllerDeploymentName)
+	deploy.SetNamespace(ControllerNamespace)
+	return append(targets, deploy)
+}

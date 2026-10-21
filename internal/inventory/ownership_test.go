@@ -14,9 +14,9 @@ func TestResolveOwnership(t *testing.T) {
 	}{
 		{"nil record (no CR) is CLI-executor", nil, ModeCLIExecutor},
 		{"owner cli is CLI-executor", &Record{Owner: OwnerCLI}, ModeCLIExecutor},
-		{"owner operator is operator-owned", &Record{Owner: OwnerOperator}, ModeOperatorOwned},
-		{"empty owner on existing CR is operator-owned", &Record{Owner: ""}, ModeOperatorOwned},
-		{"unknown owner is operator-owned", &Record{Owner: "someone-else"}, ModeOperatorOwned},
+		{"owner controller is controller-owned", &Record{Owner: OwnerController}, ModeControllerOwned},
+		{"empty owner on existing CR is controller-owned", &Record{Owner: ""}, ModeControllerOwned},
+		{"unknown owner is controller-owned", &Record{Owner: "someone-else"}, ModeControllerOwned},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -27,6 +27,6 @@ func TestResolveOwnership(t *testing.T) {
 
 func TestDisplayOwner(t *testing.T) {
 	assert.Equal(t, "cli", DisplayOwner("cli"))
-	assert.Equal(t, "operator", DisplayOwner("operator"))
-	assert.Equal(t, "operator", DisplayOwner(""))
+	assert.Equal(t, "controller", DisplayOwner("controller"))
+	assert.Equal(t, "controller", DisplayOwner(""))
 }

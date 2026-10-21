@@ -1,7 +1,7 @@
 # docs-bundle Specification
 
 ## Purpose
-The cli publishes one signed docs-kit bundle, `cli`, to `ghcr.io/open-platform-model/docs/cli`: the command reference generated from the cobra commands, the authored pages under `docs/site/`, and in its manifest the library, core and opm-operator versions the cli pins. A bundle is published for every release and as `edge` for every push to `main`, and pull requests check it. opmodel.dev anchors a site version on the cli's bundle and pulls exactly the bundles its pins name, so the pins decide which reference the site shows beside the cli's.
+The cli publishes one signed docs-kit bundle, `cli`, to `ghcr.io/open-platform-model/docs/cli`: the command reference generated from the cobra commands, the authored pages under `docs/site/`, and in its manifest the library, core and opm-controller versions the cli pins. A bundle is published for every release and as `edge` for every push to `main`, and pull requests check it. opmodel.dev anchors a site version on the cli's bundle and pulls exactly the bundles its pins name, so the pins decide which reference the site shows beside the cli's.
 
 ## Requirements
 
@@ -49,7 +49,7 @@ The cli publishes one signed docs-kit bundle, `cli`, to `ghcr.io/open-platform-m
 
 ### Requirement: The repository declares one docs-kit project, `cli`, in `docs-kit.cue`
 
-The repository SHALL declare one docs-kit project, `cli`, in `docs-kit.cue`: placed in a site version's `/docs/` tree, owning `reference/cli/`, versioned from tags with the prefix `v`, with `pins` for `library`, `core` and `opm-operator` printed by `go run ./hack/docskit-dump pins`, built from a `cobra` source whose dump comes from `go run ./hack/docskit-dump` and a `markdown` source over `docs/site`.
+The repository SHALL declare one docs-kit project, `cli`, in `docs-kit.cue`: placed in a site version's `/docs/` tree, owning `reference/cli/`, versioned from tags with the prefix `v`, with `pins` for `library`, `core` and `opm-controller` printed by `go run ./hack/docskit-dump pins`, built from a `cobra` source whose dump comes from `go run ./hack/docskit-dump` and a `markdown` source over `docs/site`.
 
 #### Scenario: The cli project is declared in docs-kit.cue
 
@@ -64,7 +64,7 @@ The bundle SHALL carry the authored pages under `docs/site/` and the generated c
 #### Scenario: The bundle holds both kinds of page and the pins
 
 - **WHEN** `task docs:bundle` runs on a clean checkout
-- **THEN** `out/cli/content/` holds `reference/registry-namespaces.md` (authored), `reference/cli/_index.md` and `reference/cli/opm-module.md` (generated), and `out/cli/manifest.json` has `pins` with exactly `library`, `core` and `opm-operator`
+- **THEN** `out/cli/content/` holds `reference/registry-namespaces.md` (authored), `reference/cli/_index.md` and `reference/cli/opm-module.md` (generated), and `out/cli/manifest.json` has `pins` with exactly `library`, `core` and `opm-controller`
 
 #### Scenario: A dev pin is refused
 
@@ -82,12 +82,12 @@ The bundle SHALL carry the authored pages under `docs/site/` and the generated c
 
 ### Requirement: `go run ./hack/docskit-dump pins` prints the pins the cli compiles in as one `docs.opmodel.dev/pins/v1` document
 
-`go run ./hack/docskit-dump pins` SHALL print one `docs.opmodel.dev/pins/v1` document: `library` the version of `github.com/open-platform-model/library` the program links, `core` the exact release the library's `schema.DefaultSchemaModule` names, `opm-operator` the `PinnedOperatorVersion` the cli records beside its pinned operator module (the operator release that module deploys, read from `internal/operator/pin.go` without a registry), each without a leading `v`.
+`go run ./hack/docskit-dump pins` SHALL print one `docs.opmodel.dev/pins/v1` document: `library` the version of `github.com/open-platform-model/library` the program links, `core` the exact release the library's `schema.DefaultSchemaModule` names, `opm-controller` the `PinnedControllerVersion` the cli records beside its pinned controller module (the controller release that module deploys, read from `internal/controller/pin.go` without a registry), each without a leading `v`.
 
 #### Scenario: The pins equal the sources the site read
 
-- **WHEN** `go.mod` requires library `v1.0.0-beta.2`, whose `DefaultSchemaModule` is `opmodel.dev/core@v2.0.0-beta.2`, and `internal/operator/pin.go` records `PinnedOperatorVersion` `v1.0.0-beta.5`
-- **THEN** `go run ./hack/docskit-dump pins` prints `{"schema": "docs.opmodel.dev/pins/v1", "pins": {"core": "2.0.0-beta.2", "library": "1.0.0-beta.2", "opm-operator": "1.0.0-beta.5"}}`, and the program's test passes
+- **WHEN** `go.mod` requires library `v1.0.0-beta.2`, whose `DefaultSchemaModule` is `opmodel.dev/core@v2.0.0-beta.2`, and `internal/controller/pin.go` records `PinnedControllerVersion` `v1.0.0-beta.5`
+- **THEN** `go run ./hack/docskit-dump pins` prints `{"schema": "docs.opmodel.dev/pins/v1", "pins": {"core": "2.0.0-beta.2", "library": "1.0.0-beta.2", "opm-controller": "1.0.0-beta.5"}}`, and the program's test passes
 
 #### Scenario: A library that pins only a core major is refused
 

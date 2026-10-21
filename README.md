@@ -87,7 +87,7 @@ Use `opm instance` when you are starting from an instance file or when you want 
 | `instance list` | List deployed instances |
 | `instance events` | Show events for an instance |
 
-#### CLI-managed vs operator-managed instances
+#### CLI-managed vs controller-managed instances
 
 Every deployed instance is managed by exactly one of two actors, recorded as
 `spec.owner` on its `ModuleInstance`. The CLI behaves differently against each,
@@ -102,29 +102,29 @@ finished Deployment, StatefulSet or DaemonSet rollout, a completed Job, a bound
 claim), bounded by `--timeout` (default 5m). On timeout it exits non-zero and
 names the resources still pending.
 
-**Operator-managed** (`spec.owner: operator`): the operator reconciles the
-instance, and the CLI edits its spec rather than the cluster. An
-operator-managed instance is one created outside the CLI — kubectl, GitOps,
-the operator's own manifests. The CLI offers no command that moves an instance
+**Controller-managed** (`spec.owner: controller`): the controller reconciles the
+instance, and the CLI edits its spec rather than the cluster. A
+controller-managed instance is one created outside the CLI — kubectl, GitOps,
+the controller's own manifests. The CLI offers no command that moves an instance
 between the two.
 
-| Command | Against an operator-managed instance |
+| Command | Against a controller-managed instance |
 |---------|--------------------------------------|
-| `instance apply` | Acts as a spec editor: writes `spec.module` and `spec.values`, waits for the operator's reconcile, reports the result. Applies and prunes nothing itself. Refuses a module that resolves from local bytes — the operator can only fetch published modules. |
-| `instance delete` | Deletes the `ModuleInstance` and lets the operator's cleanup finalizer act. Refuses when the operator is not running, because deleting a finalizer-armed resource with no controller wedges it in `Terminating` with its workloads orphaned. Whether the workloads are actually removed depends on `spec.prune` — see below. |
+| `instance apply` | Acts as a spec editor: writes `spec.module` and `spec.values`, waits for the controller's reconcile, reports the result. Applies and prunes nothing itself. Refuses a module that resolves from local bytes — the controller can only fetch published modules. |
+| `instance delete` | Deletes the `ModuleInstance` and lets the controller's cleanup finalizer act. Refuses when the controller is not running, because deleting a finalizer-armed resource with no controller wedges it in `Terminating` with its workloads orphaned. Whether the workloads are actually removed depends on `spec.prune` — see below. |
 
-> **`spec.prune` decides whether an operator-owned delete removes anything.**
+> **`spec.prune` decides whether a controller-owned delete removes anything.**
 > The field has no default and the CLI does not write it, so for a
-> CLI-created instance the operator removes the `ModuleInstance` and
+> CLI-created instance the controller removes the `ModuleInstance` and
 > deliberately **leaves the workloads running**. `opm instance delete` reports
-> which of the two happened rather than assuming. To have the operator remove
+> which of the two happened rather than assuming. To have the controller remove
 > workloads on delete, set it first:
 >
 > ```bash
 > kubectl patch moduleinstance <name> -n <ns> --type=merge -p '{"spec":{"prune":true}}'
 > ```
 
-Both wait for the operator, bounded by `--timeout` (default 5m).
+Both wait for the controller, bounded by `--timeout` (default 5m).
 
 ### Configuration (`opm config`)
 
@@ -143,39 +143,40 @@ Use `opm registry` to manage credentials for the OCI registries OPM publishes to
 
 Without a host argument, the configured registry mapping is resolved to its host set: one host proceeds, several refuse with each listed as a runnable command. Append `+insecure` for a registry served over plain HTTP.
 
-### Operator Lifecycle (`opm operator`)
+### Controller Lifecycle (`opm controller`)
 
-Use `opm operator` to put the opm-operator (and its CRDs) onto a cluster — a prerequisite for any `opm instance apply`.
+Use `opm controller` to put the opm-controller (and its CRDs) onto a cluster — a prerequisite for any `opm instance apply`.
 
-`opm operator install` installs the operator from its OPM module, `opmodel.dev/modules/opm_operator`, as the CLI-owned ModuleInstance `opm-operator` in `opm-operator-system`. The operator never reconciles that instance, so re-running the CLI is always the way to repair or upgrade the operator.
+`opm controller install` installs the controller from its OPM module, `opmodel.dev/modules/opm_controller`, as the CLI-owned ModuleInstance `opm-controller` in `opm-system`. The controller never reconciles that instance, so re-running the CLI is always the way to repair or upgrade the controller.
 
 - **Install needs a registry.** The module is pulled from the configured registry (`--registry`, `OPM_REGISTRY` or the config file). An air-gapped cluster installs from a mirror that serves the module and its dependencies.
-- **`--version` takes an operator module version**, not an opm-operator release tag: `--version 0.2.0` pins, `--version v0` floats. Without it, install uses the module version this CLI pins. Install prints the operator release the module deploys.
-- **Settings are instance values, not Deployment patches.** `-f/--values` files are layered over the values recorded on the operator's instance, so a reinstall keeps every recorded value it does not change; `--reset-values` starts from the module's defaults. The module's `#config` holds `registry` (the operator's own `--registry` mapping), `image.repository` (for a mirror), `defaultServiceAccount`, `resources`, `replicas` and `extraArgs`.
-- **Install does not take over an operator applied from a release manifest.** An object the module renders that already exists passes when the instance's record lists it, when it carries OPM's managed-by label and no other instance's UUID (a stopped install, a `--crds-only` install), or when it carries the annotation `opmodel.dev/adopt=<instance UUID>`; otherwise install refuses with exit 2, changes nothing, and prints the annotation to set for each object. Delete an earlier controller Deployment first: its selector differs from the module's and cannot change. Install does not delete or report the earlier manifest's role bindings (`opm-operator-manager-rolebinding`, `opm-operator-metrics-auth-rolebinding`, `opm-operator-leader-election-rolebinding`) or other objects the module does not render: delete them by hand.
-- **Uninstall deletes what the instance recorded**, except the CRDs and the Namespace, then the record. An operator with no record, applied with kubectl or by an older CLI, is refused: delete its objects by hand, or annotate them as install's refusal prints and install it with this CLI first.
+- **`--crds-only` needs no registry.** It applies the CRDs of the module version this CLI pins, which the CLI carries, and talks only to the cluster. It takes no `--version`, `-f` or `--reset-values`, and refuses CRDs a newer module version installed (run `--crds-only` from a CLI that pins that version or newer, or install that version in full). A CRD that exists is judged as on a full install: one the controller's instance record lists is applied (a denied read of the record is a warning, and the CRDs are then judged without it); one without OPM's managed-by label, or with another instance's identity, is refused, and the refusal prints the annotation to set on it. `--crds-only` adopts nothing by itself and writes no ModuleInstance.
+- **`--version` takes a controller module version**: `--version 0.2.0` pins, `--version v0` floats. Without it, install uses the module version this CLI pins. Install prints the controller release the module deploys.
+- **Settings are instance values, not Deployment patches.** `-f/--values` files are layered over the values recorded on the controller's instance, so a reinstall keeps every recorded value it does not change; `--reset-values` starts from the module's defaults. The module's `#config` holds `registry` (the controller's own `--registry` mapping), `image.repository` (for a mirror), `defaultServiceAccount`, `resources`, `replicas` and `extraArgs`.
+- **Install does not take over a controller applied from an earlier release manifest.** An object the module renders that already exists passes when the instance's record lists it, when it carries OPM's managed-by label and no other instance's UUID (a stopped install, a `--crds-only` install), or when it carries the annotation `opmodel.dev/adopt=<instance UUID>`; otherwise install refuses with exit 2, changes nothing, and prints the annotation to set for each object. The earlier manifest used other names and another namespace, so only its four CRDs are refused. Remove that controller first (its Deployment, Namespace and role objects, by hand: install does not delete or report objects the module does not render), then annotate the CRDs; with the CRDs annotated and the earlier controller left in place, two controllers run.
+- **Uninstall deletes what the instance recorded**, except the CRDs and the Namespace, then the record. A controller with no record, applied with kubectl or by an older CLI, is refused: delete its objects by hand, or annotate them as install's refusal prints and install it with this CLI first.
 
 | Command | Description |
 |---------|-------------|
-| `operator install` | Install the operator module (`--version`, `-f/--values`, `--reset-values`, `--crds-only`, `--rbac [--user\|--group]`, `--skip-platform`, `--catalog-prerelease`, `--timeout`) |
-| `operator uninstall` | Remove the recorded operator, preserving CRDs and its Namespace (`--remove-finalizers`) |
+| `controller install` | Install the controller module (`--version`, `-f/--values`, `--reset-values`, `--crds-only`, `--rbac [--user\|--group]`, `--skip-platform`, `--catalog-prerelease`, `--timeout`) |
+| `controller uninstall` | Remove the recorded controller, preserving CRDs and its Namespace (`--remove-finalizers`) |
 
 ```bash
-# Install the pinned operator module and wait for it to roll out
-opm operator install
+# Install the pinned controller module and wait for it to roll out
+opm controller install
 
-# Let the operator resolve modules through a mirror (recorded on its instance)
-echo 'values: registry: "opmodel.dev=mirror.example/opm"' > operator-values.cue
-opm operator install -f operator-values.cue
+# Let the controller resolve modules through a mirror (recorded on its instance)
+echo 'values: registry: "opmodel.dev=mirror.example/opm"' > controller-values.cue
+opm controller install -f controller-values.cue
 
-# CLI-solo path: install just the CRDs, no running operator
-opm operator install --crds-only
+# CLI-solo path: install just the CRDs, no running controller (works offline)
+opm controller install --crds-only
 
 # Grant a non-admin user access to ModuleInstances
-opm operator install --crds-only --rbac --user alice
+opm controller install --crds-only --rbac --user alice
 
-# Remove the operator (refuses while any ModuleInstance is still active)
-opm operator uninstall
+# Remove the controller (refuses while any ModuleInstance is still active)
+opm controller uninstall
 ```
 
 ## Example Published Module Workflow

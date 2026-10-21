@@ -24,7 +24,7 @@ Never give a fixture an `opmodel.dev/*` path. CUE routes by longest prefix, so a
 core and the catalogs onto whatever registry serves the fixture.
 
 Go programs read a fixture coordinate through the Go helper in `tests/fixtures/`, never a literal.
-The fixtures script in `hack/` and the Go helper in `tests/fixtures/` are byte-identical copies of opm-operator's. Edit
+The fixtures script in `hack/` and the Go helper in `tests/fixtures/` are byte-identical copies of opm-controller's. Edit
 both, then run the workspace root `task fixtures:lint`.
 
 ## How CI resolves them
@@ -44,7 +44,7 @@ PR CI never waits for GHCR.
 ## Bumping a fixture
 
 A bump is `opm module version set` on the fixture, plus the `cue.mod` pins in
-`tests/e2e/testdata/operator-owned` and `examples/`. `task -x deps:cascade` does both, once per PR,
+`tests/e2e/testdata/controller-owned` and `examples/`. `task -x deps:cascade` does both, once per PR,
 when it moves the fixture's catalog or core.
 
 The consumers' core and catalog pins follow the fixture's. CUE keeps a dependency a consumer already

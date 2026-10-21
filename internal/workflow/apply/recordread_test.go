@@ -200,7 +200,7 @@ var moduleInstanceGR = schema.GroupResource{Group: inventory.GroupOpmodel, Resou
 
 // A ModuleInstance read that fails with anything but NotFound stops the
 // apply, real or dry run: nothing is applied, nothing is written, and the
-// exit code follows the cause. The cluster holds an operator-owned record,
+// exit code follows the cause. The cluster holds a controller-owned record,
 // the case where going on as a first install would take the instance over.
 func TestExecute_UnreadableRecordStopsTheApply(t *testing.T) {
 	causes := []struct {
@@ -222,9 +222,9 @@ func TestExecute_UnreadableRecordStopsTheApply(t *testing.T) {
 				withReleasedCLIVersion(t)
 				logBuf := captureLog(t)
 
-				operatorOwned := cliOwnedInstance("demo", "default", "app")
-				require.NoError(t, unstructured.SetNestedField(operatorOwned.Object, inventory.OwnerOperator, "spec", "owner"))
-				cluster := newApplyCluster(operatorOwned)
+				controllerOwned := cliOwnedInstance("demo", "default", "app")
+				require.NoError(t, unstructured.SetNestedField(controllerOwned.Object, inventory.OwnerController, "spec", "owner"))
+				cluster := newApplyCluster(controllerOwned)
 				cluster.dyn.PrependReactor("get", "moduleinstances", func(k8stesting.Action) (bool, runtime.Object, error) {
 					return true, nil, cause.err
 				})

@@ -360,7 +360,7 @@ A `BEGIN_COMMIT_OVERRIDE` block in a pull request body SHALL NOT be used, becaus
 
 #### Scenario: Release run notifies after publishing
 - **WHEN** a push to `main` cuts a release, and publish-templates and goreleaser succeed
-- **THEN** the notify job runs after goreleaser in the `cascade` Environment with the release's tag, and catalog_opm and opm-operator each receive one `upstream-released` dispatch naming the cli and that tag
+- **THEN** the notify job runs after goreleaser in the `cascade` Environment with the release's tag, and catalog_opm and opm-controller each receive one `upstream-released` dispatch naming the cli and that tag
 
 ### Requirement: The notify job runs only after goreleaser succeeded, on main, unless notifying is switched off
 
@@ -416,11 +416,11 @@ The notify-downstream job SHALL have exactly one step, the shared `open-platform
 
 ### Requirement: The cascade-notify action mints the dispatch token and chooses the targets
 
-The `cascade-notify` action SHALL mint the dispatch token and choose the targets: catalog_opm and opm-operator, as release-tool edges. Source: workspace RELEASING.md, sections "Notify after publish" and "Stop switches"; Phase 3 wiring contract (version 3.1) §4.5 and §4.6.
+The `cascade-notify` action SHALL mint the dispatch token and choose the targets: catalog_opm and opm-controller, as release-tool edges. Source: workspace RELEASING.md, sections "Notify after publish" and "Stop switches"; Phase 3 wiring contract (version 3.1) §4.5 and §4.6.
 
 #### Scenario: The action chooses the targets
 - **WHEN** the `cascade-notify` action runs
-- **THEN** it mints the dispatch token and chooses the targets: catalog_opm and opm-operator, as release-tool edges
+- **THEN** it mints the dispatch token and chooses the targets: catalog_opm and opm-controller, as release-tool edges
 
 ### Requirement: Only the release-please job reads the release App key
 

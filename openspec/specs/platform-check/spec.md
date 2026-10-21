@@ -139,7 +139,7 @@ A pair of enabled transformers whose match predicates are comparable over a shar
 
 ### Requirement: The undiscriminated exit mirrors where platform-package generation refuses
 
-This SHALL mirror where the refusal lives in the system: `Discriminated: false` is a condition platform-package generation refuses on, exactly as `Routable: false` is, so a pre-flight that exits 0 on it would bless a platform the operator rejects. (Requirement: A comparable pair of enabled transformers is reported with both transformers and the shared contracts and fails the command)
+This SHALL mirror where the refusal lives in the system: `Discriminated: false` is a condition platform-package generation refuses on, exactly as `Routable: false` is, so a pre-flight that exits 0 on it would bless a platform the controller rejects. (Requirement: A comparable pair of enabled transformers is reported with both transformers and the shared contracts and fails the command)
 
 #### Scenario: An undiscriminated platform is refused where platform-package generation refuses it
 - **WHEN** a platform is not discriminated (`Discriminated: false`)

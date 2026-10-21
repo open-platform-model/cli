@@ -20,7 +20,7 @@ The system SHALL construct an inventory entry from a rendered Kubernetes resourc
 
 ### Requirement: ModuleInstance CR is the inventory store
 
-The CLI SHALL persist instance inventory in a `ModuleInstance` custom resource (`opmodel.dev/v1alpha1`, resource `moduleinstances`) named after the instance, in the instance's namespace, handled as `unstructured` via the dynamic client. The CLI MUST NOT import `opm-operator` Go packages. The `ModuleInstance` GVR and related constants SHALL be defined once in `internal/inventory` and consumed by all CLI packages that reference the CR (including `internal/operator`).
+The CLI SHALL persist instance inventory in a `ModuleInstance` custom resource (`opmodel.dev/v1alpha1`, resource `moduleinstances`) named after the instance, in the instance's namespace, handled as `unstructured` via the dynamic client. The CLI MUST NOT import `opm-controller` Go packages. The `ModuleInstance` GVR and related constants SHALL be defined once in `internal/inventory` and consumed by all CLI packages that reference the CR (including `internal/controller`).
 
 #### Scenario: Apply creates the CR
 
@@ -111,17 +111,17 @@ After resources are applied and pruned, the CLI SHALL write, via the status subr
 
 ### Requirement: The last applied render digest is the library shared render digest
 
-The digest fields SHALL be operator-parity: `lastAppliedRenderDigest` SHALL be the library's shared render digest, `opm/k8s/inventory.RenderDigest`, over the render's single export (see `kernel-render`), which leaves the managed-by label value out so the CLI and the operator digest one render to the same value (enhancement 0012, "Labels are stamped by the CUE render; the shared render digest ignores the runtime-name label value").
+The digest fields SHALL be controller-parity: `lastAppliedRenderDigest` SHALL be the library's shared render digest, `opm/k8s/inventory.RenderDigest`, over the render's single export (see `kernel-render`), which leaves the managed-by label value out so the CLI and the controller digest one render to the same value (enhancement 0012, "Labels are stamped by the CUE render; the shared render digest ignores the runtime-name label value").
 
-#### Scenario: Render digest matches the operator's algorithm
+#### Scenario: Render digest matches the controller's algorithm
 
-- **WHEN** the CLI and the operator compile the same instance against the same Platform spec
+- **WHEN** the CLI and the controller compile the same instance against the same Platform spec
 - **THEN** the two render digests SHALL be byte-identical
-- **AND** the CLI's value SHALL equal `inventory.RenderDigest` of the render's export, which the operator also computes
+- **AND** the CLI's value SHALL equal `inventory.RenderDigest` of the render's export, which the controller also computes
 
 ### Requirement: The inventory digest in the status is the library inventory digest
 
-The digest fields SHALL be operator-parity: `status.inventory.digest` SHALL be the library's `inventory.Digest` of the written entries (see "The CLI computes the inventory digest with the library and no digest of its own").
+The digest fields SHALL be controller-parity: `status.inventory.digest` SHALL be the library's `inventory.Digest` of the written entries (see "The CLI computes the inventory digest with the library and no digest of its own").
 
 #### Scenario: Stored digests change once on upgrade
 
@@ -129,22 +129,22 @@ The digest fields SHALL be operator-parity: `status.inventory.digest` SHALL be t
 - **THEN** `status.inventory.digest` and `status.lastAppliedRenderDigest` SHALL change to the library values
 - **AND** the entries, revision increment and count SHALL be written as for any other apply
 
-### Requirement: The last applied source digest is the operator module source digest
+### Requirement: The last applied source digest is the controller module source digest
 
-The digest fields SHALL be operator-parity: `lastAppliedSourceDigest` SHALL be computed as the operator's `ModuleSourceDigest` (SHA-256 of the canonical `path@version` reference: identical on both actors' CUE-native paths).
+The digest fields SHALL be controller-parity: `lastAppliedSourceDigest` SHALL be computed as the controller's `ModuleSourceDigest` (SHA-256 of the canonical `path@version` reference: identical on both actors' CUE-native paths).
 
-#### Scenario: Source digest matches the operator's computation
+#### Scenario: Source digest matches the controller's computation
 
 - **WHEN** the CLI applies a module with canonical reference `opmodel.dev/modules/test/podinfo@v0` at version `0.1.2`
-- **THEN** `status.lastAppliedSourceDigest` SHALL equal the operator's `ModuleSourceDigest` for the same path and version
+- **THEN** `status.lastAppliedSourceDigest` SHALL equal the controller's `ModuleSourceDigest` for the same path and version
 
-### Requirement: The last applied config digest follows the operator canonical-JSON semantics
+### Requirement: The last applied config digest follows the controller canonical-JSON semantics
 
-The digest fields SHALL be operator-parity: `lastAppliedConfigDigest` SHALL match the operator's `ConfigDigest` canonical-JSON semantics including the empty case (SHA-256 of no bytes).
+The digest fields SHALL be controller-parity: `lastAppliedConfigDigest` SHALL match the controller's `ConfigDigest` canonical-JSON semantics including the empty case (SHA-256 of no bytes).
 
 #### Scenario: Config digest of an empty config
 - **WHEN** the CLI computes `lastAppliedConfigDigest` for the empty case
-- **THEN** it SHALL match the operator's `ConfigDigest` canonical-JSON semantics (SHA-256 of no bytes)
+- **THEN** it SHALL match the controller's `ConfigDigest` canonical-JSON semantics (SHA-256 of no bytes)
 
 ### Requirement: The CLI sets the owner of the ModuleInstance spec to cli
 
@@ -183,10 +183,10 @@ The pair (`spec.module.path` and `spec.module.version`) applies for local-direct
 
 ### Requirement: The declared module identity pair is verified where it meets a registry
 
-The declared pair (`spec.module.path` and `spec.module.version`) SHALL be verified against fetched coordinates wherever it later meets a registry (operator acquire; any future ownership transfer), not at write time.
+The declared pair (`spec.module.path` and `spec.module.version`) SHALL be verified against fetched coordinates wherever it later meets a registry (controller acquire; any future ownership transfer), not at write time.
 
 #### Scenario: Declared pair verified at the registry
-- **WHEN** the declared pair later meets a registry (operator acquire; any future ownership transfer)
+- **WHEN** the declared pair later meets a registry (controller acquire; any future ownership transfer)
 - **THEN** it SHALL be verified against fetched coordinates, not at write time
 
 ### Requirement: The CLI stamps the source local annotation when render bytes did not come from pure registry resolution
@@ -210,7 +210,7 @@ When the applied render's module bytes did not come from pure registry resolutio
 
 ### Requirement: The source local annotation is a fail-closed provenance signal that no gate reads as an authority
 
-The annotation `module-instance.opmodel.dev/source: local` is a fail-closed provenance signal: the thin-editor apply path refuses a module that resolves from local bytes, and any future transfer of an instance to operator ownership reads it as a refusal; no CLI-executor-mode gate SHALL read it as an authority.
+The annotation `module-instance.opmodel.dev/source: local` is a fail-closed provenance signal: the thin-editor apply path refuses a module that resolves from local bytes, and any future transfer of an instance to controller ownership reads it as a refusal; no CLI-executor-mode gate SHALL read it as an authority.
 
 #### Scenario: No gate reads the annotation as an authority
 - **WHEN** a CLI-executor-mode gate runs on an instance that carries the annotation

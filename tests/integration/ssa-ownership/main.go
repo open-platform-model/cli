@@ -19,14 +19,14 @@
 //  2. Restating unchanged fields does not bump metadata.generation, so a
 //     reconcile wait keyed on the generation cannot be fooled by a no-op
 //     re-apply.
-//  3. A thin-editor apply that restates the operator's owner preserves it.
+//  3. A thin-editor apply that restates the controller's owner preserves it.
 //  4. A local render stamps the source-provenance annotation and a following
 //     registry render (which omits it) has it pruned by SSA — the fail-closed
 //     provenance signal (enhancement 0006) that patch_test.go's fake client cannot
 //     model.
 //
 // Requires a running kind cluster at context "kind-opm-dev" with the
-// ModuleInstance CRD installed (opm operator install --crds-only).
+// ModuleInstance CRD installed (opm controller install --crds-only).
 // Run with: go run tests/integration/ssa-ownership/main.go
 package main
 
@@ -88,7 +88,7 @@ func main() {
 	gen2, err := inventory.ApplySpec(ctx, client, inventory.SpecInput{
 		Name:          instanceName,
 		Namespace:     namespace,
-		Owner:         inventory.OwnerOperator,
+		Owner:         inventory.OwnerController,
 		ModulePath:    rec.ModulePath,
 		ModuleVersion: rec.ModuleVersion,
 		Values:        rec.SpecValues,
@@ -96,7 +96,7 @@ func main() {
 	check("flipping ownership", err)
 
 	rec = mustGet(ctx, client)
-	requireEqual("spec.owner after flip", inventory.OwnerOperator, rec.Owner)
+	requireEqual("spec.owner after flip", inventory.OwnerController, rec.Owner)
 	requireEqual("spec.module.path survived the flip", modulePath, rec.ModulePath)
 	requireEqual("spec.module.version survived the flip", moduleVersion, rec.ModuleVersion)
 	requireTrue("spec.values survived the flip", len(rec.SpecValues) == 2)
@@ -107,7 +107,7 @@ func main() {
 	gen3, err := inventory.ApplySpec(ctx, client, inventory.SpecInput{
 		Name:          instanceName,
 		Namespace:     namespace,
-		Owner:         inventory.OwnerOperator,
+		Owner:         inventory.OwnerController,
 		ModulePath:    rec.ModulePath,
 		ModuleVersion: rec.ModuleVersion,
 		Values:        rec.SpecValues,
@@ -116,7 +116,7 @@ func main() {
 	requireEqual("generation is unchanged by a no-op apply", fmt.Sprint(gen2), fmt.Sprint(gen3))
 	fmt.Printf("   OK: generation still %d — the reconcile wait cannot be fooled by a no-op\n", gen3)
 
-	step(4, "a thin-editor apply restates the operator owner and preserves it")
+	step(4, "a thin-editor apply restates the controller owner and preserves it")
 	newValues := map[string]any{"replicas": float64(5), "greeting": "hello"}
 	_, err = inventory.ApplySpec(ctx, client, inventory.SpecInput{
 		Name:          instanceName,
@@ -129,7 +129,7 @@ func main() {
 	check("thin-editor edit", err)
 
 	rec = mustGet(ctx, client)
-	requireEqual("spec.owner survived the edit", inventory.OwnerOperator, rec.Owner)
+	requireEqual("spec.owner survived the edit", inventory.OwnerController, rec.Owner)
 	requireEqual("spec.module.path survived the edit", modulePath, rec.ModulePath)
 	requireTrue("spec.values was updated", fmt.Sprint(rec.SpecValues["replicas"]) == "5")
 	fmt.Println("   OK: owner preserved, module intact, values updated")

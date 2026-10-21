@@ -23,18 +23,18 @@ import (
 //
 //   - internal/inventory/store.go: the ModuleInstance record, which is the
 //     CLI's own.
-//   - internal/operator/install.go:Install: the CRD step, whose objects the
+//   - internal/controller/install.go:Install: the CRD step, whose objects the
 //     guard allowed in the check phase of the same command, and the --rbac
 //     objects, which belong to no instance and stay outside the guard.
-//   - internal/operator/uninstall.go: the finalizer removal on a
+//   - internal/controller/uninstall.go: the finalizer removal on a
 //     ModuleInstance record during uninstall.
 var allowedApplySites = []string{
+	"internal/controller/install.go:Install",
+	"internal/controller/uninstall.go:removeOneCleanupFinalizer",
 	"internal/inventory/store.go:ssaApplyReturning",
 	"internal/kubernetes/apply.go:ApplyOne",
 	"internal/kubernetes/apply.go:applyOne",
 	"internal/kubernetes/apply.go:applyStage",
-	"internal/operator/install.go:Install",
-	"internal/operator/uninstall.go:removeOneCleanupFinalizer",
 	"internal/workflow/apply/apply.go:Execute",
 }
 

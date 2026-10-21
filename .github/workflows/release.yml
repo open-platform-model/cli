@@ -255,7 +255,7 @@ jobs:
     name: Publish the cli docs bundle
     # The docs bundle of this release (docs-kit.cue): the command reference,
     # the authored pages under docs/site/ and the library, core and
-    # opm-operator versions this tree pins, which opmodel.dev follows to
+    # opm-controller versions this tree pins, which opmodel.dev follows to
     # their bundles (docs-kit C15, C16). goreleaser publishes the release
     # last, so the bundle follows a published release only: a release left a
     # draft has none until the manual run that finishes it.

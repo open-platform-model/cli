@@ -1,0 +1,305 @@
+# RFC-0007: ModuleInstance CR Inventory and Controller Handoff
+
+| Field          | Value                                       |
+|----------------|---------------------------------------------|
+| **Status**     | Draft                                       |
+| **Created**    | 2026-06-12                                  |
+| **Authors**    | OPM Contributors                            |
+| **Supersedes** | RFC-0001 (storage mechanism only)           |
+| **Affects**    | `cli/`, `opm-controller/` (documented here)   |
+
+## Summary
+
+Replace the CLI's Secret-based instance inventory (RFC-0001) with the controller's `ModuleInstance` custom resource. The CLI creates and updates a ModuleInstance CR — a deliberately simpler usage of the same CRD the controller owns — and stores its inventory in `status.inventory`, using inventory code imported from the controller module rather than the CLI's own copy.
+
+The goal is not storage hygiene. It is to pave the way for a **zero-downtime handoff**: a user who starts with the CLI alone can later install the controller and transfer ownership of a deployed instance to it without re-deploying anything. Because both actors would read and write the same inventory in the same CR, takeover becomes a no-op server-side apply.
+
+This RFC also adds controller installation to the CLI (`opm install`), which becomes a prerequisite rather than a convenience: once inventory lives in a CR, the CRDs must exist in every cluster the CLI applies to.
+
+This is a cross-repo design. The controller-side changes are documented here (not in `opm-controller/`) so the whole design can be reviewed as one unit; implementation will be sliced into per-repo OpenSpec changes (see "Implementation Slices").
+
+## Motivation
+
+### The learner-to-controller migration path
+
+The expected adoption path for OPM is:
+
+1. A user discovers OPM and tries it with only the CLI — `opm instance apply` against any cluster, no controller, no CRDs, minimal footprint.
+2. The user grows into GitOps / continuous reconciliation and installs the controller.
+3. The user wants their already-deployed instances managed by the controller — **without downtime, without orphaned resources, without re-deploying**.
+
+Today step 3 is impossible. The CLI records its inventory in a Secret (`opm.<instanceName>.<instanceID>`, RFC-0001); the controller records its inventory in `ModuleInstance.status.inventory`. They are two disjoint sources of truth with structurally identical content. Handing off an instance would mean manually constructing a ModuleInstance CR, hoping the controller's first reconcile happens to be a no-op, and deleting the Secret — with pruning logic on each side unaware of the other's record.
+
+### The convergence is already half-built
+
+Three existing facts make this design cheap relative to its payoff:
+
+1. **The inventory schemas are near-identical.** The CLI Secret stores `{Revision, Digest, Count, Entries[]}` where an entry is `{Group, Kind, Namespace, Name, Version, Component}`. The controller's `status.inventory` (`api/v1alpha1/common_types.go`) stores exactly the same shape. This is not coincidence: the controller's archived change `2026-04-12-01-cli-dependency-and-inventory-bridge` deliberately copied the CLI's inventory functions (`ComputeStaleSet`, digest computation, entry identity) into `opm-controller/internal/inventory/`, and its design doc explicitly defers "promote to `pkg/` for external reuse" to a future enhancement. This RFC is that enhancement, with the dependency direction inverted: the CLI imports the controller's code and deletes its own copy.
+
+2. **Resource labeling already converges.** Both actors stamp `module-instance.opmodel.dev/{uuid,name,namespace}` and `app.kubernetes.io/managed-by` on managed resources, and the controller's prune ownership guard already accepts both `opm-cli` and `opm-controller` as recognized managed-by values.
+
+3. **The ownership marker exists.** The CLI inventory record carries `CreatedBy: "cli" | "controller"` and the CLI refuses to mutate controller-owned instances (`EnsureCLIMutable`). Handoff is, at its core, flipping this marker in a place both sides respect.
+
+### Why a single source of truth matters for handoff
+
+The controller computes its prune set as `previous entries (status.inventory) - currently rendered entries`. If the CLI has already written the deployed entry set into `status.inventory`, the controller's first reconcile after takeover sees:
+
+- a render whose digest matches `lastAppliedRenderDigest` written by the CLI → apply is a server-side-apply no-op;
+- a stale set of zero → nothing pruned.
+
+No resource is touched. That is the zero-downtime property, and it falls out of sharing the inventory rather than being engineered separately.
+
+## Current State
+
+### CLI (today)
+
+| Concern | Implementation |
+|---------|----------------|
+| Inventory storage | Secret `opm.<instanceName>.<instanceID>`, key `inventory`, JSON `InstanceInventoryRecord` (`internal/inventory/secret.go`, `types.go`) |
+| Record contents | `CreatedBy`, instance metadata, module metadata, `{Revision, Digest, Count, Entries[]}` |
+| Entry identity / stale set | `pkg/inventory/` — `InventoryEntry`, `ComputeStaleSet`, component-aware identity |
+| Apply flow | `internal/workflow/apply/apply.go` — load previous inventory, compute stale set, SSA apply in weight order, prune, write Secret |
+| Prune safety | never prunes Namespaces; component-rename detection; pre-apply existence check on first apply |
+| Ownership guard | `pkg/ownership/` — `CreatedBy: cli|controller`; CLI refuses to mutate controller-owned instances |
+| Commands touching inventory | `instance apply`, `instance delete`, `instance status`, `instance list`, `instance diff` (and `module apply` via the same workflow) |
+| Controller/library deps | none — `go.mod` has no dependency on `opm-controller` or `library` |
+
+### Controller (today)
+
+| Concern | Implementation |
+|---------|----------------|
+| CRDs | `ModuleInstance`, `ModulePackage`, `Platform` in group `opmodel.dev/v1alpha1` |
+| ModuleInstance spec | `suspend`, `module` (OCI module path + version), `values`, `prune`, `serviceAccountName`, `rollout` |
+| ModuleInstance status | `observedGeneration`, `instanceUUID`, `conditions`, `lastAttempted*` / `lastApplied*` digests and timestamps, `failureCounters`, **`inventory`**, `history`, `nextRetryAt` |
+| Inventory code | `internal/inventory/` — `NewEntryFromResource`, `IdentityEqual`, `K8sIdentityEqual`, `ComputeStaleSet`, `ComputeDigest`. **Internal: not importable by the CLI today.** |
+| Apply | Flux SSA `ResourceManager.ApplyAllStaged`, field manager `opm-controller` |
+| Prune | per-resource delete with ownership guard (managed-by label + UUID match); never deletes Namespaces or CRDs |
+| Install artifacts | `config/crd/bases/*.yaml` (4 CRDs), `dist/install.yaml` (Namespace + CRDs + RBAC + Deployment), built by `task controller:installer` |
+| Library dep | `github.com/open-platform-model/library` (kernel wired into the controller, not yet read on reconcile paths) |
+
+## Design
+
+### Overview
+
+```text
+  CLI-only phase                      Handoff                  Controller phase
+  ==============                      =======                  ==============
+
+  opm instance apply               opm instance handoff          controller reconciles
+        |                                |                           |
+        v                                v                           v
+  +------------------+          +------------------+        +------------------+
+  | ModuleInstance CR|          | verify published |        | reads status.    |
+  |  spec: module,   |  ----->  | module == what   | -----> | inventory as     |
+  |   values,        |          | is deployed,     |        | "previous";      |
+  |   owner: cli     |          | then flip        |        | SSA apply is a   |
+  |  status:         |          | owner -> controller|        | no-op (digests   |
+  |   inventory      |          +------------------+        | match), stale    |
+  |   digests        |                                      | set empty ->     |
+  |   instanceUUID   |                                      | zero downtime    |
+  +------------------+                                      +------------------+
+        |
+        v
+  resources labeled
+  managed-by: opm-cli
+  uuid: <instance-uuid>
+```
+
+### D1 — The CLI writes a ModuleInstance CR instead of a Secret
+
+On `opm instance apply`, the CLI:
+
+1. Ensures the ModuleInstance CRD exists (see D5 for the failure/auto-install behavior).
+2. Creates or updates a `ModuleInstance` object named after the instance, in the instance namespace, with the CLI-ownership marker set (D3).
+3. Renders and applies resources exactly as today (the CLI keeps its own apply engine — see "Out of scope: apply-engine unification").
+4. Writes the inventory into `status.inventory` via the status subresource, plus the small set of status fields the CLI is responsible for (D2).
+
+`instance delete` resolves inventory from the CR, deletes resources in reverse weight order, then deletes the CR last (mirroring today's "Secret deleted last" ordering). `instance list` lists ModuleInstance objects instead of inventory Secrets. `instance status` and `instance diff` read `status.inventory`.
+
+The CLI field manager for CR writes is `opm-cli` (distinct from the controller's `opm-controller`), so SSA field ownership cleanly identifies which actor wrote which fields, including status.
+
+The packages `cli/internal/inventory` (Secret marshaling, CRUD) are deleted. `cli/pkg/inventory` (entry identity, stale set) is deleted in favor of the controller's exported equivalents (D4). Prune safety semantics that exist only in the CLI today (component-rename detection, pre-apply existence check) are preserved — either by porting them into the shared package or keeping them CLI-side on top of it; the OpenSpec slice decides, with a bias toward sharing (the controller benefits from them too).
+
+### D2 — The CLI writes a strict subset of status ("simpler version of the CR")
+
+The CLI is a one-shot actor with no reconcile loop, so most status fields are meaningless for it to write. The contract:
+
+| Status field | CLI writes? | Rationale |
+|--------------|-------------|-----------|
+| `inventory` | yes | The point of this RFC. Same `{revision, digest, count, entries}` semantics as today's Secret: revision increments per successful apply. |
+| `instanceUUID` | yes | Instance identity; already stamped on resources as a label. |
+| `lastAppliedRenderDigest`, `lastAppliedSourceDigest`, `lastAppliedConfigDigest`, `lastAppliedAt` | yes | The CLI already computes render digests. Writing them lets the controller's first post-handoff reconcile detect a no-op. |
+| `conditions` | one condition only | A single `Ready` condition reflecting the last CLI apply outcome, with reason `AppliedByCLI`. No `Reconciling`/`Stalled`/`Drifted` — those describe a control loop that is not running. |
+| `observedGeneration` | no | Controller-loop semantics. |
+| `lastAttempted*` | no | Attempt/retry bookkeeping belongs to the controller. |
+| `failureCounters`, `history`, `nextRetryAt` | no | Same. |
+
+The controller MUST tolerate a ModuleInstance whose status contains only this subset (it already must tolerate empty status on a fresh CR; this is the same obligation).
+
+### D3 — Explicit CLI-ownership marker; the controller skips CLI-owned CRs
+
+A CLI-created ModuleInstance in a cluster where the controller runs would otherwise be reconciled immediately — the controller would attempt to resolve `spec.module`, fight the CLI for resources, and potentially prune. An explicit ownership marker is required.
+
+**Decision: a spec-level field the controller respects.**
+
+```yaml
+apiVersion: opmodel.dev/v1alpha1
+kind: ModuleInstance
+metadata:
+  name: jellyfin
+  namespace: media
+spec:
+  owner: cli            # new field: "cli" | "controller"; default "controller"
+  module:
+    path: example.com/modules/jellyfin
+    version: 1.2.0      # best-effort when applying from a local path (see D6)
+  values: { ... }
+```
+
+Controller behavior when `spec.owner: cli`:
+
+- Skip render/apply/prune entirely.
+- Set a single condition `Ready: Unknown` with reason `ManagedExternally`, message pointing at the CLI.
+- Do not touch `status.inventory` or any CLI-written status field.
+
+Alternatives rejected:
+
+- **`spec.suspend: true` as the marker.** Conflates "paused" with "CLI-owned". A user running `kubectl edit` to unsuspend would trigger an accidental takeover with no verification. Suspend remains available and orthogonal.
+- **Status-driven skip (`status.inventory.createdBy == cli`).** Driving controller behavior from status is fragile: status can be lost on backup/restore, and spec is the user-intent surface.
+
+The existing `CreatedBy` concept from the CLI's Secret record maps onto this field; `pkg/ownership` semantics (`EnsureCLIMutable`) are preserved: the CLI refuses to apply/delete an instance whose `spec.owner` is `controller`.
+
+> **Controller-side change.** This field, its defaulting, the skip path, and the `ManagedExternally` condition are an `opm-controller` change, documented here per the cross-repo scope of this RFC.
+
+### D4 — The controller exports its inventory package; the CLI imports it
+
+`opm-controller/internal/inventory` moves to `opm-controller/pkg/inventory` (the move already anticipated by the archived `cli-dependency-and-inventory-bridge` design). Exported surface:
+
+- `InventoryEntry` (already exported via `api/v1alpha1`)
+- `NewEntryFromResource(*unstructured.Unstructured) InventoryEntry`
+- `IdentityEqual`, `K8sIdentityEqual`
+- `ComputeStaleSet(previous, current []InventoryEntry) []InventoryEntry`
+- `ComputeDigest(entries []InventoryEntry) string`
+
+The CLI adds `github.com/open-platform-model/opm-controller` to `go.mod` and imports:
+
+- `api/v1alpha1` — the ModuleInstance type, Inventory, InventoryEntry
+- `pkg/inventory` — the functions above
+- `pkg/core` — label constants (replacing the CLI's parallel definitions where they overlap)
+
+The import is intentionally narrow: API types plus pure functions, pulling in apimachinery but not controller-runtime's manager machinery or Flux SSA. The CLI does **not** import the controller's apply/prune engine (see Out of scope).
+
+**Accepted consequence — dependency direction.** `cli -> opm-controller` couples CLI releases to controller API churn at `v1alpha1`. The alternative (move the types into `library`, both repos import from there) is cleaner long-term but fights Kubebuilder codegen for CRD types and adds a third repo to every schema change. We accept the coupling while the API is `v1alpha1` and both repos are pre-1.0; if churn becomes painful, revisit relocating the shared types.
+
+### D5 — `opm install`: CRDs and controller via the CLI
+
+Once inventory lives in a CR, the CRDs are a hard prerequisite for *every* CLI apply — including clusters where the user never intends to run the controller. The install command therefore has a CRD-only mode:
+
+```bash
+# CRDs only — required for any CLI apply; no controller deployed
+opm install crds
+
+# Full controller: namespace, CRDs, RBAC, deployment (dist/install.yaml)
+opm install controller
+
+# Remove the controller (deployment, RBAC, namespace). CRDs are intentionally left in place.
+opm uninstall controller
+```
+
+`opm uninstall` never deletes CRDs. Deleting a CRD cascades to every `ModuleInstance`
+object in the cluster — the entire CLI and controller inventory — so it is not exposed as a
+CLI operation at all. Removing CRDs is a deliberate, manual cluster-admin action
+(`kubectl delete crd ...`), kept off the CLI surface to make accidental data loss impossible.
+
+Manifest sourcing: the CLI **embeds** the CRD manifests and `dist/install.yaml` of a pinned controller version at build time (`go:embed`), with a `--version` flag to fetch a different release from GitHub instead. Embedding keeps the learner path offline-friendly and makes "this CLI build is compatible with this CRD version" a build-time fact; fetching covers skew.
+
+Apply-time behavior when the CRD is missing: `opm instance apply` fails with a one-line hint (`ModuleInstance CRD not found — run 'opm install crds'`) rather than auto-installing. Installing CRDs is a cluster-admin write; doing it implicitly inside an application apply surprises exactly the operators who care. A `--install-crds` convenience flag on `apply` is open (OQ-2).
+
+Upgrade semantics: `opm install crds` server-side-applies with field manager `opm-cli`, so re-running upgrades CRDs in place; the command warns when the cluster's CRD version is newer than the CLI's embedded copy.
+
+### D6 — Spec contents when applying from a local module
+
+The controller's `spec.module` is an OCI reference it resolves from a registry. A CLI user often applies from a **local directory** the controller can never fetch. Rules:
+
+- When the CLI applies from a published module reference, it writes that reference into `spec.module` verbatim.
+- When the CLI applies from a local path, it writes the module's declared path/version as best-effort metadata and records the source kind (e.g., an annotation `module-instance.opmodel.dev/source: local`). The CR is a valid inventory store but **not yet reconcilable**.
+- Handoff (D7) is the gate that guarantees `spec.module` is resolvable before the controller ever owns the CR.
+
+This means a CLI-owned CR can temporarily describe a module the controller could not fetch. That is acceptable *because* of D3: the controller does not act on CLI-owned CRs, and D7 refuses to flip ownership until the spec is reconcilable.
+
+### D7 — `opm instance handoff` (the migration feature)
+
+The capstone command. Preconditions, verified in order, each with an actionable error:
+
+1. Controller is installed and the controller deployment is ready (else: `opm install controller`).
+2. The instance's ModuleInstance CR exists with `spec.owner: cli`.
+3. `spec.module` is a published, registry-resolvable reference (else: publish the module and re-apply, or pass `--module <ref>` to set it now).
+4. **Digest verification:** the CLI renders from the published reference + the CR's values and compares the render digest with `status.lastAppliedRenderDigest`. Mismatch aborts the handoff: what the controller would reconcile is not what is deployed. `--force` overrides with a diff display.
+
+Then the flip:
+
+5. Patch `spec.owner: controller` (single SSA patch, field manager `opm-cli`).
+6. Wait (bounded) for the controller's first reconcile; report the outcome — expected: `Ready: True`, inventory revision incremented, zero resources changed, zero pruned.
+
+After handoff the CLI's mutation guard makes the instance read-only to the CLI (`status`, `diff`, `list` still work). A reverse handoff (`--to cli`) is the symmetric flip and is cheap to include since the verification machinery is identical.
+
+The label transition (`app.kubernetes.io/managed-by: opm-cli -> opm-controller`) happens naturally on the controller's subsequent applies; the prune guards on both sides already accept both values, so the transition window is safe.
+
+### D8 — Migration of existing Secret inventories
+
+Existing CLI deployments have Secret-based inventories. Silent breakage here is the worst outcome (orphans that never get pruned). On `opm instance apply` against an instance that has a Secret inventory but no ModuleInstance CR:
+
+1. Read the Secret, create the CR, write the Secret's record into `status.inventory` (preserving revision).
+2. Proceed with the normal apply against the CR.
+3. Delete the Secret only after the CR status write succeeds.
+
+`instance status`/`delete`/`list` fall back to reading Secrets for one transition period (one minor release), warning that the format is deprecated. After that, the Secret path is removed entirely.
+
+## Out of Scope
+
+- **Apply-engine unification.** The controller applies via Flux SSA `ApplyAllStaged` (field manager `opm-controller`); the CLI keeps its existing apply path (field manager `opm-cli`). True engine parity is not required for safe handoff: digest verification (D7.4) guarantees the controller's first apply is a no-op, and SSA field-manager transfer handles ownership of individual fields. Unifying the engines (likely by both consuming `library`) is future work.
+- **`ModulePackage` handoff.** This RFC covers `ModuleInstance` only. The Flux-sourced CR has no CLI-side equivalent today.
+- **Rollback / history.** `status.history` remains controller-only; the CLI does not gain rollback here (unchanged from RFC-0001's deferral).
+- **Controller lifecycle management beyond install/uninstall** (upgrades orchestration, HA configuration) — `opm install` applies manifests; it is not a package manager.
+
+## Risks
+
+| Risk | Severity | Mitigation |
+|------|----------|------------|
+| CRD requirement raises the CLI's barrier to entry (today: works on any cluster) | medium | `opm install crds` is one command, embedded manifests work offline; clear error with hint on missing CRD |
+| Controller API (`v1alpha1`) churn breaks CLI builds | medium | Narrow import surface (types + pure functions); both repos pre-1.0; accepted explicitly in D4 |
+| User flips `spec.owner` by hand, skipping D7 verification | medium | Controller takeover still consults `status.inventory`, so pruning stays correct; worst case is a non-no-op first apply. Document that `handoff` is the supported path. |
+| RBAC: CLI users now need permissions on `moduleinstances` and `moduleinstances/status` | low | Documented; `opm install crds` can optionally emit an RBAC snippet for non-admin CLI users |
+| Field-manager conflicts on status between `opm-cli` and `opm-controller` | low | Disjoint field sets by contract (D2); SSA resolves the overlap (`inventory`, `lastApplied*`) by manager transfer on takeover |
+| Two actors apply simultaneously during the transition window | low | Ownership guards on both sides (D3 + `EnsureCLIMutable`) make the window a spec-field race, resolved by SSA; the loser errors loudly |
+
+## Open Questions
+
+- **OQ-1:** Should the shared inventory package also absorb the CLI-only prune safety checks (component-rename detection, pre-apply existence check), making them controller behavior too? Bias: yes, but it widens the controller slice.
+- **OQ-2:** Should `opm instance apply` offer `--install-crds` to collapse the learner's first-run friction, given D5 decides against silent auto-install?
+- **OQ-3:** Does `opm install controller` belong under a broader `opm install` umbrella that might later cover other cluster prerequisites, or should it be `opm controller install` to leave `install` free? (Pure CLI-surface taxonomy; decide in the slice.)
+- **OQ-4:** Should this RFC be promoted to a workspace `enhancements/` umbrella entry (it is cross-repo by the workspace's own routing rules), with this document as its seed? The slices below work either way.
+- **OQ-5:** `instance list` across namespaces previously listed Secrets; listing CRs requires list permission on `moduleinstances` cluster-wide for `--all-namespaces`. Acceptable, or keep a label-based fallback?
+
+## Implementation Slices
+
+Ordered; each is an independently shippable OpenSpec change in its target repo.
+
+| # | Repo | Slice | Contents | Depends on |
+|---|------|-------|----------|------------|
+| 1 | `opm-controller` | `export-inventory-pkg` | Move `internal/inventory` -> `pkg/inventory`; no behavior change. Pre-designed by the archived bridge change. | — |
+| 2 | `opm-controller` | `cli-ownership-marker` | `spec.owner` field, defaulting, skip-reconcile path, `ManagedExternally` condition, CRD regen. | — |
+| 3 | `cli` | `controller-install-command` | `opm install crds|controller`, `opm uninstall`, embedded manifests, version pinning. | 2 (ships the CRD that includes `spec.owner`) |
+| 4 | `cli` | `cr-inventory-backend` | Depend on controller module; ModuleInstance CR replaces Secret in apply/delete/status/list/diff; D2 status subset; D8 Secret migration; delete `internal/inventory` Secret code and `pkg/inventory` copy. | 1, 2, 3 |
+| 5 | `cli` | `release-handoff` | `opm instance handoff` with D7 verification and reverse mode. | 4 |
+
+Slices 1–2 can proceed in parallel; slice 4 is the large one and should land behind passing e2e against a kind cluster with CRDs installed via slice 3.
+
+## References
+
+- RFC-0001 — Instance Inventory (the Secret-based design this supersedes)
+- `opm-controller/openspec/changes/archive/2026-04-12-01-cli-dependency-and-inventory-bridge/` — the deliberate copy of CLI inventory code into the controller, and its stated intent to export it later
+- `opm-controller/api/v1alpha1/moduleinstance_types.go`, `common_types.go` — CR and inventory types
+- `opm-controller/internal/inventory/` — code to be promoted in slice 1
+- `cli/internal/inventory/`, `cli/pkg/inventory/`, `cli/pkg/ownership/` — code retired by slice 4
+- `opm-controller/dist/install.yaml`, `config/crd/bases/` — install artifacts consumed by slice 3

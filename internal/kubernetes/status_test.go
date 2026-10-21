@@ -315,10 +315,10 @@ func TestFormatStatusTable_NotReadySummary(t *testing.T) {
 	assert.Contains(t, out, "1 not ready")
 }
 
-func TestFormatStatusHeader_OperatorWarning(t *testing.T) {
+func TestFormatStatusHeader_ControllerWarning(t *testing.T) {
 	result := &StatusResult{
 		InstanceName:    "my-app",
-		Owner:           "operator",
+		Owner:           "controller",
 		Namespace:       "production",
 		AggregateStatus: health.Ready,
 		Summary:         statusSummary{Total: 1, Ready: 1},
@@ -326,7 +326,7 @@ func TestFormatStatusHeader_OperatorWarning(t *testing.T) {
 
 	out := FormatStatusTable(result)
 	assert.Contains(t, out, "Owner:")
-	assert.Contains(t, out, "operator-managed instance")
+	assert.Contains(t, out, "controller-managed instance")
 }
 
 func TestFormatStatusHeader_CLIOwnedNoWarning(t *testing.T) {
@@ -339,7 +339,7 @@ func TestFormatStatusHeader_CLIOwnedNoWarning(t *testing.T) {
 	}
 
 	out := FormatStatusTable(result)
-	assert.NotContains(t, out, "operator-managed instance")
+	assert.NotContains(t, out, "controller-managed instance")
 }
 
 func TestFormatDuration(t *testing.T) {

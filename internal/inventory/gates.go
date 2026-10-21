@@ -24,8 +24,8 @@ var crdGVR = schema.GroupVersionResource{
 }
 
 const (
-	crdInstallHint  = "run 'opm operator install --crds-only'"
-	rbacInstallHint = "grant the moduleinstances/status subresource or run 'opm operator install --crds-only --rbac'"
+	crdInstallHint  = "run 'opm controller install --crds-only'"
+	rbacInstallHint = "grant the moduleinstances/status subresource or run 'opm controller install --crds-only --rbac'"
 )
 
 // GateCRDPresent verifies the ModuleInstance CRD exists. A NotFound is the
@@ -72,19 +72,19 @@ func CheckCRDFieldFloor(crd *unstructured.Unstructured) error {
 	return nil
 }
 
-// GateOperatorVersionCeiling reads the cluster-scoped Platform singleton and
-// refuses when the operator's advertised MAJOR.MINOR is newer than the CLI's.
-// Patch, prerelease and build metadata are ignored: the CLI and the operator
+// GateControllerVersionCeiling reads the cluster-scoped Platform singleton and
+// refuses when the controller's advertised MAJOR.MINOR is newer than the CLI's.
+// Patch, prerelease and build metadata are ignored: the CLI and the controller
 // share a minor line and release patches and prerelease counters
-// independently, so only a minor or major step on the operator side signals a
+// independently, so only a minor or major step on the controller side signals a
 // skew the CLI may not be able to drive. Absent Platform or absent
-// status.operatorVersion means a solo cluster (or a pre-A6 operator) and the
+// status.controllerVersion means a solo cluster (or a pre-A6 controller) and the
 // gate is skipped. A dev-build CLI or an RBAC-denied Platform read degrades to
 // skip-with-warning so a namespace-scoped user can still apply.
-func GateOperatorVersionCeiling(ctx context.Context, client *kubernetes.Client, cliVersion string) error {
+func GateControllerVersionCeiling(ctx context.Context, client *kubernetes.Client, cliVersion string) error {
 	normalizedCLI := ensureVPrefix(cliVersion)
 	if cliVersion == "" || cliVersion == "dev" || !semver.IsValid(normalizedCLI) {
-		output.Warn("skipping operator-version ceiling check: CLI version is not a released semver", "version", cliVersion)
+		output.Warn("skipping controller-version ceiling check: CLI version is not a released semver", "version", cliVersion)
 		return nil
 	}
 
@@ -92,33 +92,33 @@ func GateOperatorVersionCeiling(ctx context.Context, client *kubernetes.Client, 
 	if err != nil {
 		switch {
 		case apierrors.IsNotFound(err):
-			output.Debug("no Platform singleton; skipping operator-version ceiling (solo cluster)")
+			output.Debug("no Platform singleton; skipping controller-version ceiling (solo cluster)")
 			return nil
 		case apierrors.IsForbidden(err):
-			output.Warn("skipping operator-version ceiling check: reading the Platform was denied by RBAC")
+			output.Warn("skipping controller-version ceiling check: reading the Platform was denied by RBAC")
 			return nil
 		default:
-			return fmt.Errorf("reading Platform for operator-version ceiling: %w", err)
+			return fmt.Errorf("reading Platform for controller-version ceiling: %w", err)
 		}
 	}
 
-	//nolint:errcheck // best-effort read; wrong-typed status.operatorVersion treated as absent
-	opVersion, ok, _ := unstructured.NestedString(plat.Object, "status", "operatorVersion")
-	if !ok || opVersion == "" {
-		output.Debug("Platform has no status.operatorVersion; skipping operator-version ceiling")
+	//nolint:errcheck // best-effort read; wrong-typed status.controllerVersion treated as absent
+	ctrlVersion, ok, _ := unstructured.NestedString(plat.Object, "status", "controllerVersion")
+	if !ok || ctrlVersion == "" {
+		output.Debug("Platform has no status.controllerVersion; skipping controller-version ceiling")
 		return nil
 	}
 
-	normalizedOp := ensureVPrefix(opVersion)
-	if !semver.IsValid(normalizedOp) {
-		output.Warn("skipping operator-version ceiling check: operatorVersion is not valid semver", "operatorVersion", opVersion)
+	normalizedCtrl := ensureVPrefix(ctrlVersion)
+	if !semver.IsValid(normalizedCtrl) {
+		output.Warn("skipping controller-version ceiling check: controllerVersion is not valid semver", "controllerVersion", ctrlVersion)
 		return nil
 	}
 
-	if semver.Compare(semver.MajorMinor(normalizedOp), semver.MajorMinor(normalizedCLI)) > 0 {
+	if semver.Compare(semver.MajorMinor(normalizedCtrl), semver.MajorMinor(normalizedCLI)) > 0 {
 		return fmt.Errorf(
-			"your CLI (%s) is older than the cluster operator (%s) — upgrade the CLI before applying against this cluster",
-			cliVersion, opVersion,
+			"your CLI (%s) is older than the cluster controller (%s) — upgrade the CLI before applying against this cluster",
+			cliVersion, ctrlVersion,
 		)
 	}
 	return nil

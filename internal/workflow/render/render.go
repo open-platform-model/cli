@@ -295,7 +295,7 @@ func renderInstance(
 // refuseDuplicateIdentities returns the library's duplicate-identity error
 // when two of a render's compiled objects share one apply identity, nil
 // otherwise. A build refuses exactly what an apply would have written twice,
-// and the CLI and the operator word the refusal identically because both
+// and the CLI and the controller word the refusal identically because both
 // raise the library's error (enhancement 0015). Pure over the render output, so it is
 // tested without a render.
 func refuseDuplicateIdentities(out *kernel.RenderResult) error {

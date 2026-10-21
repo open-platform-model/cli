@@ -29,8 +29,8 @@ type Record struct {
 	Name      string
 	Namespace string
 
-	// Owner is the CR's spec.owner marker ("cli", "operator", or empty). An
-	// empty value on an existing CR means operator-managed by the operator's
+	// Owner is the CR's spec.owner marker ("cli", "controller", or empty). An
+	// empty value on an existing CR means controller-managed by the controller's
 	// defaulting contract; see ResolveOwnership.
 	Owner string
 
@@ -43,19 +43,19 @@ type Record struct {
 	// against the registry-resolved module (enhancement 0006).
 	SpecValues map[string]any
 
-	// Prune is the CR's spec.prune marker, which governs whether the operator
+	// Prune is the CR's spec.prune marker, which governs whether the controller
 	// deletes an instance's workloads when the CR is removed. It has no CRD
-	// default, so it is false unless someone set it — and the operator then
+	// default, so it is false unless someone set it — and the controller then
 	// deliberately orphans the workloads ("Prune disabled, orphaning managed
 	// resources on deletion"). The CLI does not write this field; it reads it
-	// so an operator-owned delete can report what will actually happen.
+	// so a controller-owned delete can report what will actually happen.
 	Prune bool
 
 	// DataPolicy is the CR's spec.dataPolicy as it is written, empty when the
-	// field is absent. The operator reads it to decide whether a prune or a
+	// field is absent. The controller reads it to decide whether a prune or a
 	// deletion removes PersistentVolumeClaims: only "Delete" removes them. The
 	// CLI does not write this field and does not interpret it here; it reads
-	// it so an operator-owned delete can report what will actually happen.
+	// it so a controller-owned delete can report what will actually happen.
 	DataPolicy string
 
 	// InstanceUUID is the CR's status.instanceUUID.
@@ -76,14 +76,14 @@ type Record struct {
 
 	// Generation is the CR's metadata.generation — the spec revision the API
 	// server assigned. Compared against ObservedGeneration to tell whether the
-	// operator has caught up with the latest write.
+	// controller has caught up with the latest write.
 	Generation int64
 
 	// ObservedGeneration is the CR's status.observedGeneration: the generation
-	// the operator last reconciled. Operator-written; the CLI only reads it.
+	// the controller last reconciled. Controller-written; the CLI only reads it.
 	ObservedGeneration int64
 
-	// Conditions is the CR's status.conditions block, operator-written. The
+	// Conditions is the CR's status.conditions block, controller-written. The
 	// CLI reads it to report reconcile outcomes (see ReadyFor).
 	Conditions []Condition
 }

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Platform-source resolution by precedence with visible provenance (enhancement 0006, "The CLI's platform source is a precedence: flag, then cluster Platform CR, then local default; handoff forces the CR", "Both a local Platform and an in-cluster Platform CR are first-class; OPM must never require cluster-admin for normal use", "Platform-source flag surface (single `--platform <file>` override + automatic precedence, with source-provenance reporting); resolves OQ14" and "`~/.opm` becomes two import-free data files: `config.cue` drops `providers`/`cacheDir`, D21's local default platform is the sibling `~/.opm/platform.cue`; folded into C2"): `--platform <dir>`, the cluster `Platform` CR, then a platform generated from the render's own dependency pins; there is no local default platform. Every source resolves to a platform module directory the kernel acquires with `AcquirePlatformFromDir`; the cluster CR is generated into one through the library's platform-module helper, the operator's own ingestion path (enhancement 0019, "A platform imports its catalog and embeds it whole into the registry entry, which derives everything else" and "The Platform CR keeps naming a catalog coordinate; the operator generates the platform package"), from the effective registry the operator recorded on the CR's status (enhancement 0015, "A cluster's render is reproduced by pulling the operator-generated platform package").
+Platform-source resolution by precedence with visible provenance (enhancement 0006, "The CLI's platform source is a precedence: flag, then cluster Platform CR, then local default; handoff forces the CR", "Both a local Platform and an in-cluster Platform CR are first-class; OPM must never require cluster-admin for normal use", "Platform-source flag surface (single `--platform <file>` override + automatic precedence, with source-provenance reporting); resolves OQ14" and "`~/.opm` becomes two import-free data files: `config.cue` drops `providers`/`cacheDir`, D21's local default platform is the sibling `~/.opm/platform.cue`; folded into C2"): `--platform <dir>`, the cluster `Platform` CR, then a platform generated from the render's own dependency pins; there is no local default platform. Every source resolves to a platform module directory the kernel acquires with `AcquirePlatformFromDir`; the cluster CR is generated into one through the library's platform-module helper, the controller's own ingestion path (enhancement 0019, "A platform imports its catalog and embeds it whole into the registry entry, which derives everything else" and "The Platform CR keeps naming a catalog coordinate; the operator generates the platform package"), from the effective registry the controller recorded on the CR's status (enhancement 0015, "A cluster's render is reproduced by pulling the operator-generated platform package").
 
 ## Requirements
 
@@ -15,14 +15,14 @@ Decoding a **cluster CR spec** SHALL tolerate legacy stored shapes permanently: 
 - **WHEN** the cluster Platform CR carries a legacy `filter` block and no `version`
 - **THEN** decode succeeds, and generation fails with the missing-version error plus the legacy-CR hint, before any registry access
 
-### Requirement: Acquisition mirrors the operator
+### Requirement: Acquisition mirrors the controller
 
-A cluster `Platform` CR SHALL be turned into a platform module exactly as the operator does it: the CR's `spec.type` and its registry entries (path, `version`, `enable`) feed the library's platform-module generator, the dependency closure is derived from the pinned modules' published module files through the CLI's configured registry, core is pinned at the library's verified release, and the module path is `opmodel.dev/platforms/cluster@v0`.
+A cluster `Platform` CR SHALL be turned into a platform module exactly as the controller does it: the CR's `spec.type` and its registry entries (path, `version`, `enable`) feed the library's platform-module generator, the dependency closure is derived from the pinned modules' published module files through the CLI's configured registry, core is pinned at the library's verified release, and the module path is `opmodel.dev/platforms/cluster@v0`.
 
-#### Scenario: CR generates the operator's module
+#### Scenario: CR generates the controller's module
 
 - **WHEN** the cluster CR subscribes `opmodel.dev/catalogs/opm@v4` at `4.0.1`, its status records that one entry, and the CLI resolves it
-- **THEN** the generated `cue.mod/module.cue` pins that catalog, core at the library's verified release and the catalog's transitive dependencies, and `platform.cue` carries one importing `#registry` entry for it, byte-identical to what the operator generates for the same CR and library release
+- **THEN** the generated `cue.mod/module.cue` pins that catalog, core at the library's verified release and the catalog's transitive dependencies, and `platform.cue` carries one importing `#registry` entry for it, byte-identical to what the controller generates for the same CR and library release
 
 #### Scenario: An active claim's catalog is generated
 
@@ -56,7 +56,7 @@ When the cluster Platform's status carries a resolved registry, resolution SHALL
 #### Scenario: No recorded registry falls back to the spec
 
 - **WHEN** the CR's status carries no registry
-- **THEN** the generated module carries the spec's subscriptions and the provenance says the spec was used because no operator generation is recorded
+- **THEN** the generated module carries the spec's subscriptions and the provenance says the spec was used because no controller generation is recorded
 
 #### Scenario: A stale status warns
 
@@ -271,12 +271,12 @@ Resolution SHALL NOT infer maturity, widen the major, or fall back to a hand-pin
 
 ### Requirement: The registry entries of a generated platform are the effective registry
 
-A cluster `Platform` CR SHALL be turned into a platform module exactly as the operator does it. The registry entries SHALL be the effective registry the operator recorded on `status.registry` when present (each entry's catalog, version and enabled flag, which is the operator's own resolution of subscriptions and active claims), and the `spec.registry` subscriptions (with `enable` defaulting to true) otherwise.
+A cluster `Platform` CR SHALL be turned into a platform module exactly as the controller does it. The registry entries SHALL be the effective registry the controller recorded on `status.registry` when present (each entry's catalog, version and enabled flag, which is the controller's own resolution of subscriptions and active claims), and the `spec.registry` subscriptions (with `enable` defaulting to true) otherwise.
 
 #### Scenario: The effective registry feeds the entries
 
 - **WHEN** the cluster `Platform` CR is turned into a platform module
-- **THEN** the registry entries SHALL be the effective registry the operator recorded on `status.registry` when present, and the `spec.registry` subscriptions (with `enable` defaulting to true) otherwise
+- **THEN** the registry entries SHALL be the effective registry the controller recorded on `status.registry` when present, and the `spec.registry` subscriptions (with `enable` defaulting to true) otherwise
 
 ### Requirement: Every platform source is acquired through the kernel's directory acquisition
 
@@ -298,7 +298,7 @@ The CLI MUST NOT synthesize a platform value from typed inputs and MUST NOT pers
 
 ### Requirement: A generated platform module lives in the OPM home cache under its content hash
 
-A cluster `Platform` CR SHALL be turned into a platform module exactly as the operator does it. The generated module SHALL live under the OPM home cache at `cache/platforms/<content-hash>/`, where the hash covers the generated files' bytes, so an unchanged CR maps to the same directory across invocations, generation is idempotent, and two concurrent invocations converge on identical content.
+A cluster `Platform` CR SHALL be turned into a platform module exactly as the controller does it. The generated module SHALL live under the OPM home cache at `cache/platforms/<content-hash>/`, where the hash covers the generated files' bytes, so an unchanged CR maps to the same directory across invocations, generation is idempotent, and two concurrent invocations converge on identical content.
 
 #### Scenario: The cache directory is named by the content hash
 
@@ -316,7 +316,7 @@ The CLI MUST NOT publish the generated module, write it to the cluster, or treat
 
 ### Requirement: Resolution warns and never silently substitutes when the status is stale or the Platform is not Ready
 
-Resolution SHALL warn, never silently substitute, in two cases: when `status.observedGeneration` is behind `metadata.generation`, naming both generations, because the effective package predates the spec being edited; and when the Platform's `Ready` condition is `False`, naming its reason, because the effective package is the last one the operator accepted. Neither warning changes which package is generated.
+Resolution SHALL warn, never silently substitute, in two cases: when `status.observedGeneration` is behind `metadata.generation`, naming both generations, because the effective package predates the spec being edited; and when the Platform's `Ready` condition is `False`, naming its reason, because the effective package is the last one the controller accepted. Neither warning changes which package is generated.
 
 #### Scenario: A warning does not change the generated package
 
@@ -460,7 +460,7 @@ The CLI SHALL resolve the platform for every render by precedence, and no preced
 
 ### Requirement: Every platform source resolves to a platform module directory
 
-Every source SHALL resolve to a platform module directory the kernel acquires; the CR source is generated into one first from the effective registry the operator recorded on the CR's status, or from the CR's spec when no operator has recorded one (see "Acquisition mirrors the operator" and "The cluster arm reads the effective registry"), and the deps sources are generated into one from committed dependency pins.
+Every source SHALL resolve to a platform module directory the kernel acquires; the CR source is generated into one first from the effective registry the controller recorded on the CR's status, or from the CR's spec when no controller has recorded one (see "Acquisition mirrors the controller" and "The cluster arm reads the effective registry"), and the deps sources are generated into one from committed dependency pins.
 
 #### Scenario: Every source is a module directory
 
@@ -469,12 +469,12 @@ Every source SHALL resolve to a platform module directory the kernel acquires; t
 
 ### Requirement: Every command that renders reports the platform source it resolved
 
-Every command that renders SHALL report which platform source it resolved, the directory it acquired and, for the CR source, whether the effective registry or the spec was used and the package identity the operator recorded.
+Every command that renders SHALL report which platform source it resolved, the directory it acquired and, for the CR source, whether the effective registry or the spec was used and the package identity the controller recorded.
 
 #### Scenario: The resolved source is reported
 
 - **WHEN** a command that renders resolves a platform source
-- **THEN** it SHALL report which platform source it resolved, the directory it acquired and, for the CR source, whether the effective registry or the spec was used and the package identity the operator recorded
+- **THEN** it SHALL report which platform source it resolved, the directory it acquired and, for the CR source, whether the effective registry or the spec was used and the package identity the controller recorded
 
 ### Requirement: A platform argument that is a file or an empty directory fails with the expected shape
 
@@ -494,13 +494,13 @@ The `--provider` flag SHALL NOT exist (superseded by `--platform`, enhancement 0
 - **WHEN** a command takes a platform source
 - **THEN** the `--provider` flag SHALL NOT exist (superseded by `--platform`)
 
-### Requirement: Operator install seeds the cluster Platform with a plain create
+### Requirement: Controller install seeds the cluster Platform with a plain create
 
-`opm operator install` SHALL seed the singleton `cluster` Platform with a plain create (field manager `opm-cli`), treating `AlreadyExists` as success-noop (enhancement 0006, "Solo-cluster `Platform` write-if-absent uses a plain `Create` that tolerates `AlreadyExists`, not SSA apply; refines D12's mechanism, resolves OQ13"), subscribing to the catalog build it resolved from the registry. The CLI MUST NOT use server-side apply or update for this write and MUST NOT overwrite an existing Platform.
+`opm controller install` SHALL seed the singleton `cluster` Platform with a plain create (field manager `opm-cli`), treating `AlreadyExists` as success-noop (enhancement 0006, "Solo-cluster `Platform` write-if-absent uses a plain `Create` that tolerates `AlreadyExists`, not SSA apply; refines D12's mechanism, resolves OQ13"), subscribing to the catalog build it resolved from the registry. The CLI MUST NOT use server-side apply or update for this write and MUST NOT overwrite an existing Platform.
 
 #### Scenario: Install seeds an absent Platform
 
-- **WHEN** `opm operator install` completes against a cluster with no `Platform` CR
+- **WHEN** `opm controller install` completes against a cluster with no `Platform` CR
 - **THEN** a `Platform` named `cluster` SHALL be created subscribing to the resolved catalog build
 
 #### Scenario: Concurrent create tolerated
@@ -510,20 +510,20 @@ The `--provider` flag SHALL NOT exist (superseded by `--platform`, enhancement 0
 
 ### Requirement: A forbidden create of the seeded Platform degrades to a warning
 
-`opm operator install` SHALL seed the singleton `cluster` Platform with a plain create (field manager `opm-cli`). A forbidden create SHALL degrade to a warning.
+`opm controller install` SHALL seed the singleton `cluster` Platform with a plain create (field manager `opm-cli`). A forbidden create SHALL degrade to a warning.
 
 #### Scenario: RBAC-denied create degrades
 
 - **WHEN** the create is forbidden
 - **THEN** the CLI SHALL warn and the install SHALL still complete
 
-### Requirement: Operator install reports the provenance it resolved and no other source
+### Requirement: Controller install reports the provenance it resolved and no other source
 
-The reported provenance SHALL name the catalog coordinate and version the install resolved and SHALL NOT claim any other source. (Requirement: Operator install seeds the cluster Platform with a plain create)
+The reported provenance SHALL name the catalog coordinate and version the install resolved and SHALL NOT claim any other source. (Requirement: Controller install seeds the cluster Platform with a plain create)
 
 #### Scenario: Install reports its own provenance
 
-- **WHEN** `opm operator install` seeds the Platform from a registry-resolved catalog version
+- **WHEN** `opm controller install` seeds the Platform from a registry-resolved catalog version
 - **THEN** the reported provenance SHALL name the catalog module path and the resolved version
 
 ### Requirement: No render-bearing command seeds a Platform
@@ -627,38 +627,47 @@ When `opm instance build`, `opm instance vet`, `opm instance diff`, `opm instanc
 - **WHEN** the cluster is unreachable
 - **THEN** `opm instance diff`, `opm instance apply` and `opm module apply` SHALL keep failing: they need the cluster to do their work
 
-### Requirement: Operator install renders the operator module against a platform of its own pins
+### Requirement: Controller install renders the controller module against a platform of its own pins
 
-`opm operator install`, the CRDs-only form included, SHALL render the operator module against a platform generated from the module's own committed dependency pins, and SHALL NOT read the cluster `Platform` or accept a `--platform` directory for that render. Every other command keeps its precedence under "Platform source precedence by command". Source: enhancement 0021 ("The operator's install artifact is a registry module on its own version train").
+A full `opm controller install` SHALL render the controller module against a platform generated from the module's own committed dependency pins, and SHALL NOT read the cluster `Platform` or accept a `--platform` directory for that render. Every other command keeps its precedence under "Platform source precedence by command". Source: enhancement 0021 ("The controller's install artifact is a registry module on its own version train").
 
 #### Scenario: Stalled Platform does not block repair
 
 - **WHEN** the cluster Platform is `Stalled` and install runs
 - **THEN** the render succeeds from the module's pins and install proceeds to its checks
 
-### Requirement: Operator install renders the same objects whatever the cluster Platform holds
+### Requirement: The CRDs-only form renders nothing at install time
 
-`opm operator install`, the CRDs-only form included, SHALL render the operator module. The same module version and values SHALL render the same objects whether or not the cluster holds a Platform and whatever it subscribes to, and a Platform that is missing, not Ready or unreadable SHALL NOT refuse the render. Source: enhancement 0021 ("The operator's install artifact is a registry module on its own version train").
+The CRDs-only form of `opm controller install` SHALL render nothing at install time: it applies the CRDs the pin task rendered from the pinned version. Source: enhancement 0021 ("The controller's install artifact is a registry module on its own version train").
+
+#### Scenario: CRDs-only install renders nothing
+
+- **WHEN** `opm controller install --crds-only` runs
+- **THEN** the CRDs applied are the manifests the pin task rendered from the pinned version, and no module is rendered at install time
+
+### Requirement: Controller install renders the same objects whatever the cluster Platform holds
+
+A full `opm controller install` SHALL render the controller module. The same module version and values SHALL render the same objects whether or not the cluster holds a Platform and whatever it subscribes to, and a Platform that is missing, not Ready or unreadable SHALL NOT refuse the render. Source: enhancement 0021 ("The controller's install artifact is a registry module on its own version train").
 
 #### Scenario: Seeded Platform on another catalog release
 
-- **WHEN** the cluster Platform subscribes to a catalog release other than the one the operator module pins, and install re-runs with the same module version and values
+- **WHEN** the cluster Platform subscribes to a catalog release other than the one the controller module pins, and install re-runs with the same module version and values
 - **THEN** the render is the one the module's own pins produce, and no live object changes
 
-### Requirement: Operator install names the module's deps as the provenance source
+### Requirement: Controller install names the module's deps as the provenance source
 
-`opm operator install`, the CRDs-only form included, SHALL render the operator module. The provenance line SHALL name the module's deps as the source. Source: enhancement 0021 ("The operator's install artifact is a registry module on its own version train").
+A full `opm controller install` SHALL render the controller module. The provenance line SHALL name the module's deps as the source. Source: enhancement 0021 ("The controller's install artifact is a registry module on its own version train").
 
-#### Scenario: Provenance of the operator render
+#### Scenario: Provenance of the controller render
 
-- **WHEN** `opm operator install` renders the operator module
+- **WHEN** `opm controller install` renders the controller module
 - **THEN** the provenance line SHALL name the module's deps as the source
 
-### Requirement: The operator render narrows the platform-source precedence for the operator's own instance only
+### Requirement: The controller render narrows the platform-source precedence for the controller's own instance only
 
-`opm operator install`, the CRDs-only form included, SHALL render the operator module as listed in requirement "Operator install renders the operator module against a platform of its own pins". This narrows the platform-source precedence of enhancement 0006 for the operator's own instance only, so repairing the operator never depends on the Platform it serves. Source: enhancement 0021 ("The operator's install artifact is a registry module on its own version train").
+A full `opm controller install` SHALL render the controller module as listed in requirement "Controller install renders the controller module against a platform of its own pins". This narrows the platform-source precedence of enhancement 0006 for the controller's own instance only, so repairing the controller never depends on the Platform it serves. Source: enhancement 0021 ("The controller's install artifact is a registry module on its own version train").
 
-#### Scenario: The narrowing is for the operator's own instance only
+#### Scenario: The narrowing is for the controller's own instance only
 
-- **WHEN** `opm operator install` renders the operator module against a platform generated from the module's own committed dependency pins
-- **THEN** this narrows the platform-source precedence of enhancement 0006 for the operator's own instance only, so repairing the operator never depends on the Platform it serves
+- **WHEN** `opm controller install` renders the controller module against a platform generated from the module's own committed dependency pins
+- **THEN** this narrows the platform-source precedence of enhancement 0006 for the controller's own instance only, so repairing the controller never depends on the Platform it serves

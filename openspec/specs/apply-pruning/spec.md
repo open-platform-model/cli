@@ -187,13 +187,13 @@ With `--create-namespace` and a missing namespace the record SHALL NOT be read a
 - **THEN** the command SHALL NOT read the `ModuleInstance` record
 - **AND** the apply SHALL proceed as a first-time apply
 
-### Requirement: Operator install does not say nothing changed after its CRD step
+### Requirement: Controller install does not say nothing changed after its CRD step
 
-`opm operator install` SHALL NOT say that nothing was changed when the read of the instance's `ModuleInstance` record fails after the install applied its CustomResourceDefinitions.
+`opm controller install` SHALL NOT say that nothing was changed when the read of the instance's `ModuleInstance` record fails after the install applied its CustomResourceDefinitions.
 
-#### Scenario: Read denied inside operator install after its CRD step
+#### Scenario: Read denied inside controller install after its CRD step
 
-- **WHEN** `opm operator install` has applied its CustomResourceDefinitions and the `ModuleInstance` read of its instance apply fails with Forbidden
+- **WHEN** `opm controller install` has applied its CustomResourceDefinitions and the `ModuleInstance` read of its instance apply fails with Forbidden
 - **THEN** the error SHALL name the record and the read error
 - **AND** it SHALL NOT say that the apply stopped before any change
 
@@ -393,11 +393,11 @@ The warning of a real run SHALL NOT send the user to the release to apply with f
 
 ### Requirement: The first-install warning is not printed when it does not apply
 
-The apply SHALL print no such warning when no rendered resource exists yet, or when the instance has a record. `opm operator install` SHALL NOT print it: install applies the render's CustomResourceDefinitions itself before the instance apply, so a fresh install always finds them. (Requirement: A first install over OPM-managed resources prints one warning)
+The apply SHALL print no such warning when no rendered resource exists yet, or when the instance has a record. `opm controller install` SHALL NOT print it: install applies the render's CustomResourceDefinitions itself before the instance apply, so a fresh install always finds them. (Requirement: A first install over OPM-managed resources prints one warning)
 
-#### Scenario: Operator install prints no warning
+#### Scenario: Controller install prints no warning
 
-- **WHEN** `opm operator install` runs on a cluster with no operator
+- **WHEN** `opm controller install` runs on a cluster with no controller
 - **THEN** the command SHALL print no such warning
 
 #### Scenario: Clean first install prints no warning
@@ -473,20 +473,20 @@ A stale claim that is no longer in the cluster (its read answers NotFound) SHALL
 - **WHEN** `opm instance apply --no-prune --delete-data` is run
 - **THEN** the process SHALL exit 1 and standard error SHALL name both flags
 
-### Requirement: `--delete-data` on an operator-managed instance only warns
+### Requirement: `--delete-data` on a controller-managed instance only warns
 
-The prune of `opm instance apply` and `opm module apply`: on an operator-managed instance `--delete-data` SHALL NOT change what the operator does and SHALL NOT fail the command: the command SHALL print a warning that says so, names `spec.dataPolicy` of the `ModuleInstance` as the setting that an operator with that field obeys for PersistentVolumeClaims, and says that an older operator deletes them.
+The prune of `opm instance apply` and `opm module apply`: on a controller-managed instance `--delete-data` SHALL NOT change what the controller does and SHALL NOT fail the command: the command SHALL print a warning that says so, names `spec.dataPolicy` of the `ModuleInstance` as the setting that a controller with that field obeys for PersistentVolumeClaims, and says that an older controller deletes them.
 
-#### Scenario: Delete-data on an operator-managed instance
+#### Scenario: Delete-data on a controller-managed instance
 
-- **WHEN** `opm instance apply --delete-data` or `opm module apply --delete-data` runs for an operator-managed instance
-- **THEN** the command SHALL print a warning that `--delete-data` does not change what the operator does
-- **AND** the warning SHALL name `spec.dataPolicy` and say that an older operator deletes PersistentVolumeClaims
+- **WHEN** `opm instance apply --delete-data` or `opm module apply --delete-data` runs for a controller-managed instance
+- **THEN** the command SHALL print a warning that `--delete-data` does not change what the controller does
+- **AND** the warning SHALL name `spec.dataPolicy` and say that an older controller deletes PersistentVolumeClaims
 - **AND** the apply SHALL go on as without the flag
 
 ### Requirement: Prune takes the delete decision from the ownership verdict
 
-Before the prune deletes a stale resource, it SHALL read the live object and SHALL take the decision to delete it from the delete verdict the CLI shares with the operator. The prune SHALL delete the resource only when the live object carries an OPM managed-by label and its `module-instance.opmodel.dev/uuid` label does not name an instance other than the recorded one. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
+Before the prune deletes a stale resource, it SHALL read the live object and take the decision to delete it from the delete verdict the CLI shares with the controller. The prune SHALL delete the resource only when the live object carries an OPM managed-by label and its `module-instance.opmodel.dev/uuid` label does not name an instance other than the recorded one. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
 
 #### Scenario: Stale resource now owned by another instance
 
@@ -504,7 +504,7 @@ The prune SHALL NOT delete a resource whose live `opmodel.dev/adopt` annotation 
 
 ### Requirement: The verdict is asked with the identity stored in the instance record
 
-The delete verdict the CLI shares with the operator SHALL be asked with the instance identity stored in the instance's `ModuleInstance` record (`status.instanceUUID`), which is the identity that applied the stale resources, also when the identity of the current render differs from it. An object with no UUID label SHALL be judged without the UUID comparison, and so SHALL every object when the record holds no identity.
+The delete verdict the CLI shares with the controller SHALL be asked with the instance identity stored in the instance's `ModuleInstance` record (`status.instanceUUID`), which is the identity that applied the stale resources, also when the identity of the current render differs from it. An object with no UUID label SHALL be judged without the UUID comparison, and so SHALL every object when the record holds no identity.
 
 #### Scenario: Stale object that carries neither identity
 
@@ -514,7 +514,7 @@ The delete verdict the CLI shares with the operator SHALL be asked with the inst
 
 ### Requirement: A resource that fails the verdict is left behind and not kept
 
-A resource that fails the delete verdict the CLI shares with the operator SHALL NOT be deleted: it SHALL be listed with the status `left behind` and the reason, SHALL NOT count as a failure, and SHALL NOT be kept in the written inventory. The stale set itself SHALL NOT change: it stays every recorded resource the render no longer names. Source: enhancement 0012 ("The stale set is component-blind, and the inventory digest hashes a canonical field encoding").
+A resource that fails the delete verdict the CLI shares with the controller SHALL NOT be deleted: it SHALL be listed with the status `left behind` and the reason, SHALL NOT count as a failure, and SHALL NOT be kept in the written inventory. The stale set itself SHALL NOT change: it stays every recorded resource the render no longer names. Source: enhancement 0012 ("The stale set is component-blind, and the inventory digest hashes a canonical field encoding").
 
 #### Scenario: Stale name taken by a user's object
 
@@ -634,18 +634,18 @@ A dry run in the same state SHALL print one closing line that says that nothing 
 - **THEN** the output SHALL hold one line that says that nothing would be applied
 - **AND** the command SHALL exit 0
 
-### Requirement: Operator install refuses a resource adopted by another instance
+### Requirement: Controller install refuses a resource adopted by another instance
 
-`opm operator install` is the exception: it SHALL refuse on a rendered resource whose live adopt annotation names another instance (capability `operator-lifecycle`). Source: enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override" and "The stale set is component-blind, and the inventory digest hashes a canonical field encoding").
+`opm controller install` is the exception: it SHALL refuse on a rendered resource whose live adopt annotation names another instance (capability `controller-lifecycle`). Source: enhancement 0012 ("The apply guard runs on every apply, refusing foreign objects outside the inventory and any object adopted by another instance; a per-object adopt annotation is its only override" and "The stale set is component-blind, and the inventory digest hashes a canonical field encoding").
 
-#### Scenario: Operator install refuses an adopted resource
+#### Scenario: Controller install refuses an adopted resource
 
-- **WHEN** `opm operator install` runs and a resource it renders carries `opmodel.dev/adopt` with the UUID of another instance
-- **THEN** `opm operator install` SHALL refuse on that resource (capability `operator-lifecycle`)
+- **WHEN** `opm controller install` runs and a resource it renders carries `opmodel.dev/adopt` with the UUID of another instance
+- **THEN** `opm controller install` SHALL refuse on that resource (capability `controller-lifecycle`)
 
-### Requirement: The prune takes every action from the deletion plan shared with the operator
+### Requirement: The prune takes every action from the deletion plan shared with the controller
 
-The prune of `opm instance apply` and `opm module apply` SHALL take every action on a stale resource from the deletion plan the CLI shares with the operator, built from the stale entries the prune may delete and the instance identity stored in the instance's record. That set SHALL NOT hold a `Namespace`, a `CustomResourceDefinition`, or a `PersistentVolumeClaim` that is kept.
+The prune of `opm instance apply` and `opm module apply` SHALL take every action on a stale resource from the deletion plan the CLI shares with the controller, built from the stale entries the prune may delete and the instance identity stored in the instance's record. That set SHALL NOT hold a `Namespace`, a `CustomResourceDefinition`, or a `PersistentVolumeClaim` that is kept.
 
 #### Scenario: The deletion plan holds only the stale entries the prune may delete
 
@@ -685,7 +685,7 @@ A resource whose read or delete fails SHALL NOT stop the plan, except that after
 
 ### Requirement: A stale resource counts as pruned when its delete is accepted
 
-A stale resource SHALL count as pruned when the API server accepts its delete request. Which entries stay in the written inventory, the output lines and the exit codes SHALL stay as the other requirements of this capability state them. The dry-run prune preview SHALL NOT be affected. (Requirement: The prune takes every action from the deletion plan shared with the operator)
+A stale resource SHALL count as pruned when the API server accepts its delete request. Which entries stay in the written inventory, the output lines and the exit codes SHALL stay as the other requirements of this capability state them. The dry-run prune preview SHALL NOT be affected. (Requirement: The prune takes every action from the deletion plan shared with the controller)
 
 #### Scenario: Stale resource held by a finalizer
 
@@ -696,7 +696,7 @@ A stale resource SHALL count as pruned when the API server accepts its delete re
 
 ### Requirement: The ownership guard judges every apply
 
-On every apply in CLI-executor mode, the first as well as every later one, `opm instance apply` and `opm module apply` SHALL read each rendered resource from the cluster and SHALL take the decision to apply it from the ownership verdict the CLI shares with the operator, asked with the instance identity of the render. A resource that does not exist SHALL pass; a NotFound answer, or a kind the cluster does not serve yet, SHALL mean the resource does not exist.
+On every apply in CLI-executor mode, the first as well as every later one, `opm instance apply` and `opm module apply` SHALL read each rendered resource from the cluster and SHALL take the decision to apply it from the ownership verdict the CLI shares with the controller, asked with the instance identity of the render. A resource that does not exist SHALL pass; a NotFound answer, or a kind the cluster does not serve yet, SHALL mean the resource does not exist.
 
 #### Scenario: Absent resource passes
 
@@ -840,30 +840,30 @@ When a rendered resource cannot be read, the dry run SHALL fail with the same er
 - **WHEN** `opm instance apply --dry-run` runs and the read of a rendered resource fails with Forbidden
 - **THEN** the command SHALL exit 4 with an error naming the resource and the read error
 
-### Requirement: A dry run of an operator-managed instance does not run the guard
+### Requirement: A dry run of a controller-managed instance does not run the guard
 
-A dry run of an operator-managed instance SHALL NOT run the guard: the operator applies that instance.
+A dry run of a controller-managed instance SHALL NOT run the guard: the controller applies that instance.
 
-#### Scenario: Dry run of an operator-managed instance skips the guard
+#### Scenario: Dry run of a controller-managed instance skips the guard
 
-- **WHEN** `opm instance apply --dry-run` runs for an operator-managed instance
-- **THEN** the guard SHALL NOT run, because the operator applies that instance
+- **WHEN** `opm instance apply --dry-run` runs for a controller-managed instance
+- **THEN** the guard SHALL NOT run, because the controller applies that instance
 
 ### Requirement: The guard takes no admission set
 
-The guard SHALL take no admission set: no caller, `opm operator install` included, SHALL lift a refusal for a resource by a proof of where the resource came from. An existing resource SHALL pass only when the record of the instance lists it, when its adopt annotation holds this instance's UUID, or when it carries an OPM managed-by label and no UUID label of another instance.
+The guard SHALL take no admission set: no caller, `opm controller install` included, SHALL lift a refusal for a resource by a proof of where the resource came from. An existing resource SHALL pass only when the record of the instance lists it, when its adopt annotation holds this instance's UUID, or when it carries an OPM managed-by label and no UUID label of another instance.
 
-#### Scenario: Operator install lifts no refusal
+#### Scenario: Controller install lifts no refusal
 
-- **WHEN** `opm operator install` runs on a cluster with no record of the operator's instance
+- **WHEN** `opm controller install` runs on a cluster with no record of the controller's instance
 - **AND** a rendered resource exists without an OPM managed-by label and without an adopt annotation
 - **THEN** the guard SHALL refuse that resource as it does for `opm instance apply`
 
-### Requirement: A guard refusal in operator install keeps that command's exit code and wording
+### Requirement: A guard refusal in controller install keeps that command's exit code and wording
 
-When the guard refuses in the check phase of `opm operator install`, the exit code SHALL be that command's apply-guard code (capability `operator-lifecycle`). When it refuses inside that command's instance apply, after the install's writes, the refusal SHALL NOT say that nothing was changed.
+When the guard refuses in the check phase of `opm controller install`, the exit code SHALL be that command's apply-guard code (capability `controller-lifecycle`). When it refuses inside that command's instance apply, after the install's writes, the refusal SHALL NOT say that nothing was changed.
 
-#### Scenario: Guard refusal in the check phase of operator install
+#### Scenario: Guard refusal in the check phase of controller install
 
-- **WHEN** the guard refuses in the check phase of `opm operator install`
-- **THEN** the exit code SHALL be that command's apply-guard code (capability `operator-lifecycle`)
+- **WHEN** the guard refuses in the check phase of `opm controller install`
+- **THEN** the exit code SHALL be that command's apply-guard code (capability `controller-lifecycle`)

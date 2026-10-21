@@ -80,7 +80,7 @@ func TestInstanceDeleteCmd_WaitFlag(t *testing.T) {
 	assert.Equal(t, "false", wait.DefValue)
 	assert.Empty(t, wait.Shorthand)
 	assert.Contains(t, wait.Usage, "--dry-run")
-	assert.Contains(t, wait.Usage, "operator-managed")
+	assert.Contains(t, wait.Usage, "controller-managed")
 	assert.Contains(t, cmd.Flags().Lookup("timeout").Usage, "--wait")
 	assert.Contains(t, cmd.Long, "exits 1", "the help states the exit code of a timeout")
 	assert.Contains(t, cmd.Long, "5m0s", "and the default timeout")
@@ -177,14 +177,14 @@ func TestConfirmAndDelete_WaitDoesNothingOnADryRun(t *testing.T) {
 	assert.True(t, s.exists(inventory.ModuleInstanceGVR, "demo"))
 }
 
-// For an operator-managed instance --wait changes nothing: the command
+// For a controller-managed instance --wait changes nothing: the command
 // deletes the ModuleInstance and waits for it to be gone, as without it.
-func TestConfirmAndDelete_WaitChangesNothingForAnOperatorManagedInstance(t *testing.T) {
+func TestConfirmAndDelete_WaitChangesNothingForAControllerManagedInstance(t *testing.T) {
 	shortPoll(t)
 	run := func(wait bool) (string, []string) {
 		s := newClaimScenario()
-		s.operatorManaged(t, true, dataPolicyDelete)
-		s.installOperator(t, moduleInstanceCRD(true))
+		s.controllerManaged(t, true, dataPolicyDelete)
+		s.installController(t, moduleInstanceCRD(true))
 		s.fake.ClearActions()
 		out, err := s.confirm(t, "demo", deleteFlags{SkipConfirm: true, Wait: wait, Timeout: 5 * time.Second}, "")
 		require.NoError(t, err, out)
@@ -197,5 +197,5 @@ func TestConfirmAndDelete_WaitChangesNothingForAnOperatorManagedInstance(t *test
 
 	assert.Equal(t, wantOut, gotOut)
 	assert.Equal(t, wantRequests, gotRequests)
-	assert.Contains(t, gotOut, "waiting for the operator to finish cleanup")
+	assert.Contains(t, gotOut, "waiting for the controller to finish cleanup")
 }

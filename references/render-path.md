@@ -38,10 +38,10 @@ The command acquires the directory once with the kernel's `AcquirePlatformFromDi
 the single `Kernel.Render` call (`internal/workflow/render`). The cli holds no built platform value
 and carries no matching or transformer execution.
 
-The one exception is `opm operator install`. It renders the operator module against its own
+The one exception is `opm controller install`. It renders the controller module against its own
 dependency pins only (`render.ModuleOpts.DepsOnly`): no `--platform` and no cluster Platform read, so
-repairing the operator never depends on the Platform it serves (enhancement 0021). Only
-`opm operator install` seeds a Platform. No other render-bearing command creates one.
+repairing the controller never depends on the Platform it serves (enhancement 0021). Only
+`opm controller install` seeds a Platform. No other render-bearing command creates one.
 
 ## Per command behavior
 
@@ -57,7 +57,7 @@ refused, naming the matching `opm module` command (a shared helper in `internal/
 ## The deps platform and the cache
 
 The cluster CR and the deps are turned into a module first, through the library's
-`opm/helper/platformmodule` generator (byte-identical to the operator's). The result is cached under
+`opm/helper/platformmodule` generator (byte-identical to the controller's). The result is cached under
 `~/.opm/cache/platforms/<content-hash>/`. The cache is idempotent derived state, safe to delete, and
 moves with `--config`.
 
@@ -101,7 +101,7 @@ The cli only:
 - records skips on the ModuleInstance in `instance apply` and `module apply`, as the annotation
   `module-instance.opmodel.dev/skipped-contracts` (sorted `<component>=<fqn>` pairs; omitted, and so
   cleared by server-side apply, when nothing was skipped);
-- refuses the flag for an operator-managed instance, because the operator renders it and never
+- refuses the flag for a controller-managed instance, because the controller renders it and never
   skips.
 
 A platform whose enabled registry entries share a contract key is refused by the kernel, whatever the
@@ -112,7 +112,7 @@ instance and whatever `--skip-unprovided` says. The cli prints the kernel's coll
 
 - Adding matching or transformer code to the cli to work around a render gap: it is a library defect.
   Fix it upstream.
-- Making `operator install` read the cluster Platform: it must stay deps-only (enhancement 0021).
+- Making `controller install` read the cluster Platform: it must stay deps-only (enhancement 0021).
 - Treating the platform cache as state: it is derived and safe to delete.
 - Letting `instance build` fail on an unreachable cluster: it warns and falls back.
 

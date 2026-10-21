@@ -115,7 +115,7 @@ func TestDecodeCR_EffectiveRegistryCarriesBothSources(t *testing.T) {
 	spec, eff, err := DecodeCR(crDoc(specWithOneSubscription(), map[string]any{
 		"observedGeneration": int64(7),
 		"packageIdentity":    "gen-7-3f9a1c2b",
-		"operatorVersion":    "v1.0.0-alpha.20",
+		"controllerVersion":  "v1.0.0-alpha.20",
 		"registry": []any{
 			map[string]any{
 				"catalog": "opmodel.dev/catalogs/k8up@v1",
@@ -151,13 +151,13 @@ func TestDecodeCR_EffectiveRegistryCarriesBothSources(t *testing.T) {
 	}, eff.Sources)
 	assert.Equal(t, "gen-7-3f9a1c2b", eff.PackageIdentity)
 	assert.Equal(t, int64(7), eff.ObservedGeneration)
-	assert.Equal(t, "v1.0.0-alpha.20", eff.OperatorVersion)
+	assert.Equal(t, "v1.0.0-alpha.20", eff.ControllerVersion)
 	require.NotNil(t, eff.Ready)
 	assert.Equal(t, "True", eff.Ready.Status)
 	assert.Equal(t, "Generated", eff.Ready.Reason)
 }
 
-// A disabled catalog is recorded with enabled omitted (the operator's
+// A disabled catalog is recorded with enabled omitted (the controller's
 // omitzero), so the decode default must be false — the opposite of
 // spec.registry's enable.
 func TestDecodeCR_OmittedEnabledIsFalse(t *testing.T) {
@@ -179,21 +179,21 @@ func TestDecodeCR_OmittedEnabledIsFalse(t *testing.T) {
 func TestDecodeCR_NoStatusMeansNoEffective(t *testing.T) {
 	spec, eff, err := DecodeCR(crDoc(specWithOneSubscription(), nil, 1))
 	require.NoError(t, err)
-	assert.Nil(t, eff, "a Platform no operator reconciled has no effective registry")
+	assert.Nil(t, eff, "a Platform no controller reconciled has no effective registry")
 	assert.Equal(t, "kubernetes", spec.Type)
 }
 
-// A status without a registry still carries what the operator recorded, so
-// the operator version and the observed generation stay reportable.
+// A status without a registry still carries what the controller recorded, so
+// the controller version and the observed generation stay reportable.
 func TestDecodeCR_StatusWithoutRegistry(t *testing.T) {
 	_, eff, err := DecodeCR(crDoc(specWithOneSubscription(), map[string]any{
 		"observedGeneration": int64(2),
-		"operatorVersion":    "v1.0.0-alpha.20",
+		"controllerVersion":  "v1.0.0-alpha.20",
 	}, 2))
 	require.NoError(t, err)
 	require.NotNil(t, eff)
 	assert.Empty(t, eff.Entries, "no recorded registry: resolution falls back to the spec")
-	assert.Equal(t, "v1.0.0-alpha.20", eff.OperatorVersion)
+	assert.Equal(t, "v1.0.0-alpha.20", eff.ControllerVersion)
 }
 
 func TestDecodeCR_ReadyFalseIsDecoded(t *testing.T) {
@@ -218,7 +218,7 @@ func TestDecodeCR_ReadyFalseIsDecoded(t *testing.T) {
 	assert.Equal(t, "OverSubscribedContracts", eff.Ready.Reason)
 }
 
-// The operator never records a row without a version, so one means the
+// The controller never records a row without a version, so one means the
 // status was written by hand; generating from it would drop the pin.
 func TestDecodeCR_StatusEntryWithoutVersionRefused(t *testing.T) {
 	_, _, err := DecodeCR(crDoc(specWithOneSubscription(), map[string]any{

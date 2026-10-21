@@ -1,6 +1,6 @@
 ## Purpose
 
-`.github/workflows/e2e-cluster.yml` runs the cluster-backed e2e suite in CI against the operator module the CLI pins, so a change that breaks the CLI-to-operator path, or an upstream publish that breaks the pinned operator module, fails a pull request instead of reaching a release.
+`.github/workflows/e2e-cluster.yml` runs the cluster-backed e2e suite in CI against the controller module the CLI pins, so a change that breaks the CLI-to-controller path, or an upstream publish that breaks the pinned controller module, fails a pull request instead of reaching a release.
 
 ## Requirements
 
@@ -20,7 +20,7 @@ The workflow SHALL NOT use a workflow-level path or branch filter beyond the `ma
 
 ### Requirement: The workflow runs one job named `E2E (kind, embedded operator)` on pull requests targeting `main` and on `workflow_dispatch`
 
-The workflow SHALL run one job, named `E2E (kind, embedded operator)` (a name the `main` ruleset requires as a status check, kept although no operator is embedded), triggered by `pull_request` targeting `main` with the activity types `opened`, `synchronize`, `reopened`, `labeled` and `unlabeled`, and by `workflow_dispatch`.
+The workflow SHALL run one job, named `E2E (kind, embedded operator)` (a name the `main` ruleset requires as a status check, kept although nothing is embedded), triggered by `pull_request` targeting `main` with the activity types `opened`, `synchronize`, `reopened`, `labeled` and `unlabeled`, and by `workflow_dispatch`.
 
 #### Scenario: The job is named and triggered as the ruleset requires
 
@@ -50,20 +50,20 @@ The job SHALL do the cluster-backed work (it *applies*) when at least one of the
 - **WHEN** the `deps-cascade` label is removed from a pull request whose head branch is `deps/cascade`
 - **THEN** the `unlabeled` event starts a new run, which still applies and runs the suite
 
-### Requirement: The job applies when a pull request changes a file under `internal/operator/`, `internal/cmd/operator/`, `templates/` or `hack/platform/`
+### Requirement: The job applies when a pull request changes a file under `internal/controller/`, `internal/cmd/controller/`, `templates/` or `hack/platform/`
 
 The job SHALL do the cluster-backed work (it *applies*) when at least one of these holds:
-- the pull request changes a file under `internal/operator/`, `internal/cmd/operator/`, `templates/` or `hack/platform/`;
+- the pull request changes a file under `internal/controller/`, `internal/cmd/controller/`, `templates/` or `hack/platform/`;
 
-#### Scenario: Operator pin bump applies
+#### Scenario: Controller pin bump applies
 
-- **WHEN** a pull request changes `internal/operator/pin.go`
-- **THEN** the job boots a cluster, installs the pinned operator module and runs the e2e suite
+- **WHEN** a pull request changes `internal/controller/pin.go`
+- **THEN** the job boots a cluster, installs the pinned controller module and runs the e2e suite
 
-#### Scenario: Operator command change applies
+#### Scenario: Controller command change applies
 
-- **WHEN** a pull request changes only `internal/cmd/operator/install.go`
-- **THEN** the job applies, because `task cluster:operator` runs that command and the lifecycle test exercises it
+- **WHEN** a pull request changes only `internal/cmd/controller/install.go`
+- **THEN** the job applies, because `task cluster:controller` runs that command and the lifecycle test exercises it
 
 #### Scenario: Unrelated pull request
 
@@ -73,27 +73,27 @@ The job SHALL do the cluster-backed work (it *applies*) when at least one of the
 ### Requirement: The job applies when a pull request changes the workflow file, its decision script, `Taskfile.yml` or `hack/fixtures.sh`
 
 The job SHALL do the cluster-backed work (it *applies*) when at least one of these holds:
-- the pull request changes one of the job's own inputs: the workflow file itself, its decision script `.github/scripts/e2e-cluster-applies.sh`, `Taskfile.yml` (which defines `cluster:create` and `cluster:operator`), `hack/fixtures.sh` (which seeds the registry).
+- the pull request changes one of the job's own inputs: the workflow file itself, its decision script `.github/scripts/e2e-cluster-applies.sh`, `Taskfile.yml` (which defines `cluster:create` and `cluster:controller`), `hack/fixtures.sh` (which seeds the registry).
 
 #### Scenario: Change to the preparation task applies
 
 - **WHEN** a pull request changes only `Taskfile.yml`
-- **THEN** the job applies, so a change that breaks `task cluster:operator` fails on that pull request rather than on the next release pull request
+- **THEN** the job applies, so a change that breaks `task cluster:controller` fails on that pull request rather than on the next release pull request
 
-### Requirement: The job applies when a pull request changes `hack/kind-config.yaml`, `hack/kind-platform.yaml`, `hack/kind-operator-rbac.yaml` or `hack/opm-config.cue`
+### Requirement: The job applies when a pull request changes `hack/kind-config.yaml`, `hack/kind-platform.yaml`, `hack/kind-controller-rbac.yaml` or `hack/opm-config.cue`
 
 The job SHALL do the cluster-backed work (it *applies*) when at least one of these holds:
-- the pull request changes one of the job's own inputs: `hack/kind-config.yaml`, `hack/kind-platform.yaml`, `hack/kind-operator-rbac.yaml`, `hack/opm-config.cue`.
+- the pull request changes one of the job's own inputs: `hack/kind-config.yaml`, `hack/kind-platform.yaml`, `hack/kind-controller-rbac.yaml`, `hack/opm-config.cue`.
 
 #### Scenario: Change to a kind file applies
 
 - **WHEN** a pull request changes only `hack/kind-config.yaml`
 - **THEN** the job applies
 
-### Requirement: The job applies when a pull request changes a Go file directly under `tests/e2e/` or anything under `tests/e2e/testdata/operator-owned/`
+### Requirement: The job applies when a pull request changes a Go file directly under `tests/e2e/` or anything under `tests/e2e/testdata/controller-owned/`
 
 The job SHALL do the cluster-backed work (it *applies*) when at least one of these holds:
-- the pull request changes one of the job's own inputs: any Go file directly under `tests/e2e/` (the cluster-backed tests and the suite's shared helpers such as `TestMain` and `runOPMWithEnv`), or anything under `tests/e2e/testdata/operator-owned/`.
+- the pull request changes one of the job's own inputs: any Go file directly under `tests/e2e/` (the cluster-backed tests and the suite's shared helpers such as `TestMain` and `runOPMWithEnv`), or anything under `tests/e2e/testdata/controller-owned/`.
 
 #### Scenario: Change to a Go file under tests/e2e applies
 
@@ -129,64 +129,64 @@ When the job applies, it SHALL run `go test ./tests/e2e/... -v` with the same `-
 
 #### Scenario: Lifecycle test takes the full-rollout path
 
-- **WHEN** the operator lifecycle test checks whether the pinned image is pullable
+- **WHEN** the controller lifecycle test checks whether the pinned image is pullable
 - **THEN** `crane` is present, the image is reported pullable, and the test asserts a completed rollout
 
-### Requirement: An operator-owned test that fails logs its ModuleInstance, the cluster Platform and the operator's logs before its cleanup deletes the evidence
+### Requirement: A controller-owned test that fails logs its ModuleInstance, the cluster Platform and the controller's logs before its cleanup deletes the evidence
 
-When an operator-owned test fails, the test itself SHALL log, before its cleanup deletes the evidence, the test's ModuleInstance with its status, the cluster Platform with its status and the operator's logs. Later tests (the operator lifecycle test tears the operator, CRDs and every ModuleInstance down and reinstalls) leave nothing of that state for a step after the suite.
+When a controller-owned test fails, the test itself SHALL log, before its cleanup deletes the evidence, the test's ModuleInstance with its status, the cluster Platform with its status and the controller's logs. Later tests (the controller lifecycle test tears the controller, CRDs and every ModuleInstance down and reinstalls) leave nothing of that state for a step after the suite.
 
 #### Scenario: Failure leaves diagnostics
 
-- **WHEN** an operator-owned test fails because the operator did not reconcile
-- **THEN** that test's output contains the operator's logs and the status of the Platform and of the test's ModuleInstance as they were when it failed, and its failure message names the ModuleInstance's `Ready` condition
+- **WHEN** a controller-owned test fails because the controller did not reconcile
+- **THEN** that test's output contains the controller's logs and the status of the Platform and of the test's ModuleInstance as they were when it failed, and its failure message names the ModuleInstance's `Ready` condition
 
-### Requirement: When an operator-owned test fails, a test that times out waiting for the operator to reconcile names the ModuleInstance's `Ready` condition in its failure message
+### Requirement: When a controller-owned test fails, a test that times out waiting for the controller to reconcile names the ModuleInstance's `Ready` condition in its failure message
 
-When an operator-owned test fails, a test that times out waiting for the operator to reconcile SHALL name the ModuleInstance's `Ready` condition in its failure message.
+When a controller-owned test fails, a test that times out waiting for the controller to reconcile SHALL name the ModuleInstance's `Ready` condition in its failure message.
 
 #### Scenario: A reconcile timeout names the Ready condition
 
-- **WHEN** an operator-owned test fails and a test times out waiting for the operator to reconcile
+- **WHEN** a controller-owned test fails and a test times out waiting for the controller to reconcile
 - **THEN** its failure message names the ModuleInstance's `Ready` condition
 
-### Requirement: After any failed step the job prints the operator's logs, the cluster Platform, every ModuleInstance and recent cluster events
+### Requirement: After any failed step the job prints the controller's logs, the cluster Platform, every ModuleInstance and recent cluster events
 
-After any failed step, including a preparation step before the suite starts, the job SHALL also print the operator's logs, the cluster Platform and every ModuleInstance with their status, and recent cluster events.
+After any failed step, including a preparation step before the suite starts, the job SHALL also print the controller's logs, the cluster Platform and every ModuleInstance with their status, and recent cluster events.
 
 #### Scenario: Preparation failure leaves diagnostics
 
-- **WHEN** `task cluster:operator` fails before the suite starts
-- **THEN** the job's diagnostics step prints the operator's logs, the cluster Platform, every ModuleInstance and recent events
+- **WHEN** `task cluster:controller` fails before the suite starts
+- **THEN** the job's diagnostics step prints the controller's logs, the cluster Platform, every ModuleInstance and recent events
 
-### Requirement: The job installs kind, creates the `opm-dev` cluster with `task cluster:create` and prepares it with `task cluster:operator`
+### Requirement: The job installs kind, creates the `opm-dev` cluster with `task cluster:create` and prepares it with `task cluster:controller`
 
-When the job applies, it SHALL install kind at the version and checksum `pr.yml`'s `integration` job uses, create the `opm-dev` cluster with `task cluster:create` (the node image pinned in `Taskfile.yml`), and prepare it with `task cluster:operator`, which installs the operator module version the CLI pins (no `--version`), applies `hack/kind-platform.yaml` and `hack/kind-operator-rbac.yaml`, and waits for the cluster Platform to be Ready for its current generation.
+When the job applies, it SHALL install kind at the version and checksum `pr.yml`'s `integration` job uses, create the `opm-dev` cluster with `task cluster:create` (the node image pinned in `Taskfile.yml`), and prepare it with `task cluster:controller`, which installs the controller module version the CLI pins (no `--version`), applies `hack/kind-platform.yaml` and `hack/kind-controller-rbac.yaml`, and waits for the cluster Platform to be Ready for its current generation.
 
-#### Scenario: The pinned operator module is what runs
+#### Scenario: The pinned controller module is what runs
 
 - **WHEN** the job has prepared the cluster
-- **THEN** the ModuleInstance `opm-operator` in `opm-operator-system` records the `PinnedModuleVersion` of the pull request's head commit, and the controller Deployment runs the operator release `PinnedOperatorVersion` names
+- **THEN** the ModuleInstance `opm-controller` in `opm-system` records the `PinnedModuleVersion` of the pull request's head commit, and the controller Deployment runs the controller release `PinnedControllerVersion` names
 
 #### Scenario: Stalled Platform fails the preparation
 
-- **WHEN** the pinned operator cannot build the cluster Platform
+- **WHEN** the pinned controller cannot build the cluster Platform
 - **THEN** the job fails in the preparation step, before the suite starts, naming the Platform's stall reason
 
-### Requirement: The job does not restate the kind installation, cluster creation and operator preparation steps in the workflow
+### Requirement: The job does not restate the kind installation, cluster creation and controller preparation steps in the workflow
 
-The job SHALL NOT restate those steps in the workflow. (Requirement: The job installs kind, creates the `opm-dev` cluster with `task cluster:create` and prepares it with `task cluster:operator`)
+The job SHALL NOT restate those steps in the workflow. (Requirement: The job installs kind, creates the `opm-dev` cluster with `task cluster:create` and prepares it with `task cluster:controller`)
 
 #### Scenario: The preparation steps are not restated
 
 - **WHEN** the job applies
-- **THEN** it does not restate in the workflow the steps that install kind, create the `opm-dev` cluster with `task cluster:create` and prepare it with `task cluster:operator`
+- **THEN** it does not restate in the workflow the steps that install kind, create the `opm-dev` cluster with `task cluster:create` and prepare it with `task cluster:controller`
 
-### Requirement: The job runs a registry container seeded with `hack/fixtures.sh seed` from which the CLI and the operator resolve `testing.opmodel.dev`
+### Requirement: The job runs a registry container seeded with `hack/fixtures.sh seed` from which the CLI and the controller resolve `testing.opmodel.dev`
 
-The job SHALL run a registry container seeded from the tree with `hack/fixtures.sh seed`, joined to kind's docker network. The CLI on the runner SHALL resolve `testing.opmodel.dev` from it on `localhost:5000`, and the operator SHALL resolve `testing.opmodel.dev` from it through `KIND_CUE_REGISTRY` on its in-cluster address, set as a value of the operator's instance. Core, the catalogs and the operator module SHALL resolve from GHCR on both sides.
+The job SHALL run a registry container seeded from the tree with `hack/fixtures.sh seed`, joined to kind's docker network. The CLI on the runner SHALL resolve `testing.opmodel.dev` from it on `localhost:5000`, and the controller SHALL resolve `testing.opmodel.dev` from it through `KIND_CUE_REGISTRY` on its in-cluster address, set as a value of the controller's instance. Core, the catalogs and the controller module SHALL resolve from GHCR on both sides.
 
 #### Scenario: Bumped fixture before it is published
 
-- **WHEN** a pull request bumps the fixture `tests/e2e/testdata/operator-owned` pins to a version GHCR does not hold yet
-- **THEN** the operator resolves that fixture from the job's registry and the operator-owned tests run against it
+- **WHEN** a pull request bumps the fixture `tests/e2e/testdata/controller-owned` pins to a version GHCR does not hold yet
+- **THEN** the controller resolves that fixture from the job's registry and the controller-owned tests run against it

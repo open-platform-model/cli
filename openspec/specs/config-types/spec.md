@@ -209,7 +209,7 @@ The `skewPolicy` value SHALL govern how a render responds when a module's `cue.m
 
 ### Requirement: The `skewPolicy` key applies to the local default or a `--platform` directory and the cluster Platform CR takes precedence
 
-The `skewPolicy` key applies when the platform is the local default or a `--platform` directory; when the cluster Platform CR is the source, the CR's `spec.skewPolicy` SHALL take precedence so CLI and operator judge the same platform the same way.
+The `skewPolicy` key applies when the platform is the local default or a `--platform` directory; when the cluster Platform CR is the source, the CR's `spec.skewPolicy` SHALL take precedence so CLI and controller judge the same platform the same way.
 
 #### Scenario: Cluster CR overrides the key
 

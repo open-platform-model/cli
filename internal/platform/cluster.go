@@ -20,7 +20,7 @@ import (
 // Forbidden are reported as warn-fallback conditions, not errors (enhancement 0006).
 //
 // The whole document is returned, spec and status undecoded: the effective
-// registry the operator recorded lives on status, and resolution generates
+// registry the controller recorded lives on status, and resolution generates
 // from it in preference to the spec (DecodeCR).
 func ClusterPlatformGetterFor(dyn dynamic.Interface) ClusterPlatformGetter {
 	return func(ctx context.Context) (*ClusterPlatform, string, error) {
@@ -39,7 +39,7 @@ func ClusterPlatformGetterFor(dyn dynamic.Interface) ClusterPlatformGetter {
 		if err != nil || !found {
 			return nil, "", fmt.Errorf("cluster Platform %q has no readable spec", plat.GetName())
 		}
-		// A Platform no operator has reconciled carries no status; that is
+		// A Platform no controller has reconciled carries no status; that is
 		// the solo-cluster case, not an error (DecodeCR returns no
 		// effective registry and resolution falls back to the spec).
 		status, found, err := unstructured.NestedMap(plat.Object, "status")
@@ -139,7 +139,7 @@ func EnsureClusterPlatformForCatalog(ctx context.Context, dyn dynamic.Interface,
 	case platformAlreadyPresent:
 		output.Info("cluster Platform already exists; left untouched")
 	case platformWriteForbidden:
-		output.Warn("could not create the cluster Platform (create denied by RBAC); the operator is installed but has no Platform to reconcile")
+		output.Warn("could not create the cluster Platform (create denied by RBAC); the controller is installed but has no Platform to reconcile")
 	case platformWriteUnset:
 		// Unreachable: the zero value is only ever returned beside an error.
 	}

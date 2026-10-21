@@ -67,7 +67,7 @@ config: {
 `, DefaultRegistry)
 
 // DefaultCatalogPath is the major-suffixed CUE module path of the
-// first-party catalog. `opm operator install` resolves a published
+// first-party catalog. `opm controller install` resolves a published
 // version of it when it seeds a cluster Platform.
 const DefaultCatalogPath = "opmodel.dev/catalogs/opm@v4"
 

@@ -231,7 +231,7 @@ func TestExecute_OwnObjectsOfAnOlderCLIAreApplied(t *testing.T) {
 	}
 }
 
-// With RefuseLetGo, which only `opm operator install` sets, an object adopted
+// With RefuseLetGo, which only `opm controller install` sets, an object adopted
 // by another instance refuses the apply, and the refusal does not claim that
 // nothing was changed when the caller wrote before the apply.
 func TestExecute_RefuseLetGoRefusesAnAdoptedObject(t *testing.T) {

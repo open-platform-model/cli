@@ -32,24 +32,24 @@ cascade_branch=deps/cascade
 cascade_label=deps-cascade
 release_prefix=release-please--
 
-# Paths whose change makes the job apply: the operator module pin and the
+# Paths whose change makes the job apply: the controller module pin and the
 # code that installs it, what the cluster serves, plus the job's own inputs
 # (a change to them is tested where it is made, not at the next release pull
 # request). Extended regular expressions, matched against the whole
 # repo-relative path.
 apply_paths=(
-  '^internal/operator/'
-  '^internal/cmd/operator/'
+  '^internal/controller/'
+  '^internal/cmd/controller/'
   '^templates/'
   '^hack/platform/'
   '^\.github/workflows/e2e-cluster\.yml$'
   '^\.github/scripts/e2e-cluster-applies\.sh$'
   '^Taskfile\.yml$'
   '^hack/fixtures\.sh$'
-  '^hack/kind-(config|platform|operator-rbac)\.yaml$'
+  '^hack/kind-(config|platform|controller-rbac)\.yaml$'
   '^hack/opm-config\.cue$'
   '^tests/e2e/[^/]+\.go$'
-  '^tests/e2e/testdata/operator-owned/'
+  '^tests/e2e/testdata/controller-owned/'
 )
 
 labels=$(grep -v '^[[:space:]]*$' "$labels_file" || true)
@@ -87,7 +87,7 @@ else
   echo "e2e-cluster: not applicable"
   echo "  head branch: ${head_ref:-<none>}"
   echo "  labels: ${joined_labels:-<none>}"
-  echo "  changed files: $file_count, none under internal/operator/, internal/cmd/operator/, templates/, hack/platform/ or the job's own inputs"
+  echo "  changed files: $file_count, none under internal/controller/, internal/cmd/controller/, templates/, hack/platform/ or the job's own inputs"
   echo "  nothing to do; passing"
 fi
 

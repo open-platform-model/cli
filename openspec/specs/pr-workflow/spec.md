@@ -84,7 +84,7 @@ For every template the gates SHALL be, in order:
 - **THEN** the `template-gates` job exits non-zero naming both templates
 
 ### Requirement: Integration tests use an ephemeral kind cluster with CRDs installed
-The `integration` job SHALL install kind v0.31.0 (checksum-verified), create a cluster named `opm-dev` from `hack/kind-config.yaml` with the pinned node image, run `go run ./cmd/opm operator install --crds-only --context kind-opm-dev` so the ModuleInstance CRD exists, run the integration programs under `tests/integration/` (deploy, inventory-apply, inventory-ops, inst-list, migration, gates), and delete the cluster with `if: always()`.
+The `integration` job SHALL install kind v0.31.0 (checksum-verified), create a cluster named `opm-dev` from `hack/kind-config.yaml` with the pinned node image, run `go run ./cmd/opm controller install --crds-only --context kind-opm-dev` so the ModuleInstance CRD exists, run the integration programs under `tests/integration/` (deploy, inventory-apply, inventory-ops, inst-list, migration, gates), and delete the cluster with `if: always()`.
 
 #### Scenario: CRDs installed before any program runs
 - **WHEN** the integration job starts
@@ -244,7 +244,7 @@ The `fixtures` job SHALL then run `hack/fixtures.sh seed` to publish the tree's 
 
 ### Requirement: The `fixtures` job runs the consumers and the render parity program against the mixed mapping
 
-Against the mixed mapping (`testing.opmodel.dev` local, everything else GHCR) the `fixtures` job SHALL then run `hack/fixtures.sh consumers examples tests/e2e/testdata/operator-owned`, which MUST pass (see `test-fixture-lineage`), and `tests/integration/render-parity` with `OPM_ITEST_RENDER_PARITY=1`.
+Against the mixed mapping (`testing.opmodel.dev` local, everything else GHCR) the `fixtures` job SHALL then run `hack/fixtures.sh consumers examples tests/e2e/testdata/controller-owned`, which MUST pass (see `test-fixture-lineage`), and `tests/integration/render-parity` with `OPM_ITEST_RENDER_PARITY=1`.
 (Requirement: The `fixtures` job seeds a job-local registry)
 
 #### Scenario: Render parity runs against the seeded registry
@@ -252,8 +252,8 @@ Against the mixed mapping (`testing.opmodel.dev` local, everything else GHCR) th
 - **THEN** the render-parity program SHALL load each fixture from the tree and from the registry and require byte-identical renders
 
 #### Scenario: Consumer left on a stale core pin
-- **WHEN** a PR bumps a fixture whose own `cue.mod` moved core, and re-pins `tests/e2e/testdata/operator-owned` to the new fixture version but leaves its core pin unchanged
-- **THEN** the `fixtures` job SHALL fail, printing the core pin diff and a `FAIL tests/e2e/testdata/operator-owned` line
+- **WHEN** a PR bumps a fixture whose own `cue.mod` moved core, and re-pins `tests/e2e/testdata/controller-owned` to the new fixture version but leaves its core pin unchanged
+- **THEN** the `fixtures` job SHALL fail, printing the core pin diff and a `FAIL tests/e2e/testdata/controller-owned` line
 
 ### Requirement: `task test:fixtures` runs the steps of the `fixtures` job against a local registry
 

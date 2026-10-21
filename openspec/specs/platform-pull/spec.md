@@ -8,12 +8,12 @@
 
 ### Requirement: pull reports what it reproduced
 
-The command SHALL print the CR name and generation, the recorded package identity and the operator version from status (or that none is recorded), whether the effective registry or the spec was used, and every registry entry with its catalog, version, enabled flag and source. It SHALL print the stale-status and not-Ready warnings resolution raises. It SHALL end by naming the directory and the build command that consumes it.
+The command SHALL print the CR name and generation, the recorded package identity and the controller version from status (or that none is recorded), whether the effective registry or the spec was used, and every registry entry with its catalog, version, enabled flag and source. It SHALL print the stale-status and not-Ready warnings resolution raises. It SHALL end by naming the directory and the build command that consumes it.
 
 #### Scenario: Provenance is printed
 
 - **WHEN** the pull succeeds
-- **THEN** the output names the generation, the package identity, the operator version, each entry's source, and the target directory
+- **THEN** the output names the generation, the package identity, the controller version, each entry's source, and the target directory
 
 ### Requirement: pull refuses to overwrite by accident
 
@@ -49,7 +49,7 @@ The CLI SHALL provide `opm platform pull <dir>`, registered under the `platform`
 #### Scenario: A pulled package reproduces the cluster's render
 
 - **WHEN** `opm platform pull ./cluster-platform` runs against a cluster whose Platform status records subscriptions and one registration-sourced catalog
-- **THEN** `./cluster-platform` holds a platform module pinning every recorded catalog at its recorded version, and a local build against it resolves a provider contract exactly as the operator's render does
+- **THEN** `./cluster-platform` holds a platform module pinning every recorded catalog at its recorded version, and a local build against it resolves a provider contract exactly as the controller's render does
 
 ### Requirement: The module that `opm platform pull` writes is the generated module unchanged
 

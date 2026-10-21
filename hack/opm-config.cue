@@ -1,5 +1,5 @@
 // OPM CLI configuration for the local kind dev cluster.
-// Used by: task cluster:operator (via --config), and available to any manual
+// Used by: task cluster:controller (via --config), and available to any manual
 // `opm ... --config hack/opm-config.cue` invocation against kind-opm-dev.
 //
 // This exists so the dev-cluster tooling is hermetic: it does not depend on a

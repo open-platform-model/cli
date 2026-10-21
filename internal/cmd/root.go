@@ -8,9 +8,9 @@ import (
 
 	cmdcatalog "github.com/open-platform-model/cli/internal/cmd/catalog"
 	cmdconfig "github.com/open-platform-model/cli/internal/cmd/config"
+	cmdcontroller "github.com/open-platform-model/cli/internal/cmd/controller"
 	cmdinstance "github.com/open-platform-model/cli/internal/cmd/instance"
 	cmdmodule "github.com/open-platform-model/cli/internal/cmd/module"
-	cmdoperator "github.com/open-platform-model/cli/internal/cmd/operator"
 	cmdplatform "github.com/open-platform-model/cli/internal/cmd/platform"
 	cmdregistry "github.com/open-platform-model/cli/internal/cmd/registry"
 	"github.com/open-platform-model/cli/internal/cmdutil"
@@ -69,7 +69,7 @@ The help of a command states where it differs, for example
 	rootCmd.AddCommand(cmdcatalog.NewCatalogCmd(&cfg))
 	rootCmd.AddCommand(cmdconfig.NewConfigCmd(&cfg))
 	rootCmd.AddCommand(cmdinstance.NewInstanceCmd(&cfg))
-	rootCmd.AddCommand(cmdoperator.NewOperatorCmd(&cfg))
+	rootCmd.AddCommand(cmdcontroller.NewControllerCmd(&cfg))
 	rootCmd.AddCommand(cmdplatform.NewPlatformCmd(&cfg))
 	rootCmd.AddCommand(cmdregistry.NewRegistryCmd(&cfg))
 

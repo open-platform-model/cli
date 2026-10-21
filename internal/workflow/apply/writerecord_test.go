@@ -89,7 +89,7 @@ func TestWriteInstanceRecord_StatusFailureFailsTheWrite(t *testing.T) {
 
 	// The spec write that preceded the failure carried the canonical module
 	// reference: the registry path verbatim and the v-prefixed version the
-	// operator resolves without normalising.
+	// controller resolves without normalising.
 	require.NotNil(t, specPatch, "the spec apply must have been issued")
 	var applied struct {
 		Spec struct {

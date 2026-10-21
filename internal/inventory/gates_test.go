@@ -21,7 +21,7 @@ func TestGateCRDPresent(t *testing.T) {
 		err := GateCRDPresent(ctx, client)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "ModuleInstance CRD not found")
-		assert.Contains(t, err.Error(), "opm operator install --crds-only")
+		assert.Contains(t, err.Error(), "opm controller install --crds-only")
 	})
 }
 
@@ -48,82 +48,82 @@ func TestGateCRDFieldFloor(t *testing.T) {
 	})
 }
 
-func TestGateOperatorVersionCeiling(t *testing.T) {
+func TestGateControllerVersionCeiling(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("dev build skips", func(t *testing.T) {
 		client := newDynamicClient(makePlatform("2.0.0"))
-		require.NoError(t, GateOperatorVersionCeiling(ctx, client, "dev"))
+		require.NoError(t, GateControllerVersionCeiling(ctx, client, "dev"))
 	})
 
 	t.Run("non-semver CLI skips", func(t *testing.T) {
 		client := newDynamicClient(makePlatform("2.0.0"))
-		require.NoError(t, GateOperatorVersionCeiling(ctx, client, "not-a-version"))
+		require.NoError(t, GateControllerVersionCeiling(ctx, client, "not-a-version"))
 	})
 
 	t.Run("no Platform skips (solo cluster)", func(t *testing.T) {
 		client := newDynamicClient()
-		require.NoError(t, GateOperatorVersionCeiling(ctx, client, "1.0.0"))
+		require.NoError(t, GateControllerVersionCeiling(ctx, client, "1.0.0"))
 	})
 
-	t.Run("absent operatorVersion skips", func(t *testing.T) {
+	t.Run("absent controllerVersion skips", func(t *testing.T) {
 		client := newDynamicClient(makePlatform(""))
-		require.NoError(t, GateOperatorVersionCeiling(ctx, client, "1.0.0"))
+		require.NoError(t, GateControllerVersionCeiling(ctx, client, "1.0.0"))
 	})
 
-	t.Run("newer operator refuses older CLI", func(t *testing.T) {
+	t.Run("newer controller refuses older CLI", func(t *testing.T) {
 		client := newDynamicClient(makePlatform("1.2.0"))
-		err := GateOperatorVersionCeiling(ctx, client, "1.1.0")
+		err := GateControllerVersionCeiling(ctx, client, "1.1.0")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "older than the cluster operator")
+		assert.Contains(t, err.Error(), "older than the cluster controller")
 	})
 
 	t.Run("equal version passes", func(t *testing.T) {
 		client := newDynamicClient(makePlatform("1.2.0"))
-		require.NoError(t, GateOperatorVersionCeiling(ctx, client, "1.2.0"))
+		require.NoError(t, GateControllerVersionCeiling(ctx, client, "1.2.0"))
 	})
 
 	t.Run("tolerates v-prefixed versions on both sides", func(t *testing.T) {
 		client := newDynamicClient(makePlatform("v1.2.0"))
-		require.NoError(t, GateOperatorVersionCeiling(ctx, client, "v1.3.0"))
+		require.NoError(t, GateControllerVersionCeiling(ctx, client, "v1.3.0"))
 	})
 
 	t.Run("newer prerelease counter on the same line passes", func(t *testing.T) {
 		client := newDynamicClient(makePlatform("1.0.0-beta.3"))
-		require.NoError(t, GateOperatorVersionCeiling(ctx, client, "1.0.0-beta.2"))
+		require.NoError(t, GateControllerVersionCeiling(ctx, client, "1.0.0-beta.2"))
 	})
 
-	t.Run("beta operator against an alpha cli of the same line passes", func(t *testing.T) {
+	t.Run("beta controller against an alpha cli of the same line passes", func(t *testing.T) {
 		client := newDynamicClient(makePlatform("1.0.0-beta.1"))
-		require.NoError(t, GateOperatorVersionCeiling(ctx, client, "1.0.0-alpha.27"))
+		require.NoError(t, GateControllerVersionCeiling(ctx, client, "1.0.0-alpha.27"))
 	})
 
-	t.Run("newer operator patch passes", func(t *testing.T) {
+	t.Run("newer controller patch passes", func(t *testing.T) {
 		client := newDynamicClient(makePlatform("1.0.4"))
-		require.NoError(t, GateOperatorVersionCeiling(ctx, client, "1.0.1"))
+		require.NoError(t, GateControllerVersionCeiling(ctx, client, "1.0.1"))
 	})
 
 	t.Run("build metadata is ignored", func(t *testing.T) {
 		client := newDynamicClient(makePlatform("v1.0.0-beta.1+gabc123.dirty"))
-		require.NoError(t, GateOperatorVersionCeiling(ctx, client, "1.0.0-beta.1"))
+		require.NoError(t, GateControllerVersionCeiling(ctx, client, "1.0.0-beta.1"))
 	})
 
-	t.Run("newer operator minor refuses", func(t *testing.T) {
+	t.Run("newer controller minor refuses", func(t *testing.T) {
 		client := newDynamicClient(makePlatform("1.1.0"))
-		err := GateOperatorVersionCeiling(ctx, client, "1.0.0")
+		err := GateControllerVersionCeiling(ctx, client, "1.0.0")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "older than the cluster operator")
+		assert.Contains(t, err.Error(), "older than the cluster controller")
 		assert.Contains(t, err.Error(), "1.1.0")
 		assert.Contains(t, err.Error(), "1.0.0")
 	})
 
-	t.Run("newer operator minor prerelease refuses", func(t *testing.T) {
+	t.Run("newer controller minor prerelease refuses", func(t *testing.T) {
 		client := newDynamicClient(makePlatform("1.1.0-beta.1"))
-		err := GateOperatorVersionCeiling(ctx, client, "1.0.0")
+		err := GateControllerVersionCeiling(ctx, client, "1.0.0")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "older than the cluster operator")
+		assert.Contains(t, err.Error(), "older than the cluster controller")
 		assert.Contains(t, err.Error(), "CLI (1.0.0)")
-		assert.Contains(t, err.Error(), "operator (1.1.0-beta.1)")
+		assert.Contains(t, err.Error(), "controller (1.1.0-beta.1)")
 	})
 }
 

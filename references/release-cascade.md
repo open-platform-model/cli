@@ -21,14 +21,14 @@ code pin and the stop switches.
 published versions, in the working tree only:
 
 - the library;
-- the operator module pin, through `hack/operator-pin`: the newest `opmodel.dev/modules/opm_operator`
-  release whose operator `MAJOR.MINOR` is not above the cli's (`hack/operator-pin select` reads each
+- the controller module pin, through `hack/controller-pin`: the newest `opmodel.dev/modules/opm_controller`
+  release whose controller `MAJOR.MINOR` is not above the cli's (`hack/controller-pin select` reads each
   candidate, so the lane needs Go and anonymous GHCR read);
 - the opm catalog and core in `templates/`, `hack/platform`, the kind Platform manifest in `hack/`, `examples/`,
   the podinfo fixture and the test trees.
 
 It exits 0 on a change and 3 on nothing to do. It runs no code from a moved dependency. The only Go
-programs it builds are `opm` and `hack/operator-pin`, from an export of the merge base and never the
+programs it builds are `opm` and `hack/controller-pin`, from an export of the merge base and never the
 work tree (in merge mode the work tree may already pin a library an earlier run moved). So the
 docs-bundle check lives in the PR's CI, not in the task.
 
@@ -64,7 +64,7 @@ dispatch, on a daily sweep (the schedule is in `.github/workflows`), or by hand 
 ## Notify downstream
 
 After `goreleaser` publishes a release, `release.yml`'s `Notify downstream` runs the `cascade-notify`
-action. It dispatches to catalog_opm and opm-operator, which pin the cli as their release tool.
+action. It dispatches to catalog_opm and opm-controller, which pin the cli as their release tool.
 `CASCADE_NOTIFY=off` stops it.
 
 ## Gates

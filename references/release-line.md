@@ -32,7 +32,7 @@ settings).
 
 ## Beta promise and breaking changes
 
-From its first beta the cli, with `opmodel.dev/core@v2`, the library and opm-operator, is on the path
+From its first beta the cli, with `opmodel.dev/core@v2`, the library and opm-controller, is on the path
 to GA.
 
 - A break is allowed in beta only as a `!` in the PR title (`feat!:`). That title is the squash
@@ -51,21 +51,21 @@ to GA.
 
 ## Beta skew rule
 
-An opm-operator `feat!` that the released cli cannot drive merges only after the cli release that can
+An opm-controller `feat!` that the released cli cannot drive merges only after the cli release that can
 drive it. No minor or major hop during beta: never a `release-as` of `1.1.0-beta.1` or beyond. The
-operator ceiling gate compares MAJOR.MINOR only and refuses nothing inside the `1.0` line.
+controller ceiling gate compares MAJOR.MINOR only and refuses nothing inside the `1.0` line.
 
 ## Release PR gates
 
 - Release PRs must pass the release-pin gate: `task deps:release-check`, run in CI's `Lint` job on
-  release-please branches. Its step 5 runs `go run ./hack/operator-pin --check`, so the pinned
-  operator module must be published and `PinnedOperatorVersion` must be the operator release it
+  release-please branches. Its step 5 runs `go run ./hack/controller-pin --check`, so the pinned
+  controller module must be published and `PinnedControllerVersion` must be the controller release it
   states.
 - The required check `E2E (kind, embedded operator)` runs the cluster-backed e2e suite on every
   release PR, even when no path filter matches.
 - The release-pin gate also refuses a release whose docs pins lack a bundle in
   `ghcr.io/open-platform-model/docs`: a cli release must not merge before core, the library and
-  opm-operator have bundles for every version it pins.
+  opm-controller have bundles for every version it pins.
 - `RELEASING.md` describes the gates.
 
 A broken release is fixed by the next release, with a Go `retract` when the broken version must not be

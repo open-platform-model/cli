@@ -20,13 +20,13 @@ Hint: a provider-fulfilled contract has no provider on this platform: install on
 
 ## What it means
 
-<!-- Two sentences at most. A provider-fulfilled contract (`fulfilment: "provider"`, such as the `backup` trait of opmodel.dev/catalogs/opm@v4) is implemented by a platform's provider, never by the catalog that defines it, so it renders only on a platform that carries one; a platform generated from a module's own deps never does, and a cluster without the OPM operator registers none. Link Publish a module for the deps platform. -->
+<!-- Two sentences at most. A provider-fulfilled contract (`fulfilment: "provider"`, such as the `backup` trait of opmodel.dev/catalogs/opm@v4) is implemented by a platform's provider, never by the catalog that defines it, so it renders only on a platform that carries one; a platform generated from a module's own deps never does, and a cluster without the OPM controller registers none. Link Publish a module for the deps platform. -->
 
 ## Causes and fixes
 
 ### Install a provider, or render against a platform that has one
 
-<!-- The fix that renders the contract. On a cluster with the OPM operator, a provider registers through a TransformerRegistration; `kubectl get transformerregistrations -A` lists them. Off the cluster, pass `--platform <dir>` with a platform module that carries a provider. Check against: cli/internal/platform/resolve.go -->
+<!-- The fix that renders the contract. On a cluster with the OPM controller, a provider registers through a TransformerRegistration; `kubectl get transformerregistrations -A` lists them. Off the cluster, pass `--platform <dir>` with a platform module that carries a provider. Check against: cli/internal/platform/resolve.go -->
 
 ### Render the rest with --skip-unprovided
 
@@ -45,10 +45,10 @@ WARN component "archive" not rendered: provider-fulfilled resource "example.dev/
 module-instance.opmodel.dev/skipped-contracts: db=opmodel.dev/catalogs/opm/traits/backup@v1alpha1
 ```
 
-### An operator-managed instance refuses the flag
+### A controller-managed instance refuses the flag
 
-<!-- The operator renders an instance it manages and never skips, so an apply with `--skip-unprovided` to such an instance is refused before any spec is written, exit code 2. Install a provider instead. Check against: cli/internal/workflow/apply/thineditor.go -->
+<!-- The controller renders an instance it manages and never skips, so an apply with `--skip-unprovided` to such an instance is refused before any spec is written, exit code 2. Install a provider instead. Check against: cli/internal/workflow/apply/thineditor.go -->
 
 ```text
---skip-unprovided has no effect on instance "hello": the opm-operator renders it and does not skip provider-fulfilled contracts. Install a provider for the contract instead
+--skip-unprovided has no effect on instance "hello": the opm-controller renders it and does not skip provider-fulfilled contracts. Install a provider for the contract instead
 ```

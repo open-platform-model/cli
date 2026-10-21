@@ -121,7 +121,7 @@ func TestExecute_DryRunFirstInstallThatPreviewsARefusalPrintsNoWarning(t *testin
 	}
 }
 
-// A caller that does not ask for the warning gets none: `opm operator
+// A caller that does not ask for the warning gets none: `opm controller
 // install` applies the render's CRDs before the workflow runs.
 func TestExecute_NoFirstInstallWarningUnlessAsked(t *testing.T) {
 	withReleasedCLIVersion(t)

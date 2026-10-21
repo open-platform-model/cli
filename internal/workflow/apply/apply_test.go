@@ -59,10 +59,10 @@ func TestSourceDigest(t *testing.T) {
 }
 
 // TestSourceDigestGoldenPeer pins the exact bytes of the digest for a fixed
-// canonical reference. The operator's ModuleSourceDigest
-// (opm-operator/internal/status) is the byte-identical peer computing
+// canonical reference. The controller's ModuleSourceDigest
+// (opm-controller/internal/status) is the byte-identical peer computing
 // sha256(path + "@" + version) over the same pair read from the same CR; the
-// operator carries the mirror of this golden. A change that moves this value
+// controller carries the mirror of this golden. A change that moves this value
 // breaks cross-actor digest comparability — fix the code, not the golden,
 // unless both sides move together.
 func TestSourceDigestGoldenPeer(t *testing.T) {

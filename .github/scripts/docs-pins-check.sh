@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Docs-bundle pins (docs-kit gate G2-pins): every version the cli's docs
 # bundle pins must have a docs bundle. opmodel.dev anchors a site version on
-# the cli's bundle and pulls the library, core and opm-operator bundles of
+# the cli's bundle and pulls the library, core and opm-controller bundles of
 # exactly the versions its manifest pins, refusing a pin with none (docs-kit
 # C16). The pins come from the program docs-kit runs (hack/docskit-dump pins);
 # each is looked up anonymously, as the site pulls it, at its release tag. A
@@ -13,10 +13,11 @@
 #   (default)        print one line per problem on stdout; exit 1 if any.
 #                    G1 (release-pin-check.sh) runs this mode.
 #   --moved-from REV check only when the library version in go.mod or
-#                    PinnedOperatorVersion (internal/operator/pin.go; at a REV
-#                    from before the operator module pin, manifest.go) differs
+#                    PinnedControllerVersion (internal/controller/pin.go; at a REV
+#                    from before the rename to the controller, PinnedOperatorVersion
+#                    in internal/operator/pin.go) differs
 #                    between REV and the work tree; otherwise say so and exit
-#                    0. A module pin move that deploys the same operator
+#                    0. A module pin move that deploys the same controller
 #                    changes no docs pin, so it checks nothing.
 #   --warn           every problem, a failed build or lookup included, is a
 #                    GitHub warning annotation (and a job-summary line when
@@ -43,10 +44,11 @@ while [ "$#" -gt 0 ]; do
 done
 
 LIB=github.com/open-platform-model/library
-PIN=internal/operator/pin.go
-# Where PinnedOperatorVersion lived before the operator module pin replaced
-# the embedded manifest; only a base revision can still have it.
-OLD_PIN=internal/operator/manifest.go
+PIN=internal/controller/pin.go
+# Where the pin lived before the opm-operator -> opm-controller rename, under
+# its old constant name; only a base revision can still have it. Drop this
+# fallback once no open pull request is based before the rename.
+OLD_PIN=internal/operator/pin.go
 
 problems=0
 problem() {
@@ -64,7 +66,7 @@ finish() {
 }
 
 lib_of() { awk -v m="$LIB" '$1 == m { print $2; exit }'; }
-op_of() { sed -n 's/^const PinnedOperatorVersion = "\(.*\)"$/\1/p'; }
+op_of() { sed -n -E 's/^const Pinned(Controller|Operator)Version = "(.*)"$/\2/p'; }
 
 if [ -n "$moved_from" ]; then
   base_pin=$PIN
@@ -82,11 +84,11 @@ if [ -n "$moved_from" ]; then
   # An empty read means go.mod or the pin file changed shape; two empty reads
   # would compare equal and skip the check without a word.
   if [ -z "$lib_base" ] || [ -z "$lib_tree" ] || [ -z "$op_base" ] || [ -z "$op_tree" ]; then
-    problem "docs bundles not checked: cannot read the $LIB version in go.mod or PinnedOperatorVersion in $PIN ($base_pin at the base) (base ${lib_base:-?}/${op_base:-?}, tree ${lib_tree:-?}/${op_tree:-?})"
+    problem "docs bundles not checked: cannot read the $LIB version in go.mod or PinnedControllerVersion in $PIN ($base_pin at the base) (base ${lib_base:-?}/${op_base:-?}, tree ${lib_tree:-?}/${op_tree:-?})"
     finish
   fi
   if [ "$lib_tree" = "$lib_base" ] && [ "$op_tree" = "$op_base" ]; then
-    echo "docs-pins: library ${lib_tree} and opm-operator ${op_tree} unchanged against ${moved_from}; nothing to check" >&2
+    echo "docs-pins: library ${lib_tree} and opm-controller ${op_tree} unchanged against ${moved_from}; nothing to check" >&2
     finish
   fi
 fi

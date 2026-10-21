@@ -197,7 +197,7 @@ The `module apply` subcommand SHALL accept the following flags with the listed b
 
 | Flag | Type | Default | Behavior |
 | --- | --- | --- | --- |
-| `--timeout` | duration | 5m | Bound on the CustomResourceDefinition establish wait, counted from the start of the apply; on the `--wait` readiness wait, which gets a full `--timeout` of its own; and on the operator-reconcile wait for an operator-managed instance |
+| `--timeout` | duration | 5m | Bound on the CustomResourceDefinition establish wait, counted from the start of the apply; on the `--wait` readiness wait, which gets a full `--timeout` of its own; and on the controller-reconcile wait for a controller-managed instance |
 
 #### Scenario: The timeout bounds the readiness wait
 

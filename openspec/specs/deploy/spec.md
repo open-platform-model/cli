@@ -212,7 +212,7 @@ If an existing inventory has `createdBy: "cli"` or does not contain `createdBy`,
 
 ### Requirement: Instance delete re-checks live ownership before each delete
 
-Before deleting each tracked resource, `opm instance delete` SHALL read the live object again and SHALL take the decision to delete it from the delete verdict the CLI shares with the operator and with its own prune, asked with the instance identity stored in the record. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
+Before deleting each tracked resource, `opm instance delete` SHALL read the live object again and SHALL take the decision to delete it from the delete verdict the CLI shares with the controller and with its own prune, asked with the instance identity stored in the record. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
 
 #### Scenario: Resource no longer managed by OPM is left behind
 
@@ -277,7 +277,7 @@ Before deleting each tracked resource, `opm instance delete` SHALL read the live
 
 ### Requirement: Instance delete follows the shared deletion plan
 
-`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the operator, built from the resources of the instance's `ModuleInstance` record that the command found in the cluster or could not read, and from the instance identity stored in the record. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
+`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the controller, built from the resources of the instance's `ModuleInstance` record that the command found in the cluster or could not read, and from the instance identity stored in the record. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
 
 #### Scenario: Resources are deleted in the plan's order
 
@@ -495,113 +495,122 @@ On `--dry-run`, `opm instance apply` and `opm module apply`, a custom resource t
 - **WHEN** a dry run meets a custom resource that is also in a namespace the same apply creates
 - **THEN** it SHALL be warned about once, for its CustomResourceDefinition
 
-### Requirement: An instance deploys the operator when one of three signals holds
+### Requirement: An instance deploys the controller when one of three signals holds
 
-An instance deploys the operator when any one of these SHALL hold, read from its record without rendering: it is named `opm-operator` in the namespace `opm-operator-system`; its module path, with any `@<major>` suffix removed, is `opmodel.dev/modules/opm_operator`; or its recorded inventory holds a `CustomResourceDefinition` (group `apiextensions.k8s.io`) whose name, after its first `.`, is exactly `opmodel.dev`.
+An instance deploys the controller when any one of these SHALL hold, read from its record without rendering: it is named `opm-controller` in the namespace `opm-system`; its module path, with any `@<major>` suffix removed, is `opmodel.dev/modules/opm_controller`; or its recorded inventory holds a `CustomResourceDefinition` (group `apiextensions.k8s.io`) whose name, after its first `.`, is exactly `opmodel.dev`.
 
-#### Scenario: The operator module under another name is guarded
+#### Scenario: The controller module under another name is guarded
 
-- **WHEN** `opm instance delete ops -n platform --yes` runs for a CLI-owned record whose module path is `opmodel.dev/modules/opm_operator@v0` while `default/hello` carries `opmodel.dev/cleanup`
+- **WHEN** `opm instance delete ops -n platform --yes` runs for a CLI-owned record whose module path is `opmodel.dev/modules/opm_controller@v0` while `default/hello` carries `opmodel.dev/cleanup`
 - **THEN** the command SHALL exit 2 without deleting any object
 
-#### Scenario: A record holding the operator's CRDs is guarded
+#### Scenario: A record holding the controller's CRDs is guarded
 
 - **WHEN** `opm instance delete crds -n platform --yes` runs for a CLI-owned record of another name and module path whose inventory holds the `CustomResourceDefinition` `moduleinstances.opmodel.dev`, while `default/hello` carries `opmodel.dev/cleanup`
 - **THEN** the command SHALL exit 2 without deleting any object
 
-#### Scenario: Look-alike names are not the operator
+#### Scenario: Look-alike names are not the controller
 
-- **WHEN** `opm instance delete dash -n default --yes` runs for a CLI-owned record whose module path is `opmodel.dev/modules/opm_operator_dashboard@v0` and whose inventory holds only the `CustomResourceDefinition` `widgets.example.opmodel.dev.io`, while another instance carries `opmodel.dev/cleanup`
+- **WHEN** `opm instance delete dash -n default --yes` runs for a CLI-owned record whose module path is `opmodel.dev/modules/opm_controller_dashboard@v0` and whose inventory holds only the `CustomResourceDefinition` `widgets.example.opmodel.dev.io`, while another instance carries `opmodel.dev/cleanup`
 - **THEN** the delete SHALL proceed without the guard
 
-### Requirement: Instance delete does not delete an instance that deploys the operator
+### Requirement: Instance delete does not delete an instance that deploys the controller
 
-`opm instance delete` SHALL NOT delete an instance that deploys the operator while that instance is operator-owned, nor while any `ModuleInstance` in the cluster carries the `opmodel.dev/cleanup` finalizer. These, as listed in requirement "An instance deploys the operator when one of three signals holds", are the same signals by which the operator recognises the instance that deploys it, so the CLI and the operator agree on which instance that is.
+`opm instance delete` SHALL NOT delete an instance that deploys the controller while that instance is controller-owned, nor while any `ModuleInstance` in the cluster carries the `opmodel.dev/cleanup` finalizer. These, as listed in requirement "An instance deploys the controller when one of three signals holds", are the same signals by which the controller recognises the instance that deploys it, so the CLI and the controller agree on which instance that is.
 
-#### Scenario: The guard names the operator's instance
+#### Scenario: The guard names the controller's instance
 
-- **WHEN** `opm instance delete` targets an instance that deploys the operator
-- **THEN** it SHALL NOT delete it while that instance is operator-owned, nor while any `ModuleInstance` in the cluster carries the `opmodel.dev/cleanup` finalizer
+- **WHEN** `opm instance delete` targets an instance that deploys the controller
+- **THEN** it SHALL NOT delete it while that instance is controller-owned, nor while any `ModuleInstance` in the cluster carries the `opmodel.dev/cleanup` finalizer
 
 ### Requirement: The guard runs before any object is deleted, on both branches and on a dry run
 
-`opm instance delete` SHALL NOT delete an instance that deploys the operator while that instance is operator-owned, nor while any `ModuleInstance` in the cluster carries the `opmodel.dev/cleanup` finalizer. The guard SHALL run after the target instance is resolved and before any object is deleted, on the CLI-owned and the operator-owned branch alike, and on a dry run with the same outcome as the real run.
+`opm instance delete` SHALL NOT delete an instance that deploys the controller while that instance is controller-owned, nor while any `ModuleInstance` in the cluster carries the `opmodel.dev/cleanup` finalizer. The guard SHALL run after the target instance is resolved and before any object is deleted, on the CLI-owned and the controller-owned branch alike, and on a dry run with the same outcome as the real run.
 
 #### Scenario: Dry run reports the same refusal
 
-- **WHEN** `opm instance delete opm-operator -n opm-operator-system --dry-run` runs for a CLI-owned record while an instance carries the `opmodel.dev/cleanup` finalizer
+- **WHEN** `opm instance delete opm-controller -n opm-system --dry-run` runs for a CLI-owned record while an instance carries the `opmodel.dev/cleanup` finalizer
 - **THEN** the command SHALL exit 2 with the same refusal as the real run, and nothing SHALL be deleted
 
-### Requirement: An operator-owned target is refused with exit code 2
+### Requirement: A controller-owned target is refused with exit code 2
 
-For an instance that deploys the operator, when the target is operator-owned, the command (`opm instance delete`) SHALL refuse with exit code 2 and delete and patch nothing, naming the signal that matched and the remedy of setting `spec.owner` to `cli`. The operator never reconciles, finalizes or prunes the instance that deploys it, so the operator-owned delete would wait on, and report, a cleanup that does not happen.
+For an instance that deploys the controller, when the target is controller-owned, the command (`opm instance delete`) SHALL refuse with exit code 2 and delete and patch nothing, naming the signal that matched and the remedy of setting `spec.owner` to `cli`.
 
-#### Scenario: Operator-owned instance of the operator is refused
+#### Scenario: Controller-owned instance of the controller is refused
 
-- **WHEN** the record `opm-operator` in `opm-operator-system` is operator-owned, with `spec.prune: true`, and no `ModuleInstance` carries `opmodel.dev/cleanup`
-- **AND** `opm instance delete opm-operator -n opm-operator-system --yes` runs
-- **THEN** the command SHALL exit 2 and the `ModuleInstance` `opm-operator` SHALL still exist
+- **WHEN** the record `opm-controller` in `opm-system` is controller-owned, with `spec.prune: true`, and no `ModuleInstance` carries `opmodel.dev/cleanup`
+- **AND** `opm instance delete opm-controller -n opm-system --yes` runs
+- **THEN** the command SHALL exit 2 and the `ModuleInstance` `opm-controller` SHALL still exist
 - **AND** the error SHALL name the matched signal and say to set `spec.owner` to `cli`, and SHALL NOT report that any resource was pruned
 
-### Requirement: The guard lists ModuleInstance resources cluster-wide when the target is not operator-owned
+### Requirement: A controller-owned delete of the instance that deploys the controller is refused because the controller does not clean up
 
-For an instance that deploys the operator that is not operator-owned, the command (`opm instance delete`) SHALL list `ModuleInstance` resources cluster-wide. Deleting the operator while it still owes cleanup leaves every armed instance unable to finish deletion until an operator runs again.
+The command SHALL refuse because the controller applies and prunes nothing for the instance that deploys it; when that instance is deleted, the controller at most removes its own cleanup finalizer, without pruning. The controller-owned delete would therefore remove the instance without the cleanup the user expects. (Requirement: A controller-owned target is refused with exit code 2)
+
+#### Scenario: The controller-owned delete is refused
+
+- **WHEN** `opm instance delete opm-controller -n opm-system --yes` runs for a controller-owned record
+- **THEN** the command SHALL exit 2 and the record SHALL still exist
+
+### Requirement: The guard lists ModuleInstance resources cluster-wide when the target is not controller-owned
+
+For an instance that deploys the controller that is not controller-owned, the command (`opm instance delete`) SHALL list `ModuleInstance` resources cluster-wide. Deleting the controller while it still owes cleanup leaves every armed instance unable to finish deletion until a controller runs again.
 
 #### Scenario: The guard lists every ModuleInstance
 
-- **WHEN** `opm instance delete` targets an instance that deploys the operator that is not operator-owned
+- **WHEN** `opm instance delete` targets an instance that deploys the controller that is not controller-owned
 - **THEN** the command SHALL list `ModuleInstance` resources cluster-wide
 
 ### Requirement: An armed instance blocks the delete with exit code 2
 
-For an instance that deploys the operator that is not operator-owned, when any `ModuleInstance` in the cluster carries `opmodel.dev/cleanup`, the command (`opm instance delete`) SHALL refuse with exit code 2, delete and patch nothing, and name each such instance as `namespace/name`, marking the target itself when it is one of them, and name `opm operator uninstall` with its `--remove-finalizers` choice and that choice's consequence (the named instances' workloads are orphaned).
+For an instance that deploys the controller that is not controller-owned, when any `ModuleInstance` in the cluster carries `opmodel.dev/cleanup`, the command (`opm instance delete`) SHALL refuse with exit code 2, delete and patch nothing, and name each such instance as `namespace/name`, marking the target itself when it is one of them, and name `opm controller uninstall` with its `--remove-finalizers` choice and that choice's consequence (the named instances' workloads are orphaned).
 
-#### Scenario: Refused while an instance waits on the operator's cleanup
+#### Scenario: Refused while an instance waits on the controller's cleanup
 
-- **WHEN** `opm instance delete opm-operator -n opm-operator-system --yes` runs for a CLI-owned record while `default/hello` carries the `opmodel.dev/cleanup` finalizer
+- **WHEN** `opm instance delete opm-controller -n opm-system --yes` runs for a CLI-owned record while `default/hello` carries the `opmodel.dev/cleanup` finalizer
 - **THEN** the command SHALL exit 2 without deleting any object, and the record and every object its inventory lists SHALL still exist
-- **AND** the error SHALL name `default/hello` and `opm operator uninstall --remove-finalizers` and state that this choice orphans its workloads
+- **AND** the error SHALL name `default/hello` and `opm controller uninstall --remove-finalizers` and state that this choice orphans its workloads
 
 #### Scenario: The target itself carries the finalizer
 
-- **WHEN** `opm instance delete opm-operator -n opm-operator-system --yes` runs for a CLI-owned record while the `ModuleInstance` `opm-operator` itself carries `opmodel.dev/cleanup` and no other instance does
-- **THEN** the command SHALL exit 2, naming `opm-operator-system/opm-operator` as the instance being deleted
+- **WHEN** `opm instance delete opm-controller -n opm-system --yes` runs for a CLI-owned record while the `ModuleInstance` `opm-controller` itself carries `opmodel.dev/cleanup` and no other instance does
+- **THEN** the command SHALL exit 2, naming `opm-system/opm-controller` as the instance being deleted
 
 #### Scenario: No armed instance, no refusal
 
-- **WHEN** `opm instance delete opm-operator -n opm-operator-system --yes` runs for a CLI-owned record and no `ModuleInstance` carries `opmodel.dev/cleanup`
+- **WHEN** `opm instance delete opm-controller -n opm-system --yes` runs for a CLI-owned record and no `ModuleInstance` carries `opmodel.dev/cleanup`
 - **THEN** the guard SHALL pass and the delete SHALL proceed as for any CLI-owned instance
 
 ### Requirement: A failed cluster-wide list fails closed
 
-For an instance that deploys the operator that is not operator-owned, the command (`opm instance delete`) SHALL list `ModuleInstance` resources cluster-wide. When the cluster-wide list fails, the command SHALL fail closed with the exit code `opm` maps that Kubernetes error to (4 for a permission or authentication denial) and delete nothing.
+For an instance that deploys the controller that is not controller-owned, the command (`opm instance delete`) SHALL list `ModuleInstance` resources cluster-wide. When the cluster-wide list fails, the command SHALL fail closed with the exit code `opm` maps that Kubernetes error to (4 for a permission or authentication denial) and delete nothing.
 
 #### Scenario: List failure fails closed
 
-- **WHEN** the user may not list `moduleinstances` cluster-wide and runs `opm instance delete opm-operator -n opm-operator-system --force` for a CLI-owned record
+- **WHEN** the user may not list `moduleinstances` cluster-wide and runs `opm instance delete opm-controller -n opm-system --force` for a CLI-owned record
 - **THEN** the command SHALL exit 4 without deleting anything
 
 ### Requirement: Instance delete offers no flag that removes finalizers
 
-`opm instance delete` SHALL NOT delete an instance that deploys the operator while that instance is operator-owned, nor while any `ModuleInstance` in the cluster carries the `opmodel.dev/cleanup` finalizer. `opm instance delete` SHALL offer no flag that removes finalizers and SHALL NOT write `spec.owner`.
+`opm instance delete` SHALL NOT delete an instance that deploys the controller while that instance is controller-owned, nor while any `ModuleInstance` in the cluster carries the `opmodel.dev/cleanup` finalizer. `opm instance delete` SHALL offer no flag that removes finalizers and SHALL NOT write `spec.owner`.
 
 #### Scenario: No finalizer flag and no owner write
 
-- **WHEN** `opm instance delete` targets an instance that deploys the operator
+- **WHEN** `opm instance delete` targets an instance that deploys the controller
 - **THEN** it SHALL offer no flag that removes finalizers and SHALL NOT write `spec.owner`
 
 ### Requirement: The yes flag and its deprecated alias do not bypass either refusal
 
-`opm instance delete` SHALL NOT delete an instance that deploys the operator while that instance is operator-owned, nor while any `ModuleInstance` in the cluster carries the `opmodel.dev/cleanup` finalizer. `--yes` SHALL keep its one meaning, skipping the confirmation prompt, and SHALL NOT bypass either refusal; neither SHALL `--force`, its deprecated alias on this command (capability `flag-conventions`).
+`opm instance delete` SHALL NOT delete an instance that deploys the controller while that instance is controller-owned, nor while any `ModuleInstance` in the cluster carries the `opmodel.dev/cleanup` finalizer. `--yes` SHALL keep its one meaning, skipping the confirmation prompt, and SHALL NOT bypass either refusal; neither SHALL `--force`, its deprecated alias on this command (capability `flag-conventions`).
 
 #### Scenario: The deprecated alias does not bypass the guard
 
-- **WHEN** `opm instance delete opm-operator -n opm-operator-system --force` runs for a CLI-owned record while `default/hello` carries the `opmodel.dev/cleanup` finalizer
+- **WHEN** `opm instance delete opm-controller -n opm-system --force` runs for a CLI-owned record while `default/hello` carries the `opmodel.dev/cleanup` finalizer
 - **THEN** the command SHALL exit 2 without deleting any object, exactly as with `--yes`
 
 ### Requirement: Every other instance's delete is unchanged by the guard
 
-`opm instance delete` SHALL NOT delete an instance that deploys the operator while that instance is operator-owned, nor while any `ModuleInstance` in the cluster carries the `opmodel.dev/cleanup` finalizer. Every other instance's delete SHALL be unchanged by this requirement.
+`opm instance delete` SHALL NOT delete an instance that deploys the controller while that instance is controller-owned, nor while any `ModuleInstance` in the cluster carries the `opmodel.dev/cleanup` finalizer. Every other instance's delete SHALL be unchanged by this requirement.
 
 #### Scenario: Other instances are not guarded
 
@@ -645,14 +654,14 @@ When `opm instance delete` deletes a CLI-owned instance and a tracked resource c
 - **AND** the `ModuleInstance` record SHALL be deleted
 - **AND** the command SHALL exit 0
 
-### Requirement: The operator-owned delete path is not affected by discovery read errors
+### Requirement: The controller-owned delete path is not affected by discovery read errors
 
-When `opm instance delete` deletes a CLI-owned instance and a tracked resource could not be read during discovery (the read failed with an error other than NotFound), that resource SHALL count as a failure for that resource, with the same outcome as a failed re-read: it SHALL be listed with its read error, the other tracked resources SHALL still be processed, the `ModuleInstance` record SHALL NOT be deleted, and the command SHALL exit 1. The operator-owned delete path SHALL NOT be affected.
+When `opm instance delete` deletes a CLI-owned instance and a tracked resource could not be read during discovery (the read failed with an error other than NotFound), that resource SHALL count as a failure for that resource, with the same outcome as a failed re-read: it SHALL be listed with its read error, the other tracked resources SHALL still be processed, the `ModuleInstance` record SHALL NOT be deleted, and the command SHALL exit 1. The controller-owned delete path SHALL NOT be affected.
 
-#### Scenario: Operator-owned delete ignores discovery read errors
+#### Scenario: Controller-owned delete ignores discovery read errors
 
-- **WHEN** running `opm instance delete` for an operator-owned instance and a tracked resource cannot be read
-- **THEN** the command SHALL delete the `ModuleInstance` and wait for the operator as before
+- **WHEN** running `opm instance delete` for a controller-owned instance and a tracked resource cannot be read
+- **THEN** the command SHALL delete the `ModuleInstance` and wait for the controller as before
 
 ### Requirement: A dry run skips a namespaced object whose namespace the apply would create
 
@@ -894,62 +903,62 @@ When `opm instance delete` deletes a CLI-owned instance, every tracked resource 
 - **WHEN** a tracked resource has the kind of the same name in another API group
 - **THEN** the kept-claim rule SHALL apply to the core group only, so that resource is deleted like any other resource
 
-### Requirement: --delete-data on an operator-managed instance warns and changes nothing
+### Requirement: --delete-data on a controller-managed instance warns and changes nothing
 
-On an operator-managed instance `--delete-data` SHALL NOT change what the operator does and SHALL NOT fail the command (`opm instance delete`): the command SHALL print a warning, before it asks for confirmation, that says so, names `spec.dataPolicy` of the `ModuleInstance` as the setting that an operator with that field obeys for PersistentVolumeClaims, and says that an older operator deletes them.
+On a controller-managed instance `--delete-data` SHALL NOT change what the controller does and SHALL NOT fail the command (`opm instance delete`): the command SHALL print a warning, before it asks for confirmation, that says so, names `spec.dataPolicy` of the `ModuleInstance` as the setting that a controller with that field obeys for PersistentVolumeClaims, and says that an older controller deletes them.
 
-#### Scenario: Operator-managed instance
+#### Scenario: Controller-managed instance
 
-- **WHEN** running `opm instance delete --delete-data` for an operator-managed instance
-- **THEN** the command SHALL warn that `--delete-data` does not change what the operator does and SHALL name `spec.dataPolicy`
-- **AND** the warning SHALL say that an older operator deletes PersistentVolumeClaims
+- **WHEN** running `opm instance delete --delete-data` for a controller-managed instance
+- **THEN** the command SHALL warn that `--delete-data` does not change what the controller does and SHALL name `spec.dataPolicy`
+- **AND** the warning SHALL say that an older controller deletes PersistentVolumeClaims
 - **AND** the delete SHALL go on as without the flag
 
-### Requirement: The kept-claim rule of the CLI is not claimed for an operator-managed instance
+### Requirement: The kept-claim rule of the CLI is not claimed for a controller-managed instance
 
-`opm instance delete` of a CLI-owned instance SHALL NOT delete a tracked `PersistentVolumeClaim` of the core API group unless `--delete-data` is set. The kept-claim rule of the CLI SHALL NOT be claimed for an operator-managed instance: the operator decides what it removes.
+`opm instance delete` of a CLI-owned instance SHALL NOT delete a tracked `PersistentVolumeClaim` of the core API group unless `--delete-data` is set. The kept-claim rule of the CLI SHALL NOT be claimed for a controller-managed instance: the controller decides what it removes.
 
-#### Scenario: The operator decides what it removes
+#### Scenario: The controller decides what it removes
 
-- **WHEN** the instance is operator-managed
-- **THEN** the kept-claim rule of the CLI SHALL NOT be claimed for it: the operator decides what it removes
+- **WHEN** the instance is controller-managed
+- **THEN** the kept-claim rule of the CLI SHALL NOT be claimed for it: the controller decides what it removes
 
-### Requirement: An operator-managed delete that may have kept claims does not claim a full prune
+### Requirement: A controller-managed delete that may have kept claims does not claim a full prune
 
-When the delete of an operator-managed instance with `spec.prune` set completes, its inventory tracked at least one PersistentVolumeClaim, its `spec.dataPolicy` is not `Delete` and the installed `ModuleInstance` CRD has `spec.dataPolicy` or has no schema that can be read, the closing output SHALL NOT say that every tracked resource was pruned and SHALL NOT say that the claims are still in the cluster.
+When the delete of a controller-managed instance with `spec.prune` set completes, its inventory tracked at least one PersistentVolumeClaim, its `spec.dataPolicy` is not `Delete` and the installed `ModuleInstance` CRD has `spec.dataPolicy` or has no schema that can be read, the closing output SHALL NOT say that every tracked resource was pruned and SHALL NOT say that the claims are still in the cluster.
 
 #### Scenario: No claim of a full prune and no claim of claims in the cluster
 
-- **WHEN** the delete of an operator-managed instance with `spec.prune` set completes, its inventory tracked at least one PersistentVolumeClaim, its `spec.dataPolicy` is not `Delete` and the installed `ModuleInstance` CRD has `spec.dataPolicy` or has no schema that can be read
+- **WHEN** the delete of a controller-managed instance with `spec.prune` set completes, its inventory tracked at least one PersistentVolumeClaim, its `spec.dataPolicy` is not `Delete` and the installed `ModuleInstance` CRD has `spec.dataPolicy` or has no schema that can be read
 - **THEN** the closing output SHALL NOT say that every tracked resource was pruned and SHALL NOT say that the claims are still in the cluster
 
-### Requirement: The closing output of an operator-managed delete that may have kept claims names them
+### Requirement: The closing output of a controller-managed delete that may have kept claims names them
 
-When the delete of an operator-managed instance with `spec.prune` set completes, its inventory tracked at least one PersistentVolumeClaim, its `spec.dataPolicy` is not `Delete` and the installed `ModuleInstance` CRD has `spec.dataPolicy` or has no schema that can be read, the closing output SHALL name each such claim, SHALL say that an operator with `spec.dataPolicy` keeps them and that an operator older than its CRDs deleted them, and SHALL print the `kubectl delete pvc` command for each.
+When the delete of a controller-managed instance with `spec.prune` set completes, its inventory tracked at least one PersistentVolumeClaim, its `spec.dataPolicy` is not `Delete` and the installed `ModuleInstance` CRD has `spec.dataPolicy` or has no schema that can be read, the closing output SHALL name each such claim, SHALL say that a controller with `spec.dataPolicy` keeps them and that a controller older than its CRDs deleted them, and SHALL print the `kubectl delete pvc` command for each.
 
-#### Scenario: Operator-managed delete that may have kept claims closes without claiming either outcome
+#### Scenario: Controller-managed delete that may have kept claims closes without claiming either outcome
 
-- **WHEN** `opm instance delete --yes` completes for an operator-managed instance whose `spec.prune` is true, whose `spec.dataPolicy` is absent and whose inventory tracks the PersistentVolumeClaim `data` in namespace `apps`
+- **WHEN** `opm instance delete --yes` completes for a controller-managed instance whose `spec.prune` is true, whose `spec.dataPolicy` is absent and whose inventory tracks the PersistentVolumeClaim `data` in namespace `apps`
 - **AND** the installed `ModuleInstance` CRD has `spec.dataPolicy`
-- **THEN** the closing output SHALL NOT say that the operator pruned every tracked resource
+- **THEN** the closing output SHALL NOT say that the controller pruned every tracked resource
 - **AND** it SHALL NOT say that the claim is still in the cluster
 - **AND** it SHALL name the claim and carry `kubectl delete pvc data -n apps`
-- **AND** it SHALL say that an operator older than its CRDs deleted the claim
+- **AND** it SHALL say that a controller older than its CRDs deleted the claim
 
-### Requirement: Every other operator-managed delete closes as a prune of the tracked resources
+### Requirement: Every other controller-managed delete closes as a prune of the tracked resources
 
-In every other case than the one of requirement "An operator-managed delete that may have kept claims does not claim a full prune" the closing output SHALL report the prune of the tracked resources as before.
+In every other case than the one of requirement "A controller-managed delete that may have kept claims does not claim a full prune" the closing output SHALL report the prune of the tracked resources as before.
 
-#### Scenario: Operator-managed delete with the Delete policy closes as a full prune
+#### Scenario: Controller-managed delete with the Delete policy closes as a full prune
 
 - **WHEN** the same delete completes for an instance whose `spec.dataPolicy` is `Delete`
-- **THEN** the closing output SHALL say that the operator pruned the tracked resources
+- **THEN** the closing output SHALL say that the controller pruned the tracked resources
 - **AND** it SHALL print no `kubectl delete pvc` command
 
-#### Scenario: Operator-managed delete on an operator without the field closes as a full prune
+#### Scenario: Controller-managed delete on a controller without the field closes as a full prune
 
 - **WHEN** the same delete completes in a cluster whose `ModuleInstance` CRD has no `spec.dataPolicy`
-- **THEN** the closing output SHALL say that the operator pruned the tracked resources
+- **THEN** the closing output SHALL say that the controller pruned the tracked resources
 - **AND** no output of the command SHALL say that a PersistentVolumeClaim is kept
 
 ### Requirement: Instance delete reads the instance record before it asks for confirmation
@@ -981,43 +990,43 @@ Without `--delete-data` the prompt for a CLI-owned instance SHALL say that Persi
 - **WHEN** running `opm instance delete jellyfin -n media` without `--yes`
 - **THEN** the prompt SHALL say that PersistentVolumeClaims are kept
 
-### Requirement: The prompt for an operator-managed instance says so and says what the operator does
+### Requirement: The prompt for a controller-managed instance says so and says what the controller does
 
-For an operator-managed instance the prompt SHALL be the same with or without `--delete-data`, and SHALL say that the instance is operator-managed and what the operator does.
+For a controller-managed instance the prompt SHALL be the same with or without `--delete-data`, and SHALL say that the instance is controller-managed and what the controller does.
 
 #### Scenario: Delete-data note comes before the question
 
-- **WHEN** running `opm instance delete jellyfin -n media --delete-data` without `--yes` for an operator-managed instance
-- **THEN** the warning that `--delete-data` does not change what the operator does SHALL be printed before the confirmation question
+- **WHEN** running `opm instance delete jellyfin -n media --delete-data` without `--yes` for a controller-managed instance
+- **THEN** the warning that `--delete-data` does not change what the controller does SHALL be printed before the confirmation question
 
-### Requirement: The prompt for an operator-managed instance without prune says the operator leaves the tracked resources running
+### Requirement: The prompt for a controller-managed instance without prune says the controller leaves the tracked resources running
 
-For an operator-managed instance the prompt SHALL be the same with or without `--delete-data`, and SHALL say that the instance is operator-managed and what the operator does. When `spec.prune` is not set, it SHALL say that the operator leaves the tracked resources running.
+For a controller-managed instance the prompt SHALL be the same with or without `--delete-data`, and SHALL say that the instance is controller-managed and what the controller does. When `spec.prune` is not set, it SHALL say that the controller leaves the tracked resources running.
 
-#### Scenario: Prompt for an operator-managed instance without prune
+#### Scenario: Prompt for a controller-managed instance without prune
 
-- **WHEN** the `spec.prune` of an operator-managed instance is not set and its `spec.dataPolicy` is `Delete`
-- **THEN** the prompt SHALL say that the operator leaves its tracked resources running
+- **WHEN** the `spec.prune` of a controller-managed instance is not set and its `spec.dataPolicy` is `Delete`
+- **THEN** the prompt SHALL say that the controller leaves its tracked resources running
 - **AND** the prompt SHALL NOT say that PersistentVolumeClaims are deleted
 
-### Requirement: The prompt for an operator-managed instance with prune set and no claim says nothing about claims
+### Requirement: The prompt for a controller-managed instance with prune set and no claim says nothing about claims
 
-For an operator-managed instance the prompt SHALL be the same with or without `--delete-data`, and SHALL say that the instance is operator-managed and what the operator does. When `spec.prune` is set and the inventory tracks no PersistentVolumeClaim, it SHALL say that the operator deletes the tracked resources and SHALL say nothing about PersistentVolumeClaims.
+For a controller-managed instance the prompt SHALL be the same with or without `--delete-data`, and SHALL say that the instance is controller-managed and what the controller does. When `spec.prune` is set and the inventory tracks no PersistentVolumeClaim, it SHALL say that the controller deletes the tracked resources and SHALL say nothing about PersistentVolumeClaims.
 
 #### Scenario: Prompt for an instance that tracks no claim
 
-- **WHEN** the `spec.prune` of an operator-managed instance is true and its inventory tracks no PersistentVolumeClaim
-- **THEN** the prompt SHALL say that the operator deletes its tracked resources
+- **WHEN** the `spec.prune` of a controller-managed instance is true and its inventory tracks no PersistentVolumeClaim
+- **THEN** the prompt SHALL say that the controller deletes its tracked resources
 - **AND** the prompt SHALL NOT mention PersistentVolumeClaims
 
 ### Requirement: With prune set and a tracked claim the prompt says one of four things decided by the CRD
 
-When `spec.prune` is set and the inventory tracks at least one PersistentVolumeClaim, the prompt SHALL say one of four things, decided by whether the installed `ModuleInstance` CRD has `spec.dataPolicy`. The command SHALL take that from the CRD its operator-readiness check reads and SHALL NOT read the CRD a second time for it.
+When `spec.prune` is set and the inventory tracks at least one PersistentVolumeClaim, the prompt SHALL say one of four things, decided by whether the installed `ModuleInstance` CRD has `spec.dataPolicy`. The command SHALL take that from the CRD its controller-readiness check reads and SHALL NOT read the CRD a second time for it.
 
 #### Scenario: The prompt depends on the CRD
 
 - **WHEN** `spec.prune` is set and the inventory tracks at least one PersistentVolumeClaim
-- **THEN** the prompt SHALL say one of four things, decided by whether the installed `ModuleInstance` CRD has `spec.dataPolicy`, and the command SHALL take that from the CRD its operator-readiness check reads
+- **THEN** the prompt SHALL say one of four things, decided by whether the installed `ModuleInstance` CRD has `spec.dataPolicy`, and the command SHALL take that from the CRD its controller-readiness check reads
 
 ### Requirement: The dry run and the run with --yes state the same outcome for PersistentVolumeClaims
 
@@ -1028,46 +1037,46 @@ The dry run, and the run with `--yes`, SHALL state the same outcome for Persiste
 - **WHEN** the dry run or the run with `--yes` outputs the outcome for PersistentVolumeClaims
 - **THEN** it SHALL state the same outcome for PersistentVolumeClaims in their output
 
-### Requirement: The prompt says the operator deletes the claims and their data when the CRD has no policy field or the policy is Delete
+### Requirement: The prompt says the controller deletes the claims and their data when the CRD has no policy field or the policy is Delete
 
-When `spec.prune` is set and the inventory tracks at least one PersistentVolumeClaim, the prompt SHALL say one of four things. When the installed `ModuleInstance` CRD has no `spec.dataPolicy` field, the operator does not know it: the prompt SHALL say so and SHALL say that the operator deletes the tracked resources, PersistentVolumeClaims and their data included, whatever the instance carries. When `spec.dataPolicy` is `Delete`, it SHALL say the same and name the value.
+When `spec.prune` is set and the inventory tracks at least one PersistentVolumeClaim, the prompt SHALL say one of four things. When the installed `ModuleInstance` CRD has no `spec.dataPolicy` field, the controller does not know it: the prompt SHALL say so and SHALL say that the controller deletes the tracked resources, PersistentVolumeClaims and their data included, whatever the instance carries. When `spec.dataPolicy` is `Delete`, it SHALL say the same and name the value.
 
-#### Scenario: Prompt for an operator-managed instance with prune set
+#### Scenario: Prompt for a controller-managed instance with prune set
 
-- **WHEN** running `opm instance delete jellyfin -n media` without `--yes` for an operator-managed instance whose `spec.prune` is true and whose inventory tracks a PersistentVolumeClaim
+- **WHEN** running `opm instance delete jellyfin -n media` without `--yes` for a controller-managed instance whose `spec.prune` is true and whose inventory tracks a PersistentVolumeClaim
 - **AND** whose `spec.dataPolicy` is `Delete`
-- **THEN** the prompt SHALL say that the instance is operator-managed and that the operator deletes its tracked resources, PersistentVolumeClaims and their data included
+- **THEN** the prompt SHALL say that the instance is controller-managed and that the controller deletes its tracked resources, PersistentVolumeClaims and their data included
 - **AND** the prompt SHALL name `spec.dataPolicy` and its value `Delete`
 - **AND** the prompt SHALL NOT say that PersistentVolumeClaims are kept
 
-#### Scenario: Prompt on an operator without the field
+#### Scenario: Prompt on a controller without the field
 
-- **WHEN** running `opm instance delete jellyfin -n media` without `--yes` for an operator-managed instance whose `spec.prune` is true and whose inventory tracks a PersistentVolumeClaim
+- **WHEN** running `opm instance delete jellyfin -n media` without `--yes` for a controller-managed instance whose `spec.prune` is true and whose inventory tracks a PersistentVolumeClaim
 - **AND** the installed `ModuleInstance` CRD has no `spec.dataPolicy`
-- **THEN** the prompt SHALL say that the operator in the cluster has no `spec.dataPolicy` and deletes its tracked resources, PersistentVolumeClaims and their data included
+- **THEN** the prompt SHALL say that the controller in the cluster has no `spec.dataPolicy` and deletes its tracked resources, PersistentVolumeClaims and their data included
 - **AND** the prompt SHALL NOT say that PersistentVolumeClaims are kept
 
-### Requirement: The prompt says the operator keeps the claims when the CRD has the field and the policy is Keep, absent or another value
+### Requirement: The prompt says the controller keeps the claims when the CRD has the field and the policy is Keep, absent or another value
 
-When `spec.prune` is set and the inventory tracks at least one PersistentVolumeClaim, the prompt SHALL say one of four things. When the CRD has the field and `spec.dataPolicy` is `Keep`, absent, or any other value, the prompt SHALL say that the operator deletes the tracked resources and keeps PersistentVolumeClaims and their data, and SHALL add one sentence which says that an operator older than its CRDs deletes the claims whatever the field says.
+When `spec.prune` is set and the inventory tracks at least one PersistentVolumeClaim, the prompt SHALL say one of four things. When the CRD has the field and `spec.dataPolicy` is `Keep`, absent, or any other value, the prompt SHALL say that the controller deletes the tracked resources and keeps PersistentVolumeClaims and their data, and SHALL add one sentence which says that a controller older than its CRDs deletes the claims whatever the field says.
 
-#### Scenario: Prompt for an operator-managed instance with prune set and no data policy
+#### Scenario: Prompt for a controller-managed instance with prune set and no data policy
 
-- **WHEN** running `opm instance delete jellyfin -n media` without `--yes` for an operator-managed instance whose `spec.prune` is true, whose inventory tracks a PersistentVolumeClaim and whose `spec.dataPolicy` is absent or `Keep`
+- **WHEN** running `opm instance delete jellyfin -n media` without `--yes` for a controller-managed instance whose `spec.prune` is true, whose inventory tracks a PersistentVolumeClaim and whose `spec.dataPolicy` is absent or `Keep`
 - **AND** the installed `ModuleInstance` CRD has `spec.dataPolicy`
-- **THEN** the prompt SHALL say that the operator deletes its tracked resources and keeps PersistentVolumeClaims and the data on them
+- **THEN** the prompt SHALL say that the controller deletes its tracked resources and keeps PersistentVolumeClaims and the data on them
 - **AND** the prompt SHALL say that `spec.dataPolicy` is not set, or that it is `Keep`
-- **AND** the prompt SHALL say that an operator older than its CRDs deletes the claims whatever the field says
+- **AND** the prompt SHALL say that a controller older than its CRDs deletes the claims whatever the field says
 
 ### Requirement: The prompt does not say whether claims are kept when the CRD has no readable schema
 
-When `spec.prune` is set and the inventory tracks at least one PersistentVolumeClaim, the prompt SHALL say one of four things. When the CRD has no schema that can be read and `spec.dataPolicy` is not `Delete`, the prompt SHALL NOT say that claims are kept or deleted: it SHALL say that an operator with the field keeps them, that an older operator deletes them, and that `opm` could not read the schema of the CRD to tell.
+When `spec.prune` is set and the inventory tracks at least one PersistentVolumeClaim, the prompt SHALL say one of four things. When the CRD has no schema that can be read and `spec.dataPolicy` is not `Delete`, the prompt SHALL NOT say that claims are kept or deleted: it SHALL say that a controller with the field keeps them, that an older controller deletes them, and that `opm` could not read the schema of the CRD to tell.
 
 #### Scenario: Prompt when the CRD cannot be read
 
 - **WHEN** the same prompt is built and the `ModuleInstance` CRD has no schema that can be read
 - **THEN** the prompt SHALL NOT say that PersistentVolumeClaims are kept
-- **AND** the prompt SHALL say that `opm` could not read the schema of the CRD to tell which operator runs
+- **AND** the prompt SHALL say that `opm` could not read the schema of the CRD to tell which controller runs
 
 ### Requirement: The prompt shows the value of spec.dataPolicy as it is
 
@@ -1075,24 +1084,24 @@ The prompt SHALL show the value of `spec.dataPolicy` as it is, or say that it is
 
 #### Scenario: Prompt for an unknown data policy
 
-- **WHEN** the `spec.dataPolicy` of an operator-managed instance with `spec.prune` set and a tracked PersistentVolumeClaim is `Retain`, and the CRD has the field
+- **WHEN** the `spec.dataPolicy` of a controller-managed instance with `spec.prune` set and a tracked PersistentVolumeClaim is `Retain`, and the CRD has the field
 - **THEN** the prompt SHALL show `"Retain"` and say that it is read as `Keep`
-- **AND** the prompt SHALL say that the operator keeps PersistentVolumeClaims
+- **AND** the prompt SHALL say that the controller keeps PersistentVolumeClaims
 
 ### Requirement: Every check that can refuse the delete runs before the prompt
 
-Every check that can refuse the delete SHALL run before the prompt: the guard for an instance that deploys the operator, and, for an operator-managed instance, the operator-readiness check, whose failure includes a CRD that cannot be read. A refused delete SHALL NOT ask for confirmation.
+Every check that can refuse the delete SHALL run before the prompt: the guard for an instance that deploys the controller, and, for a controller-managed instance, the controller-readiness check, whose failure includes a CRD that cannot be read. A refused delete SHALL NOT ask for confirmation.
 
 #### Scenario: Refusal comes before the question
 
-- **WHEN** running `opm instance delete jellyfin -n media` without `--yes` for an operator-managed instance
-- **AND** the operator is not ready, or one of its CRDs or its controller Deployment cannot be read
-- **THEN** the command SHALL exit 2 with the operator-readiness refusal
+- **WHEN** running `opm instance delete jellyfin -n media` without `--yes` for a controller-managed instance
+- **AND** the controller is not ready, or one of its CRDs or its controller Deployment cannot be read
+- **THEN** the command SHALL exit 2 with the controller-readiness refusal
 - **AND** it SHALL NOT print a confirmation prompt
 
 ### Requirement: A recorded resource that the command did not find is not in the deletion plan
 
-`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the operator. A recorded resource that the command did not find when it read the instance SHALL NOT be in the plan: it is not read again and not deleted. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
+`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the controller. A recorded resource that the command did not find when it read the instance SHALL NOT be in the plan: it is not read again and not deleted. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
 
 #### Scenario: A resource not found is not in the plan
 
@@ -1101,7 +1110,7 @@ Every check that can refuse the delete SHALL run before the prompt: the guard fo
 
 ### Requirement: The command acts on a tracked resource only as the deletion plan names
 
-`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the operator. It SHALL read a tracked resource, delete it or leave it in place only when the plan names that action as the next one, and it SHALL send each delete with the propagation policy and the precondition the plan names. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
+`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the controller. It SHALL read a tracked resource, delete it or leave it in place only when the plan names that action as the next one, and it SHALL send each delete with the propagation policy and the precondition the plan names. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
 
 #### Scenario: Actions and delete options come from the plan
 
@@ -1110,7 +1119,7 @@ Every check that can refuse the delete SHALL run before the prompt: the guard fo
 
 ### Requirement: The deletion plan does not hold a PersistentVolumeClaim that the command keeps
 
-`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the operator. The plan SHALL NOT hold a `PersistentVolumeClaim` that the command keeps ("Instance delete keeps a tracked PersistentVolumeClaim unless `--delete-data` is set"). Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
+`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the controller. The plan SHALL NOT hold a `PersistentVolumeClaim` that the command keeps ("Instance delete keeps a tracked PersistentVolumeClaim unless `--delete-data` is set"). Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
 
 #### Scenario: A kept claim is outside the plan
 
@@ -1119,7 +1128,7 @@ Every check that can refuse the delete SHALL run before the prompt: the guard fo
 
 ### Requirement: The ModuleInstance record is deleted only when the plan's release verdict allows it
 
-`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the operator. The command SHALL delete the `ModuleInstance` record only when the plan's release verdict allows it, which is when every planned resource was deleted or left in place and none failed. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
+`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the controller. The command SHALL delete the `ModuleInstance` record only when the plan's release verdict allows it, which is when every planned resource was deleted or left in place and none failed. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
 
 #### Scenario: The release verdict holds the record
 
@@ -1128,7 +1137,7 @@ Every check that can refuse the delete SHALL run before the prompt: the guard fo
 
 ### Requirement: A dry run follows the same plan and deletes nothing
 
-`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the operator. A dry run SHALL follow the same plan, SHALL send no delete, and SHALL NOT delete the record. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
+`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the controller. A dry run SHALL follow the same plan, SHALL send no delete, and SHALL NOT delete the record. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
 
 #### Scenario: A dry run sends no delete
 
@@ -1137,12 +1146,12 @@ Every check that can refuse the delete SHALL run before the prompt: the guard fo
 
 ### Requirement: The output lines and exit codes stay as the other requirements state them
 
-`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the operator. The output lines, their wording and the exit codes of the command SHALL stay as the other requirements of this capability state them. The operator-owned delete path SHALL NOT be affected. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
+`opm instance delete` of a CLI-owned instance SHALL take every action on a tracked resource from the deletion plan the CLI shares with the controller. The output lines, their wording and the exit codes of the command SHALL stay as the other requirements of this capability state them. The controller-owned delete path SHALL NOT be affected. Source: enhancement 0012 ("The library owns the whole deletion sequence but only the per-object verdict and the order for apply").
 
 #### Scenario: Output and exit codes are unchanged
 
 - **WHEN** `opm instance delete` follows the plan
-- **THEN** the output lines, their wording and the exit codes of the command SHALL stay as the other requirements of this capability state them, and the operator-owned delete path SHALL NOT be affected
+- **THEN** the output lines, their wording and the exit codes of the command SHALL stay as the other requirements of this capability state them, and the controller-owned delete path SHALL NOT be affected
 
 ### Requirement: Instance delete reports a resource as deleted when the API server accepts its delete
 
@@ -1245,18 +1254,18 @@ With `--wait`, on a real run of a CLI-owned instance in which no tracked resourc
 - **WHEN** a run with `--wait` timed out, the cause was removed, and the same command runs again
 - **THEN** the command SHALL find the instance, wait until the resources are gone, delete the `ModuleInstance` record and exit 0
 
-### Requirement: --wait has no effect on a dry run, after a failed delete or on an operator-managed instance
+### Requirement: --wait has no effect on a dry run, after a failed delete or on a controller-managed instance
 
-With `--dry-run`, and in a run in which a tracked resource failed, `--wait` SHALL have no effect. For an operator-managed instance `--wait` SHALL have no effect: the command (`opm instance delete`) waits for the `ModuleInstance` to be gone, bounded by `--timeout`, with or without it.
+With `--dry-run`, and in a run in which a tracked resource failed, `--wait` SHALL have no effect. For a controller-managed instance `--wait` SHALL have no effect: the command (`opm instance delete`) waits for the `ModuleInstance` to be gone, bounded by `--timeout`, with or without it.
 
 #### Scenario: Dry run does not wait
 
 - **WHEN** running `opm instance delete --wait --dry-run`
 - **THEN** no delete request SHALL be sent and the command SHALL NOT wait
 
-#### Scenario: Operator-managed instance
+#### Scenario: Controller-managed instance
 
-- **WHEN** running `opm instance delete --wait` for an operator-managed instance
+- **WHEN** running `opm instance delete --wait` for a controller-managed instance
 - **THEN** the command SHALL behave as without `--wait`: it deletes the `ModuleInstance` and waits, bounded by `--timeout`, for it to be gone
 
 ## Non-Functional Requirements
@@ -1327,7 +1336,7 @@ Flags:
   -n, --namespace string    Target namespace
   -y, --yes                 Skip the confirmation prompt
       --dry-run             Preview without deleting
-      --timeout duration    Wait for the operator to finish deleting an operator-owned instance
+      --timeout duration    Wait for the controller to finish deleting a controller-owned instance
       --kubeconfig string   Path to kubeconfig
       --context string      Kubernetes context
 ```

@@ -18,7 +18,7 @@ import (
 
 // RuntimeName is the runtime identity the CLI injects into every kernel
 // render (#context.#runtimeName): the library's managed-by value for the cli,
-// the peer of the operator's opmlabels.ManagedByController.
+// the peer of the controller's opmlabels.ManagedByController.
 const RuntimeName = opmlabels.ManagedByCLI
 
 // The per-invocation kernel itself is constructed by config.NewKernel; this
@@ -69,12 +69,12 @@ func resolvePlatformEnv(ctx context.Context, k *kernel.Kernel, cfg *config.Globa
 }
 
 // clusterSkewRefuse is the Platform CR's spec.skewPolicy value that refuses
-// (the operator's SkewPolicyRefuse); anything else, including unset, warns.
+// (the controller's SkewPolicyRefuse); anything else, including unset, warns.
 const clusterSkewRefuse = "Refuse"
 
 // skewPolicyFor chooses the kernel's skew policy (enhancement 0019): when the
 // cluster Platform CR is the source its spec.skewPolicy wins, so CLI and
-// operator judge the same platform the same way; otherwise the config file's
+// controller judge the same platform the same way; otherwise the config file's
 // skewPolicy applies. Absent means warn on both. The returned note is
 // appended to the provenance line: it names a refuse policy and its source,
 // and names the CR as the policy's source when it overrode a config key
