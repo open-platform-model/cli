@@ -305,3 +305,23 @@ func TestWithRerunHint(t *testing.T) {
 	assert.Same(t, failed, withRerunHint(nil, failed), "no result")
 	assert.Same(t, failed, withRerunHint(&ctrllib.InstallResult{}, failed), "the CRD step did not run")
 }
+
+// A refusal that carries the earlier-install hint keeps exit 2, its guard
+// error in the chain, and the hint as its last line; the same error from a
+// failure that is not a refusal is not hinted.
+func TestInstallError_KeepsTheExitCodeOfAHintedRefusal(t *testing.T) {
+	refusal := &ctrllib.GuardError{Err: errors.New("CustomResourceDefinition/x exists and is not managed by OPM")}
+	hinted := &ctrllib.HintedError{Err: refusal, Hint: "the cluster still runs the controller of the earlier install"}
+
+	var exitErr *opmexit.ExitError
+	require.ErrorAs(t, installError(hinted), &exitErr)
+	assert.Equal(t, opmexit.ExitValidationError, exitErr.Code)
+	var guardErr *ctrllib.GuardError
+	require.ErrorAs(t, exitErr, &guardErr)
+	assert.True(t, strings.HasPrefix(exitErr.Error(), refusal.Error()), "the refusal text is unchanged")
+	assert.True(t, strings.HasSuffix(exitErr.Error(), "\nhint: the cluster still runs the controller of the earlier install"))
+
+	// A later failure keeps its own code: the warning is printed apart from the error.
+	require.ErrorAs(t, installError(withRerunHint(&ctrllib.InstallResult{CRDs: 4}, &ctrllib.RolloutError{Err: errors.New("timed out")})), &exitErr)
+	assert.Equal(t, opmexit.ExitGeneralError, exitErr.Code)
+}
