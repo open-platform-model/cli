@@ -35,4 +35,4 @@ None.
 
 - Code: one read of one Deployment on every install, one wrapping error type for the refusal path and one warning, tests on the fake cluster.
 - Docs: one page. Its front matter and structure follow `legacy-inventory-secret.md` in the same folder.
-- Old names: the hint and the page name the earlier objects by their old names, so the old names appear in two files (listed in `design.md`).
+- Old names: the hint, the warning and the page name the earlier objects by their old names, so the old names appear in the Go file that holds the notice text and in the page, besides this change folder.

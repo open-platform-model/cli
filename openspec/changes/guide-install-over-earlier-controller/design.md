@@ -16,7 +16,7 @@ The names of the earlier install, from the `opm-controller` repository at `1f0e2
 | Namespace | `opm-operator-system` | `dist/install.yaml`, first document; cli `internal/operator/names.go` at `105cadee^` (`OperatorNamespace`) |
 | Deployment | `opm-operator-controller-manager`, in that namespace | `dist/install.yaml` (kind Deployment); same cli file (`ControllerDeploymentName`) |
 | CRDs | the four names above | `dist/install.yaml` |
-| ClusterRoles | `opm-operator-manager-role`, `opm-operator-metrics-auth-role`, `opm-operator-metrics-reader`, and the `opm-operator-*-admin-role`, `*-editor-role`, `*-viewer-role` of the CRDs | `dist/install.yaml` |
+| ClusterRoles | `opm-operator-manager-role`, `opm-operator-metrics-auth-role`, `opm-operator-metrics-reader`, `opm-operator-moduleinstance-admin-role`, `opm-operator-moduleinstance-editor-role`, `opm-operator-moduleinstance-viewer-role`, `opm-operator-modulepackage-viewer-role`, `opm-operator-platform-viewer-role`, `opm-operator-transformerregistration-admin-role`, `opm-operator-transformerregistration-viewer-role` | `dist/install.yaml` |
 | ClusterRoleBindings | `opm-operator-manager-rolebinding`, `opm-operator-metrics-auth-rolebinding` | `dist/install.yaml` |
 
 ## Research & Decisions
@@ -30,7 +30,7 @@ The names of the earlier install, from the `opm-controller` repository at `1f0e2
 2. Read the old record. Fails for a manifest install, and adds a second record read.
 3. Get the Deployment `opm-operator-controller-manager` in `opm-operator-system`. Both install forms keep that name (the cli's own running-controller check relied on it for both), and the new install never writes it.
 **Decision**: Option 3. When that Deployment exists, the install tells the user: a `hint:` line after an apply-guard refusal, a warning when the checks pass and the install goes on. When the read fails for any reason (not found, forbidden, other), print nothing.
-**Rationale**: It is one read, observable from the cluster, and it states a fact: a controller of the earlier install is there. It cannot be fully reliable: a cluster that deleted the Deployment but kept the CRDs gets no hint, and any other Deployment with that name in that namespace gets one. Both are acceptable: the hint is advice, never a gate. A user who set the adopt annotation on the CRDs before removing the earlier controller is not refused, and now gets the warning, so two controllers do not run unannounced (owner ruling).
+**Rationale**: It is one read, observable from the cluster, and it states a fact: a controller of the earlier install is there. It cannot be fully reliable: a cluster that deleted the Deployment but kept the CRDs gets no hint, and any other Deployment with that name in that namespace gets one. Both are acceptable: the hint is advice, never a gate. A user who set the adopt annotation on the CRDs before removing the earlier controller is not refused, and now gets the warning, so two controllers do not run unannounced.
 
 ### Where the line goes
 
@@ -52,7 +52,7 @@ func EarlierInstallHint(ctx context.Context, c *kubernetes.Client) string // "" 
 **Options considered**:
 1. Delete the four CRDs. Starts clean, and destroys every instance and its record.
 2. Keep the CRDs, delete the earlier controller, annotate the four CRDs with the `opmodel.dev/adopt` value that the refusal prints, install. Keeps the instances.
-**Decision**: The page teaches option 2 as the path, and shows option 1 behind a warning that it deletes every object of that kind, for a cluster with nothing to keep. Confirmed at the proposal gate. The owner decided "not migrated", which both options respect.
+**Decision**: The page teaches option 2 as the path, and shows option 1 behind a warning that it deletes every object of that kind, for a cluster with nothing to keep. The install is not a migration, and both options respect that.
 
 ### The Deployment selector
 
@@ -62,7 +62,13 @@ The new Deployment has another name and namespace than the earlier one, so the i
 
 `opm controller uninstall` reads the record `opm-controller` in `opm-system` and deletes nothing without one (requirement "Uninstall without an instance record deletes nothing"). An earlier install has no such record, so the page says to use `kubectl`. No code changes.
 
+### The owner value of kept ModuleInstances
+
+The earlier ModuleInstance CRD accepted `spec.owner` values `cli` and `operator`. The CRD of this CLI accepts `cli` and `controller` (`internal/controller/crds/moduleinstances.opmodel.dev.yaml`). Adopting the kept CRDs replaces the schema. The API server then rejects a create or an update that sets `owner: operator`, for stored instances and for GitOps manifests alike. The page therefore has a step before the adopt: change `spec.owner` from `operator` to `controller` (or remove it) in every existing ModuleInstance that holds the old value, and in the manifests in Git. Task 2.1 checks the enum change against the two CRD versions.
+
 ## Risks
+
+- The new controller must handle the ModuleInstances the earlier one left. The change does not test this; task 1.1 and the page step on the owner value cover the known break, and the page says other instances are the user's to check.
 
 - The hint can print for a Deployment of that name that is not the earlier controller. It states the name, so the user can see.
 - The probe adds one read of one Deployment on every install. A denied read prints nothing.

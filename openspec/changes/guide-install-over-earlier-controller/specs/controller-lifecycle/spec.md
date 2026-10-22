@@ -2,7 +2,7 @@
 
 ### Requirement: Install tells the user when the earlier controller is on the cluster
 
-When the Deployment `opm-operator-controller-manager` exists in the namespace `opm-operator-system`, `opm controller install` (full form and `--crds-only`) SHALL print one line that says the cluster still runs the controller of the earlier install and names the docs page "Install over the earlier controller". The refusal, its text and the exit codes SHALL NOT change.
+After a refusal of the apply guard, or when every check passed and before the first write, `opm controller install` (full form and `--crds-only`) SHALL print one line when the Deployment `opm-operator-controller-manager` exists in the namespace `opm-operator-system`. The line says the cluster still runs the controller of the earlier install and names the docs page "Install over the earlier controller". The refusal, its text and the exit codes SHALL NOT change.
 
 #### Scenario: A refusal on a cluster that holds the earlier controller
 
@@ -32,17 +32,31 @@ After a refusal of the apply guard the line SHALL start with `hint:` and follow 
 
 ### Requirement: Nothing is printed when the earlier Deployment is not found
 
-The line SHALL NOT be printed when the earlier Deployment is absent, when the read of it fails for any reason, or when the install fails before or outside the apply guard. A failed read of the Deployment SHALL NOT change the exit code or the text of any outcome.
+The line SHALL NOT be printed when the earlier Deployment is absent, when the read of it fails for any reason, or when the install fails before the apply guard gives its verdict. A failed read of the Deployment SHALL NOT change the exit code or the text of any outcome.
 
 #### Scenario: A refusal with no earlier Deployment
 
 - **WHEN** the apply guard refuses a foreign CustomResourceDefinition and the cluster has no Deployment `opm-operator-controller-manager`
 - **THEN** the output holds the refusal and no `hint:` line
 
+#### Scenario: A failure before the guard verdict
+
+- **WHEN** the render, the owned-record check or the wait for terminating objects fails on a cluster that holds the earlier controller Deployment
+- **THEN** the output holds that failure and no hint and no warning
+
 #### Scenario: A denied read of the Deployment
 
 - **WHEN** the read of the earlier Deployment is forbidden
 - **THEN** the output holds no hint and no warning, and the exit code is the one the install would have had
+
+### Requirement: A later failure leaves the printed warning and its exit code
+
+A warning printed before the first write SHALL stay when a later step of the install fails, and the exit code SHALL be the one of the later failure.
+
+#### Scenario: The rollout fails after the warning
+
+- **WHEN** the checks pass on a cluster that holds the earlier controller Deployment, the warning is printed, and the controller rollout then times out
+- **THEN** the warning is in the output and the exit code is the one the rollout failure gives
 
 ### Requirement: The line does not tell the user to delete an object
 
@@ -62,6 +76,16 @@ The docs site SHALL have a page `Install over the earlier controller` under `dia
 - **WHEN** a user reads the page
 - **THEN** it names the namespace, the Deployment, the four CRDs and the cluster roles and bindings of the earlier install
 - **AND** it keeps the CRDs by default and warns that deleting a CRD deletes every object of that kind
+
+### Requirement: The page has a step for the owner value of kept ModuleInstances
+
+Before the step that adopts the CRDs, the page SHALL tell the user to set `spec.owner` from `operator` to `controller` (or remove it) in existing ModuleInstances and in GitOps manifests, and SHALL say that the API server rejects the old value afterwards.
+
+#### Scenario: The order of the steps
+
+- **WHEN** a user reads the steps of the page
+- **THEN** the owner-value step comes before the adopt step
+- **AND** the page says that a create or update with `owner: operator` is rejected once the CRDs are adopted
 
 ### Requirement: The page says that uninstall deletes nothing over an earlier install
 

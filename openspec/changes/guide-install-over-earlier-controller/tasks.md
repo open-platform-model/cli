@@ -7,6 +7,6 @@
 
 ## 2. The docs page
 
-- [ ] 2.1 Check the object names against the earlier release manifests (tags `v1.0.0-alpha.18` to `v1.0.0-beta.8` and the operator module render) and write `docs/site/diagnostics/install-over-the-earlier-controller.md` after the model of `legacy-inventory-secret.md`
+- [ ] 2.1 Check the `spec.owner` enum of the earlier and the embedded ModuleInstance CRD, and check the object names against the earlier release manifests (tags `v1.0.0-alpha.18` to `v1.0.0-beta.8` and the operator module render) and write `docs/site/diagnostics/install-over-the-earlier-controller.md` after the model of `legacy-inventory-secret.md`
 - [ ] 2.2 Check the page: front matter, links, `docs-kit` check as the repo runs it, and the hint text names the page title exactly
 - [ ] 2.3 `task fmt`, `task lint`, `task test` and `task openspec:check` green, then commit `docs(diagnostics): add the page for an install over the earlier controller`
