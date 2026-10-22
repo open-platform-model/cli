@@ -183,6 +183,9 @@ func (f installFlags) validate() error {
 	return nil
 }
 
+// newClusterClient builds the cluster client install talks to; tests replace it.
+var newClusterClient = cmdutil.NewK8sClient
+
 // newModuleRegistry builds the registry client install reads the controller
 // module through; tests replace it.
 var newModuleRegistry = func(registry string) (ctrllib.ModuleRegistry, error) {
@@ -234,7 +237,7 @@ func runControllerInstall(ctx context.Context, cfg *config.GlobalConfig, kf *cmd
 	}
 	cmdutil.LogResolvedKubernetesConfig("", k8sConfig.Kubeconfig.Value, k8sConfig.Context.Value)
 
-	k8sClient, err := cmdutil.NewK8sClient(k8sConfig, cfg.Log.Kubernetes.APIWarnings)
+	k8sClient, err := newClusterClient(k8sConfig, cfg.Log.Kubernetes.APIWarnings)
 	if err != nil {
 		return err
 	}
