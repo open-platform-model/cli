@@ -257,8 +257,10 @@ func runControllerInstall(ctx context.Context, cfg *config.GlobalConfig, kf *cmd
 		plan, err = ctrllib.PlanInstall(ctx, env, res, target, opts)
 	}
 	if err != nil {
-		return installError(err)
+		return installError(ctrllib.HintEarlierInstall(ctx, k8sClient, err))
 	}
+	// Every check passed and nothing is written yet.
+	ctrllib.WarnEarlierInstall(ctx, k8sClient)
 
 	result, err := ctrllib.Install(ctx, env, plan)
 	if err != nil {
