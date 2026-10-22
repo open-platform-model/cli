@@ -2,7 +2,7 @@
 
 ### Requirement: Install tells the user when the earlier controller is on the cluster
 
-After a refusal of the apply guard, or when every check passed and before the first write, `opm controller install` (full form and `--crds-only`) SHALL print one line when the Deployment `opm-operator-controller-manager` exists in the namespace `opm-operator-system`. The line says the cluster still runs the controller of the earlier install and names the docs page "Install over the earlier controller". The refusal, its text and the exit codes SHALL NOT change.
+After a refusal of the apply guard, or when every check passed and before the first write, `opm controller install` (full form and `--crds-only`) SHALL print one line when a successful read finds the Deployment `opm-operator-controller-manager` in the namespace `opm-operator-system`. The line says the cluster still runs the controller of the earlier install and names the docs page "Install over the earlier controller". The refusal, its text and the exit codes SHALL NOT change.
 
 #### Scenario: A refusal on a cluster that holds the earlier controller
 
@@ -79,13 +79,13 @@ The docs site SHALL have a page `Install over the earlier controller` under `dia
 
 ### Requirement: The page has a step for the owner value of kept ModuleInstances
 
-Before the step that adopts the CRDs, the page SHALL tell the user to set `spec.owner` from `operator` to `controller` (or remove it) in existing ModuleInstances and in GitOps manifests, and SHALL say that the API server rejects the old value afterwards.
+After the step that removes the earlier controller and before the step that runs `opm controller install`, the page SHALL tell the user to remove the `spec.owner` field from existing ModuleInstances that hold `operator` and from GitOps manifests. It SHALL say that an absent owner is valid in both schemas and means controller-owned in the new one, and that the install replaces the CRD schema, which then rejects `operator`.
 
 #### Scenario: The order of the steps
 
 - **WHEN** a user reads the steps of the page
-- **THEN** the owner-value step comes before the adopt step
-- **AND** the page says that a create or update with `owner: operator` is rejected once the CRDs are adopted
+- **THEN** the owner-value step comes after the removal of the earlier controller and before `opm controller install`
+- **AND** the page says the install replaces the schema, after which `owner: operator` is rejected
 
 ### Requirement: The page says that uninstall deletes nothing over an earlier install
 

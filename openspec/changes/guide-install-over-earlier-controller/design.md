@@ -64,11 +64,11 @@ The new Deployment has another name and namespace than the earlier one, so the i
 
 ### The owner value of kept ModuleInstances
 
-The earlier ModuleInstance CRD accepted `spec.owner` values `cli` and `operator`. The CRD of this CLI accepts `cli` and `controller` (`internal/controller/crds/moduleinstances.opmodel.dev.yaml`). Adopting the kept CRDs replaces the schema. The API server then rejects a create or an update that sets `owner: operator`, for stored instances and for GitOps manifests alike. The page therefore has a step before the adopt: change `spec.owner` from `operator` to `controller` (or remove it) in every existing ModuleInstance that holds the old value, and in the manifests in Git. Task 2.1 checks the enum change against the two CRD versions.
+The earlier ModuleInstance CRD accepted `spec.owner` values `cli` and `operator`. The CRD of this CLI accepts `cli` and `controller` (`internal/controller/crds/moduleinstances.opmodel.dev.yaml`). Adopting the kept CRDs changes nothing in the schema: `opm controller install` applies the new CRDs. Until then the earlier schema is served and rejects `controller`; after the install the new schema rejects `operator`, for stored instances and for GitOps manifests alike. An absent owner is valid in both schemas and means controller-owned in the new one. The page therefore has a step after the earlier controller is removed and before `opm controller install`: remove the `spec.owner` field from every existing ModuleInstance that holds `operator`, and from the manifests in Git. Task 2.1 checks the enum change against the two CRD versions.
 
 ## Risks
 
-- The new controller must handle the ModuleInstances the earlier one left. The change does not test this; task 1.1 and the page step on the owner value cover the known break, and the page says other instances are the user's to check.
+- The new controller must handle the ModuleInstances the earlier one left. The change does not test this; task 2.1 and the page step on the owner value cover the known break, and the page says other instances are the user's to check.
 
 - The hint can print for a Deployment of that name that is not the earlier controller. It states the name, so the user can see.
 - The probe adds one read of one Deployment on every install. A denied read prints nothing.
