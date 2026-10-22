@@ -23,17 +23,17 @@ const (
 )
 
 // earlierInstallNotice is the one line install prints when the earlier
-// controller is on the cluster. It points to the docs page and tells the user
-// to change nothing itself.
+// controller is on the cluster. It points to the docs page and gives no
+// deletion advice.
 const earlierInstallNotice = "the cluster still runs the controller of the earlier install (Deployment " +
 	earlierControllerDeployment + " in namespace " + earlierControllerNamespace +
 	"); this install does not migrate it, and the opm docs page \"" + earlierInstallPage + "\" says how to move to this one"
 
-// EarlierInstallNotice returns the notice when a successful read finds the
+// earlierNotice returns the notice when a successful read finds the
 // earlier controller's Deployment, and "" when it is absent or the read
 // fails for any reason: the notice is advice, so an unknown answer prints
 // nothing and changes no outcome.
-func EarlierInstallNotice(ctx context.Context, client *kubernetes.Client) string {
+func earlierNotice(ctx context.Context, client *kubernetes.Client) string {
 	probe := &unstructured.Unstructured{}
 	probe.SetAPIVersion("apps/v1")
 	probe.SetKind(kindDeployment)
@@ -63,7 +63,7 @@ func HintEarlierInstall(ctx context.Context, client *kubernetes.Client, err erro
 	if !errors.As(err, &guardErr) {
 		return err
 	}
-	notice := EarlierInstallNotice(ctx, client)
+	notice := earlierNotice(ctx, client)
 	if notice == "" {
 		return err
 	}
@@ -73,7 +73,7 @@ func HintEarlierInstall(ctx context.Context, client *kubernetes.Client, err erro
 // WarnEarlierInstall prints the notice as one warning, for an install whose
 // checks all passed and that has not written yet.
 func WarnEarlierInstall(ctx context.Context, client *kubernetes.Client) {
-	if notice := EarlierInstallNotice(ctx, client); notice != "" {
+	if notice := earlierNotice(ctx, client); notice != "" {
 		output.Warn(notice)
 	}
 }

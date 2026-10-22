@@ -43,7 +43,7 @@ func adoptable(crd *unstructured.Unstructured) *unstructured.Unstructured {
 	return crd
 }
 
-func TestEarlierInstallNotice(t *testing.T) {
+func TestEarlierNotice(t *testing.T) {
 	rendered := moduleObjects(renderOpts{})
 	forbidden := func(fc *fakeCluster) {
 		fc.fake.PrependReactor("get", "deployments", func(k8stesting.Action) (bool, runtime.Object, error) {
@@ -67,7 +67,7 @@ func TestEarlierInstallNotice(t *testing.T) {
 			if c.setup != nil {
 				c.setup(fc)
 			}
-			got := EarlierInstallNotice(context.Background(), fc.client)
+			got := earlierNotice(context.Background(), fc.client)
 			if !c.notice {
 				assert.Empty(t, got)
 				return
