@@ -39,13 +39,15 @@ Do the steps in this order. Workloads that the earlier controller deployed keep 
    kubectl get moduleinstances.opmodel.dev --all-namespaces
    ```
 
-2. Delete the earlier controller. The namespace `opm-operator-system` holds the Deployment, its Service, its ServiceAccount and its leader-election Role and RoleBinding, and only those:
+2. Delete the earlier controller. Delete the objects of the namespace `opm-operator-system` by kind, and keep the namespace: an earlier install by `opm operator install` also left a ModuleInstance named `opm-operator` there, the record of that install, and deleting the namespace would delete it with the values it recorded.
 
    ```bash
-   kubectl delete namespace opm-operator-system
+   kubectl delete deployment,service,serviceaccount,role,rolebinding --all --namespace opm-operator-system
    ```
 
-3. Delete the cluster-scoped objects of the earlier install. Releases from `v1.0.0-alpha.18` to `v1.0.0-beta.8` created these names, and a release may have created fewer of them, so ignore a missing one:
+   The new install does not read the record `opm-operator`. To keep the values it recorded, save them first with `kubectl get moduleinstance opm-operator --namespace opm-operator-system --output yaml`. Delete the record yourself only when you do not need it.
+
+3. Delete the cluster-scoped objects of the earlier install. The `opm-operator` releases up to `v1.0.0-beta.8` created these names, and a release may have created fewer of them, so ignore a missing one. An install by `opm operator install` named two bindings after their roles, so the second command lists those too:
 
    ```bash
    kubectl delete --ignore-not-found clusterrole \
@@ -54,7 +56,8 @@ Do the steps in this order. Workloads that the earlier controller deployed keep 
      opm-operator-modulepackage-viewer-role opm-operator-platform-viewer-role \
      opm-operator-transformerregistration-admin-role opm-operator-transformerregistration-viewer-role
    kubectl delete --ignore-not-found clusterrolebinding \
-     opm-operator-manager-rolebinding opm-operator-metrics-auth-rolebinding
+     opm-operator-manager-rolebinding opm-operator-metrics-auth-rolebinding \
+     opm-operator-manager-role opm-operator-metrics-auth-role
    ```
 
 4. Remove `spec.owner` from the ModuleInstances that hold the old value. See the section below.
