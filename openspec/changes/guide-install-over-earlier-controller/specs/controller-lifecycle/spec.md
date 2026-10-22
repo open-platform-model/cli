@@ -1,8 +1,8 @@
 ## ADDED Requirements
 
-### Requirement: A refusal over the earlier controller carries one hint line
+### Requirement: Install tells the user when the earlier controller is on the cluster
 
-When the apply guard refuses an install and the Deployment `opm-operator-controller-manager` exists in the namespace `opm-operator-system`, `opm controller install` SHALL print one `hint:` line after the refusal that says the cluster still runs the controller of the earlier install and names the docs page "Install over the earlier controller". The refusal, its text and its exit code 2 SHALL NOT change.
+When the Deployment `opm-operator-controller-manager` exists in the namespace `opm-operator-system`, `opm controller install` (full form and `--crds-only`) SHALL print one line that says the cluster still runs the controller of the earlier install and names the docs page "Install over the earlier controller". The refusal, its text and the exit codes SHALL NOT change.
 
 #### Scenario: A refusal on a cluster that holds the earlier controller
 
@@ -10,14 +10,29 @@ When the apply guard refuses an install and the Deployment `opm-operator-control
 - **THEN** it exits 2 with the guard's refusal unchanged
 - **AND** the output ends with one line that starts with `hint:` and names the Deployment, the namespace and the docs page
 
+#### Scenario: An install that goes on
+
+- **WHEN** the checks pass on a cluster that holds the earlier controller Deployment, for example because its CRDs carry the adopt annotation
+- **THEN** one warning with the same words is printed before the first write
+- **AND** the install runs as before and its exit code is unchanged
+
 #### Scenario: The `--crds-only` form
 
-- **WHEN** `opm controller install --crds-only` is refused by the apply guard on the same cluster
-- **THEN** it prints the same hint line and exits 2
+- **WHEN** `opm controller install --crds-only` is refused, or goes on, on the same cluster
+- **THEN** it prints the hint line, or the warning, and its exit code is unchanged
 
-### Requirement: The hint line is never printed on another cause
+### Requirement: The line is a hint after a refusal and a warning when the install goes on
 
-The hint line SHALL NOT be printed when the earlier Deployment is absent, when the read of it fails for any reason, or when the install fails for a cause other than a refusal of the apply guard. A failed read of the Deployment SHALL NOT change the exit code or the text of the refusal.
+After a refusal of the apply guard the line SHALL start with `hint:` and follow the refusal. When the checks pass and the install goes on, the line SHALL be one warning printed before the first write.
+
+#### Scenario: Placement of the line
+
+- **WHEN** the guard refuses, or the checks pass
+- **THEN** the line is the last line of the refusal, or one warning before the first write
+
+### Requirement: Nothing is printed when the earlier Deployment is not found
+
+The line SHALL NOT be printed when the earlier Deployment is absent, when the read of it fails for any reason, or when the install fails before or outside the apply guard. A failed read of the Deployment SHALL NOT change the exit code or the text of any outcome.
 
 #### Scenario: A refusal with no earlier Deployment
 
@@ -26,16 +41,16 @@ The hint line SHALL NOT be printed when the earlier Deployment is absent, when t
 
 #### Scenario: A denied read of the Deployment
 
-- **WHEN** the guard refuses and the read of the earlier Deployment is forbidden
-- **THEN** the output holds the refusal and no `hint:` line, and the exit code is 2
+- **WHEN** the read of the earlier Deployment is forbidden
+- **THEN** the output holds no hint and no warning, and the exit code is the one the install would have had
 
-### Requirement: The hint line does not tell the user to delete an object
+### Requirement: The line does not tell the user to delete an object
 
-The hint line SHALL point to the docs page and SHALL NOT tell the user to delete or rename an object. The steps that delete the earlier controller SHALL be on the docs page only.
+The hint line and the warning SHALL point to the docs page and SHALL NOT tell the user to delete or rename an object. The steps that delete the earlier controller SHALL be on the docs page only.
 
-#### Scenario: The hint holds no deletion advice
+#### Scenario: The line holds no deletion advice
 
-- **WHEN** the hint line is printed
+- **WHEN** the hint line or the warning is printed
 - **THEN** it does not contain `delete`, `remove or rename` or a `kubectl` command
 
 ### Requirement: A docs page says how to move off the earlier controller
@@ -46,7 +61,7 @@ The docs site SHALL have a page `Install over the earlier controller` under `dia
 
 - **WHEN** a user reads the page
 - **THEN** it names the namespace, the Deployment, the four CRDs and the cluster roles and bindings of the earlier install
-- **AND** it warns that deleting a CRD deletes every object of that kind
+- **AND** it keeps the CRDs by default and warns that deleting a CRD deletes every object of that kind
 
 ### Requirement: The page says that uninstall deletes nothing over an earlier install
 

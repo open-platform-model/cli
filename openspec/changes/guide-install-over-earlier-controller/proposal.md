@@ -6,12 +6,12 @@ This change adds one hint line to that refusal and one docs page. The page says 
 
 ## What Changes
 
-- `opm controller install` prints one `hint:` line after a refusal of the apply guard when the cluster also holds the earlier controller Deployment. The line points to the docs page. The refusal, its exit code 2 and the objects it refuses do not change.
+- `opm controller install` (full form and `--crds-only`) tells the user about the earlier controller whenever the cluster holds its Deployment. After a refusal of the apply guard it prints one `hint:` line. When the checks pass and the install goes on, it prints one warning before the first write. Both point to the docs page. The refusal, its exit code 2, the objects it refuses and the exit code of a successful install do not change.
 - A new page `docs/site/diagnostics/install-over-the-earlier-controller.md` says what happened, how to remove the earlier controller, what to do with the four CRDs, and that `opm controller uninstall` deletes nothing over a manifest install.
 
 Affected commands and packages: `opm controller install` (both the full form and `--crds-only`), `internal/cmd/controller`, `internal/controller`, `docs/site/diagnostics`.
 
-Release class: PATCH after GA, and `beta.N+1` in beta. It adds one line to an existing error and one page. Nothing is breaking: no flag, exit code, output field or refusal changes.
+Release class: PATCH after GA, and `beta.N+1` in beta. It adds one line to an existing error, one warning and one page. Nothing is breaking: no flag, exit code, output field or refusal changes.
 
 Commit type and PR title for the implementing PR: `fix(controller): point an install refused over the earlier controller to its docs page`.
 
@@ -33,6 +33,6 @@ None.
 
 ## Impact
 
-- Code: one read of one Deployment on the refusal path, one wrapping error type, tests on the fake cluster.
+- Code: one read of one Deployment on every install, one wrapping error type for the refusal path and one warning, tests on the fake cluster.
 - Docs: one page. Its front matter and structure follow `legacy-inventory-secret.md` in the same folder.
 - Old names: the hint and the page name the earlier objects by their old names, so the old names appear in two files (listed in `design.md`).
