@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.0-beta.13](https://github.com/open-platform-model/cli/compare/v1.0.0-beta.12...v1.0.0-beta.13) (2026-10-23)
+
+
+### Bug Fixes
+
+* **controller:** point an install refused over the earlier controller to its docs page ([#384](https://github.com/open-platform-model/cli/issues/384)) ([9483ab8](https://github.com/open-platform-model/cli/commit/9483ab8273b794171833d0e302a40aaeeb2cd7fc))
+* **deps:** bump library to v1.0.0-beta.10, opm catalog to v4.7.0 and core to v2.0.0-beta.4 ([#386](https://github.com/open-platform-model/cli/issues/386)) ([8ae6708](https://github.com/open-platform-model/cli/commit/8ae67089cbb091faf683ce7b099d7acf8e845ad3))
+* **deps:** bump opm-controller to v1.0.0-beta.10 and opm-controller module to v0.1.1 ([#388](https://github.com/open-platform-model/cli/issues/388)) ([cee9087](https://github.com/open-platform-model/cli/commit/cee9087adabf022a9f3fd4c52e7d28c19c2644f4))
+* **deps:** require Go 1.26.10 ([#387](https://github.com/open-platform-model/cli/issues/387)) ([e80dcd1](https://github.com/open-platform-model/cli/commit/e80dcd14cf529f795f9a8927c310d75592d1aae9))
+
 ## [1.0.0-beta.12](https://github.com/open-platform-model/cli/compare/v1.0.0-beta.11...v1.0.0-beta.12) (2026-10-21)
 
 
