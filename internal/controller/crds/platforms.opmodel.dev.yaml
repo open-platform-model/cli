@@ -13,7 +13,7 @@ metadata:
     module-instance.opmodel.dev/uuid: a4461b4c-4976-5db8-a704-2d8b9dfc9cc6
     module.opmodel.dev/name: opm_controller
     module.opmodel.dev/uuid: 41b2be28-7f47-59da-a8ba-04ff60a5e2a8
-    module.opmodel.dev/version: 0.1.0
+    module.opmodel.dev/version: 0.1.1
   name: platforms.opmodel.dev
 spec:
   group: opmodel.dev
