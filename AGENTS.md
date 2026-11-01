@@ -4,7 +4,7 @@ The `opm` command-line tool of Open Platform Model. It builds, validates, render
 inspects portable app releases defined in CUE, with a focus on type safety, clear command behavior
 and Kubernetes workflows. Stack: `cobra`, the CUE Go SDK, Kubernetes `client-go`,
 `charmbracelet/log`, `testify`. Go version: see `go.mod`. `CONSTITUTION.md` holds the repo
-principles; `docs/STYLE.md` extends the workspace prose style.
+principles; `docs/STYLE.md` extends the workspace prose style; `GLOSSARY.md` holds the domain terms.
 
 ## Branch model
 
