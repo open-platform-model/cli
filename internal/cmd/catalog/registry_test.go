@@ -36,7 +36,7 @@ func TestNewCatalogRegistryCheckCmd(t *testing.T) {
 	// The framing of enhancement 0010 (an aid, not a guarantee) is graduation-gated into the help text VERBATIM: the
 	// check is an aid, and enforcement exists only at publish.
 	assert.Contains(t, cmd.Long, AidSentence)
-	assert.Contains(t, cmd.Long, "Exit codes: 0 clean, 2 findings, 3 registry unreachable.")
+	assert.Contains(t, cmd.Long, "Exit codes: 0 clean, 2 findings, 3 registry unreachable, 5 not published.")
 }
 
 // TestCheckError_ExitCodes pins the check's error → exit-code mapping:
