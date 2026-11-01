@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-beta.14](https://github.com/open-platform-model/cli/compare/v1.0.0-beta.13...v1.0.0-beta.14) (2026-11-01)
+
+
+### Bug Fixes
+
+* **cmd:** list exit code 5 in registry check help ([#391](https://github.com/open-platform-model/cli/issues/391)) ([acea9d9](https://github.com/open-platform-model/cli/commit/acea9d9a6935379be5fb434f2c3f3f0e90323120))
+
 ## [1.0.0-beta.13](https://github.com/open-platform-model/cli/compare/v1.0.0-beta.12...v1.0.0-beta.13) (2026-10-23)
 
 
