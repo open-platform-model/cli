@@ -14,7 +14,11 @@ An authored CUE package that evaluates to a `#Module`. It is the unit of `opm mo
 _Avoid_: app, chart, package (alone), service
 
 **Module path**:
-The registry address of a published module, written without a major suffix (for example `opmodel.dev/modules/web_app`). The version selector, never the path, chooses the major.
+The full CUE module path of a module, major suffix included, as `ModulePath` in its identity package and `module:` in its `cue.mod/module.cue` declare it.
+_Avoid_: module URL, OCI reference, module name
+
+**Published module path**:
+The major-free form of a module path (for example `opmodel.dev/modules/web_app`) that commands such as `opm instance init` take. The version selector, never the path, chooses the major.
 _Avoid_: module URL, OCI reference, module name
 
 **Component**:
@@ -34,11 +38,11 @@ A trait or resource definition that a catalog defines, named by a key such as `o
 _Avoid_: interface, API
 
 **Catalog**:
-A published CUE module under `opmodel.dev/catalogs/` that defines contracts. `opm catalog` publishes and checks catalogs.
+A published CUE module that defines contracts. `opmodel.dev/catalogs/` is the first-party namespace; other domains hold third-party catalogs. `opm catalog` publishes and checks catalogs.
 _Avoid_: library, registry, repository
 
 **Template**:
-An official starter module published under `opmodel.dev/templates/` (`minimal`, `standard`, `advanced`) that `opm module init` adopts into a new tree.
+An official starter module published under `opmodel.dev/templates/` (`minimal`, `standard`, `advanced`) that `opm module init` fetches and re-identifies into a new tree.
 _Avoid_: scaffold (that is the engine), boilerplate, example
 
 **Identity package**:
@@ -56,7 +60,7 @@ A standalone CUE module whose package evaluates to a `#ModuleInstance`, written 
 _Avoid_: release file, values package
 
 **Synthetic instance**:
-A `#ModuleInstance` that `opm module` commands build in memory from a module directory, using `-f` values or the module's `debugValues`. No `instance.cue` exists for it.
+A `#ModuleInstance` that `opm module` commands build in memory from a module directory or a published module path, using `-f` values or the module's `debugValues`. No `instance.cue` exists for it.
 _Avoid_: dry-run instance, temporary release
 
 **Inventory**:
