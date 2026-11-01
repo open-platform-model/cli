@@ -15,6 +15,7 @@ Router only. Facts and rules are in `AGENTS.md`.
 | Change help text, a docs page, `docs-kit.cue`, or recover a release with no docs bundle | `references/docs-bundles.md` | `docs/STYLE.md`, `docs/site/` |
 | Create, fix or reproduce the kind cluster, `cluster:*` tasks or the `E2E (kind, embedded operator)` check | `references/e2e-cluster.md` | `Taskfile.yml`, `.github/scripts/` |
 | Change `.golangci.yml`, bump golangci-lint, or fix a `Lint` job failure | `references/lint-config.md` | `.github/scripts/` |
+| Name a concept or pick the word for a domain term | `GLOSSARY.md` | `AGENTS.md` |
 | Start a feature change | `openspec/config.yaml` | `CONSTITUTION.md` |
 | Write or fix a record of a decision | `adr/` | `CONSTITUTION.md` |
 | Deliver or cite an enhancement | `references/enhancements.md` at the workspace root | `AGENTS.md` |
