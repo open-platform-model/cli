@@ -53,7 +53,7 @@ comparison publish enforces.
 
 ` + AidSentence + `
 
-Exit codes: 0 clean, 2 findings, 3 registry unreachable.
+Exit codes: 0 clean, 2 findings, 3 registry unreachable, 5 not published.
 
 Examples:
   # Verify a published build's identity and see what it contains

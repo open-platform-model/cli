@@ -133,7 +133,7 @@ func TestE2E_CatalogRegistryCheck_HelpCarriesAidFraming(t *testing.T) {
 	// The sentence of enhancement 0010, verbatim — the aid-not-guarantee distinction belongs
 	// where a catalog author meets it.
 	assert.Contains(t, stdout, "This check is an aid, not a guarantee: nothing requires it to have been run, and enforcement exists only at publish — it does not make an unchecked catalog trustworthy; it makes it checkable.")
-	assert.Contains(t, stdout, "Exit codes: 0 clean, 2 findings, 3 registry unreachable.")
+	assert.Contains(t, stdout, "Exit codes: 0 clean, 2 findings, 3 registry unreachable, 5 not published.")
 	assert.Contains(t, stdout, "--compat")
 }
 
