@@ -5,7 +5,7 @@ package controller
 // PinnedModuleVersion is the controller module version (ControllerModulePath)
 // 'opm controller install' installs when --version is not given. Refresh it
 // only with 'task controller:pin VERSION=<version>'.
-const PinnedModuleVersion = "0.1.1"
+const PinnedModuleVersion = "0.1.2"
 
 // PinnedControllerVersion is the controller release PinnedModuleVersion deploys, as the
 // module's controller package states it, "v"-prefixed.
