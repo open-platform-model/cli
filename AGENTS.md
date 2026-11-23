@@ -84,6 +84,8 @@ tests/fixtures/            fixture modules on `testing.opmodel.dev`; `tests/e2e/
 tests/integration/         integration programs run with `go run`
 docs/site/                 site pages opmodel.dev builds; `docs-kit.cue` is the docs bundle
 openspec/                  specs, active changes and archive
+.agents/skills/            generated openspec skills, never edited because every update rewrites them;
+                           `.claude/skills/` links there
 .tasks/, .github/scripts/  cascade and CI shell tooling
 ```
 
