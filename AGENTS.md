@@ -41,6 +41,8 @@ The remote has no `v1` or `release/*` branch (checked 2026-10-14).
 - Ship changes as sections that each merge green with their own commit (`CONSTITUTION.md` has the
   principle). Prefer updating an existing package over a new abstraction, unless duplication or
   coupling justifies it.
+- A verify run on an OpenSpec change also applies `openspec/verify.md`, because the generated verify
+  skill does not name that file.
 - A comment names an enhancement only where the rationale lives there. In CUE the reference goes in a
   `// WHY` block, one blank line below the doc comment, because `cue lsp` hover, the doc-comment
   accessor of the CUE API and `cue def` replay a doc comment verbatim. Never cite an enhancement in scaffold templates,
