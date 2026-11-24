@@ -17,6 +17,7 @@ Router only. Facts and rules are in `AGENTS.md`.
 | Change `.golangci.yml`, bump golangci-lint, or fix a `Lint` job failure | `references/lint-config.md` | `.github/scripts/` |
 | Name a concept or pick the word for a domain term | `GLOSSARY.md` | `AGENTS.md` |
 | Start a feature change | `openspec/config.yaml` | `CONSTITUTION.md` |
+| Verify a change before archive | `openspec/verify.md` | `.agents/skills/` |
 | Write or fix a record of a decision | `adr/` | `CONSTITUTION.md` |
 | Deliver or cite an enhancement | `references/enhancements.md` at the workspace root | `AGENTS.md` |
 | Look up a registry mapping or a CUE resolution problem | `references/registry.md` at the workspace root | |
