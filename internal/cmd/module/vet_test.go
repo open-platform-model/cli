@@ -43,10 +43,9 @@ func TestNewModuleVetCmd_NoLocalVerboseFlag(t *testing.T) {
 // a platform generated from the module's own deps yields zero objects — the
 // verdict build reaches for the same input. The fixture's module name carries
 // an underscore, which the default instance name hyphenates. The fixture imports
-// opmodel.dev/core@v2, so it resolves only when a registry (or a warm CUE
-// cache) is available; without one the core schema load fails with a
-// connectivity or no-registry error before the vet check is reached, and the test skips
-// rather than false-failing — matching the repo's other registry-backed tests.
+// opmodel.dev/core@v2, so the run uses the default registry; it skips only
+// when that registry cannot be reached (the connectivity exit code). A
+// NoRegistryError is a test defect, not a skip, because the registry is set.
 func TestModVet_ValidModule(t *testing.T) {
 	fixtureDir := filepath.Join("..", "..", "..", "tests", "fixtures", "valid", "simple-module")
 	if _, err := os.Stat(fixtureDir); os.IsNotExist(err) {
@@ -65,23 +64,83 @@ func TestModVet_ValidModule(t *testing.T) {
 	t.Cleanup(func() { output.SetLogWriter(os.Stderr) })
 
 	configPath := filepath.Join(tmpHome, ".opm", "config.cue")
-	cfg := &config.GlobalConfig{ConfigPath: configPath}
+	cfg := &config.GlobalConfig{ConfigPath: configPath, Registry: config.DefaultRegistry}
 	cmd := NewModuleVetCmd(cfg)
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 	cmd.SetArgs([]string{fixtureDir})
 
 	err := cmd.Execute()
-	var exitErr *opmexit.ExitError
-	var noRegistry *config.NoRegistryError
-	if errors.As(err, &noRegistry) || (errors.As(err, &exitErr) && exitErr.Code == opmexit.ExitConnectivityError) {
-		t.Skipf("core@v2 not resolvable (registry/cache unavailable?): %v", err)
-	}
+	skipIfRegistryUnreachable(t, err)
 	require.NoError(t, err, "identity, #config and a zero-object render all pass")
 	assert.Contains(t, logs.String(), "Module config valid")
 	assert.Contains(t, logs.String(), "platform: module deps (no catalogs; generated module "+config.PlatformCacheDir(configPath))
 	assert.Contains(t, logs.String(), "Module valid (0 resources)")
 	assert.Contains(t, logs.String(), `"simple-module-debug"`, "the default instance name hyphenates the module name")
+}
+
+// TestModVet_OpenVersionSkipsTheRender runs vet on a module whose identity
+// declares Version: string and whose metadata.version derives from it. The
+// identity, coordinate and #config checks pass; vet says the render was
+// skipped because the identity Version is open, names both ways to fill it,
+// prints no "Module valid" summary, and exits 0. Registry-backed like
+// TestModVet_ValidModule, and skipped the same way.
+func TestModVet_OpenVersionSkipsTheRender(t *testing.T) {
+	fixtureDir := filepath.Join("..", "..", "..", "tests", "fixtures", "valid", "open-version-module")
+	require.DirExists(t, fixtureDir)
+
+	tmpHome, cleanup := setupTestConfig(t)
+	defer cleanup()
+	t.Setenv("HOME", tmpHome)
+
+	var logs bytes.Buffer
+	output.SetLogWriter(&logs)
+	t.Cleanup(func() { output.SetLogWriter(os.Stderr) })
+
+	cfg := &config.GlobalConfig{
+		ConfigPath: filepath.Join(tmpHome, ".opm", "config.cue"),
+		Registry:   config.DefaultRegistry,
+	}
+	cmd := NewModuleVetCmd(cfg)
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	cmd.SetArgs([]string{fixtureDir})
+
+	err := cmd.Execute()
+	skipIfRegistryUnreachable(t, err)
+	require.NoError(t, err, "an open identity Version exits 0; logs:\n%s", logs.String())
+
+	out := logs.String()
+	assert.Contains(t, out, "Identity conforms to #IdentityPackage")
+	assert.Contains(t, out, "Coordinates agree")
+	assert.Contains(t, out, "Values satisfy #config")
+	assert.NotContains(t, out, "Module valid (", "the render did not run, so vet claims no render verdict")
+
+	var skipLine string
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(strings.ToLower(line), "skipped") {
+			skipLine = line
+			break
+		}
+	}
+	require.NotEmpty(t, skipLine, "vet prints that the render was skipped; logs:\n%s", out)
+	lower := strings.ToLower(skipLine)
+	assert.Contains(t, lower, "render", "the line names the render as skipped")
+	assert.Contains(t, skipLine, "Version", "the line names the identity Version as the reason")
+	assert.Contains(t, lower, "open", "the line says the Version is open")
+	assert.Contains(t, skipLine, "opm module version set")
+	assert.Contains(t, skipLine, "opm module publish --version")
+}
+
+// skipIfRegistryUnreachable skips a registry-backed vet test when the core
+// schema fetch failed for connectivity. Any other error, NoRegistryError
+// included, is left for the test to fail on.
+func skipIfRegistryUnreachable(t *testing.T, err error) {
+	t.Helper()
+	var exitErr *opmexit.ExitError
+	if errors.As(err, &exitErr) && exitErr.Code == opmexit.ExitConnectivityError {
+		t.Skipf("registry unreachable: %v", err)
+	}
 }
 
 func TestNewModuleVetCmd_PlatformFlagNamesTheModuleDeps(t *testing.T) {
@@ -248,13 +307,7 @@ func setupTestConfig(t *testing.T) (tmpHome string, cleanup func()) {
 	// Minimal config
 	simpleConfig := `package config
 
-config: {
-	providers: {
-		"default": {
-			registry: "opmodel.dev"
-		}
-	}
-}
+config: {}
 `
 	require.NoError(t, os.WriteFile(filepath.Join(opmDir, "config.cue"), []byte(simpleConfig), 0o600))
 

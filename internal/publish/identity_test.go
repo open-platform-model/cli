@@ -1,10 +1,10 @@
 package publish
 
 import (
+	"strings"
 	"testing"
 
-	"cuelang.org/go/cue"
-	"cuelang.org/go/cue/cuecontext"
+	cueerrors "cuelang.org/go/cue/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -126,10 +126,9 @@ ModulePath: "example.com/modules/demo@v1"
 `)
 		p := runFixture(t, KindModule, files)
 		require.Len(t, p.Refusals, 1, refusalHeadlines(p))
-		r := p.Refusals[0]
-		assert.Contains(t, r.Headline, "#IdentityPackage")
-		require.Error(t, r.Err)
-		assert.Contains(t, r.Err.Error(), "Version")
+		text := refusalText(p.Refusals[0])
+		assert.Contains(t, text, "Version")
+		assert.Contains(t, text, "identity/identity.cue")
 		// --version does not apply to an absent field: still one refusal.
 		p2 := runFixture(t, KindModule, files, func(o *Options) { o.VersionFlag = "1.2.0" })
 		assert.Len(t, p2.Refusals, 1, refusalHeadlines(p2))
@@ -169,9 +168,7 @@ Version: "1.2.0"
 `)
 		p := runFixture(t, KindModule, files)
 		require.NotEmpty(t, p.Refusals)
-		r := p.Refusals[0]
-		require.Error(t, r.Err)
-		assert.Contains(t, r.Err.Error(), "ModulePath")
+		assert.Contains(t, refusalText(p.Refusals[0]), "ModulePath")
 	})
 
 	t.Run("absent identity package surfaces the load error", func(t *testing.T) {
@@ -184,33 +181,104 @@ Version: "1.2.0"
 	})
 }
 
-// TestConformIdentity_IncompleteWordingCanary pins the CUE SDK error wording
-// conformIdentity's filter depends on: openness must keep reading as
-// "incomplete value" so it stays the gate of enhancement 0011 rather than a conformance failure.
-// If a cuelang.org/go bump rewords the diagnostic, this fails in CI instead
-// of publish silently misclassifying refusals.
-func TestConformIdentity_IncompleteWordingCanary(t *testing.T) {
-	ctx := cuecontext.New()
-	v := ctx.CompileString(`x: string`).LookupPath(cue.ParsePath("x"))
-	err := v.Validate(cue.Concrete(true))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "incomplete value",
-		"cuelang.org/go changed its incompleteness wording — update conformIdentity's filter in identity.go")
+// refusalText is all a refusal shows: its headline, its details, and CUE's
+// diagnostic with the positions the funnel prints.
+func refusalText(r Refusal) string {
+	text := r.Headline + "\n" + r.Details()
+	if r.Err != nil {
+		text += "\n" + cueerrors.Details(r.Err, nil)
+	}
+	return text
 }
 
-// TestRun_LoadFailureShortCircuits: a tree that does not load surfaces the
-// CUE error verbatim and reports nothing identity-derived.
-func TestRun_LoadFailureShortCircuits(t *testing.T) {
-	files := edit(moduleFiles(), "module.cue", `package demo
+// allRefusalText joins refusalText over every refusal of p.
+func allRefusalText(p *Plan) string {
+	var b strings.Builder
+	for _, r := range p.Refusals {
+		b.WriteString(refusalText(r))
+		b.WriteString("\n")
+	}
+	return b.String()
+}
 
-metadata: name: "demo"
-metadata: name: "other"
-`)
-	p := runFixture(t, KindModule, files)
-	require.Len(t, p.Refusals, 1, refusalHeadlines(p))
-	r := p.Refusals[0]
-	assert.Contains(t, r.Headline, "does not load")
-	require.Error(t, r.Err)
-	assert.Empty(t, p.DeclaredPath)
-	assert.Empty(t, p.Identity)
+// refusalNaming returns the first refusal of p whose text names s, or nil.
+func refusalNaming(p *Plan, s string) *Refusal {
+	for i := range p.Refusals {
+		if strings.Contains(refusalText(p.Refusals[i]), s) {
+			return &p.Refusals[i]
+		}
+	}
+	return nil
+}
+
+// conformanceRefusal returns the refusal of the identity check that carries
+// CUE's diagnostic, or nil.
+func conformanceRefusal(p *Plan) *Refusal {
+	for i := range p.Refusals {
+		if p.Refusals[i].Err != nil && strings.Contains(p.Refusals[i].Headline, "#IdentityPackage") {
+			return &p.Refusals[i]
+		}
+	}
+	return nil
+}
+
+// TestRun_FillThenCheck: --version fills an open Version before the identity
+// check, which then checks the identity as filled, in the dry run.
+func TestRun_FillThenCheck(t *testing.T) {
+	t.Run("a fill within the path major passes conformance", func(t *testing.T) {
+		p := runFixture(t, KindModule, v0ModuleFiles("string"), func(o *Options) { o.VersionFlag = "0.1.0" })
+		require.Empty(t, p.Refusals, refusalHeadlines(p))
+		assert.True(t, p.Go())
+		ver := p.identityField("Version")
+		require.NotNil(t, ver)
+		assert.Equal(t, StateOpen, ver.State)
+		assert.True(t, ver.Filled)
+		assert.Equal(t, "0.1.0", ver.Value)
+		assert.Equal(t, "0.1.0", p.FillVersion)
+		assert.Equal(t, "v0.1.0", p.Tag)
+		assert.Equal(t, "--version (fills the open Version)", p.TagSource)
+	})
+
+	t.Run("a fill with another major is refused, naming both majors", func(t *testing.T) {
+		p := runFixture(t, KindModule, v0ModuleFiles("string"), func(o *Options) { o.VersionFlag = "1.0.0" })
+		require.NotEmpty(t, p.Refusals)
+		assert.False(t, p.Go(), "nothing is pushed")
+		text := allRefusalText(p)
+		assert.Contains(t, text, "v1")
+		assert.Contains(t, text, "v0")
+		// The identity check sees the filled identity: when it refuses, it
+		// refuses the major skew, not the open field.
+		if r := conformanceRefusal(p); r != nil {
+			assert.Contains(t, r.Err.Error(), `"v1"`, "the identity check did not see the fill")
+			assert.Contains(t, r.Err.Error(), `"v0"`, "the identity check did not see the fill")
+		}
+	})
+
+	t.Run("an open Version without the flag is only the open-field refusal", func(t *testing.T) {
+		p := runFixture(t, KindModule, v0ModuleFiles("string"))
+		require.Len(t, p.Refusals, 1, refusalHeadlines(p))
+		assert.Contains(t, p.Refusals[0].Headline, "declares an identity field that has no value")
+	})
+
+	t.Run("a malformed Version is refused with CUE's diagnostic", func(t *testing.T) {
+		p := runFixture(t, KindModule, v0ModuleFiles(`"abc"`))
+		r := conformanceRefusal(p)
+		require.NotNil(t, r, refusalHeadlines(p))
+		assert.Contains(t, r.Err.Error(), "abc")
+	})
+
+	t.Run("a skewed Version is refused with CUE's diagnostic", func(t *testing.T) {
+		p := runFixture(t, KindModule, v0ModuleFiles(`"1.0.0"`))
+		r := conformanceRefusal(p)
+		require.NotNil(t, r, refusalHeadlines(p))
+		assert.Contains(t, r.Err.Error(), `"v0"`)
+		assert.Contains(t, r.Err.Error(), `"v1"`)
+	})
+
+	t.Run("an absent Version is refused, naming the field and its file", func(t *testing.T) {
+		p := runFixture(t, KindModule, v0ModuleFiles(""))
+		r := refusalNaming(p, "Version")
+		require.NotNil(t, r, allRefusalText(p))
+		assert.Contains(t, refusalText(*r), "identity/identity.cue")
+	})
 }

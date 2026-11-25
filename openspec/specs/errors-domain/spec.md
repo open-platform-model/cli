@@ -65,11 +65,10 @@ Where the cause is a CUE evaluation error, the cli SHALL read the error's path, 
 - **WHEN** the same load fails because the registry refused the connection or answered 503
 - **THEN** the walk stops with a connectivity error and exit code 3, with no verdict
 
-### Requirement: Non-test cli code reads error text only in four listed cases and a test fails on any other error-text predicate
+### Requirement: Non-test cli code reads error text only in three listed cases and a test fails on any other error-text predicate
 
 Non-test cli code MAY read error text only in these cases, none of which is a fetch or resolution failure:
 - the "module is not tidy" answer of the embedded `cue mod tidy`;
-- dropping incompleteness errors from the identity package conformance check;
 - dropping CUE's disjunction summary line from grouped validation output;
 - splitting the library's duplicate-identities message into a header and its rows.
 A test SHALL fail when non-test cli code gains an error-text predicate outside that list.
@@ -89,7 +88,7 @@ A test SHALL fail when non-test cli code gains an error-text predicate outside t
 
 ### Requirement: The error-text test reads the source and not its types
 
-The test SHALL read the source, not its types: it sees a string or pattern predicate, a comparison or a switch over an error's message inside one function, also when the message is wrapped in other calls. It does not see a message made by formatting the error, or a message handed to another function as a string. (Requirement: Non-test cli code reads error text only in four listed cases and a test fails on any other error-text predicate)
+The test SHALL read the source, not its types: it sees a string or pattern predicate, a comparison or a switch over an error's message inside one function, also when the message is wrapped in other calls. It does not see a message made by formatting the error, or a message handed to another function as a string. (Requirement: Non-test cli code reads error text only in three listed cases and a test fails on any other error-text predicate)
 
 **Source**: enhancement 0021 ("A beta line reaches GA only when its exit criteria hold").
 

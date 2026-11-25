@@ -14,21 +14,20 @@ import (
 // publish (enhancement 0011): identity conformance against #IdentityPackage,
 // metadata ↔ identity derivation, cue.mod ↔ declared-path agreement, and the
 // version-major/path-major half of the tag rule. Concreteness is deliberately
-// not enforced — an open Version is a valid authoring state; publish is where
-// it must be filled. (Current core refuses an open Version at
-// #IdentityPackage conformance; cli issue 326 tracks which side is right.)
+// not enforced: an open Version is a valid authoring state and passes the
+// identity check, because publish's --version fills it and publish checks the
+// identity again as filled. An absent Version, a malformed one, or one whose
+// major disagrees with the path's fails the identity check.
 //
 // Returns the plan (check failures accumulate as refusals), and a module over
 // the loaded root so the caller can continue into values validation without a
 // second load. The module wraps the root as loaded here, in the caller's CUE
-// runtime: it is not a kernel-acquired module. Its Metadata would be nil if an
-// open identity field kept the metadata from decoding, and the plan's
-// ModuleName carries the authored metadata.name either way. Both are
-// defensive: core v2.0.0-beta.4's #IdentityPackage refuses an open Version and
-// the kernel-load gate refuses an open metadata.version, so a plan without
-// refusals today always comes with decoded Metadata. A root that does not load is returned as an error — the existing vet
-// load-failure class — while a missing or broken identity package is a check
-// refusal. The module is nil wherever no root loaded.
+// runtime: it is not a kernel-acquired module. Its Metadata is nil when an
+// open identity field keeps the metadata from decoding, and the plan's
+// ModuleName carries the authored metadata.name either way. A root that does
+// not load is returned as an error (the existing vet load-failure class),
+// while a missing or broken identity package is a check refusal. The module
+// is nil wherever no root loaded.
 func VetChecks(ctx context.Context, opts Options) (*Plan, *module.Module, error) {
 	if err := opts.requireInputs(); err != nil {
 		return nil, nil, err
@@ -69,8 +68,8 @@ func VetChecks(ctx context.Context, opts Options) (*Plan, *module.Module, error)
 	}
 	p.CueModPath, p.CueModPos = a.cueModPath, a.cueModPos
 
-	if r := conformIdentity(a, opts.IdentitySchema); r != nil {
-		p.refuse(*r)
+	for _, r := range conformIdentity(a, opts.IdentitySchema, "") {
+		p.refuse(r)
 	}
 	p.Identity = identityStates(a)
 	p.DeclaredPath = requireConcreteModulePath(p)
@@ -94,9 +93,9 @@ func VetChecks(ctx context.Context, opts Options) (*Plan, *module.Module, error)
 }
 
 // vettedModule wraps the loaded root as a module. Should the metadata not
-// decode (an open identity field, which current core refuses earlier), the
-// package is still what vet validates, so the module then carries the package
-// with nil Metadata. The fallback is defensive.
+// decode (an open identity field wired into metadata.version), the package is
+// still what vet validates, so the module then carries the package with nil
+// Metadata.
 func vettedModule(root cue.Value) *module.Module {
 	mod, err := module.NewModuleFromValue(root)
 	if err != nil {
@@ -106,9 +105,8 @@ func vettedModule(root cue.Value) *module.Module {
 }
 
 // authoredName is the root's metadata.name when it is a concrete string, else
-// "". It is read from the authored tree, so it would survive an open version
-// keeping the module's metadata from decoding as a whole (a defensive case:
-// current core refuses an open version before vet logs anything).
+// "". It is read from the authored tree, so it survives an open version
+// keeping the module's metadata from decoding as a whole.
 func authoredName(root cue.Value) string {
 	name, err := root.LookupPath(cue.ParsePath("metadata.name")).String()
 	if err != nil {

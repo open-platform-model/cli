@@ -17,14 +17,15 @@ import (
 )
 
 // identitySchemaStub mirrors the core definitions the pipeline unifies
-// against, for hermetic unit tests: #IdentityPackage with its derivations
-// (RegistryPath/Major/kindPrefix — the member gate reads them), and the two
-// catalog gates copied from core verbatim, including the conditional
-// declaredAPIVersion and the hidden rule fields whose measured blind spots
-// the gate tests pin. The real definitions are exercised by the
-// registry-backed conformance tests, which skip when the schema cannot be
-// resolved.
+// against, for hermetic unit tests: #IdentityPackage with core's
+// Major and VersionMajor derivations, and the two catalog gates copied from
+// core verbatim, including the conditional declaredAPIVersion and the hidden
+// rule fields whose measured blind spots the gate tests pin. The real
+// definitions are exercised by the registry-backed conformance tests, which
+// skip when the registry is unreachable.
 const identitySchemaStub = `
+import "strings"
+
 #NameType:        string & =~"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
 #VersionType:     string & =~"^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
 #APIVersionType:  string & =~"^v[0-9]+((alpha|beta)[0-9]+)?$"
@@ -33,16 +34,19 @@ const identitySchemaStub = `
 #ImplFQNType:     string & =~"^[a-z0-9._-]+(/[a-z0-9._-]+)*/[a-z0-9]([a-z0-9-]*[a-z0-9])?@\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
 #FQNType:         #ContractFQNType | #ImplFQNType
 
-// Deliberately loose where core derives (RegistryPath, Major, kindPrefix):
-// the derivations belong to the real schema, and deriving them here broke
-// the open-Version authoring state the pipeline supports (a non-concrete
-// Version reaches strings.SplitN). Catalog fixtures author kindPrefix
-// explicitly instead — the member gate reads it off the identity value.
+// Major and VersionMajor derive as core derives them, so the version major
+// must agree with the path major. An open Version leaves VersionMajor
+// incomplete, not wrong: the identity check passes it, because --version
+// fills it at publish, and checks the identity again as filled. RegistryPath
+// and kindPrefix stay loose; catalog fixtures author kindPrefix explicitly,
+// because the member gate reads it off the identity value.
 #IdentityPackage: {
 	ModulePath!:   string & =~"^[a-z0-9._-]+(/[a-z0-9._-]+)*@v[0-9]+$"
 	Version!:      #VersionType
 	RegistryPath?: string
-	Major?:        string
+	Major:         strings.SplitN(ModulePath, "@", 2)[1]
+	VersionMajor:  "v" + strings.SplitN(Version, ".", 2)[0]
+	VersionMajor:  Major
 	kindPrefix?: [string]: string
 }
 

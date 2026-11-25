@@ -71,17 +71,20 @@ func Run(ctx context.Context, opts Options) (*Plan, error) {
 	}
 	p.CueModPath, p.CueModPos = a.cueModPath, a.cueModPos
 
-	// Gate: identity conforms to #IdentityPackage (enhancement 0011) — CUE's diagnostic,
-	// through the grouped funnel (refusal 10). Downstream gates still read
-	// the fields that do resolve.
-	if r := conformIdentity(a, opts.IdentitySchema); r != nil {
-		p.refuse(*r)
+	// Identity states (enhancement 0011 tristate, defaults are concrete). They
+	// do not depend on conformance, and they decide the --version fill the
+	// conformance check validates.
+	p.Identity = identityStates(a)
+
+	// Gate: identity conforms to #IdentityPackage (enhancement 0011): CUE's
+	// diagnostic, through the grouped funnel, on the identity as --version
+	// fills it. Downstream gates still read the fields that do resolve.
+	for _, r := range conformIdentity(a, opts.IdentitySchema, versionFill(p, opts)) {
+		p.refuse(r)
 	}
 
-	// Identity states (enhancement 0011 tristate, defaults are concrete), coordinate
-	// derivation (read and split the declared path — never composed), and
-	// --version assert/fill (enhancement 0011).
-	p.Identity = identityStates(a)
+	// Coordinate derivation (read and split the declared path, never
+	// composed), and --version assert/fill (enhancement 0011).
 	p.DeclaredPath = requireConcreteModulePath(p)
 	if before, after, ok := strings.Cut(p.DeclaredPath, "@"); ok {
 		p.RegistryRepo, p.Major = before, after
@@ -133,6 +136,16 @@ func Run(ctx context.Context, opts Options) (*Plan, error) {
 	}
 
 	return p, nil
+}
+
+// versionFill is the --version value that fills an open Version, or "" when
+// there is no flag or the Version is not open (a concrete one is asserted,
+// an absent one is refused by the conformance check).
+func versionFill(p *Plan, opts Options) string {
+	if ver := p.identityField("Version"); ver != nil && ver.State == StateOpen {
+		return opts.VersionFlag
+	}
+	return ""
 }
 
 // noCueModRefusal is msg 3. When the identity package still loads on its own,
