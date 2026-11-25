@@ -26,3 +26,13 @@ then skip the render, print why and how to fill the version, and exit 0 without 
 
 - **WHEN** the identity declares `Version: "abc"`, or `Version: "1.0.0"` under a `@v0` module path
 - **THEN** vet fails the identity check with CUE's diagnostic and exit code 2
+
+## MODIFIED Requirements
+
+### Requirement: `opm module vet` verifies the identity package, the derived coordinates and the `cue.mod` module line before values resolution
+`opm module vet` SHALL, after loading the module and before values resolution, verify: the identity package conforms to core's `#IdentityPackage` (by unification, surfacing CUE's diagnostic for a conflict, and refusing an absent `ModulePath` or `Version` by name); `metadata.modulePath` and `metadata.version` derive from the identity package's values; and `cue.mod`'s `module:` line agrees with the declared module path.
+
+#### Scenario: Replaced derivation caught at vet
+
+- **WHEN** `metadata.version` states a literal that disagrees with the identity package's `Version`
+- **THEN** vet fails naming both values and the derivation fix
