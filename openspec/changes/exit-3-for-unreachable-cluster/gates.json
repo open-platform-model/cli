@@ -1,0 +1,11 @@
+{
+  "plan": {
+    "outcome": "reviewed",
+    "source": "criteria",
+    "criteria": ["contract", "assumption"],
+    "reason": "The change alters CLI exit codes, a public contract. The plan rests on assumptions no owner answer settles: TLS failures exit 3, spec deltas across 8 capabilities, and a hand edit of the status-exit-codes Purpose at archive.",
+    "result": "approve",
+    "comments": [],
+    "datetime": "2026-11-25T11:54:49Z"
+  }
+}
