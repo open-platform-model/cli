@@ -44,6 +44,11 @@ module's own cue.mod/module.cue, one registry entry per catalog the module
 pins, at the pinned version; the cluster is not read. Pass --platform <dir>
 to render against a platform module instead.
 
+When the identity Version is open, vet skips the render and exits 0 once
+the identity and #config checks pass. Fill the Version with
+'opm module version set <version>', or let 'opm module publish --version'
+fill it.
+
 Exit codes: 0 valid, 1 usage error or the platform could not be generated
 or acquired, 2 validation failure, render refusal or no registry
 configured, 3 the core schema fetch failed (registry unreachable, or
@@ -93,7 +98,9 @@ func runVet(ctx context.Context, cfg *config.GlobalConfig, args []string, rf *cm
 // module build` does and validates them against #config through the
 // kernel's layered validation. Once those pass it renders the synthesized
 // instance as build does (renderVetModule), so vet and build agree on a
-// verdict. No cluster connection is required.
+// verdict. When the identity Version is open it skips the render and logs
+// renderSkippedOpenVersion, which says how to fill the Version. No cluster
+// connection is required.
 func runVetModuleOnly(ctx context.Context, cfg *config.GlobalConfig, modulePath string, rf *cmdutil.RenderFlags) error {
 	if err := cmdutil.ValidateModuleInputPath(modulePath); err != nil {
 		return &opmexit.ExitError{
