@@ -89,7 +89,7 @@ Base: main
 
 ### Findings
 
-- `task test` stops at `tests/integration/apply-staging` (kind `StagingTest` not served by the cluster). `main` fails the same way. Unit tests, the other 15 integration programs and e2e pass. Route: Owner. Owner answer: keep it out of this change and fix it apart.
+- `task test` stops at `tests/integration/apply-staging` (kind `StagingTest` not served by the cluster). `main` fails the same way. Unit tests, 13 of the 14 integration programs and e2e pass. Route: Owner. Owner answer: keep it out of this change and fix it apart.
 - Commit `2428b0f6` has a 75-character title; the commit rules ask for under 72. Route: Past commit. Owner answer: keep it as it is.
 - The long help of `opm module vet` and the doc comment of `runVetModuleOnly` said vet always renders. Route: Fix. Fixed in 42d95e95.
 - `design.md` named "the 0011 design archive" with no reason in words. Route: Fix. Fixed in c1d2816f.
