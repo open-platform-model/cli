@@ -82,3 +82,35 @@ The second pass found two findings still open. Both went to the owner.
 
 - The live artifact-publishing and mod-vet requirements said the identity check surfaces only CUE's diagnostic, but an absent field now gets a refusal written by hand. Owner answer: amend the delta specs and document the refusal. Done in 2428b0f6 and 10aada82.
 - The `conformIdentity` godoc cited a local refusal id. Owner answer: fix it. Done in 10aada82.
+
+## Fix round
+
+Base: main
+
+### Findings
+
+- `task test` stops at `tests/integration/apply-staging` (kind `StagingTest` not served by the cluster). `main` fails the same way. Unit tests, the other 15 integration programs and e2e pass. Route: Owner. Owner answer: keep it out of this change and fix it apart.
+- Commit `2428b0f6` has a 75-character title; the commit rules ask for under 72. Route: Past commit. Owner answer: keep it as it is.
+- The long help of `opm module vet` and the doc comment of `runVetModuleOnly` said vet always renders. Route: Fix. Fixed in 42d95e95.
+- `design.md` named "the 0011 design archive" with no reason in words. Route: Fix. Fixed in c1d2816f.
+
+### Commits
+
+- 42d95e95 docs(cmd): state the vet render skip on an open identity version
+- c1d2816f chore(openspec): name enhancement 0011 beside its reason in the design
+
+### Leads
+
+- `identityVersion` in `internal/cmd/module/vet.go` copies `Plan.identityField`.
+- The command package decides the render skip, which leans against thin command packages.
+- The `ModulePath` example string is written twice in `internal/publish/identity.go`; identity field names are bare strings.
+- `Run` in `gates.go` cites enhancement 0011 three times, in the form the file used before this change.
+- `kernel_gate.go` still hard-codes `identity/identity.cue`; one fill subtest is duplicated in `identity_realschema_test.go`.
+- The subtest "missing required field refused by unification" in `identity_test.go` has a stale name and does not check `identity/identity.cue`.
+
+Project rules: Commit rules, Release rules (RULES.md), Text rules (AGENTS.md)
+Check command: task check:commit, passed
+
+### Answers
+
+- Answer: past | 2428b0f6aef4f18d0ab8662f2dff6499e4ca483d | keep | commit title 75 characters, rule under 72 | 2026-11-25T21:38Z
