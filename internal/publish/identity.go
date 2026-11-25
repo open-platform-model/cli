@@ -17,9 +17,10 @@ var identityFieldNames = []string{"ModulePath", "Version"}
 const identityFile = "identity/identity.cue"
 
 // conformIdentity checks the identity package against core's
-// #IdentityPackage and returns refusal 10 on failure. fill, when non-empty,
-// is the --version value for an open Version: the identity is checked as
-// filled, so a fill that conflicts with the schema is refused before any push.
+// #IdentityPackage and returns its refusals: a conflict, or an absent field.
+// fill, when non-empty, is the --version value for an open Version: the
+// identity is checked as filled, so a fill that conflicts with the schema is
+// refused before any push.
 //
 // Plain validation reports conflicts only: an open field, and anything core
 // derives from it, is incomplete rather than wrong, and passes, because

@@ -44,6 +44,10 @@ refused: <headline>
 
 <!-- Headline: "the identity package does not conform to core's #IdentityPackage". Both kinds; CUE's error names the field. An open (unfilled) field is not this gate's finding; that is the empty identity field cause. Fix: correct the fields CUE names in `identity/identity.cue`. Check against: cli/internal/publish/identity.go, core/src/identity_package.cue -->
 
+### The identity package does not declare a required field
+
+<!-- Headline: "the identity package does not declare <field>, which core's #IdentityPackage requires". Both kinds; one refusal per absent field (`ModulePath` or `Version`), with the evidence row "<field> | identity/identity.cue | absent". Publish reads the field only at the path the schema fixes. Fix: declare the field in `identity/identity.cue`, as the action line shows. Check against: cli/internal/publish/identity.go -->
+
 ### The version flag disagrees with the declared version
 
 <!-- Headline: "--version disagrees with the version this artifact declares". Evidence rows "--version" and "declared". `--version` fills an open `Version` or asserts a concrete one and never overwrites it. Fix: drop or correct the flag, or set the version first with `opm module version set <version>` (or `opm catalog version set`). Check against: cli/internal/publish/identity.go, cli/internal/cmdutil/publish.go -->
