@@ -114,7 +114,7 @@ openspec/                  specs, active changes and archive
 | `task controller:pin VERSION=...` | Rewrite the controller pin file | Move the controller pin |
 | `task -x deps:cascade` (`:title`, `:body`, `:test`) | Move upstream pins in the working tree; `-x` is required | Cascade work |
 | `task check` | `fmt`, `vet`, `lint`, `cite-lint`, `openspec:check`, `docs:bundle:check`, all tests | Before you finish |
-| `task check:commit` | `fmt`, `vet`, `lint`, `openspec:check`; no tests | Before every commit except a tests commit |
+| `task check:commit` | `fmt:check` (gofmt, rewrites nothing), `vet`, `lint`, `openspec:check`; no tests | Before every commit except a tests commit |
 
 ## Style
 

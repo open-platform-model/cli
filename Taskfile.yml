@@ -428,6 +428,17 @@ tasks:
       - go fmt ./...
       - goimports -w .
 
+  fmt:check:
+    desc: Fail on Go files that gofmt would change; rewrites nothing
+    cmds:
+      - |
+        out=$(git ls-files -z '*.go' ':(exclude,glob)**/testdata/**' ':(exclude,glob)vendor/**' | xargs -0 -r gofmt -l)
+        if [ -n "$out" ]; then
+          echo "gofmt would change these files (run task fmt):"
+          echo "$out"
+          exit 1
+        fi
+
   vet:
     desc: Run go vet
     cmds:
@@ -450,9 +461,9 @@ tasks:
       - go install -ldflags "{{.LDFLAGS}}" ./cmd/opm
 
   check:commit:
-    desc: "Checks before a commit (no tests, no e2e): fmt, vet, lint and the openspec check"
+    desc: "Checks before a commit (no tests, no e2e): fmt:check, vet, lint and the openspec check"
     cmds:
-      - task: fmt
+      - task: fmt:check
       - task: vet
       - task: lint
       - task: openspec:check
