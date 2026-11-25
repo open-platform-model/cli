@@ -9,18 +9,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/log"
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+	"github.com/open-platform-model/library/opm/k8s/ownership"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
 	"github.com/open-platform-model/cli/internal/cmdutil"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
-
-	"github.com/charmbracelet/log"
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/version"
 	workflowrender "github.com/open-platform-model/cli/internal/workflow/render"
-	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
-	"github.com/open-platform-model/library/opm/k8s/ownership"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // now is the clock Execute reads the start of the apply from; tests move it
