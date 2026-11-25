@@ -576,7 +576,7 @@ Re-running `opm controller uninstall` after the cause of a failed read is fixed 
 
 ### Requirement: A failed record delete exits by the cause of the failure
 
-When `opm controller uninstall` deleted every recorded object and the delete of the controller's instance record then fails with an error other than NotFound, the exit code SHALL be 4 when the API server denied the delete (Forbidden or Unauthorized), 3 when it answered with a server timeout or service unavailable, and 1 for any other failure.
+When `opm controller uninstall` deleted every recorded object and the delete of the controller's instance record then fails with an error other than NotFound, the exit code SHALL be 4 when the API server denied the delete (Forbidden or Unauthorized), 3 when it answered with a server timeout or service unavailable or the cluster sent no response, and 1 for any other failure.
 
 #### Scenario: Record delete times out
 
@@ -585,7 +585,7 @@ When `opm controller uninstall` deleted every recorded object and the delete of 
 
 #### Scenario: Record delete fails for another reason
 
-- **WHEN** `opm controller uninstall` runs and the delete of the instance record fails with an error that is not a denial, a server timeout or service unavailable
+- **WHEN** `opm controller uninstall` runs and the delete of the instance record fails with an error that is not a denial, a server timeout, service unavailable or a request with no response
 - **THEN** the command SHALL exit 1 without reporting the controller uninstalled
 
 ### Requirement: Uninstall takes every action on a recorded object from the shared deletion plan
@@ -774,7 +774,7 @@ Two of the checks of install read every object install applies, in this order: t
 
 ### Requirement: A failed read in the wait for terminating objects exits by the read error
 
-When the wait for terminating objects fails a read with an error other than NotFound, the command SHALL exit with the code of the read error: 4 when the API server denied the read (Forbidden or Unauthorized), 3 when it answered with a server timeout or service unavailable, and 1 for any other failure. An object that install cannot read from the start is therefore refused by the wait for terminating objects, with exit code 4 when the read is denied.
+When the wait for terminating objects fails a read with an error other than NotFound, the command SHALL exit with the code of the read error: 4 when the API server denied the read (Forbidden or Unauthorized), 3 when it answered with a server timeout or service unavailable or the cluster sent no response, and 1 for any other failure. An object that install cannot read from the start is therefore refused by the wait for terminating objects, with exit code 4 when the read is denied.
 
 #### Scenario: An object unreadable from the start exits by the read error
 
