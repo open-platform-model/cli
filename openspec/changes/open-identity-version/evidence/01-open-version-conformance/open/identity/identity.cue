@@ -1,5 +1,5 @@
 // Package identity is the single source of this module's path and version
-// (core #IdentityPackage, 0010:D2, 0011:D12).
+// (core #IdentityPackage): every other file derives both from it.
 package identity
 
 ModulePath: "example.com/modules/simple_module@v0"

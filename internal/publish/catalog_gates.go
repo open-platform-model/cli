@@ -36,9 +36,9 @@ type CatalogGateOutcomes struct {
 // gateMemberFQN is the structural gate of enhancement 0011 (refusal 11): every member of the
 // tree — all four kinds, all levels; the alpha carve-out (enhancement 0010) is compat-only —
 // is unified against core's #CatalogMemberFQNGate and validated CONCRETELY.
-// The pipeline's incomplete-value filter (conformIdentity) is deliberately
-// not reused: here incompleteness is the finding — a missing
-// declaredAPIVersion passes plain and -c vet alike and surfaces only under
+// Unlike the identity check (conformIdentity), which validates plainly and
+// passes an open field, this gate validates concretely: here incompleteness
+// is the finding — a missing declaredAPIVersion passes plain and -c vet alike and surfaces only under
 // concrete evaluation (measured, core's identity_package_pins.cue). CUE's
 // error is the refusal; nothing is hand-written.
 func gateMemberFQN(p *Plan, opts Options, a *artifact, members []Member) {

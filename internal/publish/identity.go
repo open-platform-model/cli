@@ -2,10 +2,8 @@ package publish
 
 import (
 	"fmt"
-	"strings"
 
 	"cuelang.org/go/cue"
-	cueerrors "cuelang.org/go/cue/errors"
 )
 
 // identityFieldNames are the schema-fixed paths publish reads, per
@@ -14,39 +12,59 @@ import (
 // malformed artifact, not a cue to search wider).
 var identityFieldNames = []string{"ModulePath", "Version"}
 
-// conformIdentity unifies the identity package against core's
-// #IdentityPackage and returns refusal 10 on failure. CUE's own error is
-// surfaced — a procedural expected-versus-found check would be a second
-// statement of the contract, and the two drift.
-func conformIdentity(a *artifact, schema cue.Value) *Refusal {
-	unified := schema.Unify(a.identity)
-	err := unified.Validate(cue.Concrete(true))
-	if err == nil {
-		return nil
-	}
+// identityFile is the file of the identity package that declares the
+// identity fields, relative to the artifact root.
+const identityFile = "identity/identity.cue"
 
-	// Concrete validation is what makes CUE name a missing required field
-	// ("field is required but not present"). It also flags open fields as
-	// incomplete — but openness is the gate of enhancement 0011 (refusal 1, fillable by
-	// --version), not a conformance failure, so incompleteness errors are
-	// dropped here. One cause, one refusal.
-	//
-	// The message text is the only signal: the public CUE API gives an
-	// incomplete-value error no type and no code to test. This is one of the
-	// named text matches TestNoErrorTextMatch allows.
-	var kept cueerrors.Error
-	for _, e := range cueerrors.Errors(err) {
-		if strings.Contains(e.Error(), "incomplete value") {
+// conformIdentity checks the identity package against core's
+// #IdentityPackage and returns refusal 10 on failure. fill, when non-empty,
+// is the --version value for an open Version: the identity is checked as
+// filled, so a fill that conflicts with the schema is refused before any push.
+//
+// Plain validation reports conflicts only: an open field, and anything core
+// derives from it, is incomplete rather than wrong, and passes, because
+// openness is the gate for open fields (fillable by --version). CUE's own
+// error is surfaced: a procedural expected-versus-found check would be a
+// second statement of the contract, and the two drift.
+//
+// Plain validation does not report an absent required field, so the absent
+// schema-fixed fields are read from the identity value and refused by name.
+func conformIdentity(a *artifact, schema cue.Value, fill string) []Refusal {
+	id := a.identity
+	if fill != "" {
+		id = id.FillPath(cue.ParsePath("Version"), fill)
+	}
+	if err := schema.Unify(id).Validate(); err != nil {
+		return []Refusal{{
+			Headline: "the identity package does not conform to core's #IdentityPackage",
+			Err:      err,
+		}}
+	}
+	var out []Refusal
+	for _, name := range identityFieldNames {
+		if id.LookupPath(cue.ParsePath(name)).Exists() {
 			continue
 		}
-		kept = cueerrors.Append(kept, e)
+		out = append(out, absentIdentityFieldRefusal(name))
 	}
-	if kept == nil {
-		return nil
+	return out
+}
+
+// absentIdentityFieldRefusal refuses an identity package that does not
+// declare the named schema-fixed field. It names the field and the file that
+// declares the identity.
+func absentIdentityFieldRefusal(name string) Refusal {
+	example := `Version: "<major>.<minor>.<patch>"`
+	if name == "ModulePath" {
+		example = `ModulePath: "<host>/<path>@v<major>"`
 	}
-	return &Refusal{
-		Headline: "the identity package does not conform to core's #IdentityPackage",
-		Err:      kept,
+	return Refusal{
+		Headline: fmt.Sprintf("the identity package does not declare %s, which core's #IdentityPackage requires", name),
+		Evidence: [][]string{
+			{name, identityFile, "absent"},
+		},
+		Consequence: "Publish reads the field at the path the schema fixes and searches no wider.",
+		Action:      fmt.Sprintf("Declare it in %s:  %s", identityFile, example),
 	}
 }
 
@@ -142,7 +160,7 @@ func requireConcreteModulePath(p *Plan) string {
 				{"ModulePath", mp.Pos, "declared, never filled"},
 			},
 			Consequence: "There is nothing to derive a registry coordinate from; publish reads the\ndeclared path and refuses to invent one.",
-			Action:      "Declare it in identity/identity.cue:  ModulePath: \"<host>/<path>@v<major>\"",
+			Action:      "Declare it in " + identityFile + ":  ModulePath: \"<host>/<path>@v<major>\"",
 		})
 		return ""
 	}

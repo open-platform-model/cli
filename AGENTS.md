@@ -28,7 +28,7 @@ The remote has no `v1` or `release/*` branch (checked 2026-10-14).
 - Read no error text. Read a registry fetch or dependency answer from the library's typed errors
   (`liberrors.Classify`, `*FetchError`, `*ResolutionError`), and a CUE failure from its error path
   (the error-path helper in `internal/config/`). A refusal test in `pkg/errors/` refuses a new text match in non-test code and lists the
-  four that stay, each with the typed cause that is missing. It reads syntax, not types: it misses a
+  three that stay, each with the typed cause that is missing. It reads syntax, not types: it misses a
   message built by formatting the error (`fmt.Sprint(err)`) or passed on as a string. Pass the error,
   never its text.
 - One deletion function in `internal/kubernetes/` deletes the objects of an instance, following the
