@@ -29,8 +29,10 @@ func ParseStatusOutputFormat(outputFmt string) (output.Format, error) {
 }
 
 // ResolveInventory reads the instance's ModuleInstance record and discovers
-// the live state of every resource it tracks. A failed record read exits 1 and
-// a missing record exits 5. Each tracked resource is returned as live, missing
+// the live state of every resource it tracks. A failed record read exits by
+// its cause through cmdutil.ExitCodeFromK8sError (3 when the cluster gives no
+// response, 4 when the read is denied, 1 otherwise) and a missing record exits
+// 5; ResolveInventory logs both, so the caller does not print them again. Each tracked resource is returned as live, missing
 // (NotFound) or unreadable (any other read error); ResolveInventory prints
 // nothing about unreadable entries, since delete and the read-only commands
 // report them differently.
@@ -54,7 +56,11 @@ func ResolveInventory(
 
 	if invErr != nil {
 		instanceLog.Error("reading inventory", "error", invErr)
-		err = &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf("reading inventory: %w", invErr)}
+		err = &opmexit.ExitError{
+			Code:    cmdutil.ExitCodeFromK8sError(invErr),
+			Err:     fmt.Errorf("reading inventory: %w", invErr),
+			Printed: true,
+		}
 		return nil, nil, nil, nil, err
 	}
 
