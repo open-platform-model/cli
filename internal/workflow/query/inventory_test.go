@@ -3,6 +3,10 @@ package query
 import (
 	"context"
 	"errors"
+	"net"
+	"net/url"
+	"os"
+	"syscall"
 	"testing"
 
 	"github.com/open-platform-model/cli/internal/kubernetes/kubetest"
@@ -160,21 +164,60 @@ func TestResolveInventory_ReturnsUnreadable(t *testing.T) {
 	assert.True(t, apierrors.IsForbidden(unreadable[0].Err))
 }
 
-// A failed read of the ModuleInstance record itself stops the command with
-// exit 1; only per-resource reads become unreadable entries.
-func TestResolveInventory_RecordReadErrorExitsGeneral(t *testing.T) {
-	client := makeCRClient()
-	fake, ok := client.Dynamic.(*dynamicfake.FakeDynamicClient)
-	require.True(t, ok)
-	fake.PrependReactor("get", "moduleinstances", func(k8stesting.Action) (bool, runtime.Object, error) {
-		return true, nil, apierrors.NewForbidden(schema.GroupResource{Group: "opmodel.dev", Resource: "moduleinstances"}, "guarded", nil)
-	})
-	rsf := &cmdutil.InstanceSelectorFlags{InstanceName: "guarded", Namespace: "default"}
+// A failed read of the ModuleInstance record itself stops the command with an
+// exit code chosen by its cause, and ResolveInventory prints the error itself
+// (Printed), so the command does not print it a second time. Only per-resource
+// reads become unreadable entries.
+func TestResolveInventory_RecordReadErrorExitsByCause(t *testing.T) {
+	moduleInstances := schema.GroupResource{Group: "opmodel.dev", Resource: "moduleinstances"}
+	// The error client-go returns when the API server refuses the connection.
+	refusedDial := &url.Error{
+		Op:  "Get",
+		URL: "https://127.0.0.1:1/apis/opmodel.dev/v1alpha1/namespaces/default/moduleinstances/guarded",
+		Err: &net.OpError{
+			Op:   "dial",
+			Net:  "tcp",
+			Addr: &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 1},
+			Err:  os.NewSyscallError("connect", syscall.ECONNREFUSED),
+		},
+	}
 
-	inv, _, _, unreadable, err := ResolveInventory(context.Background(), client, rsf, "default", silentLogger())
-	assert.Nil(t, inv)
-	assert.Nil(t, unreadable)
-	var exitErr *opmexit.ExitError
-	require.ErrorAs(t, err, &exitErr)
-	assert.Equal(t, opmexit.ExitGeneralError, exitErr.Code)
+	paths := []struct {
+		name string
+		verb string
+		rsf  *cmdutil.InstanceSelectorFlags
+	}{
+		{"by name", "get", &cmdutil.InstanceSelectorFlags{InstanceName: "guarded", Namespace: "default"}},
+		{"by uuid", "list", &cmdutil.InstanceSelectorFlags{InstanceID: "uuid-abc-123", Namespace: "default"}},
+	}
+	causes := []struct {
+		name     string
+		err      error
+		wantCode int
+	}{
+		{"forbidden", apierrors.NewForbidden(moduleInstances, "guarded", nil), opmexit.ExitPermissionDenied},
+		{"refused dial", refusedDial, opmexit.ExitConnectivityError},
+		{"internal server error", apierrors.NewInternalError(errors.New("etcd is down")), opmexit.ExitGeneralError},
+	}
+
+	for _, p := range paths {
+		for _, c := range causes {
+			t.Run(p.name+"/"+c.name, func(t *testing.T) {
+				client := makeCRClient()
+				fake, ok := client.Dynamic.(*dynamicfake.FakeDynamicClient)
+				require.True(t, ok)
+				fake.PrependReactor(p.verb, "moduleinstances", func(k8stesting.Action) (bool, runtime.Object, error) {
+					return true, nil, c.err
+				})
+
+				inv, _, _, unreadable, err := ResolveInventory(context.Background(), client, p.rsf, "default", silentLogger())
+				assert.Nil(t, inv)
+				assert.Nil(t, unreadable)
+				var exitErr *opmexit.ExitError
+				require.ErrorAs(t, err, &exitErr)
+				assert.Equal(t, c.wantCode, exitErr.Code, "exit code")
+				assert.True(t, exitErr.Printed, "ResolveInventory logs the error, so it must mark it Printed")
+			})
+		}
+	}
 }

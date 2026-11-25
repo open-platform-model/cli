@@ -9,18 +9,18 @@ import (
 	"strings"
 	"time"
 
-	opmexit "github.com/open-platform-model/cli/internal/exit"
-
 	"github.com/charmbracelet/log"
+	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
+	"github.com/open-platform-model/library/opm/k8s/ownership"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"github.com/open-platform-model/cli/internal/cmdutil"
+	opmexit "github.com/open-platform-model/cli/internal/exit"
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/kubernetes"
 	"github.com/open-platform-model/cli/internal/output"
 	"github.com/open-platform-model/cli/internal/version"
 	workflowrender "github.com/open-platform-model/cli/internal/workflow/render"
-	k8sinventory "github.com/open-platform-model/library/opm/k8s/inventory"
-	"github.com/open-platform-model/library/opm/k8s/ownership"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // now is the clock Execute reads the start of the apply from; tests move it
@@ -265,7 +265,7 @@ func Execute(ctx context.Context, req Request) error { //nolint:gocyclo // orche
 		})
 		if err != nil {
 			instanceLog.Error("apply failed", "error", err)
-			return &opmexit.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
+			return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
 		}
 
 		if len(applyResult.Errors) > 0 {
@@ -421,7 +421,7 @@ func pruneStale(ctx context.Context, client *kubernetes.Client, prunable []k8sin
 	for i, e := range pruneErr.Failed {
 		instanceLog.Error(output.FormatResourceLine(e.Kind, e.Namespace, e.Name, statusPruneFailed), "error", pruneErr.Errs[i])
 		if kubernetes.IsDiscoveryFailure(pruneErr.Errs[i]) {
-			exitCode = exitCodeFromK8sError(pruneErr.Errs[i])
+			exitCode = cmdutil.ExitCodeFromK8sError(pruneErr.Errs[i])
 		}
 	}
 	return pruneErr.Failed, exitCode, nil
@@ -475,7 +475,7 @@ func previewPrune(ctx context.Context, client *kubernetes.Client, prunable, prot
 	for i, e := range pruneErr.Failed {
 		instanceLog.Error(output.FormatResourceLine(e.Kind, e.Namespace, e.Name, output.StatusCannotCheck), "error", pruneErr.Errs[i])
 		if kubernetes.IsDiscoveryFailure(pruneErr.Errs[i]) {
-			exitCode = exitCodeFromK8sError(pruneErr.Errs[i])
+			exitCode = cmdutil.ExitCodeFromK8sError(pruneErr.Errs[i])
 		}
 	}
 	failure := fmt.Errorf("dry run: %d stale resource(s) could not be checked, so a real apply could not prune them; fix the cause and run the dry run again", len(pruneErr.Failed))
@@ -540,7 +540,7 @@ func namespaceToCreate(ctx context.Context, k8sClient *kubernetes.Client, namesp
 	missing, err := k8sClient.EnsureNamespace(ctx, namespace, true)
 	if err != nil {
 		instanceLog.Error("ensuring namespace", "error", err)
-		return false, &opmexit.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
+		return false, &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 	if missing && dryRun {
 		instanceLog.Info(fmt.Sprintf("namespace %q would be created", namespace))
@@ -560,7 +560,7 @@ func ensureNamespace(ctx context.Context, k8sClient *kubernetes.Client, namespac
 	created, err := k8sClient.EnsureNamespace(ctx, namespace, false)
 	if err != nil {
 		instanceLog.Error("ensuring namespace", "error", err)
-		return &opmexit.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
+		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 	if !created {
 		return &opmexit.ExitError{Code: opmexit.ExitGeneralError, Err: fmt.Errorf(
@@ -609,7 +609,7 @@ func unreadableRecordError(name, namespace string, cause error, nothingChanged b
 		stopped += " before any change"
 	}
 	return &opmexit.ExitError{
-		Code: exitCodeFromK8sError(cause),
+		Code: cmdutil.ExitCodeFromK8sError(cause),
 		Err: fmt.Errorf("cannot read the ModuleInstance record %q in namespace %q: %w\n"+
 			"%s: without the record it cannot tell a first install from an existing instance.\n"+
 			"Check that you can read moduleinstances.%s in that namespace, then run the command again",
@@ -638,7 +638,7 @@ func WriteInstanceRecord(ctx context.Context, req Request, prevRecord *inventory
 		SkippedContracts: SkippedContracts(result),
 	}); err != nil {
 		instanceLog.Warn("failed to write ModuleInstance spec", "error", err)
-		return &opmexit.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
+		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 
 	revision := nextRevision(prevRecord)
@@ -663,7 +663,7 @@ func WriteInstanceRecord(ctx context.Context, req Request, prevRecord *inventory
 
 	if err := inventory.ApplyStatus(ctx, req.K8sClient, statusInput); err != nil {
 		instanceLog.Warn("failed to write ModuleInstance status", "error", err)
-		return &opmexit.ExitError{Code: exitCodeFromK8sError(err), Err: err, Printed: true}
+		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err, Printed: true}
 	}
 	output.Debug("inventory written to ModuleInstance CR", "revision", revision)
 	return nil
@@ -749,7 +749,7 @@ func RunOwnershipGuard(ctx context.Context, k8sClient *kubernetes.Client, in inv
 	var refusal *inventory.GuardRefusalError
 	if !errors.As(err, &refusal) {
 		return inventory.GuardResult{}, &opmexit.ExitError{
-			Code: exitCodeFromK8sError(err),
+			Code: cmdutil.ExitCodeFromK8sError(err),
 			Err:  fmt.Errorf("pre-apply existence check failed: %w%s", err, stopped),
 		}
 	}
@@ -790,7 +790,7 @@ func previewOwnershipGuard(ctx context.Context, k8sClient *kubernetes.Client, in
 	var refusal *inventory.GuardRefusalError
 	if !errors.As(err, &refusal) {
 		return inventory.GuardResult{}, &opmexit.ExitError{
-			Code: exitCodeFromK8sError(err),
+			Code: cmdutil.ExitCodeFromK8sError(err),
 			Err:  fmt.Errorf("dry run: pre-apply existence check failed: %w\n%s", err, dryRunChangedNothing),
 		}
 	}
@@ -941,17 +941,4 @@ func valuesDigest(values map[string]any) string {
 	}
 	sum := sha256.Sum256(b)
 	return fmt.Sprintf("sha256:%x", sum)
-}
-
-func exitCodeFromK8sError(err error) int {
-	switch {
-	case apierrors.IsNotFound(err):
-		return opmexit.ExitNotFound
-	case apierrors.IsForbidden(err), apierrors.IsUnauthorized(err):
-		return opmexit.ExitPermissionDenied
-	case apierrors.IsServerTimeout(err), apierrors.IsServiceUnavailable(err):
-		return opmexit.ExitConnectivityError
-	default:
-		return opmexit.ExitGeneralError
-	}
 }

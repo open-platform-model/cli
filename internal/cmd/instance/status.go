@@ -35,7 +35,7 @@ The exit code carries the verdict, so a pipeline can act on it without
 reading the output:
 
   0  every tracked resource is healthy
-  1  usage error, or the instance record could not be read
+  1  usage error, or the instance record could not be read for another reason
   2  a resource is not ready, or a tracked resource could not be read
   3  the cluster could not be reached
   4  permission denied

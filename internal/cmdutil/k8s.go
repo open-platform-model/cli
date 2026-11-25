@@ -1,8 +1,10 @@
 package cmdutil
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 
 	opmexit "github.com/open-platform-model/cli/internal/exit"
@@ -43,18 +45,37 @@ func RequireNamespace(k8sConfig *config.ResolvedKubernetesConfig) error {
 	return nil
 }
 
-// ExitCodeFromK8sError maps Kubernetes API errors to exit codes.
+// ExitCodeFromK8sError maps an error from a Kubernetes request to the exit code
+// of its cause. It reads only the typed error chain, so a %w-wrapped error keeps
+// its code: NotFound is ExitNotFound; Forbidden and Unauthorized are
+// ExitPermissionDenied; ServerTimeout, ServiceUnavailable and a request with no
+// response from the cluster (see noResponse) are ExitConnectivityError; any
+// other error, a cancellation among them, is ExitGeneralError.
 func ExitCodeFromK8sError(err error) int {
 	switch {
 	case apierrors.IsNotFound(err):
 		return opmexit.ExitNotFound
 	case apierrors.IsForbidden(err), apierrors.IsUnauthorized(err):
 		return opmexit.ExitPermissionDenied
-	case apierrors.IsServerTimeout(err), apierrors.IsServiceUnavailable(err):
+	case apierrors.IsServerTimeout(err), apierrors.IsServiceUnavailable(err), noResponse(err):
 		return opmexit.ExitConnectivityError
 	default:
 		return opmexit.ExitGeneralError
 	}
+}
+
+// noResponse reports whether the request got no answer from the cluster: the
+// chain holds a net.Error (a refused connection, a host name that does not
+// resolve, a timeout, a failed TLS handshake) or context.DeadlineExceeded. A
+// chain that holds context.Canceled is the caller's cancellation, not a
+// connectivity failure, also when a *url.Error (a net.Error) wraps it, so it is
+// checked first.
+func noResponse(err error) bool {
+	if errors.Is(err, context.Canceled) {
+		return false
+	}
+	var netErr net.Error
+	return errors.As(err, &netErr) || errors.Is(err, context.DeadlineExceeded)
 }
 
 // IsNoKubeContext reports whether a client-building error means no kubeconfig

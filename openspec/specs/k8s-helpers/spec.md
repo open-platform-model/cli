@@ -143,7 +143,7 @@ When a discovery request fails (the API server denies it, is unavailable, or the
 
 ### Requirement: An apply stops at a failed discovery request and exits with code 4, 3 or 1
 
-An apply SHALL stop at a failed discovery request, in its first-install check, in its apply of objects and in its prune, and SHALL exit with code 4 when access is denied, 3 when the server is unavailable and 1 otherwise.
+An apply SHALL stop at a failed discovery request, in its first-install check, in its apply of objects and in its prune, and SHALL exit with code 4 when access is denied, 3 when the server is unavailable, timed out or sent no response, and 1 otherwise.
 
 #### Scenario: Discovery is unavailable during the first-install check
 
@@ -174,7 +174,7 @@ An apply SHALL stop at a failed discovery request, in its first-install check, i
 
 - **WHEN** `opm instance delete` runs and the discovery request for the group and version of a recorded object answers Forbidden
 - **THEN** the command SHALL report a failure for that object, with the Forbidden error in its message, and keep the `ModuleInstance` record
-- **AND** it SHALL exit with code 4 (3 when the discovery request timed out or the server is unavailable, 1 for any other discovery failure)
+- **AND** it SHALL exit with code 4 (3 when the discovery request timed out, the server is unavailable or the cluster sent no response, 1 for any other discovery failure)
 
 #### Scenario: Discovery is forbidden during diff
 
