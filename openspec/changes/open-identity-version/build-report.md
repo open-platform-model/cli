@@ -52,3 +52,26 @@ None.
 
 Project rules: Commit rules, Release rules (RULES.md), Text rules (AGENTS.md)
 Check command: task check:commit, passed at both code commits
+
+## Fix round
+
+Base: main
+
+### Findings
+
+- `task test` fails on `tests/integration/apply-staging` (pre-clean: kind `StagingTest` not served). Route: Owner. The failure is in code from before this change, and `main` fails the same way. Owner answer: keep it out of this change, and fix it apart. All other unit, integration and e2e tests pass.
+- The identity gate comment in `internal/publish/gates.go` cited a local refusal id, against the comment rule of `openspec/config.yaml`. Route: Fix. Fixed in cd81d9df.
+
+### Commits
+
+- cd81d9df docs(publish): drop a local refusal id from the identity gate comment
+
+### Leads
+
+- The open-Version render-skip rule and `identityVersion` sit in `internal/cmd/module`; `identityVersion` duplicates `Plan.identityField`.
+- The `ModulePath` example string is written twice in `internal/publish/identity.go`.
+- Identity field names are bare strings in several places.
+- `internal/publish/kernel_gate.go` still hard-codes `identity/identity.cue` (code from before this change).
+
+Project rules: Commit rules, Release rules (RULES.md), Text rules (AGENTS.md)
+Check command: task check:commit, passed
