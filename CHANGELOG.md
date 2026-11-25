@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.0-beta.14](https://github.com/open-platform-model/cli/compare/v1.0.0-beta.13...v1.0.0-beta.14) (2026-11-25)
+
+
+### Bug Fixes
+
+* **cmd:** exit 3 on an unreachable cluster and 4 on a denied read ([#403](https://github.com/open-platform-model/cli/issues/403)) ([9a512d2](https://github.com/open-platform-model/cli/commit/9a512d2e76e294c2e21f2cee6b5fb3efa40406c6))
+* **cmd:** list exit code 5 in registry check help ([#391](https://github.com/open-platform-model/cli/issues/391)) ([acea9d9](https://github.com/open-platform-model/cli/commit/acea9d9a6935379be5fb434f2c3f3f0e90323120))
+* **publish:** accept an open identity version in vet and publish ([#406](https://github.com/open-platform-model/cli/issues/406)) ([4edafe6](https://github.com/open-platform-model/cli/commit/4edafe6605015fa4993f26a143ab05383cffaa96))
+
 ## [1.0.0-beta.13](https://github.com/open-platform-model/cli/compare/v1.0.0-beta.12...v1.0.0-beta.13) (2026-10-23)
 
 
