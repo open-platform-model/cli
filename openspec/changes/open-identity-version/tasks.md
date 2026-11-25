@@ -13,7 +13,7 @@
 
 ## 2. Vet skips the render on an open Version
 
-- [ ] 2.1 Make `TestModVet_ValidModule` set `cfg.Registry = config.DefaultRegistry`, skip only on the connectivity exit code, and fail on `NoRegistryError`; delete the `providers` block from `setupTestConfig`; verify the test runs and passes with a reachable registry
-- [ ] 2.2 Add a fixture under `tests/fixtures/valid/` with an open identity `Version` wired into `metadata.version`, following `references/fixtures.md`, and a vet command test that asserts the render-skip line, exit 0 and no `Module valid` line; verify it fails before 2.3
-- [ ] 2.3 In `runVetModuleOnly` (`internal/cmd/module/vet.go`), after the values check, log the render-skip line and return nil when the plan's `Version` state is open; verify the test of 2.2 passes
-- [ ] 2.4 Run `task lint`, `task test` and `task test:fixtures`; verify all pass
+- [x] 2.1 Make `TestModVet_ValidModule` set `cfg.Registry = config.DefaultRegistry`, skip only on the connectivity exit code, and fail on `NoRegistryError`; delete the `providers` block from `setupTestConfig`; verify the test runs and passes with a reachable registry
+- [x] 2.2 Add a fixture under `tests/fixtures/valid/` with an open identity `Version` wired into `metadata.version`, following `references/fixtures.md`, and a vet command test that asserts the render-skip line, exit 0 and no `Module valid` line; verify it fails before 2.3
+- [x] 2.3 In `runVetModuleOnly` (`internal/cmd/module/vet.go`), after the values check, log the render-skip line and return nil when the plan's `Version` state is open; verify the test of 2.2 passes
+- [x] 2.4 Run `task lint`, `task test` and `task test:fixtures`; verify all pass

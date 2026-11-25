@@ -146,8 +146,9 @@ func runVetModuleOnly(ctx context.Context, cfg *config.GlobalConfig, modulePath 
 
 	moduleLog.Info(output.FormatVetCheck("Identity conforms to #IdentityPackage", "identity/identity.cue"))
 	moduleLog.Info(output.FormatVetCheck("Coordinates agree", plan.DeclaredPath))
-	if ver := versionState(plan); ver != "" {
-		moduleLog.Info(output.FormatVetCheck("Version matches path major", ver))
+	version := identityVersion(plan)
+	if version != nil && version.State == publish.StateConcrete {
+		moduleLog.Info(output.FormatVetCheck("Version matches path major", version.Value))
 	}
 
 	// Resolve the values to validate against #config: -f files as
@@ -170,6 +171,15 @@ func runVetModuleOnly(ctx context.Context, cfg *config.GlobalConfig, modulePath 
 
 	moduleLog.Info(output.FormatVetCheck("Values satisfy #config", vetValuesDetail(rf.Values)))
 	moduleLog.Info(output.FormatCheckmark("Module config valid"))
+
+	// The render needs a concrete identity Version (the library loader
+	// requires one). An open Version is a valid authoring state that
+	// publish --version fills, so vet stops here with exit 0 and claims no
+	// render verdict.
+	if version != nil && version.State == publish.StateOpen {
+		moduleLog.Info(renderSkippedOpenVersion)
+		return nil
+	}
 
 	return renderVetModule(ctx, cfg, modulePath, rf, moduleLog)
 }
@@ -278,13 +288,17 @@ func vetValuesDetail(valuesFiles []string) string {
 	return strings.Join(basenames, ", ")
 }
 
-// versionState returns the concrete identity Version for the vet-check line,
-// or "" when the field is open (a valid authoring state vet does not police).
-func versionState(plan *publish.Plan) string {
-	for _, f := range plan.Identity {
-		if f.Name == "Version" && f.State == publish.StateConcrete {
-			return f.Value
+// renderSkippedOpenVersion is the vet line for a module whose identity
+// Version is open: why the render did not run, and the two ways to fill it.
+const renderSkippedOpenVersion = "Render skipped: identity Version is open. Fill it with opm module version set <version>, or let opm module publish --version fill it."
+
+// identityVersion returns the plan's identity Version field, or nil when the
+// plan carries none.
+func identityVersion(plan *publish.Plan) *publish.IdentityField {
+	for i := range plan.Identity {
+		if plan.Identity[i].Name == "Version" {
+			return &plan.Identity[i]
 		}
 	}
-	return ""
+	return nil
 }
