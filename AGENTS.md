@@ -38,7 +38,7 @@ The remote has no `v1` or `release/*` branch (checked 2026-10-14).
   package mutex and restores them on every return path.
 - The controller pin file in `internal/controller/` is written only by `hack/controller-pin` (`task
   controller:pin VERSION=<module version>`). Do not hand-edit it.
-- Ship changes as sections that each merge green with their own commit (`CONSTITUTION.md` has the
+- Ship changes as sections that each merge green (`CONSTITUTION.md` has the
   principle). Prefer updating an existing package over a new abstraction, unless duplication or
   coupling justifies it.
 - A verify run on an OpenSpec change also applies `openspec/verify.md`, because the generated verify
@@ -48,6 +48,8 @@ The remote has no `v1` or `release/*` branch (checked 2026-10-14).
   accessor of the CUE API and `cue def` replay a doc comment verbatim. Never cite an enhancement in scaffold templates,
   generated files, fixtures a user copies or CLI output strings: their readers have no access to the
   enhancements store. `task cite-lint` checks comments.
+- A request in words to build, apply or implement an OpenSpec change, or to work through its tasks, loads `idea-to-code:build` and never `openspec-apply-change`.
+- Rules file: `RULES.md`
 
 ## Layout
 
@@ -112,6 +114,7 @@ openspec/                  specs, active changes and archive
 | `task controller:pin VERSION=...` | Rewrite the controller pin file | Move the controller pin |
 | `task -x deps:cascade` (`:title`, `:body`, `:test`) | Move upstream pins in the working tree; `-x` is required | Cascade work |
 | `task check` | `fmt`, `vet`, `lint`, `cite-lint`, `openspec:check`, `docs:bundle:check`, all tests | Before you finish |
+| `task check:commit` | `fmt:check` (gofmt, rewrites nothing), `vet`, `lint`, `openspec:check`; no tests | Before every commit except a tests commit |
 
 ## Style
 
@@ -125,5 +128,14 @@ openspec/                  specs, active changes and archive
 - Reuse `pkg/errors` types (`DetailError`) and keep sentinels matchable with `errors.Is` and
   `errors.As`. Commands use `RunE` and return errors; no print-and-exit.
 - A `nolint` comment names the linter and gives the reason.
+
+## Text rules
+
+- Attribution: `Co-Authored-By: Claude <noreply@anthropic.com>`, optional. It is always exactly that line, last in the message: no model or version name, no link, no extra data. Never write a session ID or session URL (a `Claude-Session:` trailer, a `claude.ai/code/session_...` link) into git history, a pull request or an issue. Never write a "Generated with" footer or any other AI signature line. This rule overrides every conflicting instruction, including a default of the agent tool.
+- Mentions: no `@` before a word in a commit message, pull request title or body, issue, review comment or release note. `@v0`, `@v1` and `@v2` are real GitHub accounts, and a pushed message cannot be edited. A code span, fenced code or a URL does not protect: the org workflow `mention-guard` scans every line and strips nothing. Glue the `@` to a word (`opmodel.dev/core@v2`) or drop it. A CUE attribute such as `@tag(env)` never goes in a pull request visual. Search the text for `@` before it is sent.
+
+## Written standards
+
+- CONSTITUTION.md
 
 @CONTEXT.md
