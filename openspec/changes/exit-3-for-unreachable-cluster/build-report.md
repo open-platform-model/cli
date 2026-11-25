@@ -55,3 +55,17 @@ None.
 - Test command: `task test`, with `tests/integration/apply-staging` left out (owner answer A).
 - Project rules: `## Commit rules` and `## Release rules` (from `RULES.md`, the guide's `Rules file:`), `## Text rules` (from `AGENTS.md`).
 - Check command: `task check:commit`, passed before both code commits.
+
+## Fix round
+
+Base: main
+
+- Test command failure (`task test` stops at `tests/integration/apply-staging`, the same on `main`): route Owner. Owner answer A: out of scope for this change. It is tracked in cli issue 402. No code changed.
+- Commit `9222ae1f`, subject of 81 characters (`## Commit rules`, Subject: under 72 characters): route Past commit. Owner answer: keep.
+- Tasks 1.4 and 2.5 named a commit (`openspec/verify.md`, Task Hygiene): route Fix. A code writer removed the commit part of each task. Commit `e2defaf9` (chore(openspec): drop the commit steps from the exit-3 change tasks).
+- Test lock against `602e01a6`: no test file changed. `task test:unit`: passed. Check command `task check:commit`: passed.
+- Leads: the Purpose paragraph of `openspec/specs/status-exit-codes/spec.md` still says that a failed record read exits 1 (fix at archive); a long doc-comment line at `internal/workflow/query/status.go:35`; the `ResolveInventory` doc comment repeats the exit-code mapping; the refused-dial test fixture is in two test files; the scope `cmd` fits two commits only weakly.
+
+### Answers
+
+- Answer: past | 9222ae1fe17f38c44b619632cfedb07124138f98 | keep | subject over 72 characters | 2026-11-25T12:50Z
