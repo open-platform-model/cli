@@ -1,9 +1,9 @@
 ## 1. The connectivity rule in the shared function
 
-- [ ] 1.1 Add rows to `TestExitCodeFromK8sError` in `internal/cmdutil/exit_test.go`: a `*url.Error` with a refused dial (`*net.OpError`) gives 3, a wrapped `context.DeadlineExceeded` gives 3, a `*url.Error` that wraps `context.Canceled` gives 1, a `fmt.Errorf("...: %w", forbidden)` gives 4, and a ServerTimeout gives 3
-- [ ] 1.2 Add the no-response branch to `cmdutil.ExitCodeFromK8sError` in `internal/cmdutil/k8s.go`, reading only the typed chain, and update its doc comment
-- [ ] 1.3 Delete `exitCodeFromK8sError` from `internal/workflow/apply/apply.go` and call `cmdutil.ExitCodeFromK8sError` at each call site in `apply.go` and `thineditor.go`
-- [ ] 1.4 `task fmt`, `task lint` and `task test:unit` green, then commit `fix(cmd): exit 3 when a cluster request gets no response`
+- [x] 1.1 Add rows to `TestExitCodeFromK8sError` in `internal/cmdutil/exit_test.go`: a `*url.Error` with a refused dial (`*net.OpError`) gives 3, a wrapped `context.DeadlineExceeded` gives 3, a `*url.Error` that wraps `context.Canceled` gives 1, a `fmt.Errorf("...: %w", forbidden)` gives 4, and a ServerTimeout gives 3
+- [x] 1.2 Add the no-response branch to `cmdutil.ExitCodeFromK8sError` in `internal/cmdutil/k8s.go`, reading only the typed chain, and update its doc comment
+- [x] 1.3 Delete `exitCodeFromK8sError` from `internal/workflow/apply/apply.go` and call `cmdutil.ExitCodeFromK8sError` at each call site in `apply.go` and `thineditor.go`
+- [x] 1.4 `task fmt`, `task lint` and `task test:unit` green, then commit `fix(cmd): exit 3 when a cluster request gets no response`
 
 ## 2. The record read in ResolveInventory
 

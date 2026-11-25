@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/open-platform-model/cli/internal/cmdutil"
 	opmexit "github.com/open-platform-model/cli/internal/exit"
 	"github.com/open-platform-model/cli/internal/inventory"
 	"github.com/open-platform-model/cli/internal/output"
@@ -57,7 +58,7 @@ func executeThinEditor(ctx context.Context, req Request, rec *inventory.Record) 
 		SourceLocal: false,
 	})
 	if err != nil {
-		return &opmexit.ExitError{Code: exitCodeFromK8sError(err), Err: err}
+		return &opmexit.ExitError{Code: cmdutil.ExitCodeFromK8sError(err), Err: err}
 	}
 	output.Debug("thin-editor spec written", "generation", generation)
 
