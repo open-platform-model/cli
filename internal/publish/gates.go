@@ -77,9 +77,8 @@ func Run(ctx context.Context, opts Options) (*Plan, error) {
 	p.Identity = identityStates(a)
 
 	// Gate: identity conforms to #IdentityPackage (enhancement 0011): CUE's
-	// diagnostic, through the grouped funnel (refusal 10), on the identity as
-	// --version fills it. Downstream gates still read the fields that do
-	// resolve.
+	// diagnostic, through the grouped funnel, on the identity as --version
+	// fills it. Downstream gates still read the fields that do resolve.
 	for _, r := range conformIdentity(a, opts.IdentitySchema, versionFill(p, opts)) {
 		p.refuse(r)
 	}
