@@ -65,7 +65,10 @@ Base: main
 - Tasks 1.4 and 2.5 named a commit (`openspec/verify.md`, Task Hygiene): route Fix. A code writer removed the commit part of each task. Commit `e2defaf9` (chore(openspec): drop the commit steps from the exit-3 change tasks).
 - Test lock against `602e01a6`: no test file changed. `task test:unit`: passed. Check command `task check:commit`: passed.
 - Leads: the Purpose paragraph of `openspec/specs/status-exit-codes/spec.md` still says that a failed record read exits 1 (fix at archive); a long doc-comment line at `internal/workflow/query/status.go:35`; the `ResolveInventory` doc comment repeats the exit-code mapping; the refused-dial test fixture is in two test files; the scope `cmd` fits two commits only weakly.
+- Second verify pass: two findings went to the owner. Import order in `internal/workflow/apply/apply.go` (`openspec/config.yaml`, Import Order): owner answer A, fixed in commit `504b2115` (chore(apply): group the imports of apply.go by origin); `task test:unit` and `task check:commit` passed, test lock clean. The same breach in `internal/workflow/query/events.go`, `list.go`, `status.go` and `apply/delete.go` predates this change and stays a lead.
+- Commit `ae0f3422`, subject of 75 characters: route Past commit. Owner answer: keep.
 
 ### Answers
 
 - Answer: past | 9222ae1fe17f38c44b619632cfedb07124138f98 | keep | subject over 72 characters | 2026-11-25T12:50Z
+- Answer: past | ae0f3422a8d724e79a689b976272ada9fb1b09cd | keep | subject over 72 characters | 2026-11-25T13:03Z
