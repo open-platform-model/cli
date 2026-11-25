@@ -41,11 +41,11 @@ func TestVetChecks_CleanModulePasses(t *testing.T) {
 	assert.Equal(t, "demo", mod.Metadata.Name)
 }
 
-// TestVetChecks_OpenMetadataVersionKeepsName: an open metadata.version keeps
-// the module's metadata from decoding as a whole, yet the plan still carries
-// the authored name for vet's log prefix and the module still reaches #config.
-// It holds under the stub schema only: core v2.0.0-beta.4's #IdentityPackage
-// refuses an open Version, so this pins the defensive path.
+// TestVetChecks_OpenMetadataVersionKeepsName: an open identity Version passes
+// the identity check, because --version fills it at publish. An open
+// metadata.version then keeps the module's metadata from decoding as a whole,
+// yet the plan still carries the authored name for vet's log prefix and the
+// module still reaches #config.
 func TestVetChecks_OpenMetadataVersionKeepsName(t *testing.T) {
 	files := edit(moduleFiles(), "identity/identity.cue", `package identity
 
@@ -161,4 +161,74 @@ func TestVetChecks_KernelLoad(t *testing.T) {
 	p, _ := runVetChecks(t, defaultedIdentityFiles())
 	require.Len(t, p.Refusals, 1, refusalHeadlines(p))
 	assert.Contains(t, p.Refusals[0].Headline, "the kernel would refuse to load this module")
+}
+
+// v0ModuleFiles is moduleFiles under a @v0 module path, with the given
+// identity Version declaration and no metadata.version: the identity check
+// is what these cases are about.
+func v0ModuleFiles(versionDecl string) map[string]string {
+	identity := `package identity
+
+ModulePath: "example.com/modules/demo@v0"
+`
+	if versionDecl != "" {
+		identity += "Version:    " + versionDecl + "\n"
+	}
+	return map[string]string{
+		"cue.mod/module.cue": `module: "example.com/modules/demo@v0"
+language: version: "v0.17.0"
+source: kind: "self"
+`,
+		"identity/identity.cue": identity,
+		"module.cue": `package demo
+
+kind: "Module"
+metadata: {
+	name:       "demo"
+	modulePath: "example.com/modules/demo@v0"
+}
+`,
+	}
+}
+
+// TestVetChecks_OpenVersionUnderV0Passes: an open Version under a @v0 path
+// passes vet's identity checks, with the stub's VersionMajor derivation in
+// place.
+func TestVetChecks_OpenVersionUnderV0Passes(t *testing.T) {
+	p, _ := runVetChecks(t, v0ModuleFiles("string"))
+	assert.Empty(t, p.Refusals, refusalHeadlines(p))
+	ver := p.identityField("Version")
+	require.NotNil(t, ver)
+	assert.Equal(t, StateOpen, ver.State)
+}
+
+// TestVetChecks_AbsentVersionFails: an identity package that declares no
+// Version fails the identity check, naming the missing field and the file.
+func TestVetChecks_AbsentVersionFails(t *testing.T) {
+	p, _ := runVetChecks(t, v0ModuleFiles(""))
+	require.NotEmpty(t, p.Refusals)
+	r := refusalNaming(p, "Version")
+	require.NotNil(t, r, "no refusal names the missing Version:\n%s", allRefusalText(p))
+	assert.Contains(t, refusalText(*r), "identity/identity.cue")
+}
+
+// TestVetChecks_MalformedVersionFails: a Version that is not a version fails
+// the identity check with CUE's diagnostic.
+func TestVetChecks_MalformedVersionFails(t *testing.T) {
+	p, _ := runVetChecks(t, v0ModuleFiles(`"abc"`))
+	r := conformanceRefusal(p)
+	require.NotNil(t, r, refusalHeadlines(p))
+	require.Error(t, r.Err, "the diagnostic is CUE's")
+	assert.Contains(t, r.Err.Error(), "abc")
+}
+
+// TestVetChecks_SkewedVersionFails: Version "1.0.0" under a @v0 path fails the
+// identity check with CUE's diagnostic, which names both majors.
+func TestVetChecks_SkewedVersionFails(t *testing.T) {
+	p, _ := runVetChecks(t, v0ModuleFiles(`"1.0.0"`))
+	r := conformanceRefusal(p)
+	require.NotNil(t, r, refusalHeadlines(p))
+	require.Error(t, r.Err, "the diagnostic is CUE's")
+	assert.Contains(t, r.Err.Error(), `"v0"`)
+	assert.Contains(t, r.Err.Error(), `"v1"`)
 }
