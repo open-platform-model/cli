@@ -75,3 +75,10 @@ Base: main
 
 Project rules: Commit rules, Release rules (RULES.md), Text rules (AGENTS.md)
 Check command: task check:commit, passed
+
+### After the second verify pass
+
+The second pass found two findings still open. Both went to the owner.
+
+- The live artifact-publishing and mod-vet requirements said the identity check surfaces only CUE's diagnostic, but an absent field now gets a refusal written by hand. Owner answer: amend the delta specs and document the refusal. Done in 2428b0f6 and 10aada82.
+- The `conformIdentity` godoc cited a local refusal id. Owner answer: fix it. Done in 10aada82.
