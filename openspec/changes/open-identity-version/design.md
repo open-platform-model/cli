@@ -46,7 +46,7 @@ See `proposal.md` for the motivation. The facts below were checked in the explor
 #### Is an open identity `Version` valid
 
 **Context**: The issue asked whether the schema or the godoc claim is wrong.
-**Explored**: The publishing spec, the 0011 design archive, core beta.4, and a CUE prototype.
+**Explored**: The publishing spec, the design archive of enhancement 0011, which states the open Version flow, core beta.4, and a CUE prototype.
 **Options considered**:
 1. Keep it valid, fix the cli: matches the spec and enhancement 0011; core needs no change.
 2. Retire it: one fewer state, but removes a documented publish flow.
