@@ -1,0 +1,11 @@
+{
+  "plan": {
+    "outcome": "reviewed",
+    "source": "criteria",
+    "criteria": ["assumption", "contract"],
+    "reason": "The render-skip wording, the release class, the fixture location and the empty enhancement line are assumptions. The change alters the user-visible output of opm module vet and the identity check of publish.",
+    "result": "approve",
+    "comments": [],
+    "datetime": "2026-11-25T16:44:19Z"
+  }
+}
